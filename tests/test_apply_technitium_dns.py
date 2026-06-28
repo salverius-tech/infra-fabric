@@ -16,14 +16,17 @@ spec.loader.exec_module(apply_dns)
 
 VALID_CONFIG = {
     "settings": {
-        "forwarders": ["dns.quad9.net (9.9.9.9:853)"],
+        "forwarders": [
+            "dns.quad9.net (9.9.9.9:853)",
+            "dns.quad9.net (149.112.112.112:853)",
+        ],
         "forwarderProtocol": "Tls",
         "concurrentForwarding": False,
         "dnssecValidation": True,
         "preferIPv6": False,
     },
     "zones": {
-        "example.internal": ["192.0.2.10:54"],
+        "example.internal": ["192.0.2.10:54", "192.0.2.11:54"],
         "apps.example.net": ["192.0.2.20:54"],
     },
     "a_records": {
@@ -120,6 +123,53 @@ class DnsApplyTests(unittest.TestCase):
         paths = [path for path, _params in client.calls]
         self.assertIn("/zones/create", paths)
         self.assertIn("/zones/records/add", paths)
+
+    def test_apply_sends_expected_payloads(self) -> None:
+        client = FakeClient()
+        apply_dns.apply_config(apply_dns.validate_config(VALID_CONFIG), client)
+
+        settings = client.calls[0]
+        self.assertEqual(settings[0], "/settings/set")
+        self.assertEqual(settings[1]["forwarderProtocol"], "Tls")
+        self.assertEqual(settings[1]["concurrentForwarding"], "false")
+        self.assertEqual(settings[1]["dnssecValidation"], "true")
+        self.assertIn(",", settings[1]["forwarders"])
+
+        zone_create = next(
+            params for path, params in client.calls if path == "/zones/create"
+        )
+        self.assertEqual(zone_create["type"], "Forwarder")
+        self.assertEqual(zone_create["initializeForwarder"], "false")
+
+        fwd_records = [
+            params
+            for path, params in client.calls
+            if path == "/zones/records/add"
+            and params["type"] == "FWD"
+            and params["domain"] == "example.internal"
+        ]
+        self.assertEqual(fwd_records[0]["overwrite"], "true")
+        self.assertEqual(fwd_records[1]["overwrite"], "false")
+        self.assertEqual(fwd_records[0]["protocol"], "Udp")
+        self.assertEqual(fwd_records[0]["ttl"], "300")
+        self.assertEqual(fwd_records[0]["proxyType"], "NoProxy")
+
+        a_record = next(
+            params
+            for path, params in client.calls
+            if path == "/zones/records/add" and params.get("domain") == "app.apps.example.net"
+        )
+        self.assertEqual(a_record["zone"], "apps.example.net")
+        self.assertEqual(a_record["type"], "A")
+        self.assertEqual(a_record["ipAddress"], "192.0.2.20")
+
+        cname_record = next(
+            params
+            for path, params in client.calls
+            if path == "/zones/records/add" and params["type"] == "CNAME"
+        )
+        self.assertEqual(cname_record["zone"], "example.internal")
+        self.assertEqual(cname_record["cname"], "dns.example.internal")
 
 
 if __name__ == "__main__":

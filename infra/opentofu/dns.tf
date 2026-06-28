@@ -3,7 +3,10 @@ locals {
 }
 
 resource "terraform_data" "technitium_dns" {
-  input = filesha256(local.dns_records_path)
+  count = local.technitium_enabled ? 1 : 0
+
+  input            = local.dns_records_path
+  triggers_replace = filesha256(local.dns_records_path)
 
   provisioner "local-exec" {
     working_dir = path.module
