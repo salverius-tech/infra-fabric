@@ -27,7 +27,7 @@
         DEBIAN_FRONTEND=noninteractive apt-get update;
         DEBIAN_FRONTEND=noninteractive apt-get install -y
         ca-certificates curl docker.io fuse-overlayfs git gnupg jq
-        openssh-client python3 tar;
+        nodejs npm openssh-client python3 tar;
         systemctl enable --now docker
   changed_when: false
 
@@ -192,7 +192,7 @@
       - -lc
       - >-
         set -euo pipefail;
-        runuser -u git -- env FORGEJO_RUNNER_SECRET="${FORGEJO_RUNNER_SECRET}"
+        runuser -u git -- env FORGEJO_RUNNER_SECRET="${FORGEJO_RUNNER_SECRET}" # public-safety: allow-secret
         /usr/local/bin/forgejo --config /etc/forgejo/app.ini --work-path /var/lib/forgejo forgejo-cli actions register
         --name "$1" --scope "$2" --secret "${FORGEJO_RUNNER_SECRET}" | tail -n1
       - --
@@ -201,6 +201,25 @@
   environment:
     FORGEJO_RUNNER_SECRET: "{{ forgejo_runner_registration_secret }}"
   register: forgejo_runner_registration
+  changed_when: false
+
+- name: Normalize Forgejo repository-scoped runner ownership
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - runuser
+      - -u
+      - git
+      - --
+      - sqlite3
+      - /var/lib/forgejo/data/forgejo.db
+      - >-
+        update action_runner set owner_id=0
+        where name='{{ forgejo_runner_name | default('homelab-deploy') }}'
+        and repo_id != 0 and owner_id != 0;
   changed_when: false
 
 - name: Stage Forgejo runner env on Proxmox host
