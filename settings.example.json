@@ -1,0 +1,9 @@
+{
+  "values_repo": {
+    "remote": "git@git.example.internal:owner/homelab-infra-values.git"
+  },
+  "services": [
+    "technitium",
+    "forgejo"
+  ]
+}

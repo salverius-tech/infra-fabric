@@ -1,6 +1,7 @@
 FROM debian:bookworm-slim
 
 ARG OPENTOFU_VERSION=1.10.6
+ARG TFLINT_VERSION=0.58.1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
@@ -24,6 +25,11 @@ RUN apt-get update \
     && unzip /tmp/tofu.zip -d /usr/local/bin tofu \
     && chmod 0755 /usr/local/bin/tofu \
     && rm -f /tmp/tofu.zip \
+    && curl -fsSL -o /tmp/tflint.zip \
+        "https://github.com/terraform-linters/tflint/releases/download/v${TFLINT_VERSION}/tflint_linux_amd64.zip" \
+    && unzip /tmp/tflint.zip -d /usr/local/bin tflint \
+    && chmod 0755 /usr/local/bin/tflint \
+    && rm -f /tmp/tflint.zip \
     && python3 -m venv /opt/ansible \
     && /opt/ansible/bin/pip install --no-cache-dir --upgrade pip \
     && /opt/ansible/bin/pip install --no-cache-dir ansible-core ansible-lint jmespath requests \
