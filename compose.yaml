@@ -9,7 +9,7 @@ services:
     working_dir: /workspace
     volumes:
       - .:/workspace
-      - ${USERPROFILE}/.ssh:/ssh-ro:ro
+      - ${HOST_SSH_DIR:-${HOME}/.ssh}:/ssh-ro:ro
       - tofu-plugin-cache:/root/.terraform.d/plugin-cache
       - ansible-cache:/root/.ansible
     environment:
