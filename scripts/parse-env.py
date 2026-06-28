@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parse values/.env as data and emit sanitized shell exports."""
+"""Parse values/.env as data and emit sanitized environment records."""
 from __future__ import annotations
 
 import argparse
@@ -8,22 +8,34 @@ import shlex
 import sys
 from pathlib import Path
 
-ALLOWED_KEYS = {
+PROXMOX_KEYS = {
     "PROXMOX_VE_ENDPOINT",
     "PROXMOX_VE_API_TOKEN",
     "PROXMOX_VE_USERNAME",
     "PROXMOX_VE_PASSWORD",
     "PVE_HOST",
+}
+
+CADDY_KEYS = {
     "SERVER_NAME",
     "CF_API_EMAIL",
     "CF_DNS_API_TOKEN",
+}
+
+TERRAFORM_KEYS = {
     "TF_VAR_container_root_password",
     "TF_VAR_container_ssh_public_keys",
     "TF_VAR_technitium_api_token",
     "TECHNITIUM_API_TOKEN",
+}
+
+TECHNITIUM_BOOTSTRAP_KEYS = {
     "TECHNITIUM_ADMIN_USER",
     "TECHNITIUM_ADMIN_PASSWORD",
     "TECHNITIUM_ADMIN_PASS",
+}
+
+FORGEJO_KEYS = {
     "FORGEJO_VERSION",
     "FORGEJO_DOMAIN",
     "FORGEJO_SERVER_NAME",
@@ -31,6 +43,14 @@ ALLOWED_KEYS = {
     "FORGEJO_SSH_PORT",
     "FORGEJO_ENABLE_CADDY",
 }
+
+ALLOWED_KEYS = (
+    PROXMOX_KEYS
+    | CADDY_KEYS
+    | TERRAFORM_KEYS
+    | TECHNITIUM_BOOTSTRAP_KEYS
+    | FORGEJO_KEYS
+)
 
 KEY_RE = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 
@@ -41,7 +61,9 @@ class EnvError(ValueError):
 
 def parse_env(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
-    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
@@ -52,19 +74,19 @@ def parse_env(path: Path) -> dict[str, str]:
 
         key, raw_value = match.groups()
         if key not in ALLOWED_KEYS:
-            print(
-                f"{path}:{line_number}: ignoring unsupported environment key {key}",
-                file=sys.stderr,
-            )
-            continue
+            raise EnvError(f"{path}:{line_number}: unsupported environment key {key}")
         if key in values:
             raise EnvError(f"{path}:{line_number}: duplicate environment key {key}")
         try:
-            parts = shlex.split(raw_value, posix=True)
+            parts = shlex.split(raw_value, posix=True, comments=False)
         except ValueError as error:
-            raise EnvError(f"{path}:{line_number}: invalid quoting for {key}: {error}") from error
+            raise EnvError(
+                f"{path}:{line_number}: invalid quoting for {key}: {error}"
+            ) from error
         if len(parts) != 1:
             raise EnvError(f"{path}:{line_number}: {key} must have exactly one value")
+        if "\x00" in parts[0]:
+            raise EnvError(f"{path}:{line_number}: {key} contains a NUL byte")
         values[key] = parts[0]
     return values
 
@@ -76,7 +98,11 @@ def shell_quote(value: str) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--keys", action="store_true", help="print parsed keys, one per line")
-    parser.add_argument("--env-file", action="store_true", help="print KEY=value lines for docker compose --env-from-file")
+    parser.add_argument(
+        "--env-file",
+        action="store_true",
+        help="print KEY=value lines for docker compose --env-from-file",
+    )
     parser.add_argument("path", type=Path)
     args = parser.parse_args(argv)
 
@@ -92,7 +118,10 @@ def main(argv: list[str] | None = None) -> int:
     elif args.env_file:
         for key, value in values.items():
             if "\n" in value or "\r" in value:
-                print(f"{key} contains a newline and cannot be used in an env file", file=sys.stderr)
+                print(
+                    f"{key} contains a newline and cannot be used in an env file",
+                    file=sys.stderr,
+                )
                 return 1
             print(f"{key}={value}")
     else:

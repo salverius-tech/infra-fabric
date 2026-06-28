@@ -8,9 +8,17 @@ if [[ ! -f "${env_file}" ]]; then
   exit 1
 fi
 
-# Convert values/.env to a sanitized Docker env file. Do not source it directly.
-compose_env_file="$(mktemp)"
-trap 'rm -f "${compose_env_file}"' EXIT
-python3 scripts/parse-env.py --env-file "${env_file}" >"${compose_env_file}"
+tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/run-infra.XXXXXX")"
+chmod 0700 "${tmp_dir}"
+compose_env_file="${tmp_dir}/env"
+cleanup() {
+  rm -rf -- "${tmp_dir}"
+}
+trap cleanup EXIT HUP INT TERM
 
-exec docker compose run --rm --env-from-file "${compose_env_file}" infra "$@"
+# Convert values/.env to a sanitized Docker env file. Do not source it directly.
+umask 077
+python3 scripts/parse-env.py --env-file "${env_file}" >"${compose_env_file}"
+chmod 0600 "${compose_env_file}"
+
+docker compose run --rm --env-from-file "${compose_env_file}" infra "$@"
