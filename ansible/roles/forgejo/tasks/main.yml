@@ -1,0 +1,192 @@
+---
+- name: Validate Forgejo required variables
+  ansible.builtin.assert:
+    that:
+      - forgejo_domain is defined
+      - forgejo_version is defined
+    fail_msg: forgejo_domain and forgejo_version are required.
+
+- name: Install Forgejo OS dependencies in LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        DEBIAN_FRONTEND=noninteractive apt-get update &&
+        DEBIAN_FRONTEND=noninteractive apt-get install -y
+        ca-certificates curl git git-lfs openssh-server sqlite3
+  changed_when: false
+
+- name: Enable Git LFS system hooks
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - git
+      - lfs
+      - install
+      - --system
+  changed_when: false
+
+- name: Ensure git user exists
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        if ! id git >/dev/null 2>&1; then
+        adduser --system --shell /bin/bash --gecos 'Git Version Control'
+        --group --disabled-password --home /var/lib/forgejo git;
+        fi
+  changed_when: false
+
+- name: Ensure Forgejo directories exist
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        install -d -m 0750 -o git -g git /var/lib/forgejo
+        /var/lib/forgejo/custom /var/lib/forgejo/data /var/lib/forgejo/log &&
+        install -d -m 0770 -o root -g git /etc/forgejo
+  changed_when: false
+
+- name: Check installed Forgejo version
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - /usr/local/bin/forgejo --version 2>/dev/null | grep -oE '[0-9]+[.][0-9]+[.][0-9]+' | head -n1
+  register: forgejo_installed_version
+  changed_when: false
+  failed_when: false
+
+- name: Install requested Forgejo binary
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        base={{ forgejo_download_base | default('https://code.forgejo.org/forgejo/forgejo/releases/download') }} &&
+        curl -fsSL -o /usr/local/bin/forgejo
+        "$base/v{{ forgejo_version }}/forgejo-{{ forgejo_version }}-linux-amd64" &&
+        chmod 0755 /usr/local/bin/forgejo
+  when: forgejo_installed_version.stdout | trim != forgejo_version
+  notify: Restart forgejo
+
+- name: Stage Forgejo systemd service on Proxmox host
+  ansible.builtin.template:
+    src: forgejo.service.j2
+    dest: /tmp/forgejo.service.{{ forgejo_vmid }}
+    mode: "0644"
+
+- name: Push Forgejo systemd service into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ forgejo_vmid | string }}"
+      - /tmp/forgejo.service.{{ forgejo_vmid }}
+      - /etc/systemd/system/forgejo.service
+  notify: Restart forgejo
+
+- name: Check Forgejo app.ini presence
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - test
+      - -f
+      - /etc/forgejo/app.ini
+  register: forgejo_app_ini_check
+  changed_when: false
+  failed_when: false
+
+- name: Stage initial Forgejo app.ini on Proxmox host
+  ansible.builtin.template:
+    src: app.ini.j2
+    dest: /tmp/forgejo-app.ini.{{ forgejo_vmid }}
+    mode: "0640"
+  when: forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0
+
+- name: Push initial Forgejo app.ini into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ forgejo_vmid | string }}"
+      - /tmp/forgejo-app.ini.{{ forgejo_vmid }}
+      - /etc/forgejo/app.ini
+  when: forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0
+  notify: Restart forgejo
+
+- name: Secure Forgejo app.ini
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - chown root:git /etc/forgejo/app.ini && chmod 0640 /etc/forgejo/app.ini
+  changed_when: false
+
+- name: Stage Forgejo SSH integration config on Proxmox host
+  ansible.builtin.template:
+    src: forgejo-sshd.conf.j2
+    dest: /tmp/forgejo-sshd.conf.{{ forgejo_vmid }}
+    mode: "0644"
+  when: forgejo_configure_system_ssh | default(true) | bool
+
+- name: Push Forgejo SSH integration config into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ forgejo_vmid | string }}"
+      - /tmp/forgejo-sshd.conf.{{ forgejo_vmid }}
+      - /etc/ssh/sshd_config.d/forgejo.conf
+  when: forgejo_configure_system_ssh | default(true) | bool
+  notify: Restart ssh
+
+- name: Configure Caddy on Forgejo LXC
+  ansible.builtin.include_tasks: caddy.yml
+  when: forgejo_enable_caddy | default(false) | bool
+
+- name: Enable Forgejo service
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_vmid | string }}"
+      - --
+      - systemctl
+      - enable
+      - --now
+      - forgejo
+  changed_when: false

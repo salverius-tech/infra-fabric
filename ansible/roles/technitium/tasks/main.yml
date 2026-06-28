@@ -1,0 +1,54 @@
+---
+- name: Install Technitium prerequisites in LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        DEBIAN_FRONTEND=noninteractive apt-get update &&
+        (DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates libicu72 ||
+        DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates libicu-dev)
+  changed_when: false
+
+- name: Check Technitium service presence
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - systemctl list-unit-files dns.service >/dev/null 2>&1
+  register: technitium_service_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Technitium DNS Server
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - curl -sSL https://download.technitium.com/dns/install.sh | bash
+  when: technitium_service_check.rc != 0
+
+- name: Ensure Technitium service is running
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - systemctl
+      - enable
+      - --now
+      - dns
+  changed_when: false

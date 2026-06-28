@@ -4,7 +4,7 @@ Guidance for coding agents working in this repository.
 
 ## Overview
 
-This repo manages homelab DNS infrastructure with OpenTofu/Terraform.
+This repo manages homelab infrastructure with OpenTofu/Terraform, including Technitium DNS, Forgejo, and service bootstrap scripts.
 
 Tracked files are intentionally public-safe examples/source. Real Proxmox endpoints, LAN IPs, DNS zones, records, and credentials belong in local gitignored files:
 
@@ -16,9 +16,9 @@ Tracked files are intentionally public-safe examples/source. Real Proxmox endpoi
 
 - Do not run `tofu apply`, `terraform apply`, `destroy`, import, or state surgery without explicit user approval.
 - Do not commit secrets, `.env`, `terraform.tfvars`, `dns-records.local.json`, state files, plans, or generated local credentials.
-- Treat DNS as critical infrastructure. Prefer reviewed plans over ad hoc mutation.
+- Treat DNS, Forgejo, and HTTPS/SSH endpoints as critical infrastructure. Prefer reviewed plans over ad hoc mutation.
 - Do not mutate production routers/firewalls unless explicitly requested.
-- If changing the DNS server IP or hostname, update local tfvars, local DNS records, README, and any migration notes together.
+- If changing service IPs, hostnames, SSH ports, or proxy topology, update local tfvars, local DNS records, README, and any migration notes together.
 
 ## Commands
 
@@ -37,6 +37,17 @@ Terraform may be used for local validation if OpenTofu is unavailable:
 terraform fmt -check -recursive
 terraform validate
 ```
+
+Containerized tooling is available for Windows/local consistency:
+
+```bash
+docker compose run --rm infra tofu fmt -check -recursive
+docker compose run --rm infra tofu validate
+docker compose run --rm infra ansible --version
+docker compose run --rm infra ansible-lint ansible
+```
+
+Use `bash -lc 'set -a; . <(tr -d "\r" < ./.env); set +a; ...'` for containerized commands that source `.env`, so CRLF line endings do not corrupt environment values.
 
 Shell/Python validation:
 
@@ -74,6 +85,7 @@ Do not print token values, generated passwords, or real local DNS inventory in r
 4. Summarize planned creates/changes/destroys.
 5. Apply only after explicit approval.
 6. Remove plan files after use.
+7. For in-LXC service configuration, prefer Ansible playbooks over ad hoc bootstrap-script reruns.
 
 ## Bootstrap
 
@@ -88,6 +100,14 @@ Configure local Caddy HTTPS proxy with:
 ```bash
 ./scripts/bootstrap-caddy.sh <vmid>
 ```
+
+After the Forgejo LXC is created, install/configure Forgejo with:
+
+```bash
+./scripts/bootstrap-forgejo.sh <vmid>
+```
+
+Preferred Forgejo topology: point the Forgejo hostname directly at the Forgejo LXC, run Caddy on that LXC for HTTPS, and use system OpenSSH on port 22 integrated with Forgejo for git SSH. The DNS LXC Caddy can still proxy Forgejo as a fallback, but direct Forgejo hosting is preferred.
 
 ## EdgeRouter helper
 

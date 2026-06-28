@@ -13,10 +13,14 @@ tfplan
 # Local DNS inventory
 dns-records.local.json
 
+# Private local notes/archive source
+private/
+
 # Secrets / local env
 .env
 .env.*
 !.env.example
+ansible/inventory/local.yml
 
 # Python
 __pycache__/
@@ -27,3 +31,4 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+.pi/todo.json

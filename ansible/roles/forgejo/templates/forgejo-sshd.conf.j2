@@ -1,0 +1,3 @@
+Match User git
+    AuthorizedKeysCommandUser git
+    AuthorizedKeysCommand /usr/local/bin/forgejo keys -c /etc/forgejo/app.ini -e git -u %u -t %t -k %k

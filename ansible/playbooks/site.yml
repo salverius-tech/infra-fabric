@@ -1,0 +1,12 @@
+---
+- name: Bootstrap Technitium DNS LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - technitium
+
+- name: Bootstrap Forgejo LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - forgejo

@@ -1,0 +1,6 @@
+---
+- name: Configure Caddy proxy on DNS LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - caddy_proxy

@@ -1,0 +1,22 @@
+name: homelab-infra
+
+services:
+  infra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: homelab-infra-tooling:local
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - ${USERPROFILE}/.ssh:/ssh-ro:ro
+      - tofu-plugin-cache:/root/.terraform.d/plugin-cache
+      - ansible-cache:/root/.ansible
+    environment:
+      TF_PLUGIN_CACHE_DIR: /root/.terraform.d/plugin-cache
+      ANSIBLE_CONFIG: /workspace/ansible.cfg
+      ANSIBLE_HOST_KEY_CHECKING: "true"
+
+volumes:
+  tofu-plugin-cache:
+  ansible-cache:

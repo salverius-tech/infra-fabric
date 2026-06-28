@@ -1,10 +1,11 @@
-# This file is maintained automatically by "terraform init".
+# This file is maintained automatically by "tofu init".
 # Manual edits may be lost in future updates.
 
 provider "registry.terraform.io/bpg/proxmox" {
   version     = "0.111.0"
   constraints = "~> 0.88"
   hashes = [
+    "h1:RHGueoNj9kiaBMD5mbWFudB4sSvMuqlZJ8UfMfmgnss=",
     "h1:ajXBm3f5rZgG/eV7cyhtSu89J5kVosmQwdxgMVmGyYo=",
     "zh:07afbe99e262f36b6285df259fa5b371bdb0ca62515a6da486ee004562ddcc1d",
     "zh:0b3f17c240a488c8768dc8415c8b80b285495c801a300a784bae677a49eff8bc",

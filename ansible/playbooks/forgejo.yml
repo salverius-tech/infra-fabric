@@ -1,0 +1,6 @@
+---
+- name: Bootstrap Forgejo LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - forgejo

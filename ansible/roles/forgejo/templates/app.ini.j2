@@ -1,0 +1,25 @@
+APP_NAME = Forgejo
+RUN_USER = git
+WORK_PATH = /var/lib/forgejo
+
+[database]
+DB_TYPE = sqlite3
+PATH = /var/lib/forgejo/data/forgejo.db
+
+[repository]
+ROOT = /var/lib/forgejo/data/gitea-repositories
+
+[server]
+DOMAIN = {{ forgejo_domain }}
+ROOT_URL = {{ forgejo_root_url | default('https://' ~ forgejo_domain ~ '/') }}
+HTTP_ADDR = 127.0.0.1
+HTTP_PORT = 3000
+SSH_DOMAIN = {{ forgejo_domain }}
+SSH_PORT = {{ forgejo_ssh_port | default(22) }}
+SSH_USER = git
+START_SSH_SERVER = false
+
+[log]
+MODE = file
+LEVEL = Info
+ROOT_PATH = /var/lib/forgejo/log

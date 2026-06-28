@@ -1,0 +1,162 @@
+---
+- name: Validate Caddy proxy variables
+  ansible.builtin.assert:
+    that:
+      - technitium_vmid is defined
+      - caddy_server_name is defined
+      - caddy_upstream is defined
+      - caddy_email is defined
+      - caddy_cloudflare_api_token is defined
+    fail_msg: technitium_vmid, caddy_server_name, caddy_upstream, caddy_email, and caddy_cloudflare_api_token are required.
+
+- name: Install Caddy build dependencies in DNS LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - DEBIAN_FRONTEND=noninteractive apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y caddy ca-certificates curl
+  changed_when: false
+
+- name: Check whether DNS LXC Caddy has Cloudflare DNS module
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
+  register: caddy_proxy_cloudflare_module
+  changed_when: false
+  failed_when: false
+
+- name: Build DNS LXC Caddy with Cloudflare DNS module
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz &&
+        rm -rf /usr/local/go &&
+        tar -C /usr/local -xzf /tmp/go.tar.gz &&
+        PATH=/usr/local/go/bin:${PATH} GOBIN=/usr/local/bin /usr/local/go/bin/go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest &&
+        PATH=/usr/local/go/bin:${PATH} /usr/local/bin/xcaddy build --with github.com/caddy-dns/cloudflare --output /tmp/caddy-cloudflare &&
+        install -m 0755 /tmp/caddy-cloudflare /usr/bin/caddy
+  when: caddy_proxy_cloudflare_module.rc != 0
+  notify: Restart caddy
+
+- name: Stage DNS LXC Caddy env on Proxmox host
+  ansible.builtin.template:
+    src: caddy.env.j2
+    dest: /tmp/dns-caddy.env.{{ technitium_vmid }}
+    mode: "0600"
+  no_log: true
+
+- name: Push DNS LXC Caddy env
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ technitium_vmid | string }}"
+      - /tmp/dns-caddy.env.{{ technitium_vmid }}
+      - /etc/caddy/env
+  no_log: true
+  notify: Restart caddy
+
+- name: Secure DNS LXC Caddy env
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - chmod 0600 /etc/caddy/env && chown root:caddy /etc/caddy/env
+  changed_when: false
+
+- name: Stage DNS LXC Caddyfile on Proxmox host
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /tmp/dns-Caddyfile.{{ technitium_vmid }}
+    mode: "0644"
+
+- name: Push DNS LXC Caddyfile
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ technitium_vmid | string }}"
+      - /tmp/dns-Caddyfile.{{ technitium_vmid }}
+      - /etc/caddy/Caddyfile
+  notify: Restart caddy
+
+- name: Stage DNS LXC Caddy systemd override on Proxmox host
+  ansible.builtin.template:
+    src: caddy-override.conf.j2
+    dest: /tmp/dns-caddy-override.conf.{{ technitium_vmid }}
+    mode: "0644"
+
+- name: Ensure DNS LXC Caddy systemd override directory exists
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - install
+      - -d
+      - -m
+      - "0755"
+      - /etc/systemd/system/caddy.service.d
+  changed_when: false
+
+- name: Push DNS LXC Caddy systemd override
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ technitium_vmid | string }}"
+      - /tmp/dns-caddy-override.conf.{{ technitium_vmid }}
+      - /etc/systemd/system/caddy.service.d/override.conf
+  notify: Restart caddy
+
+- name: Validate DNS LXC Caddy config
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - set -a && . /etc/caddy/env && set +a && caddy fmt --overwrite /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile
+  changed_when: false
+
+- name: Enable DNS LXC Caddy service
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - systemctl
+      - enable
+      - --now
+      - caddy
+  changed_when: false
+
+- name: Configure optional SSH socket proxies
+  ansible.builtin.include_tasks: ssh_proxy.yml
+  loop: "{{ caddy_ssh_proxies | default([]) }}"
+  loop_control:
+    loop_var: item

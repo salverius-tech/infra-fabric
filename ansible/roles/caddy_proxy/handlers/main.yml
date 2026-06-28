@@ -1,0 +1,12 @@
+---
+- name: Restart caddy
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ technitium_vmid | string }}"
+      - --
+      - systemctl
+      - restart
+      - caddy
+  changed_when: true

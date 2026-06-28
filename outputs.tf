@@ -29,8 +29,13 @@ output "forgejo_lan_ip" {
 }
 
 output "forgejo_https_url" {
-  description = "Forgejo HTTPS URL when proxied through Caddy on the Technitium LXC."
+  description = "Forgejo HTTPS URL when the Forgejo hostname points at the Forgejo LXC Caddy instance."
   value       = "https://${var.forgejo_server_name}/"
+}
+
+output "forgejo_ssh_clone_prefix" {
+  description = "Forgejo SSH clone prefix when system OpenSSH on the Forgejo LXC is integrated with Forgejo."
+  value       = "git@${var.forgejo_server_name}:"
 }
 
 output "forgejo_data_mount" {
