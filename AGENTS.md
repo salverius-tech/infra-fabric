@@ -16,7 +16,7 @@ Real Proxmox endpoints, LAN IPs, DNS zones/records, hostnames, credentials, and 
 - `values/ansible/inventory/local.yml`
 - `values/terraform.tfstate*`
 
-`scaffold/` is the public-safe starter template copied into `values/`; keep it generic and sanitized.
+`scaffold/` is the public-safe starter template copied into `values/`; keep it generic and sanitized. `settings.example.json` documents the ignored local `settings.local.json` operator settings file used for the values repo remote and enabled service list.
 
 ## Layout
 
@@ -30,11 +30,11 @@ Real Proxmox endpoints, LAN IPs, DNS zones/records, hostnames, credentials, and 
 ## Safety Rules
 
 - Do not run `tofu apply`, `terraform apply`, `destroy`, import, or state surgery without explicit user approval.
-- Do not commit secrets, live domains/IPs/hostnames, `values/`, state files, plans, or generated local credentials.
+- Do not commit secrets, live domains/IPs/hostnames, `values/`, `settings.local.json`, state files, plans, or generated local credentials.
 - Keep non-public material in `values/` or outside the checkout; do not add another sensitive-data directory to this repo.
 - Treat DNS, Forgejo, and HTTPS/SSH endpoints as critical infrastructure. Prefer reviewed plans over ad hoc mutation.
 - Do not mutate production routers/firewalls unless explicitly requested.
-- If changing service IPs, hostnames, SSH ports, or proxy topology, update scaffold examples, private values as requested, README, and any migration notes together.
+- If changing service IPs, hostnames, SSH ports, proxy topology, or service-selection behavior, update scaffold examples, private values as requested, README, and any migration notes together.
 
 ## Commands
 
@@ -47,9 +47,9 @@ just plan
 just apply      # only after explicit approval
 ```
 
-Validation performed by `just validate` includes OpenTofu, ShellCheck, Python JSON/compile checks, Ansible syntax, and ansible-lint.
+Validation performed by `just validate` includes public-safety checks, OpenTofu format/validate, TFLint, ShellCheck, Python compile/unit checks, Technitium DNS JSON validation, Ansible syntax, ansible-lint, and private `values/` wiring checks.
 
-Containerized tooling is used for Windows/local consistency. Project commands source `values/.env` through `scripts/run-infra.sh` and run inside the Docker Compose `infra` service.
+Containerized tooling is used for Windows/local consistency. Project commands parse `values/.env` as dotenv-style data through `scripts/parse-env.py` / `scripts/run-infra.sh` and run inside the Docker Compose `infra` service. Do not source `values/.env` directly in new workflow code.
 
 ## Workflow
 
@@ -57,9 +57,10 @@ Containerized tooling is used for Windows/local consistency. Project commands so
 2. Put site-specific changes in `values/` only.
 3. Run `just validate` after source or scaffold changes.
 4. If a plan is requested, run `just plan` and summarize creates/changes/destroys.
-5. Apply only after explicit approval using `just apply`.
-6. Remove local plan files if a command fails before cleanup.
-7. For in-LXC service configuration, prefer Ansible playbooks via `just apply` over ad hoc shell changes.
+5. Apply only after explicit approval using `just apply`; it verifies `tfplan.meta.json` before applying.
+6. Use the user-facing `just` recipes (`setup`, `validate`, `plan`, `apply`) rather than ad hoc shell sequences for normal operations.
+7. If plan verification fails, rerun `just plan` instead of reusing or editing saved plan files.
+8. For in-LXC service configuration, prefer Ansible playbooks via `just apply` over ad hoc shell changes.
 
 ## DNS Management
 

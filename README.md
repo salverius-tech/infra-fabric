@@ -1,6 +1,6 @@
 # Homelab Infrastructure Runbooks
 
-Reusable OpenTofu and Ansible runbooks for Proxmox LXCs running Technitium DNS, Caddy, and Forgejo.
+Reusable OpenTofu and Ansible runbooks for Proxmox LXCs running Technitium DNS, Caddy, Forgejo, and an optional Tailscale client.
 
 This public repo is intentionally generic. Real domains, LAN IPs, DNS records, Proxmox endpoints, credentials, and state belong in the ignored private `values/` repo.
 
@@ -28,15 +28,23 @@ Keep non-public material in `values/` or outside this checkout; do not add anoth
 
 ## Fresh setup
 
-From a fresh checkout, run:
+From a fresh checkout, optionally copy the local settings template:
+
+```bash
+cp settings.example.json settings.local.json
+```
+
+Edit `settings.local.json` if you want `just setup` to clone a private values repo or if you want only selected services maintained. The file is ignored by Git. Supported services are `technitium`, `forgejo`, and `tailscale_client`; `technitium` includes its Caddy proxy, and `forgejo` includes its in-LXC Caddy configuration when enabled in inventory.
+
+Then run:
 
 ```bash
 just setup
 ```
 
-This builds the local tooling container and creates `values/` from `scaffold/`.
+This builds the local tooling container and creates `values/` from `scaffold/`, or clones the `values_repo.remote` configured in `settings.local.json`.
 
-To clone an existing private values repo instead:
+You can also pass the values repo URL directly:
 
 ```bash
 just setup git@git.example.internal:owner/homelab-infra-values.git
@@ -53,17 +61,13 @@ values/ansible/inventory/local.yml
 
 ## Daily workflow
 
-Validate tracked public source only:
-
-```bash
-just validate-public
-```
-
 Validate public source and private values wiring:
 
 ```bash
 just validate
 ```
+
+`just validate` runs source checks, linting, tests, and private `values/` wiring checks. Use it as the normal validation entry point.
 
 Review infrastructure/DNS changes:
 
@@ -77,7 +81,7 @@ Apply the reviewed plan and configure services with Ansible:
 just apply
 ```
 
-`just apply` runs the saved `tfplan`, removes plan artifacts, then runs `infra/ansible/playbooks/site.yml`.
+`just plan` writes `tfplan` plus `tfplan.meta.json`. `just apply` refuses to run if the saved plan or its inputs changed, then removes plan artifacts after the apply attempt.
 
 ## Private values repo
 
@@ -91,13 +95,14 @@ values/
   ansible/inventory/local.yml
 ```
 
-Use `just status-values` to inspect the nested private repo.
+Use `git -C values status --short --branch` if you need to inspect the nested private repo directly.
 
 ## Responsibilities
 
 OpenTofu manages:
 
 - Proxmox LXC resources
+- Optional Tailscale client LXC shape, disabled by default until `tailscale_client_enabled` is set in private values
 - Forgejo ZFS bind mount shape
 - Technitium DNS records/settings through `infra/opentofu/scripts/apply-technitium-dns.py`
 
@@ -107,9 +112,16 @@ Ansible manages:
 - Caddy installation/configuration on the Technitium LXC
 - Forgejo installation/configuration
 - Caddy and OpenSSH integration on the Forgejo LXC
+- Optional Tailscale installation and private backup restore on the Tailscale client LXC
 
 ## Safety
 
-Do not apply without reviewing `just plan` output. Do not commit secrets, state, plans, or real site values to the public repo.
+Do not apply without reviewing `just plan` output. If `just apply` says the saved plan is stale, rerun `just plan` and review it again. Do not commit secrets, state, plans, or real site values to the public repo.
 
-`scripts/edgeos-static-host-mapping.sh` mutates a live EdgeRouter config and should only be run after explicit review/approval.
+`settings.local.json` is the local operator settings file. It can set `values_repo.remote` for setup and the `services` list used by OpenTofu planning plus Ansible validation/apply. Removing a service from the list tells OpenTofu to stop maintaining its resources, which can plan destroys; review `just plan` before applying.
+
+`values/.env` is parsed as dotenv-style data by `scripts/parse-env.py`; it is not sourced as shell. Keep required variables from `scaffold/.env.example` in sync with your private `values/.env`.
+
+The tooling container mounts `${HOST_SSH_DIR:-${HOME}/.ssh}` read-only. It copies public SSH support files by default; set `INFRA_COPY_SSH_KEYS=true` only when private keys must be copied into the container for a run.
+
+`scripts/edgeos-static-host-mapping.sh` mutates a live EdgeRouter config and should only be run after explicit review/approval. Use `--dry-run` to inspect commands first.
