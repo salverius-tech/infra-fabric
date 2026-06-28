@@ -146,6 +146,80 @@
         install -d -m 0750 -o root -g runner /etc/forgejo-runner
   changed_when: false
 
+- name: Ensure Forgejo runner SSH key exists
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_runner_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        install -d -m 0700 -o runner -g runner /var/lib/forgejo-runner/.ssh;
+        if [[ ! -f /var/lib/forgejo-runner/.ssh/id_ed25519 ]]; then
+          key_comment="forgejo-runner@{{ forgejo_runner_hostname | default('forgejo-runner') }}";
+          runuser -u runner -- ssh-keygen -t ed25519 -N '' -C "${key_comment}" -f /var/lib/forgejo-runner/.ssh/id_ed25519 >/dev/null;
+        fi;
+        chmod 0700 /var/lib/forgejo-runner/.ssh;
+        chmod 0600 /var/lib/forgejo-runner/.ssh/id_ed25519;
+        chmod 0644 /var/lib/forgejo-runner/.ssh/id_ed25519.pub
+  changed_when: false
+
+- name: Read Forgejo runner SSH public key
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_runner_vmid | string }}"
+      - --
+      - cat
+      - /var/lib/forgejo-runner/.ssh/id_ed25519.pub
+  register: forgejo_runner_ssh_public_key
+  changed_when: false
+
+- name: Ensure root SSH directory exists on Proxmox host
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Authorize Forgejo runner SSH key on Proxmox host
+  ansible.builtin.lineinfile:
+    path: /root/.ssh/authorized_keys
+    line: "{{ forgejo_runner_ssh_public_key.stdout }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0600"
+    state: present
+
+- name: Trust Proxmox host key in Forgejo runner LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ forgejo_runner_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        install -d -m 0700 -o runner -g runner /var/lib/forgejo-runner/.ssh;
+        tmp="$(mktemp)";
+        ssh-keyscan -H {{ ansible_host | quote }} > "${tmp}" 2>/dev/null;
+        touch /var/lib/forgejo-runner/.ssh/known_hosts;
+        if ! grep -Fxf "${tmp}" /var/lib/forgejo-runner/.ssh/known_hosts >/dev/null; then
+          cat "${tmp}" >> /var/lib/forgejo-runner/.ssh/known_hosts;
+        fi;
+        rm -f "${tmp}";
+        chown runner:runner /var/lib/forgejo-runner/.ssh/known_hosts;
+        chmod 0644 /var/lib/forgejo-runner/.ssh/known_hosts
+  changed_when: false
+
 - name: Check installed Forgejo runner version
   ansible.builtin.command:
     argv:
