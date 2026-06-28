@@ -4,7 +4,7 @@ services:
   infra:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: tools/Dockerfile
     image: homelab-infra-tooling:local
     working_dir: /workspace
     volumes:

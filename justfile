@@ -28,25 +28,24 @@ check-values:
 # Validate OpenTofu, shell, Python, and Ansible source
 validate: check-values
     docker compose config >/dev/null
-    scripts/run-infra.sh tofu init -backend=false
-    scripts/run-infra.sh tofu fmt -check *.tf values.example/terraform.tfvars
-    scripts/run-infra.sh tofu validate
+    scripts/run-infra.sh tofu -chdir=infra/opentofu init -backend=false
+    docker compose run --rm infra tofu fmt -check infra/opentofu scaffold/terraform.tfvars
+    scripts/run-infra.sh tofu -chdir=infra/opentofu validate
     docker compose run --rm infra shellcheck scripts/*.sh
-    docker compose run --rm infra python -m py_compile scripts/apply-technitium-dns.py
-    docker compose run --rm infra python -m json.tool dns-records.example.json >/dev/null
-    docker compose run --rm infra python -m json.tool values.example/dns-records.local.json >/dev/null
-    scripts/run-infra.sh ansible-playbook -i values/ansible/inventory/local.yml --syntax-check ansible/playbooks/site.yml
-    docker compose run --rm infra ansible-lint ansible
+    docker compose run --rm infra python -m py_compile infra/opentofu/scripts/apply-technitium-dns.py
+    docker compose run --rm infra python -m json.tool scaffold/dns-records.local.json >/dev/null
+    scripts/run-infra.sh ansible-playbook -i values/ansible/inventory/local.yml --syntax-check infra/ansible/playbooks/site.yml
+    docker compose run --rm infra ansible-lint infra/ansible
 
 # Review infrastructure changes using private values; writes tfplan for `just apply`
 plan: check-values
-    scripts/run-infra.sh tofu init
-    scripts/run-infra.sh tofu plan -var-file=values/terraform.tfvars -out=tfplan
-    scripts/run-infra.sh tofu show tfplan
+    scripts/run-infra.sh tofu -chdir=infra/opentofu init
+    scripts/run-infra.sh tofu -chdir=infra/opentofu plan -var-file=../../values/terraform.tfvars -state=../../values/terraform.tfstate -out=../../tfplan
+    scripts/run-infra.sh tofu -chdir=infra/opentofu show ../../tfplan
 
 # Apply reviewed infrastructure plan, then configure services with Ansible
 apply: check-values
     test -f tfplan
-    scripts/run-infra.sh tofu apply tfplan
+    scripts/run-infra.sh tofu -chdir=infra/opentofu apply ../../tfplan
     rm -f tfplan *.tfplan
-    scripts/run-infra.sh ansible-playbook -i values/ansible/inventory/local.yml ansible/playbooks/site.yml
+    scripts/run-infra.sh ansible-playbook -i values/ansible/inventory/local.yml infra/ansible/playbooks/site.yml

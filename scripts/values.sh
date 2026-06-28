@@ -3,21 +3,21 @@ set -euo pipefail
 
 command_name="${1:-}"
 values_dir="${VALUES_DIR:-values}"
-template_dir="${VALUES_TEMPLATE_DIR:-values.example}"
+template_dir="${VALUES_TEMPLATE_DIR:-scaffold}"
 
 usage() {
   cat <<'USAGE'
 Usage: scripts/values.sh <command> [args]
 
 Commands:
-  init [remote]      Create values/ from values.example and git init it. If remote is supplied, add it as origin.
+  init [remote]      Create values/ from scaffold/ and git init it. If remote is supplied, add it as origin.
   clone <remote>     Clone an existing private values repo into values/.
   status             Show values/ git status.
   check              Verify required values/ files exist.
 
 Environment:
   VALUES_DIR              Override private values directory (default: values).
-  VALUES_TEMPLATE_DIR     Override scaffold template directory (default: values.example).
+  VALUES_TEMPLATE_DIR     Override scaffold template directory (default: scaffold).
 USAGE
 }
 

@@ -9,7 +9,6 @@ terraform.tfvars
 tfplan
 *.tfplan
 dns-records.local.json
-ansible/inventory/local.yml
 values
 private
 scripts/__pycache__

@@ -9,11 +9,11 @@ tfplan
 *.tfplan
 *.tfvars
 !*.tfvars.example
-!values.example/terraform.tfvars
+!scaffold/terraform.tfvars
 
 # Local DNS inventory
 dns-records.local.json
-!values.example/dns-records.local.json
+!scaffold/dns-records.local.json
 
 # Nested private values repo and local private notes/archive source
 values/
@@ -23,7 +23,11 @@ private/
 .env
 .env.*
 !.env.example
+!scaffold/.env.example
+
+# Local Ansible inventories outside the private values repo
 ansible/inventory/local.yml
+infra/ansible/inventory/local.yml
 
 # Python
 __pycache__/
@@ -35,3 +39,5 @@ Thumbs.db
 .vscode/
 .idea/
 .pi/todo.json
+scaffold/dns-records.local.json
+scaffold/terraform.tfvars

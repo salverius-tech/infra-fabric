@@ -35,7 +35,7 @@ variable "technitium_api_url" {
 }
 
 variable "dns_records_file" {
-  description = "Path to the local Technitium DNS records JSON file. The real file is gitignored; see dns-records.example.json."
+  description = "Path to the local Technitium DNS records JSON file. The real file belongs in values/; see scaffold/dns-records.local.json."
   type        = string
 }
 

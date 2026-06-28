@@ -1,81 +1,80 @@
-# Technitium DNS Infrastructure
+# Homelab Infrastructure Runbooks
 
-OpenTofu/Terraform configuration for Proxmox LXCs running Technitium DNS and Forgejo, plus an idempotent API script for local DNS records and upstream resolver settings.
+Reusable OpenTofu and Ansible runbooks for Proxmox LXCs running Technitium DNS, Caddy, and Forgejo.
 
-This repo intentionally keeps real hostnames, LAN IPs, DNS zones, and secrets out of tracked files. Copy the example files to local gitignored files before planning/applying.
+This public repo is intentionally generic. Real domains, LAN IPs, DNS records, Proxmox endpoints, credentials, and state belong in the ignored private `values/` repo.
 
-## Tracked vs local files
+## Layout
 
-Tracked examples/source:
+Tracked public source:
 
-- `*.tf`
-- `scripts/`
-- `.env.example`
-- `example.vars`
-- `dns-records.example.json`
-
-Local ignored configuration:
-
-- `.env` — tokens/passwords and bootstrap credentials
-- `terraform.tfvars` — local Proxmox/LXC values
-- `dns-records.local.json` — real local DNS zones, records, and upstream resolver policy
-- `terraform.tfstate*`, `.terraform/`, `tfplan*`
-
-## Initial local setup
-
-```bash
-cp example.vars terraform.tfvars
-cp dns-records.example.json dns-records.local.json
-cp .env.example .env
+```text
+infra/opentofu/    OpenTofu configuration and Technitium DNS API helper
+infra/ansible/     Ansible playbooks and roles for in-LXC service config
+scaffold/          Public-safe starter files copied into values/
+scripts/           Local workflow helpers
+tools/             Docker tooling image
 ```
 
-Edit those local files with your real values.
+Ignored private/local state:
 
-## Install OpenTofu
-
-Windows examples:
-
-```powershell
-winget install OpenTofu.Tofu
-# or
-choco install opentofu
+```text
+values/            Private site values repo
+private/           Optional local private notes/archive
+.terraform/        OpenTofu/Terraform working data
+tfplan             Local plan artifact
 ```
 
-Verify:
+## Fresh setup
 
-```bash
-tofu version
-```
-
-Terraform can be used for validation if OpenTofu is unavailable.
-
-## Containerized tooling
-
-A local Docker tool image provides OpenTofu, Ansible, ShellCheck, Python, Git, SSH, and `jq` without installing those tools directly on Windows.
+From a fresh checkout, run:
 
 ```bash
 just setup
 ```
 
-The Compose service mounts the repo at `/workspace`, copies your Windows `%USERPROFILE%/.ssh` into the container with safe permissions for SSH access, and keeps the OpenTofu plugin cache in a named Docker volume.
+This builds the local tooling container and creates `values/` from `scaffold/`.
 
-## Private values repo
-
-This public repo is the reusable runbook/source repo. Site-specific settings live in an ignored nested `values/` directory that can be its own private Git repo, typically hosted on Forgejo.
-
-Fresh setup builds the tooling image and creates a new private values repo scaffold:
-
-```bash
-just setup
-```
-
-Or clone an existing private values repo during setup:
+To clone an existing private values repo instead:
 
 ```bash
 just setup git@git.example.internal:owner/homelab-infra-values.git
 ```
 
-The tracked `values.example/` directory documents the expected private layout:
+Then edit the private files:
+
+```text
+values/.env
+values/terraform.tfvars
+values/dns-records.local.json
+values/ansible/inventory/local.yml
+```
+
+## Daily workflow
+
+Validate public source and private values wiring:
+
+```bash
+just validate
+```
+
+Review infrastructure/DNS changes:
+
+```bash
+just plan
+```
+
+Apply the reviewed plan and configure services with Ansible:
+
+```bash
+just apply
+```
+
+`just apply` runs the saved `tfplan`, removes plan artifacts, then runs `infra/ansible/playbooks/site.yml`.
+
+## Private values repo
+
+`values/` is ignored by this public repo and can be its own private Git repo. The scaffold defines this shape:
 
 ```text
 values/
@@ -85,108 +84,25 @@ values/
   ansible/inventory/local.yml
 ```
 
-Most day-to-day commands use `values/` through `just`:
+Use `just status-values` to inspect the nested private repo.
 
-```bash
-just validate
-just plan
-just apply
-```
+## Responsibilities
 
-## Ansible configuration management
+OpenTofu manages:
 
-Terraform/OpenTofu manages Proxmox infrastructure. Ansible manages in-LXC service configuration through the Proxmox host using `pct exec`/`pct push`.
+- Proxmox LXC resources
+- Forgejo ZFS bind mount shape
+- Technitium DNS records/settings through `infra/opentofu/scripts/apply-technitium-dns.py`
 
-Keep real inventory in `values/ansible/inventory/local.yml`. `just apply` applies the reviewed OpenTofu plan, then runs `ansible/playbooks/site.yml` to configure Technitium, the Technitium Caddy instance, Forgejo, and the Forgejo Caddy instance.
+Ansible manages:
 
-## Credentials
+- Technitium installation
+- Caddy installation/configuration on the Technitium LXC
+- Forgejo installation/configuration
+- Caddy and OpenSSH integration on the Forgejo LXC
 
-Preferred Proxmox auth is an API token. Example token creation on the Proxmox host:
+## Safety
 
-```bash
-pveum user add terraform@pve
-pveum aclmod / -user terraform@pve -role Administrator
-pveum user token add terraform@pve provider --privsep=0
-```
+Do not apply without reviewing `just plan` output. Do not commit secrets, state, plans, or real site values to the public repo.
 
-Store secrets in `values/.env` or other ignored/private values files, never in tracked files.
-
-## Plan and apply
-
-Do not apply without reviewing the plan.
-
-```bash
-just validate
-just plan
-# after review
-just apply
-```
-
-## Import existing LXCs
-
-If a container was created manually before adding it to this repo, import it before applying. Example for the current Forgejo shape:
-
-```bash
-tofu import proxmox_virtual_environment_container.forgejo pve/107
-```
-
-Do not run imports without review; imports mutate local state.
-
-## Install Technitium inside the LXC
-
-After the LXC exists and is reachable:
-
-```bash
-./scripts/bootstrap-technitium.sh 106
-```
-
-## Configure Caddy HTTPS UI on the LXC
-
-If you want local Caddy to terminate HTTPS for the Technitium web console, add Cloudflare DNS credentials to `.env` and run:
-
-```bash
-./scripts/bootstrap-caddy.sh 106
-```
-
-The script builds Caddy with the Cloudflare DNS module and reverse-proxies the configured hostname to Technitium's local web console.
-
-## Install Forgejo inside the LXC
-
-After the Forgejo LXC exists and its ZFS bind mount is writable, set the Forgejo bootstrap values and run:
-
-```bash
-export FORGEJO_VERSION="12.0.4"
-export FORGEJO_DOMAIN="git.example.internal"
-export FORGEJO_SSH_PORT="22"
-export FORGEJO_ENABLE_CADDY="1"
-./scripts/bootstrap-forgejo.sh 107
-```
-
-With `FORGEJO_ENABLE_CADDY=1`, the script installs Caddy on the Forgejo LXC and terminates HTTPS for `FORGEJO_DOMAIN` with Cloudflare DNS-01. With the default `FORGEJO_CONFIGURE_SYSTEM_SSH=1`, the LXC's OpenSSH server on port 22 is integrated with Forgejo for git access, e.g. `git@git.example.internal:owner/repo.git`.
-
-By default, the script installs Forgejo and starts the web setup flow. To write a minimal SQLite `app.ini` during bootstrap, set:
-
-```bash
-export FORGEJO_WRITE_INITIAL_CONFIG=1
-```
-
-## DNS zones and records
-
-`dns.tf` manages DNS through `terraform_data`, which runs:
-
-```bash
-python scripts/apply-technitium-dns.py dns-records.local.json
-```
-
-The local JSON file controls:
-
-- upstream DNS forwarders, e.g. DNS-over-TLS Quad9 and Cloudflare Security
-- conditional forwarder zones
-- local A records
-- local CNAME records
-
-Use `dns-records.example.json` as the public-safe schema example.
-
-## EdgeRouter helper
-
-`scripts/edgeos-static-host-mapping.sh` mutates the live EdgeRouter config to add a temporary static host mapping. Run only after review and explicit approval.
+`scripts/edgeos-static-host-mapping.sh` mutates a live EdgeRouter config and should only be run after explicit review/approval.
