@@ -8,7 +8,10 @@ terraform.tfvars
 *.tfstate
 *.tfstate.*
 tfplan
+tfplan.meta.json
+settings.local.json
 *.tfplan
+*.tfplan.meta.json
 dns-records.local.json
 !scaffold/dns-records.local.json
 values

@@ -6,7 +6,10 @@ crash.log
 crash.*.log
 
 tfplan
+tfplan.meta.json
+settings.local.json
 *.tfplan
+*.tfplan.meta.json
 *.tfvars
 !*.tfvars.example
 !scaffold/terraform.tfvars
