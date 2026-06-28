@@ -16,14 +16,15 @@ scripts/           Local workflow helpers
 tools/             Docker tooling image
 ```
 
-Ignored private/local state:
+Ignored site/local state:
 
 ```text
 values/            Private site values repo
-private/           Optional local private notes/archive
 .terraform/        OpenTofu/Terraform working data
 tfplan             Local plan artifact
 ```
+
+Keep non-public material in `values/` or outside this checkout; do not add another sensitive-data directory to this repo.
 
 ## Fresh setup
 
@@ -51,6 +52,12 @@ values/ansible/inventory/local.yml
 ```
 
 ## Daily workflow
+
+Validate tracked public source only:
+
+```bash
+just validate-public
+```
 
 Validate public source and private values wiring:
 

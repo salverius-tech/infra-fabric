@@ -15,9 +15,8 @@ tfplan
 dns-records.local.json
 !scaffold/dns-records.local.json
 
-# Nested private values repo and local private notes/archive source
+# Nested site values repo
 values/
-private/
 
 # Secrets / local env
 .env
@@ -39,5 +38,3 @@ Thumbs.db
 .vscode/
 .idea/
 .pi/todo.json
-scaffold/dns-records.local.json
-scaffold/terraform.tfvars

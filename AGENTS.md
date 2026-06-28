@@ -30,7 +30,8 @@ Real Proxmox endpoints, LAN IPs, DNS zones/records, hostnames, credentials, and 
 ## Safety Rules
 
 - Do not run `tofu apply`, `terraform apply`, `destroy`, import, or state surgery without explicit user approval.
-- Do not commit secrets, live domains/IPs/hostnames, `values/`, `private/`, state files, plans, or generated local credentials.
+- Do not commit secrets, live domains/IPs/hostnames, `values/`, state files, plans, or generated local credentials.
+- Keep non-public material in `values/` or outside the checkout; do not add another sensitive-data directory to this repo.
 - Treat DNS, Forgejo, and HTTPS/SSH endpoints as critical infrastructure. Prefer reviewed plans over ad hoc mutation.
 - Do not mutate production routers/firewalls unless explicitly requested.
 - If changing service IPs, hostnames, SSH ports, or proxy topology, update scaffold examples, private values as requested, README, and any migration notes together.

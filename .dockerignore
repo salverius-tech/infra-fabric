@@ -4,13 +4,16 @@
 .env.*
 !.env.example
 terraform.tfvars
+!scaffold/terraform.tfvars
 *.tfstate
 *.tfstate.*
 tfplan
 *.tfplan
 dns-records.local.json
+!scaffold/dns-records.local.json
 values
-private
+local
+secrets
 scripts/__pycache__
 __pycache__
 *.py[cod]
