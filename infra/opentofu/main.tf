@@ -1,4 +1,6 @@
 resource "proxmox_download_file" "debian_12_lxc_template" {
+  count = local.lxc_template_enabled ? 1 : 0
+
   content_type        = "vztmpl"
   datastore_id        = var.template_datastore_id
   file_name           = var.debian_template_file_name
@@ -9,6 +11,8 @@ resource "proxmox_download_file" "debian_12_lxc_template" {
 }
 
 resource "proxmox_virtual_environment_container" "technitium_dns" {
+  count = local.technitium_enabled ? 1 : 0
+
   description   = var.container_description
   node_name     = var.proxmox_node_name
   vm_id         = var.container_vmid
@@ -62,7 +66,7 @@ resource "proxmox_virtual_environment_container" "technitium_dns" {
   }
 
   operating_system {
-    template_file_id = proxmox_download_file.debian_12_lxc_template.id
+    template_file_id = proxmox_download_file.debian_12_lxc_template[0].id
     type             = "debian"
   }
 

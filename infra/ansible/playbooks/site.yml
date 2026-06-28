@@ -16,3 +16,9 @@
   gather_facts: false
   roles:
     - forgejo
+
+- name: Bootstrap Tailscale client LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - tailscale_client

@@ -14,6 +14,13 @@ all:
     forgejo_enable_caddy: true
     forgejo_configure_system_ssh: true
     forgejo_write_initial_config: false
+    tailscale_client_enabled: false
+    tailscale_client_vmid: 108
+    tailscale_client_restore_backup: false
+    tailscale_client_backup_archive: ../../values/backups/tailscale-client/example/client-config-full.tgz
+    tailscale_client_enable_ip_forwarding: true
+    tailscale_client_auth_key: "{{ lookup('env', 'TAILSCALE_AUTH_KEY') }}"
+    tailscale_client_up_args: []
     caddy_email: admin@example.internal
     caddy_cloudflare_api_token: "{{ lookup('env', 'CF_DNS_API_TOKEN') }}"
     caddy_server_name: dns-ui.example.internal

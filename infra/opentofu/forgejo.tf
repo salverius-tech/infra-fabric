@@ -1,9 +1,18 @@
 resource "terraform_data" "forgejo_data_dataset" {
+  count = local.forgejo_enabled ? 1 : 0
+
   input = {
     dataset    = var.forgejo_data_dataset
     mountpoint = var.forgejo_data_host_path
     uid        = var.forgejo_data_host_uid
     gid        = var.forgejo_data_host_gid
+  }
+
+  triggers_replace = {
+    dataset    = var.forgejo_data_dataset
+    mountpoint = var.forgejo_data_host_path
+    uid        = tostring(var.forgejo_data_host_uid)
+    gid        = tostring(var.forgejo_data_host_gid)
   }
 
   provisioner "local-exec" {
@@ -23,8 +32,14 @@ resource "terraform_data" "forgejo_data_dataset" {
       gid="$4"
 
       if ! zfs list -- "$dataset" >/dev/null 2>&1; then
-        zfs create -o "mountpoint=$mountpoint" -- "$dataset"
+        zfs create -p -o "mountpoint=$mountpoint" -- "$dataset"
+      else
+        current_mountpoint="$(zfs get -H -o value mountpoint "$dataset")"
+        if [[ "$current_mountpoint" != "$mountpoint" ]]; then
+          zfs set "mountpoint=$mountpoint" -- "$dataset"
+        fi
       fi
+      zfs mount "$dataset" >/dev/null 2>&1 || true
       mkdir -p -- "$mountpoint"
       chown -- "$uid:$gid" "$mountpoint"
       chmod 0750 -- "$mountpoint"
@@ -41,6 +56,8 @@ resource "terraform_data" "forgejo_data_dataset" {
 }
 
 resource "proxmox_virtual_environment_container" "forgejo" {
+  count = local.forgejo_enabled ? 1 : 0
+
   depends_on = [terraform_data.forgejo_data_dataset]
 
   description   = var.forgejo_container_description
@@ -102,7 +119,7 @@ resource "proxmox_virtual_environment_container" "forgejo" {
   }
 
   operating_system {
-    template_file_id = proxmox_download_file.debian_12_lxc_template.id
+    template_file_id = proxmox_download_file.debian_12_lxc_template[0].id
     type             = "debian"
   }
 

@@ -1,3 +1,17 @@
+variable "enabled_services" {
+  description = "Services OpenTofu should build and maintain. Service selection is normally supplied from settings.local.json by just plan."
+  type        = list(string)
+  default     = ["technitium", "forgejo"]
+
+  validation {
+    condition = alltrue([
+      for service in var.enabled_services : contains(["technitium", "forgejo", "tailscale_client"], service)
+    ])
+    error_message = "enabled_services may contain only technitium, forgejo, and tailscale_client."
+  }
+}
+
+
 variable "proxmox_endpoint" {
   description = "Proxmox VE API endpoint. Set in terraform.tfvars."
   type        = string
@@ -295,4 +309,128 @@ variable "forgejo_startup_down_delay" {
   description = "Seconds to wait after shutting down the Forgejo LXC before shutting down the next guest."
   type        = string
   default     = "20"
+}
+
+variable "tailscale_client_enabled" {
+  description = "Create the Tailscale client LXC. Keep false for backup-only documentation until a reviewed plan should create it."
+  type        = bool
+  default     = false
+}
+
+variable "tailscale_client_vmid" {
+  description = "Proxmox VMID for the Tailscale client LXC. Set in terraform.tfvars before enabling tailscale_client_enabled."
+  type        = number
+  default     = 108
+}
+
+variable "tailscale_client_hostname" {
+  description = "Hostname for the Tailscale client LXC."
+  type        = string
+  default     = "tailscale-client"
+}
+
+variable "tailscale_client_description" {
+  description = "Description for the Tailscale client LXC."
+  type        = string
+  default     = "Tailscale client LXC managed by OpenTofu."
+}
+
+variable "tailscale_client_ipv4_address" {
+  description = "IPv4 address/CIDR for the Tailscale client LXC, or dhcp when the router supplies a static DHCP reservation."
+  type        = string
+  default     = "dhcp"
+
+  validation {
+    condition     = var.tailscale_client_ipv4_address == "dhcp" || can(cidrhost(var.tailscale_client_ipv4_address, 0))
+    error_message = "tailscale_client_ipv4_address must be dhcp or a valid IPv4 CIDR address."
+  }
+}
+
+variable "tailscale_client_ipv4_gateway" {
+  description = "IPv4 gateway for the Tailscale client LXC. Use null when tailscale_client_ipv4_address is dhcp."
+  type        = string
+  default     = null
+}
+
+variable "tailscale_client_mac_address" {
+  description = "MAC address for the Tailscale client LXC, useful when the router supplies a static DHCP reservation."
+  type        = string
+  default     = "BC:24:11:00:00:01"
+
+  validation {
+    condition     = can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.tailscale_client_mac_address))
+    error_message = "tailscale_client_mac_address must use colon-separated hex octets, for example BC:24:11:00:00:01."
+  }
+}
+
+variable "tailscale_client_dns_servers" {
+  description = "DNS servers used by the Tailscale client LXC before Tailscale DNS is configured."
+  type        = list(string)
+  default     = ["1.1.1.1", "9.9.9.9"]
+}
+
+variable "tailscale_client_search_domain" {
+  description = "DNS search domain for the Tailscale client LXC."
+  type        = string
+  default     = "example.internal"
+}
+
+variable "tailscale_client_bridge" {
+  description = "Proxmox bridge for the Tailscale client LXC interface."
+  type        = string
+  default     = "vmbr0"
+}
+
+variable "tailscale_client_cores" {
+  description = "CPU cores for the Tailscale client LXC."
+  type        = number
+  default     = 1
+}
+
+variable "tailscale_client_memory_mb" {
+  description = "Dedicated memory for the Tailscale client LXC."
+  type        = number
+  default     = 512
+}
+
+variable "tailscale_client_swap_mb" {
+  description = "Swap for the Tailscale client LXC."
+  type        = number
+  default     = 256
+}
+
+variable "tailscale_client_disk_gb" {
+  description = "Root filesystem size in GB for the Tailscale client LXC."
+  type        = number
+  default     = 4
+}
+
+variable "tailscale_client_started" {
+  description = "Whether OpenTofu should start the Tailscale client LXC after creation."
+  type        = bool
+  default     = true
+}
+
+variable "tailscale_client_start_on_boot" {
+  description = "Whether Proxmox should start the Tailscale client LXC on host boot."
+  type        = bool
+  default     = true
+}
+
+variable "tailscale_client_startup_order" {
+  description = "Proxmox startup order for the Tailscale client LXC."
+  type        = string
+  default     = "3"
+}
+
+variable "tailscale_client_startup_up_delay" {
+  description = "Seconds to wait after starting the Tailscale client LXC before starting the next guest."
+  type        = string
+  default     = "10"
+}
+
+variable "tailscale_client_startup_down_delay" {
+  description = "Seconds to wait after shutting down the Tailscale client LXC before shutting down the next guest."
+  type        = string
+  default     = "10"
 }

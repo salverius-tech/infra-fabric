@@ -56,3 +56,23 @@ forgejo_container_disk_gb   = 8
 forgejo_data_dataset    = "tank/forgejo"
 forgejo_data_host_path  = "/tank/forgejo"
 forgejo_data_mount_path = "/var/lib/forgejo"
+
+# Optional Tailscale client LXC. Leave disabled until a reviewed plan should create it.
+tailscale_client_enabled       = false
+tailscale_client_vmid          = 108
+tailscale_client_hostname      = "tailscale-client"
+tailscale_client_description   = "Tailscale client LXC managed by OpenTofu."
+tailscale_client_ipv4_address  = "dhcp"
+tailscale_client_ipv4_gateway  = null
+tailscale_client_mac_address   = "BC:24:11:00:00:01"
+tailscale_client_dns_servers   = ["1.1.1.1", "9.9.9.9"]
+tailscale_client_search_domain = "example.internal"
+tailscale_client_bridge        = "vmbr0"
+
+tailscale_client_cores     = 1
+tailscale_client_memory_mb = 512
+tailscale_client_swap_mb   = 256
+tailscale_client_disk_gb   = 4
+
+tailscale_client_started       = true
+tailscale_client_start_on_boot = true
