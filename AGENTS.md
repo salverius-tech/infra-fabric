@@ -75,6 +75,16 @@ These route through `scripts/forgejo-actions-monitor.py`, query Forgejo read-onl
 7. If plan verification fails, rerun `just plan` instead of reusing or editing saved plan files.
 8. For in-LXC service configuration, prefer Ansible playbooks via `just apply` over ad hoc shell changes.
 
+## Service HTTPS / Caddy Pattern
+
+This repo generally uses service-local Caddy instances rather than one central reverse proxy.
+
+- Technitium LXC runs its own Caddy for the DNS/Technitium UI.
+- Forgejo LXC runs its own Caddy for Forgejo.
+- New browser-facing first-class services should usually follow the same pattern: app plus Caddy in the same LXC, with Caddy proxying to the app on loopback.
+- Caddy uses Cloudflare DNS-01 ACME via `CF_DNS_API_TOKEN`, so multiple service-local Caddy instances can obtain certificates without competing for HTTP-01 port 80 routing.
+- Avoid turning the Technitium/DNS LXC into a general ingress proxy unless there is an explicit design reason. `caddy_extra_vhosts` exists, but should not be the default for new first-class services.
+
 ## DNS Management
 
 `infra/opentofu/dns.tf` uses `terraform_data` to run `infra/opentofu/scripts/apply-technitium-dns.py` against `values/dns-records.local.json` via `var.dns_records_file`.
