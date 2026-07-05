@@ -136,8 +136,13 @@ validate_user_id() {
 require_file "$env_file"
 
 current_token="$(get_env_value PROXMOX_VE_API_TOKEN || true)"
-if [[ "$if_needed" -eq 1 && "$force" -eq 0 ]] && ! is_placeholder_token "$current_token"; then
-  printf 'Proxmox API token already configured in %s; skipping bootstrap wizard.\n' "$env_file"
+current_endpoint="$(get_env_value PROXMOX_VE_ENDPOINT || true)"
+current_pve_host="$(get_env_value PVE_HOST || true)"
+if [[ "$if_needed" -eq 1 && "$force" -eq 0 ]] && \
+  ! is_placeholder_token "$current_token" && \
+  [[ -n "$current_endpoint" && "$current_endpoint" != *REPLACE* ]] && \
+  [[ -n "$current_pve_host" && "$current_pve_host" != *REPLACE* ]]; then
+  printf 'Proxmox API endpoint, token, and SSH target already configured in %s; skipping bootstrap wizard.\n' "$env_file"
   exit 0
 fi
 
@@ -158,8 +163,8 @@ if ! confirm 'Bootstrap a Proxmox API token over SSH now? This will create/updat
   exit 0
 fi
 
-existing_host="$(get_env_value PVE_HOST || true)"
-existing_endpoint="$(get_env_value PROXMOX_VE_ENDPOINT || true)"
+existing_host="${current_pve_host:-$(get_env_value PVE_HOST || true)}"
+existing_endpoint="${current_endpoint:-$(get_env_value PROXMOX_VE_ENDPOINT || true)}"
 existing_host="${existing_host#root@}"
 
 pve_host="$(prompt 'Proxmox host' "${existing_host:-proxmox.example.internal}")"

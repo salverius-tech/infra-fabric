@@ -57,7 +57,7 @@ validate-public: validate-public-safety
     docker compose run --rm infra tofu -chdir=infra/opentofu validate
     docker compose run --rm infra tflint --chdir=infra/opentofu --minimum-failure-severity=error
     docker compose run --rm infra shellcheck scripts/*.sh tools/docker-entrypoint.sh
-    docker compose run --rm infra python -m py_compile infra/opentofu/scripts/apply-technitium-dns.py scripts/migrate-values.py scripts/parse-env.py scripts/public-safety-check.py scripts/settings.py scripts/tfplan-metadata.py scripts/update.py scripts/workspace-preflight.py tests/test_apply_technitium_dns.py tests/test_migrate_values.py tests/test_parse_env.py tests/test_public_safety_check.py tests/test_run_infra.py tests/test_settings.py tests/test_tfplan_metadata.py tests/test_update.py tests/test_workspace_preflight.py
+    docker compose run --rm infra python -m py_compile infra/opentofu/scripts/apply-technitium-dns.py scripts/bootstrap-domain.py scripts/migrate-values.py scripts/parse-env.py scripts/public-safety-check.py scripts/settings.py scripts/tfplan-metadata.py scripts/update.py scripts/workspace-preflight.py tests/test_apply_technitium_dns.py tests/test_bootstrap_domain.py tests/test_migrate_values.py tests/test_parse_env.py tests/test_public_safety_check.py tests/test_run_infra.py tests/test_settings.py tests/test_tfplan_metadata.py tests/test_update.py tests/test_workspace_preflight.py
     docker compose run --rm infra python infra/opentofu/scripts/apply-technitium-dns.py --check scaffold/dns-records.local.json
     docker compose run --rm infra python scripts/parse-env.py --env-file scaffold/.env.example >/dev/null
     docker compose run --rm infra python scripts/settings.py --settings settings.example.json validate >/dev/null

@@ -96,13 +96,29 @@ def confirm(label: str, default: bool = False) -> bool:
     return value in {"y", "yes"}
 
 
-def configured_domain(env_path: Path) -> str:
+def domain_from_hostname(value: str, prefix: str) -> str:
+    if not value.startswith(prefix):
+        return ""
+    domain = value.removeprefix(prefix).split(":", 1)[0].rstrip("/")
+    return domain if domain and not is_placeholder_domain(domain) else ""
+
+
+def configured_domain(env_path: Path, tfvars_path: Path) -> str:
+    api_url = env_value(env_path, "TECHNITIUM_API_URL")
+    match = re.match(r"^https?://([^/:]+)", api_url)
+    if match:
+        domain = domain_from_hostname(match.group(1), "dns.")
+        if domain:
+            return domain
+
+    search_domain = tfvar_value(tfvars_path, "container_search_domain")
+    if search_domain and not is_placeholder_domain(search_domain):
+        return search_domain
+
     for key, prefix in (("SERVER_NAME", "dns."), ("FORGEJO_DOMAIN", "git.")):
-        value = env_value(env_path, key)
-        if value.startswith(prefix):
-            domain = value.removeprefix(prefix)
-            if domain and not is_placeholder_domain(domain):
-                return domain
+        domain = domain_from_hostname(env_value(env_path, key), prefix)
+        if domain:
+            return domain
     return ""
 
 
@@ -133,9 +149,9 @@ def update_inventory(path: Path, domain: str) -> None:
         return
     text = path.read_text(encoding="utf-8")
     block = (
-        '    caddy_server_name: "{{ lookup(\'env\', \'SERVER_NAME\') }}"\n'
+        f"    caddy_server_name: dns.{domain}\n"
         "    caddy_server_names:\n"
-        '      - "{{ lookup(\'env\', \'SERVER_NAME\') }}"\n'
+        f"      - dns.{domain}\n"
         f"      - technitium.{domain}\n"
         "    caddy_upstream: 127.0.0.1:5380"
     )
@@ -185,7 +201,7 @@ def run(args: argparse.Namespace) -> int:
             print(f"  {path}", file=sys.stderr)
         return 1
 
-    existing_domain = configured_domain(env_path)
+    existing_domain = configured_domain(env_path, tfvars_path)
     if args.if_needed and existing_domain and not args.force:
         print(f"Domain values already configured for {existing_domain}; skipping domain wizard.")
         return 0
