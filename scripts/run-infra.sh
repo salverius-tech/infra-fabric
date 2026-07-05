@@ -8,6 +8,9 @@ if [[ ! -f "${env_file}" ]]; then
   exit 1
 fi
 
+export INFRA_HOST_UID="${INFRA_HOST_UID:-$(scripts/host-id.sh uid)}"
+export INFRA_HOST_GID="${INFRA_HOST_GID:-$(scripts/host-id.sh gid)}"
+
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/run-infra.XXXXXX")"
 chmod 0700 "${tmp_dir}"
 compose_env_file="${tmp_dir}/env"

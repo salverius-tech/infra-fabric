@@ -72,8 +72,9 @@ These route through `scripts/forgejo-actions-monitor.py`, query Forgejo read-onl
 4. If a plan is requested, run `just plan` and summarize creates/changes/destroys.
 5. Apply only after explicit approval using `just apply`; it verifies `tfplan.meta.json` before applying.
 6. Use the user-facing `just` recipes (`setup`, `validate`, `plan`, `apply`) rather than ad hoc shell sequences for normal operations.
-7. If plan verification fails, rerun `just plan` instead of reusing or editing saved plan files.
-8. For in-LXC service configuration, prefer Ansible playbooks via `just apply` over ad hoc shell changes.
+7. Do not add new public `just` recipes unless the user explicitly asks for that exact command. Prefer scripts or private/internal helpers for implementation details, and keep the public command surface limited to requested commands.
+8. If plan verification fails, rerun `just plan` instead of reusing or editing saved plan files.
+9. For in-LXC service configuration, prefer Ansible playbooks via `just apply` over ad hoc shell changes.
 
 ## Service HTTPS / Caddy Pattern
 

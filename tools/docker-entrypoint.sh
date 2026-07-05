@@ -5,6 +5,14 @@ container_user="${INFRA_CONTAINER_USER:-anvil}"
 container_home="/home/${container_user}"
 ssh_dir="${container_home}/.ssh"
 
+if [[ -n "${INFRA_HOST_GID:-}" ]] && [[ "$(id -g "${container_user}")" != "${INFRA_HOST_GID}" ]]; then
+  groupmod -o -g "${INFRA_HOST_GID}" "${container_user}"
+fi
+
+if [[ -n "${INFRA_HOST_UID:-}" ]] && [[ "$(id -u "${container_user}")" != "${INFRA_HOST_UID}" ]]; then
+  usermod -o -u "${INFRA_HOST_UID}" -g "$(id -g "${container_user}")" "${container_user}"
+fi
+
 install -d -m 0755 "${container_home}"
 install -d -m 0755 "${container_home}/.terraform.d" "${container_home}/.ansible"
 install -d -m 0755 "${container_home}/.terraform.d/plugin-cache"

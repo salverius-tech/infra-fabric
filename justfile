@@ -1,5 +1,8 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+export INFRA_HOST_UID := `scripts/host-id.sh uid`
+export INFRA_HOST_GID := `scripts/host-id.sh gid`
+
 # Show available commands
 default:
     @just --list
