@@ -19,6 +19,7 @@ setup remote="":
         scripts/values.sh init; \
     fi
     @if [[ -t 0 && -t 1 ]]; then scripts/bootstrap-pve-token.sh --if-needed; else printf 'Skipping Proxmox token bootstrap wizard because just setup is not interactive.\n'; fi
+    @if [[ -t 0 && -t 1 ]]; then scripts/python.sh scripts/bootstrap-domain.py --if-needed; else printf 'Skipping domain wizard because just setup is not interactive.\n'; fi
     @printf '\nEdit these private values before running `just validate` and `just plan`:\n'
     @printf '  values/.env\n  values/terraform.tfvars\n  values/dns-records.local.json\n  values/ansible/inventory/local.yml\n'
 

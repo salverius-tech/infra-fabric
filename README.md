@@ -42,7 +42,7 @@ Then run:
 just setup
 ```
 
-This builds the local tooling container and creates `values/` from `scaffold/`, or clones the `values_repo.remote` configured in `settings.local.json`. In an interactive terminal, it also starts a Proxmox token bootstrap wizard when `values/.env` does not already contain a usable `PROXMOX_VE_API_TOKEN`. The wizard asks for your Proxmox host, verifies root SSH key access, offers an alternate key file or a command to authorize your default public SSH key if default keys fail, creates/updates a dedicated Proxmox API user/token, and writes the endpoint/token/SSH target to `values/.env` without printing the token secret.
+This builds the local tooling container and creates `values/` from `scaffold/`, or clones the `values_repo.remote` configured in `settings.local.json`. In an interactive terminal, it also starts setup wizards for Proxmox API access and domain-derived service names. The Proxmox wizard asks for your Proxmox host, verifies root SSH key access, offers an alternate key file or a command to authorize your default public SSH key if default keys fail, creates/updates a dedicated Proxmox API user/token, and writes the endpoint/token/SSH target to `values/.env` without printing the token secret. The domain wizard asks for your base domain plus service IPs, then derives names such as `dns.<domain>`, `technitium.<domain>`, and `git.<domain>` in the private values files.
 
 You can also pass the values repo URL directly:
 
@@ -63,6 +63,12 @@ If you skipped the Proxmox token wizard or need to rotate the token later, run:
 
 ```bash
 scripts/bootstrap-pve-token.sh --force
+```
+
+If you need to rerun the domain wizard, run:
+
+```bash
+scripts/python.sh scripts/bootstrap-domain.py --force
 ```
 
 ## Daily workflow
