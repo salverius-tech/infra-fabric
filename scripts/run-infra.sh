@@ -18,7 +18,7 @@ trap cleanup EXIT HUP INT TERM
 
 # Convert values/.env to a sanitized Docker env file. Do not source it directly.
 umask 077
-python3 scripts/parse-env.py --env-file "${env_file}" >"${compose_env_file}"
+scripts/python.sh scripts/parse-env.py --env-file "${env_file}" >"${compose_env_file}"
 chmod 0600 "${compose_env_file}"
 
 docker compose run --rm --env-from-file "${compose_env_file}" infra "$@"

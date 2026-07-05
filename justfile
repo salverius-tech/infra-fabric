@@ -7,8 +7,8 @@ default:
 # Fresh-checkout setup: build tools, create or clone values/, then show next files to edit
 setup remote="":
     docker compose build infra
-    @scripts/settings.py validate >/dev/null
-    @settings_remote="$(scripts/settings.py values-remote)"; \
+    @scripts/python.sh scripts/settings.py validate >/dev/null
+    @settings_remote="$(scripts/python.sh scripts/settings.py values-remote)"; \
     selected_remote="{{remote}}"; \
     if [[ -z "${selected_remote}" ]]; then selected_remote="${settings_remote}"; fi; \
     if [[ -d values ]]; then \
@@ -57,10 +57,10 @@ validate-public: validate-public-safety
 # Validate only private values wiring and data shape
 [private]
 validate-values: check-values
-    scripts/settings.py validate >/dev/null
+    scripts/python.sh scripts/settings.py validate >/dev/null
     scripts/run-infra.sh python infra/opentofu/scripts/apply-technitium-dns.py --check values/dns-records.local.json
     scripts/run-infra.sh ansible-inventory -i values/ansible/inventory/local.yml --list >/dev/null
-    @while IFS= read -r playbook; do playbook="$(printf '%s' "${playbook}" | tr -d '\r')"; scripts/run-infra.sh ansible-playbook -i values/ansible/inventory/local.yml --syntax-check "$playbook"; done < <(scripts/settings.py ansible-playbooks)
+    @while IFS= read -r playbook; do playbook="$(printf '%s' "${playbook}" | tr -d '\r')"; scripts/run-infra.sh ansible-playbook -i values/ansible/inventory/local.yml --syntax-check "$playbook"; done < <(scripts/python.sh scripts/settings.py ansible-playbooks)
 
 # Validate public source and private values wiring
 validate: validate-public validate-values
@@ -93,14 +93,14 @@ clean-plans:
 # Review infrastructure changes using private values; writes tfplan for `just apply`
 plan: check-values clean-plans
     scripts/run-infra.sh tofu -chdir=infra/opentofu init
-    enabled_services="$(scripts/settings.py tofu-var)"; scripts/run-infra.sh tofu -chdir=infra/opentofu plan -var "enabled_services=${enabled_services}" -var-file=../../values/terraform.tfvars -state=../../values/terraform.tfstate -out=../../tfplan
+    enabled_services="$(scripts/python.sh scripts/settings.py tofu-var)"; scripts/run-infra.sh tofu -chdir=infra/opentofu plan -var "enabled_services=${enabled_services}" -var-file=../../values/terraform.tfvars -state=../../values/terraform.tfstate -out=../../tfplan
     scripts/run-infra.sh tofu -chdir=infra/opentofu show ../../tfplan
-    scripts/tfplan-metadata.py create --plan tfplan --metadata tfplan.meta.json
+    scripts/python.sh scripts/tfplan-metadata.py create --plan tfplan --metadata tfplan.meta.json
 
 # Apply reviewed infrastructure plan, then configure services with Ansible
 apply: check-values
     test -f tfplan
     test -f tfplan.meta.json
-    scripts/tfplan-metadata.py verify --plan tfplan --metadata tfplan.meta.json
+    scripts/python.sh scripts/tfplan-metadata.py verify --plan tfplan --metadata tfplan.meta.json
     @printf 'Applying verified tfplan created by `just plan`.\n'
-    trap 'rm -f tfplan tfplan.meta.json *.tfplan *.tfplan.meta.json' EXIT; scripts/run-infra.sh tofu -chdir=infra/opentofu apply -state=../../values/terraform.tfstate ../../tfplan && while IFS= read -r playbook; do playbook="$(printf '%s' "${playbook}" | tr -d '\r')"; scripts/run-infra.sh ansible-playbook -i values/ansible/inventory/local.yml "$playbook"; done < <(scripts/settings.py ansible-playbooks)
+    trap 'rm -f tfplan tfplan.meta.json *.tfplan *.tfplan.meta.json' EXIT; scripts/run-infra.sh tofu -chdir=infra/opentofu apply -state=../../values/terraform.tfstate ../../tfplan && while IFS= read -r playbook; do playbook="$(printf '%s' "${playbook}" | tr -d '\r')"; INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh ansible-playbook -i values/ansible/inventory/local.yml "$playbook"; done < <(scripts/python.sh scripts/settings.py ansible-playbooks)
