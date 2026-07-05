@@ -1,7 +1,7 @@
 FROM debian:bookworm-slim
 
-ARG OPENTOFU_VERSION=1.10.6
-ARG TFLINT_VERSION=0.58.1
+ARG OPENTOFU_VERSION=1.12.3
+ARG TFLINT_VERSION=0.63.1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \

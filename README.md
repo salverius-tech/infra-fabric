@@ -83,6 +83,14 @@ just validate
 
 `just validate` runs source checks, linting, tests, and private `values/` wiring checks. Use it as the normal validation entry point.
 
+Check for eligible pinned version updates without applying infrastructure changes:
+
+```bash
+just update
+```
+
+`just update` checks known upstream releases and only updates pins for releases at least 48 hours old. Review the resulting diff before continuing with validation and planning.
+
 Review infrastructure/DNS changes:
 
 ```bash
