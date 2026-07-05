@@ -18,8 +18,29 @@ install -d -m 0755 "${container_home}/.terraform.d" "${container_home}/.ansible"
 install -d -m 0755 "${container_home}/.terraform.d/plugin-cache"
 chown -R "${container_user}:${container_user}" "${container_home}/.terraform.d" "${container_home}/.ansible"
 
+# Keep generated bind-mounted artifacts writable by the host user that invoked
+# Docker. This is intentionally narrow: do not recursively chown the private
+# values repo, but do repair local state/lock/plan files that OpenTofu must
+# rewrite or replace.
+for path in /workspace /workspace/infra/opentofu /workspace/values; do
+  if [[ -e "${path}" ]]; then
+    chown "${container_user}:${container_user}" "${path}" 2>/dev/null || true
+  fi
+done
+
 find /workspace -type d \( -name __pycache__ -o -name .pytest_cache -o -name .terraform \) \
   -prune -exec chown -R "${container_user}:${container_user}" {} + 2>/dev/null || true
+
+find /workspace -maxdepth 1 -type f \( -name 'tfplan*' -o -name '*.tfplan*' \) \
+  -exec chown "${container_user}:${container_user}" {} + 2>/dev/null || true
+
+if [[ -d /workspace/values ]]; then
+  find /workspace/values -maxdepth 1 -type f \( \
+    -name 'terraform.tfstate*' -o \
+    -name '*.tfstate*' -o \
+    -name '.terraform.tfstate.lock.info' \
+  \) -exec chown "${container_user}:${container_user}" {} + 2>/dev/null || true
+fi
 
 if [[ -d /ssh-ro ]]; then
   install -d -m 0700 -o "${container_user}" -g "${container_user}" "${ssh_dir}"
@@ -44,7 +65,11 @@ if [[ -d /ssh-ro ]]; then
   find "${ssh_dir}" -type f ! -name '*.pub' -exec chmod 0600 {} +
 fi
 
-gosu "${container_user}" git config --global --add safe.directory /workspace >/dev/null 2>&1 || true
-
 export HOME="${container_home}"
+
+gosu "${container_user}" git config --global --add safe.directory /workspace >/dev/null 2>&1 || true
+if [[ -d /workspace/values ]]; then
+  gosu "${container_user}" git config --global --add safe.directory /workspace/values >/dev/null 2>&1 || true
+fi
+
 exec gosu "${container_user}" "$@"

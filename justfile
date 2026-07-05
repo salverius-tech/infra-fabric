@@ -21,6 +21,7 @@ setup remote="":
     else \
         scripts/values.sh init; \
     fi
+    docker compose run --rm infra python scripts/workspace-preflight.py --require-values
     @if [[ -t 0 && -t 1 ]]; then INFRA_COPY_SSH_KEYS=true docker compose run --rm infra bash scripts/bootstrap-pve-token.sh --if-needed; else printf 'Skipping Proxmox token bootstrap wizard because just setup is not interactive.\n'; fi
     @if [[ -t 0 && -t 1 ]]; then scripts/python.sh scripts/bootstrap-domain.py --if-needed; else printf 'Skipping domain wizard because just setup is not interactive.\n'; fi
     @printf '\nEdit these private values before running `just validate` and `just plan`:\n'
@@ -45,13 +46,14 @@ validate-public-safety:
 [private]
 validate-public: validate-public-safety
     docker compose config >/dev/null
-    rm -rf infra/opentofu/.terraform
+    docker compose run --rm infra rm -rf infra/opentofu/.terraform
+    docker compose run --rm infra python scripts/workspace-preflight.py
     docker compose run --rm infra tofu -chdir=infra/opentofu init -backend=false
     docker compose run --rm infra tofu fmt -check -recursive infra/opentofu scaffold/terraform.tfvars
     docker compose run --rm infra tofu -chdir=infra/opentofu validate
     docker compose run --rm infra tflint --chdir=infra/opentofu --minimum-failure-severity=error
     docker compose run --rm infra shellcheck scripts/*.sh tools/docker-entrypoint.sh
-    docker compose run --rm infra python -m py_compile infra/opentofu/scripts/apply-technitium-dns.py scripts/parse-env.py scripts/public-safety-check.py scripts/settings.py scripts/tfplan-metadata.py scripts/update.py tests/test_apply_technitium_dns.py tests/test_parse_env.py tests/test_public_safety_check.py tests/test_run_infra.py tests/test_settings.py tests/test_tfplan_metadata.py tests/test_update.py
+    docker compose run --rm infra python -m py_compile infra/opentofu/scripts/apply-technitium-dns.py scripts/parse-env.py scripts/public-safety-check.py scripts/settings.py scripts/tfplan-metadata.py scripts/update.py scripts/workspace-preflight.py tests/test_apply_technitium_dns.py tests/test_parse_env.py tests/test_public_safety_check.py tests/test_run_infra.py tests/test_settings.py tests/test_tfplan_metadata.py tests/test_update.py tests/test_workspace_preflight.py
     docker compose run --rm infra python infra/opentofu/scripts/apply-technitium-dns.py --check scaffold/dns-records.local.json
     docker compose run --rm infra python scripts/parse-env.py --env-file scaffold/.env.example >/dev/null
     docker compose run --rm infra python scripts/settings.py --settings settings.example.json validate >/dev/null
@@ -62,6 +64,7 @@ validate-public: validate-public-safety
 # Validate only private values wiring and data shape
 [private]
 validate-values: check-values
+    scripts/run-infra.sh python scripts/workspace-preflight.py --require-values
     scripts/python.sh scripts/settings.py validate >/dev/null
     scripts/run-infra.sh python infra/opentofu/scripts/apply-technitium-dns.py --check values/dns-records.local.json
     scripts/run-infra.sh ansible-inventory -i values/ansible/inventory/local.yml --list >/dev/null
@@ -97,11 +100,12 @@ actions-runners:
 # Remove saved plan artifacts
 [private]
 clean-plans:
-    rm -f tfplan tfplan.meta.json *.tfplan *.tfplan.meta.json
+    docker compose run --rm infra rm -f tfplan tfplan.meta.json *.tfplan *.tfplan.meta.json
 
 # Review infrastructure changes using private values; writes tfplan for `just apply`
 plan: check-values clean-plans
-    rm -rf infra/opentofu/.terraform
+    scripts/run-infra.sh python scripts/workspace-preflight.py --require-values
+    scripts/run-infra.sh rm -rf infra/opentofu/.terraform
     scripts/run-infra.sh tofu -chdir=infra/opentofu init
     enabled_services="$(scripts/python.sh scripts/settings.py tofu-var)"; scripts/run-infra.sh tofu -chdir=infra/opentofu plan -var "enabled_services=${enabled_services}" -var-file=../../values/terraform.tfvars -state=../../values/terraform.tfstate -out=../../tfplan
     scripts/run-infra.sh tofu -chdir=infra/opentofu show ../../tfplan
@@ -109,6 +113,7 @@ plan: check-values clean-plans
 
 # Apply reviewed infrastructure plan, then configure services with Ansible
 apply: check-values
+    scripts/run-infra.sh python scripts/workspace-preflight.py --require-values
     test -f tfplan
     test -f tfplan.meta.json
     scripts/python.sh scripts/tfplan-metadata.py verify --plan tfplan --metadata tfplan.meta.json

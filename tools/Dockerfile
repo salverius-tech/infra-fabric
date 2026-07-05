@@ -2,6 +2,11 @@ FROM debian:bookworm-slim
 
 ARG OPENTOFU_VERSION=1.12.3
 ARG TFLINT_VERSION=0.63.1
+ARG PIP_VERSION=26.1.2
+ARG ANSIBLE_CORE_VERSION=2.19.11
+ARG ANSIBLE_LINT_VERSION=26.6.0
+ARG JMESPATH_VERSION=1.1.0
+ARG REQUESTS_VERSION=2.34.2
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
@@ -32,8 +37,12 @@ RUN apt-get update \
     && chmod 0755 /usr/local/bin/tflint \
     && rm -f /tmp/tflint.zip \
     && python3 -m venv /opt/ansible \
-    && /opt/ansible/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/ansible/bin/pip install --no-cache-dir ansible-core ansible-lint jmespath requests \
+    && /opt/ansible/bin/pip install --no-cache-dir --upgrade "pip==${PIP_VERSION}" \
+    && /opt/ansible/bin/pip install --no-cache-dir \
+        "ansible-core==${ANSIBLE_CORE_VERSION}" \
+        "ansible-lint==${ANSIBLE_LINT_VERSION}" \
+        "jmespath==${JMESPATH_VERSION}" \
+        "requests==${REQUESTS_VERSION}" \
     && useradd --create-home --shell /bin/bash --uid 1000 anvil \
     && mkdir -p /home/anvil/.terraform.d/plugin-cache /home/anvil/.ansible /workspace \
     && chown -R anvil:anvil /home/anvil /workspace \
