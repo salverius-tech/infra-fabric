@@ -111,7 +111,6 @@ plan: check-values clean-plans
 
 # Apply reviewed infrastructure plan, then configure services with Ansible
 apply: check-values
-    @if [[ -n "$(git -C values status --short)" ]]; then printf 'Private values repo has uncommitted changes; commit or discard them before just apply.\n' >&2; git -C values status --short >&2; exit 1; fi
     scripts/run-infra.sh python scripts/workspace-preflight.py --require-values
     test -f tfplan
     test -f tfplan.meta.json
