@@ -217,8 +217,8 @@ def run(args: argparse.Namespace) -> int:
         print(error, file=sys.stderr)
         return 1
 
-    set_env_value(env_path, "SERVER_NAME", f"dns.{domain}")
-    set_env_value(env_path, "FORGEJO_DOMAIN", f"git.{domain}")
+    set_env_value(env_path, "TECHNITIUM_API_URL", f"https://dns.{domain}/api")
+    set_env_value(env_path, "DNS_RECORDS_FILE", "values/dns-records.local.json")
 
     set_tfvar_string(tfvars_path, "container_search_domain", domain)
     set_tfvar_string(tfvars_path, "forgejo_server_name", f"git.{domain}")
@@ -231,8 +231,7 @@ def run(args: argparse.Namespace) -> int:
     update_dns_records(dns_records_path, domain, technitium_ip, forgejo_ip)
 
     print("Updated domain-derived values:")
-    print(f"  SERVER_NAME=dns.{domain}")
-    print(f"  FORGEJO_DOMAIN=git.{domain}")
+    print(f"  TECHNITIUM_API_URL=https://dns.{domain}/api")
     print(f"  DNS records: dns.{domain}, technitium.{domain}, git.{domain}")
     return 0
 

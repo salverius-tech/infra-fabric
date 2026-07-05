@@ -30,6 +30,9 @@ TERRAFORM_KEYS = {
 TECHNITIUM_DNS_KEYS = {
     "TECHNITIUM_API_URL",
     "TECHNITIUM_API_TOKEN",
+    # Backward-compatible alias for existing values repos created before DNS
+    # sync settings moved out of OpenTofu variables.
+    "TF_VAR_technitium_api_token",
     "DNS_RECORDS_FILE",
 }
 
@@ -40,12 +43,6 @@ TECHNITIUM_BOOTSTRAP_KEYS = {
 }
 
 FORGEJO_KEYS = {
-    "FORGEJO_VERSION",
-    "FORGEJO_DOMAIN",
-    "FORGEJO_SERVER_NAME",
-    "FORGEJO_UPSTREAM",
-    "FORGEJO_SSH_PORT",
-    "FORGEJO_ENABLE_CADDY",
     "FORGEJO_RUNNER_REGISTRATION_SECRET",
 }
 
