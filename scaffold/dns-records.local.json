@@ -12,15 +12,22 @@
     "preferIPv6": false
   },
   "zones": {
-    "example.internal": ["192.0.2.10:54"],
-    "apps.example.net": ["192.0.2.20:54", "192.0.2.21:54"]
+    "example.internal": [
+      "192.0.2.10:54"
+    ],
+    "apps.example.net": [
+      "192.0.2.20:54",
+      "192.0.2.21:54"
+    ]
   },
   "a_records": {
     "dns.example.internal": "192.0.2.53",
     "technitium.example.internal": "192.0.2.53",
     "git.example.internal": "192.0.2.62",
     "proxy.example.internal": "192.0.2.10",
-    "app.apps.example.net": "192.0.2.20"
+    "app.apps.example.net": "192.0.2.20",
+    "infisical.example.internal": "192.0.2.70",
+    "hermes.example.internal": "192.0.2.71"
   },
   "cname_records": {
     "www.example.internal": "proxy.example.internal"

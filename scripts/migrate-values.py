@@ -14,9 +14,14 @@ SECRET_KEYS = {
     "PROXMOX_VE_PASSWORD",
     "TECHNITIUM_API_TOKEN",
     "TF_VAR_technitium_api_token",
+    "TF_VAR_container_root_password",
+    "TF_VAR_lxc_root_password",
     "CF_DNS_API_TOKEN",
     "FORGEJO_RUNNER_REGISTRATION_SECRET",
     "TAILSCALE_AUTH_KEY",
+    "INFISICAL_ENCRYPTION_KEY",
+    "INFISICAL_AUTH_SECRET",
+    "INFISICAL_POSTGRES_PASSWORD",
 }
 
 ENV_TO_INVENTORY = {
@@ -27,9 +32,32 @@ ENV_TO_INVENTORY = {
     "FORGEJO_ENABLE_CADDY": "forgejo_enable_caddy",
 }
 HISTORICAL_ENV_KEYS = ("FORGEJO_SERVER_NAME", "FORGEJO_UPSTREAM")
+TF_VAR_RENAMES = {
+    "TF_VAR_container_root_password": "TF_VAR_lxc_root_password",
+    "TF_VAR_container_ssh_public_keys": "TF_VAR_lxc_ssh_public_keys",
+}
+
+TECHNITIUM_TFVARS_RENAMES = {
+    "container_root_password": "lxc_root_password",
+    "container_ssh_public_keys": "lxc_ssh_public_keys",
+    "container_vmid": "technitium_container_vmid",
+    "container_hostname": "technitium_container_hostname",
+    "container_description": "technitium_container_description",
+    "container_ipv4_address": "technitium_container_ipv4_address",
+    "container_ipv4_gateway": "technitium_container_ipv4_gateway",
+    "container_dns_servers": "technitium_container_dns_servers",
+    "container_search_domain": "technitium_container_search_domain",
+    "container_bridge": "technitium_container_bridge",
+    "container_cores": "technitium_container_cores",
+    "container_memory_mb": "technitium_container_memory_mb",
+    "container_swap_mb": "technitium_container_swap_mb",
+    "container_disk_gb": "technitium_container_disk_gb",
+}
 
 MIGRATION_ENV_KEYS = {
     "TF_VAR_technitium_api_token",
+    *TF_VAR_RENAMES,
+    *TF_VAR_RENAMES.values(),
     "TECHNITIUM_API_TOKEN",
     "TECHNITIUM_API_URL",
     "DNS_RECORDS_FILE",
@@ -140,6 +168,30 @@ def parse_tfvars(lines: list[str], path: Path) -> dict[str, tuple[int, str]]:
     return values
 
 
+def tfvars_key_exists(lines: list[str], key: str) -> bool:
+    pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
+    return any(pattern.match(line) for line in lines)
+
+
+def rename_tfvars_key(lines: list[str], old_key: str, new_key: str) -> bool:
+    old_pattern = re.compile(rf"^(?P<prefix>\s*){re.escape(old_key)}(?P<suffix>\s*=.*)$")
+    old_indexes = [index for index, line in enumerate(lines) if old_pattern.match(line)]
+    if not old_indexes:
+        return False
+    if tfvars_key_exists(lines, new_key):
+        for index in reversed(old_indexes):
+            lines.pop(index)
+        return True
+    index = old_indexes[0]
+    match = old_pattern.match(lines[index])
+    if match is None:
+        return False
+    lines[index] = f"{match.group('prefix')}{new_key}{match.group('suffix')}"
+    for extra_index in reversed(old_indexes[1:]):
+        lines.pop(extra_index)
+    return True
+
+
 def remove_tfvars(lines: list[str], values: dict[str, tuple[int, str]], key: str) -> bool:
     item = values.get(key)
     if item is None:
@@ -151,6 +203,21 @@ def remove_tfvars(lines: list[str], values: dict[str, tuple[int, str]], key: str
         if other_index > index:
             values[other_key] = (other_index - 1, other_value)
     lines[:] = [line for line in lines if line is not None]
+    return True
+
+
+def rename_env_key(
+    lines: list[str], entries: dict[str, EnvEntry], old_key: str, new_key: str
+) -> bool:
+    old_entry = entries.get(old_key)
+    if old_entry is None:
+        return False
+    new_entry = entries.get(new_key)
+    if new_entry is not None and new_entry.value != old_entry.value:
+        raise MigrationError(f"{old_key} and {new_key} differ")
+    if new_entry is None:
+        set_env(lines, entries, new_key, old_entry.value)
+    remove_env(lines, entries, old_key)
     return True
 
 
@@ -169,6 +236,14 @@ def migrate(values_dir: Path) -> list[str]:
     inventory_text = inventory_path.read_text(encoding="utf-8") if inventory_path.exists() else ""
 
     env_entries = parse_env_lines(env_lines, env_path)
+
+    for old_key, new_key in TF_VAR_RENAMES.items():
+        if rename_env_key(env_lines, env_entries, old_key, new_key):
+            changes.append(f"renamed {old_key} to {new_key}")
+
+    for old_key, new_key in TECHNITIUM_TFVARS_RENAMES.items():
+        if rename_tfvars_key(tfvars_lines, old_key, new_key):
+            changes.append(f"renamed {old_key} to {new_key}")
     tfvars_values = parse_tfvars(tfvars_lines, tfvars_path)
 
     old_token = env_entries.get("TF_VAR_technitium_api_token")

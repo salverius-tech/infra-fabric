@@ -1,0 +1,10 @@
+---
+- name: Bootstrap Infisical LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - role: lxc_ready
+      vars:
+        lxc_ready_vmid: "{{ infisical_vmid }}"
+        lxc_ready_name: infisical
+    - infisical

@@ -5,9 +5,9 @@ variable "enabled_services" {
 
   validation {
     condition = alltrue([
-      for service in var.enabled_services : contains(["technitium", "forgejo", "tailscale_client", "forgejo_runner"], service)
+      for service in var.enabled_services : contains(["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes"], service)
     ])
-    error_message = "enabled_services may contain only technitium, forgejo, tailscale_client, and forgejo_runner."
+    error_message = "enabled_services may contain only technitium, forgejo, tailscale_client, forgejo_runner, infisical, and hermes."
   }
 }
 
@@ -48,48 +48,48 @@ variable "proxmox_node_name" {
   type        = string
 }
 
-variable "container_vmid" {
+variable "technitium_container_vmid" {
   description = "Proxmox VMID for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
 }
 
-variable "container_hostname" {
+variable "technitium_container_hostname" {
   description = "Hostname for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = string
 }
 
-variable "container_description" {
+variable "technitium_container_description" {
   description = "Description for the Technitium DNS LXC. Set in terraform.tfvars if you want a site-specific label."
   type        = string
   default     = "Technitium DNS primary resolver managed by OpenTofu."
 }
 
-variable "container_ipv4_address" {
+variable "technitium_container_ipv4_address" {
   description = "Static IPv4 address/CIDR for the Technitium DNS LXC. Use an address outside DHCP scope. Set in terraform.tfvars."
   type        = string
 
   validation {
-    condition     = can(cidrhost(var.container_ipv4_address, 0))
-    error_message = "container_ipv4_address must be a valid IPv4 CIDR address, for example 192.0.2.10/24."
+    condition     = can(cidrhost(var.technitium_container_ipv4_address, 0))
+    error_message = "technitium_container_ipv4_address must be a valid IPv4 CIDR address, for example 192.0.2.10/24."
   }
 }
 
-variable "container_ipv4_gateway" {
+variable "technitium_container_ipv4_gateway" {
   description = "IPv4 gateway for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = string
 }
 
-variable "container_dns_servers" {
+variable "technitium_container_dns_servers" {
   description = "DNS servers used by the LXC before it becomes the primary resolver. Set in terraform.tfvars."
   type        = list(string)
 }
 
-variable "container_search_domain" {
+variable "technitium_container_search_domain" {
   description = "DNS search domain for the LXC. Set in terraform.tfvars."
   type        = string
 }
 
-variable "container_bridge" {
+variable "technitium_container_bridge" {
   description = "Proxmox bridge for the LXC interface. Set in terraform.tfvars."
   type        = string
 }
@@ -114,34 +114,34 @@ variable "debian_template_file_name" {
   type        = string
 }
 
-variable "container_root_password" {
+variable "lxc_root_password" {
   description = "Initial root password for the LXC. Store only in terraform.tfvars or environment injection."
   type        = string
   sensitive   = true
 }
 
-variable "container_ssh_public_keys" {
+variable "lxc_ssh_public_keys" {
   description = "SSH public keys to install for root in the LXC."
   type        = list(string)
   default     = []
 }
 
-variable "container_cores" {
+variable "technitium_container_cores" {
   description = "CPU cores for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
 }
 
-variable "container_memory_mb" {
+variable "technitium_container_memory_mb" {
   description = "Dedicated memory for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
 }
 
-variable "container_swap_mb" {
+variable "technitium_container_swap_mb" {
   description = "Swap for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
 }
 
-variable "container_disk_gb" {
+variable "technitium_container_disk_gb" {
   description = "Root filesystem size in GB. Set in terraform.tfvars."
   type        = number
 }
@@ -403,6 +403,306 @@ variable "forgejo_runner_startup_up_delay" {
 
 variable "forgejo_runner_startup_down_delay" {
   description = "Seconds to wait after shutting down the Forgejo Actions runner LXC before shutting down the next guest."
+  type        = string
+  default     = "10"
+}
+
+variable "infisical_container_vmid" {
+  description = "Proxmox VMID for the Infisical LXC."
+  type        = number
+  default     = 110
+}
+
+variable "infisical_container_hostname" {
+  description = "Hostname for the Infisical LXC."
+  type        = string
+  default     = "infisical"
+}
+
+variable "infisical_container_description" {
+  description = "Description for the Infisical LXC."
+  type        = string
+  default     = "Infisical secrets service managed by OpenTofu."
+}
+
+variable "infisical_container_ipv4_address" {
+  description = "IPv4 address/CIDR for the Infisical LXC, or dhcp when the router supplies a static DHCP reservation."
+  type        = string
+  default     = "dhcp"
+
+  validation {
+    condition     = var.infisical_container_ipv4_address == "dhcp" || can(cidrhost(var.infisical_container_ipv4_address, 0))
+    error_message = "infisical_container_ipv4_address must be dhcp or a valid IPv4 CIDR address."
+  }
+}
+
+variable "infisical_container_ipv4_gateway" {
+  description = "IPv4 gateway for the Infisical LXC. Use null when infisical_container_ipv4_address is dhcp."
+  type        = string
+  default     = null
+}
+
+variable "infisical_container_mac_address" {
+  description = "MAC address for the Infisical LXC, useful when the router supplies a static DHCP reservation."
+  type        = string
+  default     = "BC:24:11:00:00:03"
+
+  validation {
+    condition     = can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.infisical_container_mac_address))
+    error_message = "infisical_container_mac_address must use colon-separated hex octets, for example BC:24:11:00:00:03."
+  }
+}
+
+variable "infisical_lan_ip" {
+  description = "Expected LAN IP for Infisical, without CIDR. Used for outputs and DNS documentation when the LXC uses DHCP reservation."
+  type        = string
+  default     = "192.0.2.70"
+}
+
+variable "infisical_server_name" {
+  description = "DNS hostname users should use for Infisical."
+  type        = string
+  default     = "infisical.example.internal"
+}
+
+variable "infisical_container_dns_servers" {
+  description = "DNS servers used by the Infisical LXC."
+  type        = list(string)
+  default     = ["192.0.2.1"]
+}
+
+variable "infisical_container_search_domain" {
+  description = "DNS search domain for the Infisical LXC."
+  type        = string
+  default     = "example.internal"
+}
+
+variable "infisical_container_bridge" {
+  description = "Proxmox bridge for the Infisical LXC interface."
+  type        = string
+  default     = "vmbr0"
+}
+
+variable "infisical_container_cores" {
+  description = "CPU cores for the Infisical LXC."
+  type        = number
+  default     = 2
+}
+
+variable "infisical_container_memory_mb" {
+  description = "Dedicated memory for the Infisical LXC."
+  type        = number
+  default     = 4096
+}
+
+variable "infisical_container_swap_mb" {
+  description = "Swap for the Infisical LXC."
+  type        = number
+  default     = 1024
+}
+
+variable "infisical_container_disk_gb" {
+  description = "Root filesystem size in GB for the Infisical LXC."
+  type        = number
+  default     = 20
+}
+
+variable "infisical_data_dataset" {
+  description = "ZFS dataset that backs Infisical data. The local-exec provisioner creates it idempotently on PVE_HOST."
+  type        = string
+  default     = "tank/infisical"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.:-]+(/[A-Za-z0-9_.:-]+)+$", var.infisical_data_dataset))
+    error_message = "infisical_data_dataset must be a ZFS dataset path containing only letters, numbers, dot, underscore, colon, dash, and slash."
+  }
+}
+
+variable "infisical_data_host_path" {
+  description = "Proxmox host path bind-mounted into the Infisical LXC."
+  type        = string
+  default     = "/tank/infisical"
+
+  validation {
+    condition     = can(regex("^/[A-Za-z0-9_./:-]+$", var.infisical_data_host_path))
+    error_message = "infisical_data_host_path must be an absolute path without whitespace or shell metacharacters."
+  }
+}
+
+variable "infisical_data_mount_path" {
+  description = "Mount path inside the Infisical LXC."
+  type        = string
+  default     = "/var/lib/infisical"
+}
+
+variable "infisical_data_host_uid" {
+  description = "Host UID owner for the Infisical bind mount. 100000 maps to root inside the default unprivileged LXC."
+  type        = number
+  default     = 100000
+}
+
+variable "infisical_data_host_gid" {
+  description = "Host GID owner for the Infisical bind mount. 100000 maps to root inside the default unprivileged LXC."
+  type        = number
+  default     = 100000
+}
+
+variable "infisical_started" {
+  description = "Whether OpenTofu should start the Infisical LXC after creation."
+  type        = bool
+  default     = true
+}
+
+variable "infisical_start_on_boot" {
+  description = "Whether Proxmox should start the Infisical LXC on host boot."
+  type        = bool
+  default     = true
+}
+
+variable "infisical_startup_order" {
+  description = "Proxmox startup order for the Infisical LXC."
+  type        = string
+  default     = "5"
+}
+
+variable "infisical_startup_up_delay" {
+  description = "Seconds to wait after starting the Infisical LXC before starting the next guest."
+  type        = string
+  default     = "20"
+}
+
+variable "infisical_startup_down_delay" {
+  description = "Seconds to wait after shutting down the Infisical LXC before shutting down the next guest."
+  type        = string
+  default     = "20"
+}
+
+variable "hermes_container_vmid" {
+  description = "Proxmox VMID for the Hermes management LXC."
+  type        = number
+  default     = 111
+}
+
+variable "hermes_container_hostname" {
+  description = "Hostname for the Hermes management LXC."
+  type        = string
+  default     = "hermes"
+}
+
+variable "hermes_container_description" {
+  description = "Description for the Hermes management LXC."
+  type        = string
+  default     = "Hermes management LXC managed by OpenTofu."
+}
+
+variable "hermes_container_ipv4_address" {
+  description = "IPv4 address/CIDR for the Hermes LXC, or dhcp when the router supplies a static DHCP reservation."
+  type        = string
+  default     = "dhcp"
+
+  validation {
+    condition     = var.hermes_container_ipv4_address == "dhcp" || can(cidrhost(var.hermes_container_ipv4_address, 0))
+    error_message = "hermes_container_ipv4_address must be dhcp or a valid IPv4 CIDR address."
+  }
+}
+
+variable "hermes_container_ipv4_gateway" {
+  description = "IPv4 gateway for the Hermes LXC. Use null when hermes_container_ipv4_address is dhcp."
+  type        = string
+  default     = null
+}
+
+variable "hermes_container_mac_address" {
+  description = "MAC address for the Hermes LXC, useful when the router supplies a static DHCP reservation."
+  type        = string
+  default     = "BC:24:11:00:00:04"
+
+  validation {
+    condition     = can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.hermes_container_mac_address))
+    error_message = "hermes_container_mac_address must use colon-separated hex octets, for example BC:24:11:00:00:04."
+  }
+}
+
+variable "hermes_lan_ip" {
+  description = "Expected LAN IP for Hermes, without CIDR. Used for outputs and DNS documentation when the LXC uses DHCP reservation."
+  type        = string
+  default     = "192.0.2.71"
+}
+
+variable "hermes_server_name" {
+  description = "DNS hostname users should use for Hermes."
+  type        = string
+  default     = "hermes.example.internal"
+}
+
+variable "hermes_container_dns_servers" {
+  description = "DNS servers used by the Hermes LXC."
+  type        = list(string)
+  default     = ["192.0.2.1"]
+}
+
+variable "hermes_container_search_domain" {
+  description = "DNS search domain for the Hermes LXC."
+  type        = string
+  default     = "example.internal"
+}
+
+variable "hermes_container_bridge" {
+  description = "Proxmox bridge for the Hermes LXC interface."
+  type        = string
+  default     = "vmbr0"
+}
+
+variable "hermes_container_cores" {
+  description = "CPU cores for the Hermes LXC."
+  type        = number
+  default     = 2
+}
+
+variable "hermes_container_memory_mb" {
+  description = "Dedicated memory for the Hermes LXC."
+  type        = number
+  default     = 2048
+}
+
+variable "hermes_container_swap_mb" {
+  description = "Swap for the Hermes LXC."
+  type        = number
+  default     = 512
+}
+
+variable "hermes_container_disk_gb" {
+  description = "Root filesystem size in GB for the Hermes LXC."
+  type        = number
+  default     = 64
+}
+
+variable "hermes_started" {
+  description = "Whether OpenTofu should start the Hermes LXC after creation."
+  type        = bool
+  default     = true
+}
+
+variable "hermes_start_on_boot" {
+  description = "Whether Proxmox should start the Hermes LXC on host boot."
+  type        = bool
+  default     = true
+}
+
+variable "hermes_startup_order" {
+  description = "Proxmox startup order for the Hermes LXC."
+  type        = string
+  default     = "6"
+}
+
+variable "hermes_startup_up_delay" {
+  description = "Seconds to wait after starting the Hermes LXC before starting the next guest."
+  type        = string
+  default     = "10"
+}
+
+variable "hermes_startup_down_delay" {
+  description = "Seconds to wait after shutting down the Hermes LXC before shutting down the next guest."
   type        = string
   default     = "10"
 }

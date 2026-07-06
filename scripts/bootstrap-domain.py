@@ -111,7 +111,7 @@ def configured_domain(env_path: Path, tfvars_path: Path) -> str:
         if domain:
             return domain
 
-    search_domain = tfvar_value(tfvars_path, "container_search_domain")
+    search_domain = tfvar_value(tfvars_path, "technitium_container_search_domain")
     if search_domain and not is_placeholder_domain(search_domain):
         return search_domain
 
@@ -168,7 +168,14 @@ def update_inventory(path: Path, domain: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def update_dns_records(path: Path, domain: str, technitium_ip: str, forgejo_ip: str) -> None:
+def update_dns_records(
+    path: Path,
+    domain: str,
+    technitium_ip: str,
+    forgejo_ip: str,
+    infisical_ip: str,
+    hermes_ip: str,
+) -> None:
     if not path.exists():
         return
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -179,11 +186,15 @@ def update_dns_records(path: Path, domain: str, technitium_ip: str, forgejo_ip: 
         "dns.example.internal",
         "technitium.example.internal",
         "git.example.internal",
+        "infisical.example.internal",
+        "hermes.example.internal",
     ):
         records.pop(placeholder, None)
     records[f"dns.{domain}"] = technitium_ip
     records[f"technitium.{domain}"] = technitium_ip
     records[f"git.{domain}"] = forgejo_ip
+    records[f"infisical.{domain}"] = infisical_ip
+    records[f"hermes.{domain}"] = hermes_ip
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
@@ -222,13 +233,19 @@ def run(args: argparse.Namespace) -> int:
         print(f"Invalid domain: {error}", file=sys.stderr)
         return 1
 
-    default_technitium_ip = ip_without_cidr(tfvar_value(tfvars_path, "container_ipv4_address") or "192.0.2.53")
+    default_technitium_ip = ip_without_cidr(tfvar_value(tfvars_path, "technitium_container_ipv4_address") or "192.0.2.53")
     default_forgejo_ip = tfvar_value(tfvars_path, "forgejo_lan_ip") or "192.0.2.62"
+    default_infisical_ip = tfvar_value(tfvars_path, "infisical_lan_ip") or "192.0.2.70"
+    default_hermes_ip = tfvar_value(tfvars_path, "hermes_lan_ip") or "192.0.2.71"
     technitium_ip = prompt("Technitium DNS/UI IP", default_technitium_ip)
     forgejo_ip = prompt("Forgejo LAN IP", default_forgejo_ip)
+    infisical_ip = prompt("Infisical LAN IP", default_infisical_ip)
+    hermes_ip = prompt("Hermes LAN IP", default_hermes_ip)
     try:
         validate_ip(technitium_ip, "Technitium DNS/UI IP")
         validate_ip(forgejo_ip, "Forgejo LAN IP")
+        validate_ip(infisical_ip, "Infisical LAN IP")
+        validate_ip(hermes_ip, "Hermes LAN IP")
     except ValueError as error:
         print(error, file=sys.stderr)
         return 1
@@ -236,19 +253,29 @@ def run(args: argparse.Namespace) -> int:
     set_env_value(env_path, "TECHNITIUM_API_URL", f"https://dns.{domain}/api")
     set_env_value(env_path, "DNS_RECORDS_FILE", "values/dns-records.local.json")
 
-    set_tfvar_string(tfvars_path, "container_search_domain", domain)
+    set_tfvar_string(tfvars_path, "technitium_container_search_domain", domain)
     set_tfvar_string(tfvars_path, "forgejo_server_name", f"git.{domain}")
     set_tfvar_string(tfvars_path, "forgejo_lan_ip", forgejo_ip)
     set_tfvar_string(tfvars_path, "forgejo_container_search_domain", domain)
     set_tfvar_string(tfvars_path, "forgejo_runner_search_domain", domain)
+    set_tfvar_string(tfvars_path, "infisical_server_name", f"infisical.{domain}")
+    set_tfvar_string(tfvars_path, "infisical_lan_ip", infisical_ip)
+    set_tfvar_string(tfvars_path, "infisical_container_search_domain", domain)
+    set_tfvar_string(tfvars_path, "hermes_server_name", f"hermes.{domain}")
+    set_tfvar_string(tfvars_path, "hermes_lan_ip", hermes_ip)
+    set_tfvar_string(tfvars_path, "hermes_container_search_domain", domain)
     set_tfvar_string(tfvars_path, "tailscale_client_search_domain", domain)
 
     update_inventory(inventory_path, domain)
-    update_dns_records(dns_records_path, domain, technitium_ip, forgejo_ip)
+    inventory_text = inventory_path.read_text(encoding="utf-8")
+    inventory_text = inventory_text.replace("infisical.example.internal", f"infisical.{domain}")
+    inventory_text = inventory_text.replace("hermes.example.internal", f"hermes.{domain}")
+    inventory_path.write_text(inventory_text, encoding="utf-8")
+    update_dns_records(dns_records_path, domain, technitium_ip, forgejo_ip, infisical_ip, hermes_ip)
 
     print("Updated domain-derived values:")
     print(f"  TECHNITIUM_API_URL=https://dns.{domain}/api")
-    print(f"  DNS records: dns.{domain}, technitium.{domain}, git.{domain}")
+    print(f"  DNS records: dns.{domain}, technitium.{domain}, git.{domain}, infisical.{domain}, hermes.{domain}")
     return 0
 
 

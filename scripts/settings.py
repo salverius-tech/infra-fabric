@@ -16,24 +16,29 @@ SERVICES = {
         "playbooks": (
             "infra/ansible/playbooks/technitium.yml",
             "infra/ansible/playbooks/caddy-proxy.yml",
+            "infra/ansible/playbooks/technitium-dns.yml",
         ),
         "dependencies": (),
-        "post_apply": ("scripts/apply-technitium-dns.sh",),
     },
     "forgejo": {
         "playbooks": ("infra/ansible/playbooks/forgejo.yml",),
         "dependencies": (),
-        "post_apply": (),
     },
     "tailscale_client": {
         "playbooks": (),
         "dependencies": (),
-        "post_apply": (),
     },
     "forgejo_runner": {
         "playbooks": ("infra/ansible/playbooks/forgejo-runner.yml",),
         "dependencies": ("forgejo",),
-        "post_apply": (),
+    },
+    "infisical": {
+        "playbooks": ("infra/ansible/playbooks/infisical.yml",),
+        "dependencies": (),
+    },
+    "hermes": {
+        "playbooks": ("infra/ansible/playbooks/hermes.yml",),
+        "dependencies": (),
     },
 }
 SERVICE_PLAYBOOKS = {name: config["playbooks"] for name, config in SERVICES.items()}
@@ -124,7 +129,6 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("values-remote")
     subparsers.add_parser("services")
     subparsers.add_parser("ansible-playbooks")
-    subparsers.add_parser("post-apply-hooks")
     subparsers.add_parser("tofu-var")
     args = parser.parse_args(argv)
 
@@ -144,10 +148,6 @@ def main(argv: list[str] | None = None) -> int:
         for service in settings["services"]:
             for playbook in SERVICES[service]["playbooks"]:
                 print(playbook)
-    elif args.command == "post-apply-hooks":
-        for service in settings["services"]:
-            for hook in SERVICES[service]["post_apply"]:
-                print(hook)
     elif args.command == "tofu-var":
         print(json.dumps(settings["services"]))
     return 0

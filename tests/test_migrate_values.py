@@ -36,12 +36,19 @@ class MigrateValuesTests(unittest.TestCase):
         with temp:
             (values / ".env").write_text(
                 "export TF_VAR_technitium_api_token='REPLACE_SECRET'\n"
+                "export TF_VAR_container_root_password='REPLACE_PASSWORD'\n"
                 "export SERVER_NAME='dns.example.internal'\n"
                 "export FORGEJO_SERVER_NAME='git.example.internal'\n"
                 "export FORGEJO_UPSTREAM='192.0.2.10:3000'\n",
                 encoding="utf-8",
             )
             (values / "terraform.tfvars").write_text(
+                'container_root_password = "REPLACE_PASSWORD"\n'
+                'container_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA_REPLACE_ME user@host"]\n'
+                'container_vmid = 106\n'
+                'container_hostname = "technitium-dns"\n'
+                'container_ipv4_address = "192.0.2.53/24"\n'
+                'container_dns_servers = ["192.0.2.1"]\n'
                 'technitium_api_url = "http://192.0.2.53:5380/api"\n'
                 'dns_records_file = "../../values/dns-records.local.json"\n',
                 encoding="utf-8",
@@ -52,12 +59,24 @@ class MigrateValuesTests(unittest.TestCase):
             env_text = (values / ".env").read_text(encoding="utf-8")
             tfvars_text = (values / "terraform.tfvars").read_text(encoding="utf-8")
             self.assertIn("TECHNITIUM_API_TOKEN=REPLACE_SECRET", env_text)
+            self.assertIn("TF_VAR_lxc_root_password=REPLACE_PASSWORD", env_text)
             self.assertIn("TECHNITIUM_API_URL=http://192.0.2.53:5380/api", env_text)
             self.assertIn("DNS_RECORDS_FILE=values/dns-records.local.json", env_text)
             self.assertNotIn("TF_VAR_technitium_api_token", env_text)
+            self.assertNotIn("TF_VAR_container_root_password", env_text)
             self.assertNotIn("SERVER_NAME", env_text)
             self.assertNotIn("FORGEJO_SERVER_NAME", env_text)
             self.assertNotIn("FORGEJO_UPSTREAM", env_text)
+            self.assertIn('lxc_root_password = "REPLACE_PASSWORD"', tfvars_text)
+            self.assertIn('lxc_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA_REPLACE_ME user@host"]', tfvars_text)
+            self.assertIn("technitium_container_vmid = 106", tfvars_text)
+            self.assertIn('technitium_container_hostname = "technitium-dns"', tfvars_text)
+            self.assertIn('technitium_container_ipv4_address = "192.0.2.53/24"', tfvars_text)
+            self.assertIn('technitium_container_dns_servers = ["192.0.2.1"]', tfvars_text)
+            self.assertNotIn("container_root_password", tfvars_text)
+            self.assertNotIn("container_ssh_public_keys", tfvars_text)
+            self.assertNotRegex(tfvars_text, r"(?m)^container_vmid\\s*=")
+            self.assertNotRegex(tfvars_text, r"(?m)^container_hostname\\s*=")
             self.assertNotIn("technitium_api_url", tfvars_text)
             self.assertNotIn("dns_records_file", tfvars_text)
             self.assertTrue(changes)
@@ -80,6 +99,7 @@ class MigrateValuesTests(unittest.TestCase):
         with temp:
             (values / ".env").write_text(
                 "export TECHNITIUM_API_TOKEN='REPLACE_SECRET'\n"
+                "export TF_VAR_lxc_root_password='REPLACE_PASSWORD'\n"
                 "export TECHNITIUM_API_URL='http://192.0.2.53:5380/api'\n"
                 "export DNS_RECORDS_FILE='values/dns-records.local.json'\n",
                 encoding="utf-8",

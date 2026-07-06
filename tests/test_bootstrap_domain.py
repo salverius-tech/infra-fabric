@@ -24,7 +24,7 @@ class BootstrapDomainTests(unittest.TestCase):
                 'export TECHNITIUM_API_URL="https://dns.lab.example/api"\n',
                 encoding="utf-8",
             )
-            tfvars_path.write_text('container_search_domain = "example.internal"\n', encoding="utf-8")
+            tfvars_path.write_text('technitium_container_search_domain = "example.internal"\n', encoding="utf-8")
 
             self.assertEqual(
                 bootstrap_domain.configured_domain(env_path, tfvars_path),
@@ -40,7 +40,7 @@ class BootstrapDomainTests(unittest.TestCase):
                 'export TECHNITIUM_API_URL="https://dns.example.internal/api"\n',
                 encoding="utf-8",
             )
-            tfvars_path.write_text('container_search_domain = "lab.example"\n', encoding="utf-8")
+            tfvars_path.write_text('technitium_container_search_domain = "lab.example"\n', encoding="utf-8")
 
             self.assertEqual(
                 bootstrap_domain.configured_domain(env_path, tfvars_path),

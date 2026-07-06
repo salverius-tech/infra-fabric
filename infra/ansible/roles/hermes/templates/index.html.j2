@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hermes</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.5; }
+    code { background: #eee; padding: 0.1rem 0.25rem; border-radius: 0.25rem; }
+  </style>
+</head>
+<body>
+  <h1>Hermes management host</h1>
+  <p>This LXC is the SSH entry point for homelab infrastructure operations.</p>
+  <ul>
+    <li>SSH: <code>ssh root@{{ hermes_domain }}</code></li>
+    <li>Repo path: <code>{{ hermes_repo_path | default('/srv/homelab-infra') }}</code></li>
+  </ul>
+</body>
+</html>

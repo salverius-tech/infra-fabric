@@ -1,0 +1,345 @@
+---
+- name: Validate Infisical required variables
+  ansible.builtin.assert:
+    that:
+      - infisical_vmid is defined
+      - infisical_domain is defined
+      - infisical_encryption_key is defined
+      - infisical_encryption_key | length >= 32
+      - infisical_auth_secret is defined
+      - infisical_auth_secret | length >= 32
+      - infisical_postgres_password is defined
+      - infisical_postgres_password | length >= 16
+      - caddy_email is defined
+      - caddy_cloudflare_api_token is defined
+    fail_msg: >-
+      infisical_vmid, infisical_domain, infisical_encryption_key, infisical_auth_secret,
+      infisical_postgres_password, caddy_email, and caddy_cloudflare_api_token are required.
+
+- name: Install Infisical OS dependencies in LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        DEBIAN_FRONTEND=noninteractive apt-get update;
+        DEBIAN_FRONTEND=noninteractive apt-get install -y
+        ca-certificates caddy curl docker.io git gnupg openssh-client;
+        systemctl enable --now docker
+  changed_when: false
+
+- name: Install Docker Compose CLI plugin in Infisical LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        version="{{ infisical_compose_version | default('5.3.0') }}";
+        arch="$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/')";
+        install -d -m 0755 /usr/local/lib/docker/cli-plugins;
+        curl -fsSL "https://github.com/docker/compose/releases/download/v${version}/docker-compose-linux-${arch}"
+        -o /usr/local/lib/docker/cli-plugins/docker-compose;
+        chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+  changed_when: false
+
+- name: Ensure Infisical directories exist
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        install -d -m 0750 /etc/infisical /opt/infisical
+        {{ infisical_data_dir | default('/var/lib/infisical') }}
+        {{ infisical_data_dir | default('/var/lib/infisical') }}/postgres
+        {{ infisical_data_dir | default('/var/lib/infisical') }}/redis
+  changed_when: false
+
+- name: Stage Infisical env on Proxmox host
+  ansible.builtin.template:
+    src: infisical.env.j2
+    dest: /tmp/infisical.env.{{ infisical_vmid }}
+    mode: "0600"
+  no_log: true
+
+- name: Check Infisical env drift
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        local_hash="$(sha256sum /tmp/infisical.env.{{ infisical_vmid }} | awk '{print $1}')";
+        remote_hash="$(pct exec {{ infisical_vmid | quote }} -- sha256sum /etc/infisical/infisical.env 2>/dev/null | awk '{print $1}')";
+        test "${local_hash}" = "${remote_hash}"
+  register: infisical_env_drift
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Push Infisical env into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ infisical_vmid | string }}"
+      - /tmp/infisical.env.{{ infisical_vmid }}
+      - /etc/infisical/infisical.env
+  when: infisical_env_drift.rc != 0
+  changed_when: true
+  no_log: true
+  notify: Restart infisical
+
+- name: Secure Infisical env
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - chmod 0600 /etc/infisical/infisical.env
+  changed_when: false
+  no_log: true
+
+- name: Stage Infisical Compose file on Proxmox host
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: /tmp/infisical-compose.{{ infisical_vmid }}.yml
+    mode: "0644"
+
+- name: Check Infisical Compose drift
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        local_hash="$(sha256sum /tmp/infisical-compose.{{ infisical_vmid }}.yml | awk '{print $1}')";
+        remote_hash="$(pct exec {{ infisical_vmid | quote }} -- sha256sum /opt/infisical/docker-compose.yml 2>/dev/null | awk '{print $1}')";
+        test "${local_hash}" = "${remote_hash}"
+  register: infisical_compose_drift
+  changed_when: false
+  failed_when: false
+
+- name: Push Infisical Compose file into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ infisical_vmid | string }}"
+      - /tmp/infisical-compose.{{ infisical_vmid }}.yml
+      - /opt/infisical/docker-compose.yml
+  when: infisical_compose_drift.rc != 0
+  changed_when: true
+  notify: Restart infisical
+
+- name: Start Infisical Compose stack
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - cd /opt/infisical && set -a && . /etc/infisical/infisical.env && set +a && docker compose -f docker-compose.yml up -d
+  changed_when: false
+  no_log: true
+
+- name: Check whether Infisical Caddy has Cloudflare DNS module
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
+  register: infisical_caddy_cloudflare_module
+  changed_when: false
+  failed_when: false
+
+- name: Build Infisical Caddy with Cloudflare DNS module
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz &&
+        rm -rf /usr/local/go &&
+        tar -C /usr/local -xzf /tmp/go.tar.gz &&
+        PATH=/usr/local/go/bin:${PATH} GOBIN=/usr/local/bin /usr/local/go/bin/go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest &&
+        PATH=/usr/local/go/bin:${PATH} /usr/local/bin/xcaddy build --with github.com/caddy-dns/cloudflare --output /tmp/caddy-cloudflare &&
+        install -m 0755 /tmp/caddy-cloudflare /usr/bin/caddy
+  when: infisical_caddy_cloudflare_module.rc != 0
+  notify: Restart caddy
+
+- name: Stage Infisical Caddy env on Proxmox host
+  ansible.builtin.template:
+    src: caddy.env.j2
+    dest: /tmp/infisical-caddy.env.{{ infisical_vmid }}
+    mode: "0600"
+  no_log: true
+
+- name: Check Infisical Caddy env drift
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        local_hash="$(sha256sum /tmp/infisical-caddy.env.{{ infisical_vmid }} | awk '{print $1}')";
+        remote_hash="$(pct exec {{ infisical_vmid | quote }} -- sha256sum /etc/caddy/env 2>/dev/null | awk '{print $1}')";
+        test "${local_hash}" = "${remote_hash}"
+  register: infisical_caddy_env_drift
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Push Infisical Caddy env into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ infisical_vmid | string }}"
+      - /tmp/infisical-caddy.env.{{ infisical_vmid }}
+      - /etc/caddy/env
+  when: infisical_caddy_env_drift.rc != 0
+  changed_when: true
+  no_log: true
+  notify: Restart caddy
+
+- name: Secure Infisical Caddy env
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - chmod 0600 /etc/caddy/env && chown root:caddy /etc/caddy/env
+  changed_when: false
+
+- name: Stage Infisical Caddyfile on Proxmox host
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /tmp/infisical-Caddyfile.{{ infisical_vmid }}
+    mode: "0644"
+
+- name: Check Infisical Caddyfile drift
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        local_hash="$(sha256sum /tmp/infisical-Caddyfile.{{ infisical_vmid }} | awk '{print $1}')";
+        remote_hash="$(pct exec {{ infisical_vmid | quote }} -- sha256sum /etc/caddy/Caddyfile 2>/dev/null | awk '{print $1}')";
+        test "${local_hash}" = "${remote_hash}"
+  register: infisical_caddyfile_drift
+  changed_when: false
+  failed_when: false
+
+- name: Push Infisical Caddyfile into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ infisical_vmid | string }}"
+      - /tmp/infisical-Caddyfile.{{ infisical_vmid }}
+      - /etc/caddy/Caddyfile
+  when: infisical_caddyfile_drift.rc != 0
+  changed_when: true
+  notify: Restart caddy
+
+- name: Stage Infisical Caddy systemd override on Proxmox host
+  ansible.builtin.template:
+    src: caddy-override.conf.j2
+    dest: /tmp/infisical-caddy-override.conf.{{ infisical_vmid }}
+    mode: "0644"
+
+- name: Ensure Infisical Caddy systemd override directory exists
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - install
+      - -d
+      - -m
+      - "0755"
+      - /etc/systemd/system/caddy.service.d
+  changed_when: false
+
+- name: Check Infisical Caddy systemd override drift
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        local_hash="$(sha256sum /tmp/infisical-caddy-override.conf.{{ infisical_vmid }} | awk '{print $1}')";
+        remote_hash="$(pct exec {{ infisical_vmid | quote }} -- sha256sum /etc/systemd/system/caddy.service.d/override.conf 2>/dev/null | awk '{print $1}')";
+        test "${local_hash}" = "${remote_hash}"
+  register: infisical_caddy_override_drift
+  changed_when: false
+  failed_when: false
+
+- name: Push Infisical Caddy systemd override into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ infisical_vmid | string }}"
+      - /tmp/infisical-caddy-override.conf.{{ infisical_vmid }}
+      - /etc/systemd/system/caddy.service.d/override.conf
+  when: infisical_caddy_override_drift.rc != 0
+  changed_when: true
+  notify: Restart caddy
+
+- name: Validate Infisical Caddy config
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - set -a && . /etc/caddy/env && set +a && caddy fmt --overwrite /etc/caddy/Caddyfile && caddy validate --config /etc/caddy/Caddyfile
+  changed_when: false
+
+- name: Enable Infisical Caddy service
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ infisical_vmid | string }}"
+      - --
+      - systemctl
+      - enable
+      - --now
+      - caddy
+  changed_when: false

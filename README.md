@@ -1,6 +1,6 @@
 # Homelab Infrastructure Runbooks
 
-Reusable OpenTofu and Ansible runbooks for Proxmox LXCs running Technitium DNS, Caddy, Forgejo, and an optional Tailscale client.
+Reusable OpenTofu and Ansible runbooks for Proxmox LXCs running Technitium DNS, Caddy, Forgejo, Infisical, Hermes, and optional runner/VPN services.
 
 This public repo is intentionally generic. Real domains, LAN IPs, DNS records, Proxmox endpoints, credentials, and state belong in `values/`, an ignored nested Git repo. In a typical install, `values/` is pushed to a private Forgejo repository while this runbook repo stays public-safe.
 
@@ -36,7 +36,7 @@ From a fresh checkout, optionally copy the local settings template:
 cp settings.example.json settings.local.json
 ```
 
-Edit `settings.local.json` if you want `just setup` to clone your private `values/` Git repo. For example, set `values_repo.remote` to your Forgejo SSH URL. The file is ignored by Git. Supported services are `technitium`, `forgejo`, `tailscale_client`, and `forgejo_runner`; `technitium` includes its Caddy proxy, `forgejo` includes its in-LXC Caddy configuration when enabled in inventory, and `forgejo_runner` creates/configures a separate Forgejo Actions runner LXC.
+Edit `settings.local.json` if you want `just setup` to clone your private `values/` Git repo. For example, set `values_repo.remote` to your Forgejo SSH URL. The file is ignored by Git. Supported services are `technitium`, `forgejo`, `tailscale_client`, `forgejo_runner`, `infisical`, and `hermes`; `technitium` includes its Caddy proxy, browser-facing first-class services use in-LXC Caddy, and `forgejo_runner` creates/configures a separate Forgejo Actions runner LXC.
 
 Then run:
 
@@ -44,7 +44,7 @@ Then run:
 just setup
 ```
 
-This builds the local tooling container and creates `values/` from `scaffold/`, or clones the `values_repo.remote` configured in `settings.local.json`. If no remote is configured and setup is interactive, it can ask for a base domain, probe `git.<domain>` for an accessible `homelab-infra-values` repository, save the discovered remote in ignored `settings.local.json`, and clone it. It also starts setup wizards for Proxmox API access and domain-derived service names. The Proxmox wizard asks for your Proxmox host, verifies root SSH key access, offers an alternate key file or a command to authorize your default public SSH key if default keys fail, creates/updates a dedicated Proxmox API user/token, and writes the endpoint/token/SSH target to `values/.env` without printing the token secret. The domain wizard asks for your base domain plus service IPs, then derives names such as `dns.<domain>`, `technitium.<domain>`, and `git.<domain>` in the private values files.
+This builds the local tooling container and creates `values/` from `scaffold/`, or clones the `values_repo.remote` configured in `settings.local.json`. If no remote is configured and setup is interactive, it can ask for a base domain, probe `git.<domain>` for an accessible `homelab-infra-values` repository, save the discovered remote in ignored `settings.local.json`, and clone it. It also starts setup wizards for Proxmox API access and domain-derived service names. The Proxmox wizard asks for your Proxmox host, verifies root SSH key access, offers an alternate key file or a command to authorize your default public SSH key if default keys fail, creates/updates a dedicated Proxmox API user/token, and writes the endpoint/token/SSH target to `values/.env` without printing the token secret. The domain wizard asks for your base domain plus service IPs, then derives names such as `dns.<domain>`, `technitium.<domain>`, `git.<domain>`, `infisical.<domain>`, and `hermes.<domain>` in the authoritative private values files.
 
 You can also pass the values repo URL directly:
 
@@ -156,8 +156,10 @@ OpenTofu manages:
 - Proxmox LXC resources
 - Optional Tailscale client LXC shape, disabled by default until `tailscale_client_enabled` is set in private values
 - Optional Forgejo Actions runner LXC when `forgejo_runner` is enabled in local settings
+- Optional Infisical secrets service LXC with a service-local Caddy frontend
+- Optional Hermes management LXC with SSH tooling and a service-local Caddy landing page
 - Forgejo ZFS bind mount shape
-- Technitium DNS records/settings through `infra/opentofu/scripts/apply-technitium-dns.py`
+- Technitium DNS records/settings through `infra/ansible/playbooks/technitium-dns.yml`
 
 Ansible manages:
 
@@ -166,6 +168,8 @@ Ansible manages:
 - Forgejo installation/configuration, including Actions settings
 - Caddy and OpenSSH integration on the Forgejo LXC
 - Forgejo Actions runner installation/registration on a separate LXC
+- Infisical Docker Compose stack, including PostgreSQL, Redis, and Caddy
+- Hermes management tooling, SSH-oriented bootstrap directories, and Caddy
 - Optional Tailscale installation and private backup restore on the Tailscale client LXC
 
 ## Safety

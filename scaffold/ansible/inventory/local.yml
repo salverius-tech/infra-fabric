@@ -29,6 +29,18 @@ all:
     forgejo_runner_hosts:
       - name: git.example.internal
         address: 192.0.2.62
+    infisical_vmid: 110
+    infisical_domain: infisical.example.internal
+    infisical_version: latest
+    infisical_data_dir: /var/lib/infisical
+    infisical_encryption_key: "{{ lookup('env', 'INFISICAL_ENCRYPTION_KEY') }}"
+    infisical_auth_secret: "{{ lookup('env', 'INFISICAL_AUTH_SECRET') }}"
+    infisical_postgres_user: infisical
+    infisical_postgres_db: infisical
+    infisical_postgres_password: "{{ lookup('env', 'INFISICAL_POSTGRES_PASSWORD') }}"
+    hermes_vmid: 111
+    hermes_domain: hermes.example.internal
+    hermes_repo_path: /srv/homelab-infra
     tailscale_client_enabled: false
     tailscale_client_vmid: 108
     tailscale_client_restore_backup: false

@@ -1,0 +1,10 @@
+---
+- name: Bootstrap Hermes management LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - role: lxc_ready
+      vars:
+        lxc_ready_vmid: "{{ hermes_vmid }}"
+        lxc_ready_name: hermes
+    - hermes

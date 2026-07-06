@@ -42,7 +42,7 @@ class SettingsTests(unittest.TestCase):
         finally:
             path.unlink()
 
-    def test_technitium_implies_caddy_proxy_playbook(self) -> None:
+    def test_technitium_adds_dns_playbook(self) -> None:
         path = self.write_settings({"services": ["technitium"]})
         try:
             settings = settings_script.load_settings(path)
@@ -58,6 +58,7 @@ class SettingsTests(unittest.TestCase):
             [
                 "infra/ansible/playbooks/technitium.yml",
                 "infra/ansible/playbooks/caddy-proxy.yml",
+                "infra/ansible/playbooks/technitium-dns.yml",
             ],
         )
 
@@ -68,12 +69,6 @@ class SettingsTests(unittest.TestCase):
         finally:
             path.unlink()
         self.assertEqual(settings["services"], ["tailscale_client"])
-
-    def test_technitium_has_post_apply_dns_hook(self) -> None:
-        self.assertEqual(
-            settings_script.SERVICES["technitium"]["post_apply"],
-            ("scripts/apply-technitium-dns.sh",),
-        )
 
     def test_forgejo_runner_requires_forgejo(self) -> None:
         path = self.write_settings({"services": ["forgejo_runner"]})
@@ -102,6 +97,25 @@ class SettingsTests(unittest.TestCase):
             ],
         )
 
+    def test_infisical_and_hermes_add_playbooks(self) -> None:
+        path = self.write_settings({"services": ["infisical", "hermes"]})
+        try:
+            settings = settings_script.load_settings(path)
+        finally:
+            path.unlink()
+        playbooks = [
+            playbook
+            for service in settings["services"]
+            for playbook in settings_script.SERVICE_PLAYBOOKS[service]
+        ]
+        self.assertEqual(
+            playbooks,
+            [
+                "infra/ansible/playbooks/infisical.yml",
+                "infra/ansible/playbooks/hermes.yml",
+            ],
+        )
+
     def test_playbooks_follow_service_order(self) -> None:
         path = self.write_settings({"services": ["technitium", "forgejo", "tailscale_client"]})
         try:
@@ -118,6 +132,7 @@ class SettingsTests(unittest.TestCase):
             [
                 "infra/ansible/playbooks/technitium.yml",
                 "infra/ansible/playbooks/caddy-proxy.yml",
+                "infra/ansible/playbooks/technitium-dns.yml",
                 "infra/ansible/playbooks/forgejo.yml",
             ],
         )

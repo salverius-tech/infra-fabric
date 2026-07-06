@@ -13,21 +13,21 @@ resource "proxmox_download_file" "debian_12_lxc_template" {
 resource "proxmox_virtual_environment_container" "technitium_dns" {
   count = local.technitium_enabled ? 1 : 0
 
-  description   = var.container_description
+  description   = var.technitium_container_description
   node_name     = var.proxmox_node_name
-  vm_id         = var.container_vmid
+  vm_id         = var.technitium_container_vmid
   unprivileged  = true
   started       = true
   start_on_boot = true
   tags          = ["dns", "technitium", "opentofu"]
 
   cpu {
-    cores = var.container_cores
+    cores = var.technitium_container_cores
   }
 
   memory {
-    dedicated = var.container_memory_mb
-    swap      = var.container_swap_mb
+    dedicated = var.technitium_container_memory_mb
+    swap      = var.technitium_container_swap_mb
   }
 
   features {
@@ -36,33 +36,33 @@ resource "proxmox_virtual_environment_container" "technitium_dns" {
 
   disk {
     datastore_id = var.rootfs_datastore_id
-    size         = var.container_disk_gb
+    size         = var.technitium_container_disk_gb
   }
 
   initialization {
-    hostname = var.container_hostname
+    hostname = var.technitium_container_hostname
 
     dns {
-      domain  = var.container_search_domain
-      servers = var.container_dns_servers
+      domain  = var.technitium_container_search_domain
+      servers = var.technitium_container_dns_servers
     }
 
     ip_config {
       ipv4 {
-        address = var.container_ipv4_address
-        gateway = var.container_ipv4_gateway
+        address = var.technitium_container_ipv4_address
+        gateway = var.technitium_container_ipv4_gateway
       }
     }
 
     user_account {
-      password = var.container_root_password
-      keys     = var.container_ssh_public_keys
+      password = var.lxc_root_password
+      keys     = var.lxc_ssh_public_keys
     }
   }
 
   network_interface {
     name   = "eth0"
-    bridge = var.container_bridge
+    bridge = var.technitium_container_bridge
   }
 
   operating_system {

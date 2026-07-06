@@ -43,8 +43,8 @@ resource "proxmox_virtual_environment_container" "forgejo_runner" {
     }
 
     user_account {
-      password = var.container_root_password
-      keys     = var.container_ssh_public_keys
+      password = var.lxc_root_password
+      keys     = var.lxc_ssh_public_keys
     }
   }
 

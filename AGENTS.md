@@ -4,7 +4,7 @@ Guidance for coding agents working in this repository.
 
 ## Overview
 
-This repo is a generic, reusable homelab infrastructure runbook for Proxmox LXCs running Technitium DNS, Caddy, and Forgejo.
+This repo is a generic, reusable homelab infrastructure runbook for Proxmox LXCs running Technitium DNS, Caddy, Forgejo, Infisical, and Hermes.
 
 Tracked source must stay public-safe and free of the operator's real network/domain specifics. Use placeholders such as `example.internal`, `git.example.internal`, `apps.example.net`, and RFC 5737 addresses like `192.0.2.0/24` in tracked files.
 
@@ -82,15 +82,15 @@ This repo generally uses service-local Caddy instances rather than one central r
 
 - Technitium LXC runs its own Caddy for the DNS/Technitium UI.
 - Forgejo LXC runs its own Caddy for Forgejo.
-- New browser-facing first-class services should usually follow the same pattern: app plus Caddy in the same LXC, with Caddy proxying to the app on loopback.
+- New browser-facing first-class services should usually follow the same pattern: app plus Caddy in the same LXC, with Caddy proxying to the app on loopback. Infisical and Hermes follow this pattern.
 - Caddy uses Cloudflare DNS-01 ACME via `CF_DNS_API_TOKEN`, so multiple service-local Caddy instances can obtain certificates without competing for HTTP-01 port 80 routing.
 - Avoid turning the Technitium/DNS LXC into a general ingress proxy unless there is an explicit design reason. `caddy_extra_vhosts` exists, but should not be the default for new first-class services.
 
 ## DNS Management
 
-Technitium DNS records are synced after OpenTofu and Ansible in `just apply`. Do not call the Technitium API from OpenTofu resources: fresh installs need the LXC created and the Technitium service installed before API mutation is possible.
+Technitium DNS records are synced by `infra/ansible/playbooks/technitium-dns.yml` during `just apply`, after OpenTofu creates the LXC and Ansible installs/configures Technitium. Do not call the Technitium API from OpenTofu resources.
 
-The DNS helper is `infra/opentofu/scripts/apply-technitium-dns.py`; it runs after Ansible configures the DNS LXC.
+The Ansible playbook invokes `infra/opentofu/scripts/apply-technitium-dns.py`; keep DNS service orchestration in Ansible.
 
 The intended pattern is hybrid DNS:
 

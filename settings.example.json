@@ -5,6 +5,8 @@
   "services": [
     "technitium",
     "forgejo",
-    "forgejo_runner"
+    "forgejo_runner",
+    "infisical",
+    "hermes"
   ]
 }

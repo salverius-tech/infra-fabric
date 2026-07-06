@@ -17,22 +17,18 @@ PROXMOX_KEYS = {
 }
 
 CADDY_KEYS = {
-    "SERVER_NAME",
     "CF_API_EMAIL",
     "CF_DNS_API_TOKEN",
 }
 
 TERRAFORM_KEYS = {
-    "TF_VAR_container_root_password",
-    "TF_VAR_container_ssh_public_keys",
+    "TF_VAR_lxc_root_password",
+    "TF_VAR_lxc_ssh_public_keys",
 }
 
 TECHNITIUM_DNS_KEYS = {
     "TECHNITIUM_API_URL",
     "TECHNITIUM_API_TOKEN",
-    # Backward-compatible alias for existing values repos created before DNS
-    # sync settings moved out of OpenTofu variables.
-    "TF_VAR_technitium_api_token",
     "DNS_RECORDS_FILE",
 }
 
@@ -46,6 +42,12 @@ FORGEJO_KEYS = {
     "FORGEJO_RUNNER_REGISTRATION_SECRET",
 }
 
+INFISICAL_KEYS = {
+    "INFISICAL_ENCRYPTION_KEY",
+    "INFISICAL_AUTH_SECRET",
+    "INFISICAL_POSTGRES_PASSWORD",
+}
+
 ALLOWED_KEYS = (
     PROXMOX_KEYS
     | CADDY_KEYS
@@ -53,6 +55,7 @@ ALLOWED_KEYS = (
     | TECHNITIUM_DNS_KEYS
     | TECHNITIUM_BOOTSTRAP_KEYS
     | FORGEJO_KEYS
+    | INFISICAL_KEYS
 )
 
 KEY_RE = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")

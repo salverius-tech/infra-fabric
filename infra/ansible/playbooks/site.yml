@@ -19,6 +19,9 @@
         lxc_ready_name: technitium
     - caddy_proxy
 
+- name: Sync Technitium DNS records
+  ansible.builtin.import_playbook: technitium-dns.yml
+
 - name: Bootstrap Forgejo LXC
   hosts: pve
   gather_facts: false
@@ -28,6 +31,26 @@
         lxc_ready_vmid: "{{ forgejo_vmid }}"
         lxc_ready_name: forgejo
     - forgejo
+
+- name: Bootstrap Infisical LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - role: lxc_ready
+      vars:
+        lxc_ready_vmid: "{{ infisical_vmid }}"
+        lxc_ready_name: infisical
+    - infisical
+
+- name: Bootstrap Hermes management LXC
+  hosts: pve
+  gather_facts: false
+  roles:
+    - role: lxc_ready
+      vars:
+        lxc_ready_vmid: "{{ hermes_vmid }}"
+        lxc_ready_name: hermes
+    - hermes
 
 - name: Bootstrap Tailscale client LXC
   hosts: pve
