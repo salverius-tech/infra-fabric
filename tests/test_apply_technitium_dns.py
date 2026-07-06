@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / "infra" / "opentofu" / "scripts" / "apply-technitium-dns.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "infra" / "ansible" / "scripts" / "apply-technitium-dns.py"
 spec = importlib.util.spec_from_file_location("apply_technitium_dns", SCRIPT)
 assert spec and spec.loader
 apply_dns = importlib.util.module_from_spec(spec)

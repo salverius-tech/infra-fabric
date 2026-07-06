@@ -90,7 +90,7 @@ This repo generally uses service-local Caddy instances rather than one central r
 
 Technitium DNS records are synced by `infra/ansible/playbooks/technitium-dns.yml` during `just apply`, after OpenTofu creates the LXC and Ansible installs/configures Technitium. Do not call the Technitium API from OpenTofu resources.
 
-The Ansible playbook invokes `infra/opentofu/scripts/apply-technitium-dns.py`; keep DNS service orchestration in Ansible.
+The Ansible playbook invokes `infra/ansible/scripts/apply-technitium-dns.py`; keep DNS service orchestration in Ansible.
 
 The intended pattern is hybrid DNS:
 

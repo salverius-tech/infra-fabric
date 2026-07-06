@@ -17,7 +17,7 @@ DEFAULT_MAX_AGE_HOURS = 24
 INPUT_GLOBS = (
     "infra/opentofu/**/*.tf",
     "infra/opentofu/.terraform.lock.hcl",
-    "infra/opentofu/scripts/apply-technitium-dns.py",
+    "infra/ansible/scripts/apply-technitium-dns.py",
     "infra/ansible/**/*",
     "ansible.cfg",
     "values/terraform.tfvars",

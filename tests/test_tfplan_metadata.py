@@ -17,9 +17,10 @@ class TfplanMetadataTests(unittest.TestCase):
     def make_repo(self) -> tuple[tempfile.TemporaryDirectory[str], Path, Path, Path]:
         temp_dir = tempfile.TemporaryDirectory()
         repo = Path(temp_dir.name)
-        (repo / "infra" / "opentofu" / "scripts").mkdir(parents=True)
+        (repo / "infra" / "ansible" / "scripts").mkdir(parents=True)
+        (repo / "infra" / "opentofu").mkdir(parents=True)
         (repo / "infra" / "opentofu" / "main.tf").write_text("terraform {}\n")
-        (repo / "infra" / "opentofu" / "scripts" / "apply-technitium-dns.py").write_text("# helper\n")
+        (repo / "infra" / "ansible" / "scripts" / "apply-technitium-dns.py").write_text("# helper\n")
         (repo / "values" / "ansible" / "inventory").mkdir(parents=True)
         (repo / "values" / "terraform.tfvars").write_text("x = 1\n")
         (repo / "values" / "dns-records.local.json").write_text("{}\n")
