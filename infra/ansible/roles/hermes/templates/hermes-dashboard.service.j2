@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 EnvironmentFile=/etc/hermes-dashboard.env
 WorkingDirectory=/root
-ExecStart=/usr/local/bin/hermes dashboard --host {{ hermes_dashboard_host | default('0.0.0.0') }} --port {{ hermes_dashboard_port | default(9119) }} --no-open --insecure
+ExecStart=/usr/local/bin/hermes dashboard --host {{ hermes_dashboard_host | default('127.0.0.1') }} --port {{ hermes_dashboard_port | default(9119) }} --no-open --insecure
 Restart=on-failure
 RestartSec=5
 

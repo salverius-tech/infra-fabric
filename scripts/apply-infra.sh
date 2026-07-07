@@ -11,15 +11,15 @@ INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh bash -euo pipefail -c '
 python scripts/workspace-preflight.py --require-values
 
 if [[ ! -f tfplan && ! -f tfplan.meta.json ]]; then
-  printf "No saved infrastructure plan found. Run `just plan`, review the output, then run `just apply`.\n" >&2
+  printf "No saved infrastructure plan found. Run just plan, review the output, then run just apply.\n" >&2
   exit 1
 fi
 if [[ ! -f tfplan ]]; then
-  printf "Saved plan file `tfplan` is missing. Run `just plan` again.\n" >&2
+  printf "Saved plan file tfplan is missing. Run just plan again.\n" >&2
   exit 1
 fi
 if [[ ! -f tfplan.meta.json ]]; then
-  printf "Saved plan metadata `tfplan.meta.json` is missing. Run `just plan` again.\n" >&2
+  printf "Saved plan metadata tfplan.meta.json is missing. Run just plan again.\n" >&2
   exit 1
 fi
 
@@ -32,7 +32,7 @@ python scripts/tfplan-metadata.py summary --metadata tfplan.meta.json
 python scripts/settings.py summary
 python scripts/storage-vars.py --summary
 
-printf "Applying verified tfplan created by `just plan`.\n"
+printf "Applying verified tfplan created by just plan.\n"
 trap "rm -f tfplan tfplan.meta.json ./*.tfplan ./*.tfplan.meta.json" EXIT
 
 storage_vars="$(python scripts/storage-vars.py)"
@@ -45,10 +45,16 @@ ansible-playbook \
 tofu -chdir=infra/opentofu apply -state=../../values/terraform.tfstate ../../tfplan
 
 mapfile -t playbooks < <(python scripts/settings.py ansible-playbooks)
-if [[ "${#playbooks[@]}" -gt 0 ]]; then
+for playbook in "${playbooks[@]}"; do
+  if [[ "${playbook}" == "infra/ansible/playbooks/technitium-dns.yml" ]]; then
+    python scripts/bootstrap-technitium-api-token.py --env-file values/.env
+    # Refresh the current process environment so the DNS sync playbook can see
+    # a token generated during this apply run.
+    source <(python scripts/parse-env.py values/.env)
+  fi
   ansible-playbook \
     -i values/ansible/inventory/local.yml \
     -i infra/ansible/inventory/tfvars.py \
-    "${playbooks[@]}"
-fi
+    "${playbook}"
+done
 ' bash "${destroy_verify_flag}"

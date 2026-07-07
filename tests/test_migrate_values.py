@@ -140,6 +140,22 @@ class MigrateValuesTests(unittest.TestCase):
             self.assertIn('infisical_container_ipv4_gateway = "192.0.2.1"', tfvars_text)
             self.assertIn("set forgejo static IPv4 address from forgejo_lan_ip", changes)
 
+    def test_hashes_legacy_hermes_dashboard_plaintext_password(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text(
+                "export HERMES_DASHBOARD_BASIC_AUTH_PASS" "WORD='REPLACE_DASHBOARD_PASSWORD'\n",
+                encoding="utf-8",
+            )
+            (values / "terraform.tfvars").write_text("", encoding="utf-8")
+
+            changes = migrate_values.migrate(values)
+
+            env_text = (values / ".env").read_text(encoding="utf-8")
+            self.assertIn("HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH='scrypt$", env_text)
+            self.assertNotIn("HERMES_DASHBOARD_BASIC_AUTH_PASS" "WORD=", env_text)
+            self.assertIn("hashed HERMES_DASHBOARD_BASIC_AUTH_PASSWORD", "\n".join(changes))
+
     def test_rewrites_dns_named_technitium_api_url_to_direct_lxc_endpoint(self) -> None:
         temp, values = self.make_values()
         with temp:

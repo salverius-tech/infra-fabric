@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import ipaddress
 import json
 import re
@@ -18,7 +20,6 @@ GENERATED_SECRET_KEYS = {
     "INFISICAL_ENCRYPTION_KEY": lambda: secrets.token_hex(32),
     "INFISICAL_AUTH_SECRET": lambda: secrets.token_hex(32),
     "INFISICAL_POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(32),
-    "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD": lambda: secrets.token_urlsafe(32),
     "HERMES_DASHBOARD_BASIC_AUTH_SECRET": lambda: secrets.token_urlsafe(48),
 }
 
@@ -36,6 +37,7 @@ SECRET_KEYS = {
     "INFISICAL_AUTH_SECRET",
     "INFISICAL_POSTGRES_PASSWORD",
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
+    "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
     "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
 }
 
@@ -78,15 +80,39 @@ MIGRATION_ENV_KEYS = {
     "TECHNITIUM_API_URL",
     "DNS_RECORDS_FILE",
     *GENERATED_SECRET_KEYS,
+    "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
+    "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
     *ENV_TO_INVENTORY,
     *HISTORICAL_ENV_KEYS,
 }
 
 TFVARS_LINE_RE = re.compile(r"^\s*(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?P<value>.*?)(?:\s*#.*)?$")
+HERMES_SCRYPT_N = 2**14
+HERMES_SCRYPT_R = 8
+HERMES_SCRYPT_P = 1
+HERMES_SCRYPT_DKLEN = 32
+HERMES_SCRYPT_SALT_BYTES = 16
 
 
 class MigrationError(ValueError):
     pass
+
+
+def hermes_hash_password(password: str) -> str:
+    salt = secrets.token_bytes(HERMES_SCRYPT_SALT_BYTES)
+    derived_key = hashlib.scrypt(
+        password.encode("utf-8"),
+        salt=salt,
+        n=HERMES_SCRYPT_N,
+        r=HERMES_SCRYPT_R,
+        p=HERMES_SCRYPT_P,
+        dklen=HERMES_SCRYPT_DKLEN,
+        maxmem=0,
+    )
+    return (
+        f"scrypt${HERMES_SCRYPT_N}${HERMES_SCRYPT_R}${HERMES_SCRYPT_P}$"
+        f"{base64.b64encode(salt).decode()}${base64.b64encode(derived_key).decode()}"
+    )
 
 
 def parse_scalar(raw_value: str) -> str:
@@ -216,6 +242,20 @@ def rename_env_key(
         set_env(lines, entries, new_key, old_entry.value)
     remove_env(lines, entries, old_key)
     return True
+
+
+def migrate_hermes_dashboard_password_hash(lines: list[str], entries: dict[str, EnvEntry]) -> list[str]:
+    plaintext = entries.get("HERMES_DASHBOARD_BASIC_AUTH_PASSWORD")
+    password_hash = entries.get("HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH")
+    if plaintext is None:
+        return []
+    changes: list[str] = []
+    if password_hash is None:
+        set_env(lines, entries, "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH", hermes_hash_password(plaintext.value))
+        changes.append("hashed HERMES_DASHBOARD_BASIC_AUTH_PASSWORD to HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH")
+    if remove_env(lines, entries, "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"):
+        changes.append("removed plaintext HERMES_DASHBOARD_BASIC_AUTH_PASSWORD")
+    return changes
 
 
 def inventory_has_key(text: str, key: str) -> bool:
@@ -380,6 +420,8 @@ def ensure_inventory_vars(path: Path, text: str, domain: str) -> tuple[str, list
     replacements = {
         "{{ lookup('env', 'FORGEJO_DOMAIN') }}": f"git.{domain}",
         "{{ lookup('env', 'SERVER_NAME') }}": f"dns.{domain}",
+        "hermes_dashboard_basic_auth_password:": "hermes_dashboard_basic_auth_password_hash:",
+        "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD')": "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH')",
     }
     for old, new in replacements.items():
         if old in text:
@@ -401,8 +443,9 @@ def ensure_inventory_vars(path: Path, text: str, domain: str) -> tuple[str, list
         "hermes_repo_path": "    hermes_repo_path: /srv/homelab-infra",
         "hermes_dashboard_enabled": "    hermes_dashboard_enabled: true",
         "hermes_dashboard_port": "    hermes_dashboard_port: 9119",
+        "hermes_dashboard_host": "    hermes_dashboard_host: 127.0.0.1",
         "hermes_dashboard_basic_auth_username": "    hermes_dashboard_basic_auth_username: admin",
-        "hermes_dashboard_basic_auth_password": "    hermes_dashboard_basic_auth_password: \"{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD') }}\"",
+        "hermes_dashboard_basic_auth_password_hash": "    hermes_dashboard_basic_auth_password_hash: \"{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH') }}\"",
         "hermes_dashboard_basic_auth_secret": "    hermes_dashboard_basic_auth_secret: \"{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_SECRET') }}\"",
     }
     lines = text.rstrip().splitlines() if text.strip() else ["---", "all:", "  vars:"]
@@ -466,6 +509,7 @@ def migrate(values_dir: Path) -> list[str]:
         if rename_tfvars_key(tfvars_lines, old_key, new_key):
             changes.append(f"renamed {old_key} to {new_key}")
     optional_services = enabled_optional_services(values_dir)
+    changes.extend(migrate_hermes_dashboard_password_hash(env_lines, env_entries))
     if optional_services:
         changes.extend(ensure_optional_service_tfvars(tfvars_lines))
     changes.extend(ensure_vlan_tfvars(tfvars_lines))

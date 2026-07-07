@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -80,6 +82,16 @@ class ParseEnvTests(unittest.TestCase):
             self.assertEqual(parse_env_script.main(["--env-file", str(path)]), 0)
         finally:
             path.unlink()
+
+    def test_env_file_mode_escapes_dollar_for_docker_compose(self) -> None:
+        path = self.write_env("HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH='scrypt$1$2$3$salt$hash'\n")
+        output = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(parse_env_script.main(["--env-file", str(path)]), 0)
+        finally:
+            path.unlink()
+        self.assertIn("HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH=scrypt$$1$$2$$3$$salt$$hash", output.getvalue())
 
 
 if __name__ == "__main__":

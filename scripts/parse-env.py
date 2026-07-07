@@ -55,6 +55,7 @@ INFISICAL_KEYS = {
 
 HERMES_KEYS = {
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
+    "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
     "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
 }
 
@@ -73,6 +74,10 @@ ALLOWED_KEYS = (
 
 class EnvError(ValueError):
     pass
+
+
+def docker_env_file_value(value: str) -> str:
+    return value.replace("$", "$$")
 
 
 def parse_env(path: Path) -> dict[str, str]:
@@ -116,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
                     file=sys.stderr,
                 )
                 return 1
-            print(f"{key}={value}")
+            print(f"{key}={docker_env_file_value(value)}")
     else:
         for key, value in values.items():
             print(f"export {key}={shell_quote(value)}")

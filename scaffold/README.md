@@ -26,7 +26,7 @@ Or clone an existing private values repo, such as the Forgejo-hosted values repo
 just setup git@git.example.internal:owner/homelab-infra-values.git
 ```
 
-When run interactively, `just setup` starts setup wizards if private values still have scaffold placeholders. The Proxmox wizard asks for the Proxmox host, tests root SSH key access, offers an alternate key file or a command to authorize your default public SSH key if default keys fail, creates/updates a Proxmox API user/token, and stores the endpoint/token/SSH target in `.env` without printing the token secret. The domain wizard asks for your base domain plus service IPs, then derives names such as `dns.<domain>`, `technitium.<domain>`, `git.<domain>`, `infisical.<domain>`, and `hermes.<domain>` in the authoritative private values files. To rerun the Proxmox wizard later from the runbooks repo root:
+When run interactively, `just setup` starts setup wizards if private values still have scaffold placeholders. The Proxmox wizard asks for the Proxmox host, tests root SSH key access, offers an alternate key file or a command to authorize your default public SSH key if default keys fail, creates/updates a Proxmox API user/token, and stores the endpoint/token/SSH target in `.env` without printing the token secret. The domain wizard asks for your base domain plus a starting service IP, then derives static LXC addresses and names such as `dns.<domain>`, `technitium.<domain>`, `git.<domain>`, `infisical.<domain>`, and `hermes.<domain>` in the authoritative private values files. To rerun the Proxmox wizard later from the runbooks repo root:
 
 ```bash
 scripts/bootstrap-pve-token.sh --force
@@ -49,5 +49,11 @@ just validate
 ```
 
 Keep `.env` in dotenv-style `KEY=value` or `export KEY=value` format. The runbooks parse it as data and reject shell execution patterns.
+
+For Hermes dashboard form login, store `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH`, not a plaintext password. Generate it with:
+
+```bash
+python scripts/hermes-password-hash.py
+```
 
 For Forgejo Actions deployment, set `FORGEJO_RUNNER_REGISTRATION_SECRET` to a persistent 40-character hex secret and enable `forgejo_runner` in `settings.local.json` services before planning the runner LXC.

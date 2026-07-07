@@ -5,7 +5,15 @@
 {{ hermes_domain }} {
     encode zstd gzip
 {% if hermes_dashboard_enabled | default(true) %}
-    reverse_proxy 127.0.0.1:{{ hermes_dashboard_port | default(9119) }}
+    @basic_auth_login {
+        path /auth/login
+        query provider=basic
+    }
+    rewrite @basic_auth_login /login?{query}
+
+    reverse_proxy 127.0.0.1:{{ hermes_dashboard_port | default(9119) }} {
+        header_up Host 127.0.0.1:{{ hermes_dashboard_port | default(9119) }}
+    }
 {% else %}
     root * /var/www/hermes
     file_server

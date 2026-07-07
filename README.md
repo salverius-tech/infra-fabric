@@ -103,7 +103,7 @@ Apply the reviewed plan and configure services with Ansible:
 just apply
 ```
 
-`just plan` writes `tfplan` plus `tfplan.meta.json`. `just apply` refuses to run if the saved plan or its inputs changed, then applies infrastructure, runs enabled Ansible playbooks, and syncs Technitium DNS records after the DNS service is installed. It removes plan artifacts after the apply attempt. `TECHNITIUM_API_URL` should use the direct LXC API endpoint (`http://<technitium-lxc-ip>:5380/api`) so DNS sync does not depend on records it creates.
+`just plan` writes `tfplan` plus `tfplan.meta.json`. `just apply` refuses to run if the saved plan or its inputs changed, then applies infrastructure, runs enabled Ansible playbooks, and syncs Technitium DNS records after the DNS service is installed. It removes plan artifacts after the apply attempt. `TECHNITIUM_API_URL` should use the direct LXC API endpoint (`http://<technitium-lxc-ip>:5380/api`) so DNS sync does not depend on records it creates. If the Technitium token is missing or still a placeholder, apply bootstraps one through the local API and stores it in `values/.env` without printing the token.
 
 After a successful apply, review and commit the private `values/` repo because OpenTofu state and local inventory may have changed:
 
@@ -186,6 +186,17 @@ Container VLAN tags are optional. Omit a `*_vlan_id` variable or set it to
 `null` for an untagged LXC interface; set it to a VLAN ID from 1 through 4094
 for a tagged interface. The selected Proxmox bridge must already be configured
 for that VLAN.
+
+Browser-facing services with DNS records should use static LXC IP addresses,
+not DHCP-only addresses. The setup wizard derives contiguous static service IPs
+from the first managed service IP you provide and keeps `*_lan_ip`, LXC network
+configuration, and Technitium DNS records aligned.
+
+Hermes dashboard uses a form-login provider named `basic`. Store
+`HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH` in private values instead of a
+plaintext password; generate it with `python scripts/hermes-password-hash.py`.
+The service-local Caddy config rewrites the upstream provider redirect to the
+form login route and proxies only to the loopback-bound dashboard.
 
 `values/.env` is parsed as dotenv-style data by `scripts/parse-env.py`; it is not sourced as shell. Keep required variables from `scaffold/.env.example` in sync with your private `values/.env`.
 
