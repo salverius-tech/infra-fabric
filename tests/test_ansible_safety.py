@@ -12,6 +12,7 @@ CADDY_TASK_FILES = (
     REPO / "infra" / "ansible" / "roles" / "infisical" / "tasks" / "main.yml",
     REPO / "infra" / "ansible" / "roles" / "hermes" / "tasks" / "main.yml",
 )
+ANSIBLE_TASK_FILES = tuple((REPO / "infra" / "ansible" / "roles").glob("*/tasks/*.yml"))
 
 
 def task_block(text: str, name: str) -> str:
@@ -47,6 +48,16 @@ class AnsibleSafetyTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("caddy fmt --overwrite", text, str(path))
             self.assertIn("caddy validate --config /etc/caddy/Caddyfile", text, str(path))
+
+    def test_curl_output_is_not_accidentally_streamed_to_ansible(self) -> None:
+        for path in ANSIBLE_TASK_FILES:
+            text = path.read_text(encoding="utf-8")
+            self.assertNotRegex(
+                text,
+                r"curl[^\n]*\n\s+-o\b",
+                f"{path} has curl URL and -o split across YAML lines; "
+                "folded blocks preserve the newline here, causing curl to stream binary to Ansible stdout",
+            )
 
     def test_forgejo_runner_registration_is_guarded_by_existing_lookup(self) -> None:
         text = RUNNER_TASKS.read_text(encoding="utf-8")
