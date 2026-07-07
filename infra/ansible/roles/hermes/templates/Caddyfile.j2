@@ -11,8 +11,21 @@
     }
     rewrite @basic_auth_login /login?{query}
 
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @websockets 127.0.0.1:{{ hermes_dashboard_port | default(9119) }} {
+        header_up Host 127.0.0.1:{{ hermes_dashboard_port | default(9119) }}
+        header_up Origin http://127.0.0.1:{{ hermes_dashboard_port | default(9119) }}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
     reverse_proxy 127.0.0.1:{{ hermes_dashboard_port | default(9119) }} {
         header_up Host 127.0.0.1:{{ hermes_dashboard_port | default(9119) }}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Proto {scheme}
     }
 {% else %}
     root * /var/www/hermes
