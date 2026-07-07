@@ -103,7 +103,7 @@ Apply the reviewed plan and configure services with Ansible:
 just apply
 ```
 
-`just plan` writes `tfplan` plus `tfplan.meta.json`. `just apply` refuses to run if the saved plan or its inputs changed, then applies infrastructure, runs enabled Ansible playbooks, and syncs Technitium DNS records after the DNS service is installed. It removes plan artifacts after the apply attempt.
+`just plan` writes `tfplan` plus `tfplan.meta.json`. `just apply` refuses to run if the saved plan or its inputs changed, then applies infrastructure, runs enabled Ansible playbooks, and syncs Technitium DNS records after the DNS service is installed. It removes plan artifacts after the apply attempt. `TECHNITIUM_API_URL` should use the direct LXC API endpoint (`http://<technitium-lxc-ip>:5380/api`) so DNS sync does not depend on records it creates.
 
 After a successful apply, review and commit the private `values/` repo because OpenTofu state and local inventory may have changed:
 
@@ -158,7 +158,7 @@ OpenTofu manages:
 - Optional Tailscale client LXC shape, disabled by default until `tailscale_client_enabled` is set in private values
 - Optional Forgejo Actions runner LXC when `forgejo_runner` is enabled in local settings
 - Optional Infisical secrets service LXC with a service-local Caddy frontend
-- Optional Hermes management LXC with SSH tooling and a service-local Caddy landing page
+- Optional Hermes management LXC with SSH tooling and a service-local Caddy reverse proxy for the Hermes Agent web dashboard
 - LXC bind mount attachments for services that use host storage
 
 Ansible manages:
@@ -170,7 +170,7 @@ Ansible manages:
 - Caddy and OpenSSH integration on the Forgejo LXC
 - Forgejo Actions runner installation/registration on a separate LXC
 - Infisical Docker Compose stack, including PostgreSQL, Redis, and Caddy
-- Hermes management tooling, SSH-oriented bootstrap directories, and Caddy
+- Hermes management tooling, SSH-oriented bootstrap directories, the Hermes Agent web dashboard, and Caddy
 - Optional Tailscale installation and private backup restore on the Tailscale client LXC
 - Technitium DNS records/settings through `infra/ansible/playbooks/technitium-dns.yml`
 

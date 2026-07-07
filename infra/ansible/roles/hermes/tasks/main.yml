@@ -6,7 +6,10 @@
       - hermes_domain is defined
       - caddy_email is defined
       - caddy_cloudflare_api_token is defined
-    fail_msg: hermes_vmid, hermes_domain, caddy_email, and caddy_cloudflare_api_token are required.
+      - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_username is defined
+      - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_password is defined
+      - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_secret is defined
+    fail_msg: hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token, and Hermes dashboard auth variables are required.
 
 - name: Install Hermes OS dependencies in LXC
   ansible.builtin.command:
@@ -19,7 +22,7 @@
       - -lc
       - >-
         set -euo pipefail;
-        packages="ca-certificates caddy curl docker.io git gnupg jq openssh-client python3 rsync tar unzip";
+        packages="build-essential ca-certificates caddy curl docker.io git gnupg jq openssh-client python3 python3-pip python3-venv rsync tar unzip xz-utils";
         missing=0;
         for package in ${packages}; do
           dpkg-query -W "${package}" >/dev/null 2>&1 || missing=1;
@@ -203,6 +206,128 @@
       - bash
       - -lc
       - chmod 0600 /etc/caddy/env && chown root:caddy /etc/caddy/env
+  changed_when: false
+
+- name: Install Hermes Agent CLI and dashboard dependencies in LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ hermes_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        if ! command -v hermes >/dev/null 2>&1; then
+          curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser;
+        fi;
+        cd /usr/local/lib/hermes-agent;
+        python3 -m venv --upgrade-deps venv;
+        venv/bin/python -m pip install -e ".[web,pty]"
+  when: hermes_dashboard_enabled | default(true) | bool
+  changed_when: false
+
+- name: Stage Hermes dashboard env on Proxmox host
+  ansible.builtin.template:
+    src: hermes-dashboard.env.j2
+    dest: /tmp/hermes-dashboard.env.{{ hermes_vmid }}
+    mode: "0600"
+  when: hermes_dashboard_enabled | default(true) | bool
+  no_log: true
+
+- name: Check Hermes dashboard env drift
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        local_hash="$(sha256sum /tmp/hermes-dashboard.env.{{ hermes_vmid }} | awk '{print $1}')";
+        remote_hash="$(pct exec {{ hermes_vmid | quote }} -- sha256sum /etc/hermes-dashboard.env 2>/dev/null | awk '{print $1}')";
+        test "${local_hash}" = "${remote_hash}"
+  register: hermes_dashboard_env_drift
+  changed_when: false
+  failed_when: false
+  when: hermes_dashboard_enabled | default(true) | bool
+  no_log: true
+
+- name: Push Hermes dashboard env into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ hermes_vmid | string }}"
+      - /tmp/hermes-dashboard.env.{{ hermes_vmid }}
+      - /etc/hermes-dashboard.env
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_dashboard_env_drift.rc != 0
+  changed_when: true
+  no_log: true
+  notify: Restart hermes dashboard
+
+- name: Secure Hermes dashboard env
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ hermes_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - chmod 0600 /etc/hermes-dashboard.env && chown root:root /etc/hermes-dashboard.env
+  when: hermes_dashboard_enabled | default(true) | bool
+  changed_when: false
+  no_log: true
+
+- name: Stage Hermes dashboard systemd unit on Proxmox host
+  ansible.builtin.template:
+    src: hermes-dashboard.service.j2
+    dest: /tmp/hermes-dashboard.service.{{ hermes_vmid }}
+    mode: "0644"
+  when: hermes_dashboard_enabled | default(true) | bool
+
+- name: Check Hermes dashboard systemd unit drift
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        local_hash="$(sha256sum /tmp/hermes-dashboard.service.{{ hermes_vmid }} | awk '{print $1}')";
+        remote_hash="$(pct exec {{ hermes_vmid | quote }} -- sha256sum /etc/systemd/system/hermes-dashboard.service 2>/dev/null | awk '{print $1}')";
+        test "${local_hash}" = "${remote_hash}"
+  register: hermes_dashboard_unit_drift
+  changed_when: false
+  failed_when: false
+  when: hermes_dashboard_enabled | default(true) | bool
+
+- name: Push Hermes dashboard systemd unit into LXC
+  ansible.builtin.command:
+    argv:
+      - pct
+      - push
+      - "{{ hermes_vmid | string }}"
+      - /tmp/hermes-dashboard.service.{{ hermes_vmid }}
+      - /etc/systemd/system/hermes-dashboard.service
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_dashboard_unit_drift.rc != 0
+  changed_when: true
+  notify: Restart hermes dashboard
+
+- name: Enable Hermes dashboard service
+  ansible.builtin.command:
+    argv:
+      - pct
+      - exec
+      - "{{ hermes_vmid | string }}"
+      - --
+      - bash
+      - -lc
+      - systemctl daemon-reload && systemctl enable --now hermes-dashboard
+  when: hermes_dashboard_enabled | default(true) | bool
   changed_when: false
 
 - name: Stage Hermes Caddyfile on Proxmox host

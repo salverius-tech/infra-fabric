@@ -41,6 +41,11 @@ all:
     hermes_vmid: 111
     hermes_domain: hermes.example.internal
     hermes_repo_path: /srv/homelab-infra
+    hermes_dashboard_enabled: true
+    hermes_dashboard_port: 9119
+    hermes_dashboard_basic_auth_username: admin
+    hermes_dashboard_basic_auth_password: "{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD') }}"
+    hermes_dashboard_basic_auth_secret: "{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_SECRET') }}"
     tailscale_client_enabled: false
     tailscale_client_vmid: 108
     tailscale_client_restore_backup: false

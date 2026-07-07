@@ -5,8 +5,11 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import os
 import re
 import shlex
+import socket
+import subprocess
 import sys
 from pathlib import Path
 
@@ -113,6 +116,79 @@ def ip_without_cidr(value: str) -> str:
     return value.split("/", 1)[0]
 
 
+def cidr_prefix(value: str) -> int:
+    try:
+        return ipaddress.ip_interface(value).network.prefixlen
+    except ValueError:
+        return 24
+
+
+def ip_with_host(ip_value: str, host_octet: int) -> str:
+    try:
+        address = ipaddress.ip_address(ip_without_cidr(ip_value))
+    except ValueError:
+        return f"192.0.2.{host_octet}"
+    if not isinstance(address, ipaddress.IPv4Address):
+        return f"192.0.2.{host_octet}"
+    octets = str(address).split(".")
+    octets[-1] = str(host_octet)
+    return ".".join(octets)
+
+
+def service_ip_sequence(start_ip: str, count: int) -> list[str]:
+    try:
+        start = ipaddress.ip_address(start_ip)
+    except ValueError as error:
+        raise ValueError("service IP range start must be an IPv4 address") from error
+    if not isinstance(start, ipaddress.IPv4Address):
+        raise ValueError("service IP range start must be an IPv4 address")
+    return [str(start + offset) for offset in range(count)]
+
+
+def host_lan_defaults() -> tuple[str, str, int]:
+    env_ip = os.environ.get("HOST_LAN_IP", "")
+    env_gateway = os.environ.get("HOST_LAN_GATEWAY", "")
+    env_prefix = os.environ.get("HOST_LAN_PREFIX", "")
+    if env_ip and env_gateway:
+        try:
+            return env_ip, env_gateway, int(env_prefix or "24")
+        except ValueError:
+            return env_ip, env_gateway, 24
+
+    local_ip = ""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("1.1.1.1", 53))
+            local_ip = probe.getsockname()[0]
+    except OSError:
+        pass
+
+    gateway = ""
+    for command in (("ip", "route", "show", "default"), ("netstat", "-rn")):
+        try:
+            result = subprocess.run(command, text=True, capture_output=True, check=False, timeout=2)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        for line in result.stdout.splitlines():
+            if command[0] == "ip" and line.startswith("default "):
+                parts = line.split()
+                if "via" in parts:
+                    gateway = parts[parts.index("via") + 1]
+                    break
+            default_route = ".".join(("0", "0", "0", "0"))
+            if command[0] == "netstat" and (line.startswith(default_route) or line.strip().startswith("default")):
+                parts = line.split()
+                if len(parts) >= 2:
+                    gateway = parts[1]
+                    break
+        if gateway:
+            break
+
+    if local_ip.startswith(("172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.")):
+        return "", "", 24
+    return local_ip, gateway, 24
+
+
 def update_inventory(path: Path, domain: str) -> None:
     if not path.exists():
         return
@@ -202,37 +278,54 @@ def run(args: argparse.Namespace) -> int:
         print(f"Invalid domain: {error}", file=sys.stderr)
         return 1
 
-    default_technitium_ip = ip_without_cidr(tfvar_value(tfvars_path, "technitium_container_ipv4_address") or "192.0.2.53")
-    default_forgejo_ip = tfvar_value(tfvars_path, "forgejo_lan_ip") or "192.0.2.62"
-    default_infisical_ip = tfvar_value(tfvars_path, "infisical_lan_ip") or "192.0.2.70"
-    default_hermes_ip = tfvar_value(tfvars_path, "hermes_lan_ip") or "192.0.2.71"
+    technitium_address = tfvar_value(tfvars_path, "technitium_container_ipv4_address") or "192.0.2.53/24"
+    default_technitium_ip = ip_without_cidr(technitium_address)
+    default_gateway = tfvar_value(tfvars_path, "technitium_container_ipv4_gateway") or "192.0.2.1"
+    default_prefix = cidr_prefix(technitium_address)
+    host_ip, host_gateway, host_prefix = host_lan_defaults()
+    if host_ip and is_placeholder_domain(default_domain):
+        default_technitium_ip = ip_with_host(host_ip, 22)
+        default_gateway = host_gateway or ip_with_host(host_ip, 1)
+        default_prefix = host_prefix
+
+    default_service_start = tfvar_value(tfvars_path, "forgejo_lan_ip") or ip_with_host(default_technitium_ip, 23)
     technitium_ip = prompt("Technitium DNS/UI IP", default_technitium_ip)
-    forgejo_ip = prompt("Forgejo LAN IP", default_forgejo_ip)
-    infisical_ip = prompt("Infisical LAN IP", default_infisical_ip)
-    hermes_ip = prompt("Hermes LAN IP", default_hermes_ip)
+    gateway = prompt("LXC IPv4 gateway", default_gateway)
+    service_start_ip = prompt("First managed service IP (Forgejo; following services increment from this)", default_service_start)
     try:
         validate_ip(technitium_ip, "Technitium DNS/UI IP")
-        validate_ip(forgejo_ip, "Forgejo LAN IP")
-        validate_ip(infisical_ip, "Infisical LAN IP")
-        validate_ip(hermes_ip, "Hermes LAN IP")
+        validate_ip(gateway, "LXC IPv4 gateway")
+        forgejo_ip, forgejo_runner_ip, tailscale_ip, infisical_ip, hermes_ip = service_ip_sequence(service_start_ip, 5)
     except ValueError as error:
         print(error, file=sys.stderr)
         return 1
 
-    set_env_value(env_path, "TECHNITIUM_API_URL", f"https://dns.{domain}/api")
+    set_env_value(env_path, "TECHNITIUM_API_URL", f"http://{technitium_ip}:5380/api")
     set_env_value(env_path, "DNS_RECORDS_FILE", "values/dns-records.local.json")
 
+    set_tfvar_string(tfvars_path, "technitium_container_ipv4_address", f"{technitium_ip}/{default_prefix}")
+    set_tfvar_string(tfvars_path, "technitium_container_ipv4_gateway", gateway)
     set_tfvar_string(tfvars_path, "technitium_container_search_domain", domain)
     set_tfvar_string(tfvars_path, "forgejo_server_name", f"git.{domain}")
     set_tfvar_string(tfvars_path, "forgejo_lan_ip", forgejo_ip)
+    set_tfvar_string(tfvars_path, "forgejo_container_ipv4_address", f"{forgejo_ip}/{default_prefix}")
+    set_tfvar_string(tfvars_path, "forgejo_container_ipv4_gateway", gateway)
     set_tfvar_string(tfvars_path, "forgejo_container_search_domain", domain)
+    set_tfvar_string(tfvars_path, "forgejo_runner_ipv4_address", f"{forgejo_runner_ip}/{default_prefix}")
+    set_tfvar_string(tfvars_path, "forgejo_runner_ipv4_gateway", gateway)
     set_tfvar_string(tfvars_path, "forgejo_runner_search_domain", domain)
     set_tfvar_string(tfvars_path, "infisical_server_name", f"infisical.{domain}")
     set_tfvar_string(tfvars_path, "infisical_lan_ip", infisical_ip)
+    set_tfvar_string(tfvars_path, "infisical_container_ipv4_address", f"{infisical_ip}/{default_prefix}")
+    set_tfvar_string(tfvars_path, "infisical_container_ipv4_gateway", gateway)
     set_tfvar_string(tfvars_path, "infisical_container_search_domain", domain)
     set_tfvar_string(tfvars_path, "hermes_server_name", f"hermes.{domain}")
     set_tfvar_string(tfvars_path, "hermes_lan_ip", hermes_ip)
+    set_tfvar_string(tfvars_path, "hermes_container_ipv4_address", f"{hermes_ip}/{default_prefix}")
+    set_tfvar_string(tfvars_path, "hermes_container_ipv4_gateway", gateway)
     set_tfvar_string(tfvars_path, "hermes_container_search_domain", domain)
+    set_tfvar_string(tfvars_path, "tailscale_client_ipv4_address", f"{tailscale_ip}/{default_prefix}")
+    set_tfvar_string(tfvars_path, "tailscale_client_ipv4_gateway", gateway)
     set_tfvar_string(tfvars_path, "tailscale_client_search_domain", domain)
 
     update_inventory(inventory_path, domain)
@@ -243,7 +336,9 @@ def run(args: argparse.Namespace) -> int:
     update_dns_records(dns_records_path, domain, technitium_ip, forgejo_ip, infisical_ip, hermes_ip)
 
     print("Updated domain-derived values:")
-    print(f"  TECHNITIUM_API_URL=https://dns.{domain}/api")
+    print(f"  TECHNITIUM_API_URL=http://{technitium_ip}:5380/api")
+    print(f"  LXC gateway: {gateway}")
+    print(f"  Managed service IPs: git={forgejo_ip}, runner={forgejo_runner_ip}, tailscale={tailscale_ip}, infisical={infisical_ip}, hermes={hermes_ip}")
     print(f"  DNS records: dns.{domain}, technitium.{domain}, git.{domain}, infisical.{domain}, hermes.{domain}")
     return 0
 

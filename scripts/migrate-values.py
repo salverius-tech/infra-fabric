@@ -9,6 +9,7 @@ import re
 import secrets
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from envfile import EnvEntry, EnvFileError, parse_env_lines as parse_envfile_lines, parse_scalar as envfile_parse_scalar, read_lines, remove_env, set_env, write_lines
@@ -17,6 +18,8 @@ GENERATED_SECRET_KEYS = {
     "INFISICAL_ENCRYPTION_KEY": lambda: secrets.token_hex(32),
     "INFISICAL_AUTH_SECRET": lambda: secrets.token_hex(32),
     "INFISICAL_POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(32),
+    "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD": lambda: secrets.token_urlsafe(32),
+    "HERMES_DASHBOARD_BASIC_AUTH_SECRET": lambda: secrets.token_urlsafe(48),
 }
 
 SECRET_KEYS = {
@@ -32,6 +35,8 @@ SECRET_KEYS = {
     "INFISICAL_ENCRYPTION_KEY",
     "INFISICAL_AUTH_SECRET",
     "INFISICAL_POSTGRES_PASSWORD",
+    "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
+    "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
 }
 
 ENV_TO_INVENTORY = {
@@ -58,6 +63,7 @@ TECHNITIUM_TFVARS_RENAMES = {
     "container_dns_servers": "technitium_container_dns_servers",
     "container_search_domain": "technitium_container_search_domain",
     "container_bridge": "technitium_container_bridge",
+    "container_vlan_id": "technitium_container_vlan_id",
     "container_cores": "technitium_container_cores",
     "container_memory_mb": "technitium_container_memory_mb",
     "container_swap_mb": "technitium_container_swap_mb",
@@ -123,6 +129,18 @@ def set_tfvars_raw(lines: list[str], key: str, raw_value: str) -> bool:
         lines.append("")
     lines.append(f"{key} = {raw_value}")
     return True
+
+
+def replace_tfvars_raw(lines: list[str], key: str, raw_value: str) -> bool:
+    pattern = re.compile(rf"^(?P<prefix>\s*{re.escape(key)}\s*=\s*).*$")
+    for index, line in enumerate(lines):
+        if pattern.match(line):
+            new_line = pattern.sub(rf"\g<prefix>{raw_value}", line)
+            if new_line == line:
+                return False
+            lines[index] = new_line
+            return True
+    return False
 
 
 def hcl_quote(value: str) -> str:
@@ -226,6 +244,84 @@ def subnet_ip(tfvars_lines: list[str], host_octet: int) -> str:
     return f"192.0.2.{host_octet}"
 
 
+def cidr_prefix(value: str) -> str:
+    match = re.search(r"/(\d+)$", value)
+    return match.group(1) if match else "24"
+
+
+def direct_technitium_api_url(tfvars_lines: list[str]) -> str:
+    address = tfvars_scalar_value(tfvars_lines, "technitium_container_ipv4_address")
+    host = address.split("/", 1)[0]
+    return f"http://{host}:5380/api" if host else ""
+
+
+def should_rewrite_technitium_api_url(value: str) -> bool:
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return False
+    host = parsed.hostname or ""
+    if not host:
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        return host.startswith(("dns.", "technitium."))
+
+
+def ensure_direct_technitium_api_url(
+    env_lines: list[str], env_entries: dict[str, EnvEntry], tfvars_lines: list[str]
+) -> list[str]:
+    entry = env_entries.get("TECHNITIUM_API_URL")
+    direct_url = direct_technitium_api_url(tfvars_lines)
+    if entry is None or not direct_url or not should_rewrite_technitium_api_url(entry.value):
+        return []
+    if set_env(env_lines, env_entries, "TECHNITIUM_API_URL", direct_url):
+        return ["set TECHNITIUM_API_URL to direct Technitium LXC API endpoint"]
+    return []
+
+
+def ensure_static_service_addresses(tfvars_lines: list[str]) -> list[str]:
+    changes: list[str] = []
+    prefix = cidr_prefix(tfvars_scalar_value(tfvars_lines, "technitium_container_ipv4_address"))
+    gateway = tfvars_scalar_value(tfvars_lines, "technitium_container_ipv4_gateway")
+    service_keys = {
+        "forgejo": ("forgejo_container_ipv4_address", "forgejo_container_ipv4_gateway", "forgejo_lan_ip"),
+        "infisical": ("infisical_container_ipv4_address", "infisical_container_ipv4_gateway", "infisical_lan_ip"),
+        "hermes": ("hermes_container_ipv4_address", "hermes_container_ipv4_gateway", "hermes_lan_ip"),
+    }
+    for service, (address_key, gateway_key, lan_key) in service_keys.items():
+        lan_ip = tfvars_scalar_value(tfvars_lines, lan_key)
+        if not lan_ip or tfvars_scalar_value(tfvars_lines, address_key) != "dhcp":
+            continue
+        if replace_tfvars_raw(tfvars_lines, address_key, hcl_quote(f"{lan_ip}/{prefix}")):
+            changes.append(f"set {service} static IPv4 address from {lan_key}")
+        if gateway and tfvars_raw_value(tfvars_lines, gateway_key) == "null":
+            replace_tfvars_raw(tfvars_lines, gateway_key, hcl_quote(gateway))
+            changes.append(f"set {service} IPv4 gateway")
+    return changes
+
+
+def ensure_vlan_tfvars(tfvars_lines: list[str]) -> list[str]:
+    changes: list[str] = []
+    service_prefixes = (
+        "technitium_container",
+        "forgejo_container",
+        "forgejo_runner",
+        "infisical_container",
+        "hermes_container",
+        "tailscale_client",
+    )
+    for prefix in service_prefixes:
+        if not (tfvars_key_exists(tfvars_lines, f"{prefix}_vmid") or tfvars_key_exists(tfvars_lines, f"{prefix}_bridge")):
+            continue
+        key = f"{prefix}_vlan_id"
+        if set_tfvars_raw(tfvars_lines, key, "null"):
+            changes.append(f"added {key}")
+    return changes
+
+
 def ensure_optional_service_tfvars(tfvars_lines: list[str]) -> list[str]:
     changes: list[str] = []
     domain = service_domain(tfvars_lines)
@@ -303,6 +399,11 @@ def ensure_inventory_vars(path: Path, text: str, domain: str) -> tuple[str, list
         "hermes_vmid": "    hermes_vmid: 111",
         "hermes_domain": f"    hermes_domain: hermes.{domain}",
         "hermes_repo_path": "    hermes_repo_path: /srv/homelab-infra",
+        "hermes_dashboard_enabled": "    hermes_dashboard_enabled: true",
+        "hermes_dashboard_port": "    hermes_dashboard_port: 9119",
+        "hermes_dashboard_basic_auth_username": "    hermes_dashboard_basic_auth_username: admin",
+        "hermes_dashboard_basic_auth_password": "    hermes_dashboard_basic_auth_password: \"{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD') }}\"",
+        "hermes_dashboard_basic_auth_secret": "    hermes_dashboard_basic_auth_secret: \"{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_SECRET') }}\"",
     }
     lines = text.rstrip().splitlines() if text.strip() else ["---", "all:", "  vars:"]
     for key, line in additions.items():
@@ -367,6 +468,9 @@ def migrate(values_dir: Path) -> list[str]:
     optional_services = enabled_optional_services(values_dir)
     if optional_services:
         changes.extend(ensure_optional_service_tfvars(tfvars_lines))
+    changes.extend(ensure_vlan_tfvars(tfvars_lines))
+    changes.extend(ensure_static_service_addresses(tfvars_lines))
+    changes.extend(ensure_direct_technitium_api_url(env_lines, env_entries, tfvars_lines))
     tfvars_values = parse_tfvars(tfvars_lines, tfvars_path)
 
     inventory_changes: list[str] = []
@@ -402,7 +506,9 @@ def migrate(values_dir: Path) -> list[str]:
 
     old_url = tfvars_values.get("technitium_api_url")
     if old_url and "TECHNITIUM_API_URL" not in env_entries:
-        set_env(env_lines, env_entries, "TECHNITIUM_API_URL", old_url[1])
+        direct_url = direct_technitium_api_url(tfvars_lines)
+        api_url = direct_url if should_rewrite_technitium_api_url(old_url[1]) and direct_url else old_url[1]
+        set_env(env_lines, env_entries, "TECHNITIUM_API_URL", api_url)
         changes.append("moved technitium_api_url to TECHNITIUM_API_URL")
     if remove_tfvars(tfvars_lines, tfvars_values, "technitium_api_url"):
         changes.append("removed technitium_api_url from terraform.tfvars")

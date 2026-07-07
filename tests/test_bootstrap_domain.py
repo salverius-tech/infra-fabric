@@ -47,6 +47,34 @@ class BootstrapDomainTests(unittest.TestCase):
                 "lab.example",
             )
 
+    def test_configured_domain_uses_tfvars_when_api_url_is_direct_ip(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            env_path = root / ".env"
+            tfvars_path = root / "terraform.tfvars"
+            env_path.write_text(
+                'export TECHNITIUM_API_URL="http://192.0.2.53:5380/api"\n',
+                encoding="utf-8",
+            )
+            tfvars_path.write_text('technitium_container_search_domain = "lab.example"\n', encoding="utf-8")
+
+            self.assertEqual(
+                bootstrap_domain.configured_domain(env_path, tfvars_path),
+                "lab.example",
+            )
+
+    def test_service_ip_sequence_allocates_contiguous_addresses(self) -> None:
+        self.assertEqual(
+            bootstrap_domain.service_ip_sequence("192.0.2.23", 5),
+            [
+                "192.0.2.23",
+                "192.0.2.24",
+                "192.0.2.25",
+                "192.0.2.26",
+                "192.0.2.27",
+            ],
+        )
+
     def test_update_inventory_writes_concrete_caddy_names(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             inventory_path = Path(temp) / "local.yml"

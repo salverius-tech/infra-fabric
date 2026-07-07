@@ -48,6 +48,7 @@ class MigrateValuesTests(unittest.TestCase):
                 'container_vmid = 106\n'
                 'container_hostname = "technitium-dns"\n'
                 'container_ipv4_address = "192.0.2.53/24"\n'
+                'container_vlan_id = 42\n'
                 'container_dns_servers = ["192.0.2.1"]\n'
                 'technitium_api_url = "http://192.0.2.53:5380/api"\n'
                 'dns_records_file = "../../values/dns-records.local.json"\n',
@@ -72,6 +73,7 @@ class MigrateValuesTests(unittest.TestCase):
             self.assertIn("technitium_container_vmid = 106", tfvars_text)
             self.assertIn('technitium_container_hostname = "technitium-dns"', tfvars_text)
             self.assertIn('technitium_container_ipv4_address = "192.0.2.53/24"', tfvars_text)
+            self.assertIn("technitium_container_vlan_id = 42", tfvars_text)
             self.assertIn('technitium_container_dns_servers = ["192.0.2.1"]', tfvars_text)
             self.assertNotIn("container_root_password", tfvars_text)
             self.assertNotIn("container_ssh_public_keys", tfvars_text)
@@ -93,6 +95,68 @@ class MigrateValuesTests(unittest.TestCase):
 
             with self.assertRaises(migrate_values.MigrationError):
                 migrate_values.migrate(values)
+
+    def test_adds_missing_vlan_ids_for_existing_service_values(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("", encoding="utf-8")
+            (values / "terraform.tfvars").write_text(
+                'technitium_container_vmid = 106\n'
+                'forgejo_container_bridge = "vmbr0"\n',
+                encoding="utf-8",
+            )
+
+            changes = migrate_values.migrate(values)
+
+            tfvars_text = (values / "terraform.tfvars").read_text(encoding="utf-8")
+            self.assertIn("technitium_container_vlan_id = null", tfvars_text)
+            self.assertIn("forgejo_container_vlan_id = null", tfvars_text)
+            self.assertNotIn("hermes_container_vlan_id", tfvars_text)
+            self.assertIn("added technitium_container_vlan_id", changes)
+            self.assertIn("added forgejo_container_vlan_id", changes)
+
+    def test_sets_dns_backed_services_static_from_lan_ips(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("", encoding="utf-8")
+            (values / "terraform.tfvars").write_text(
+                'technitium_container_ipv4_address = "192.0.2.22/24"\n'
+                'technitium_container_ipv4_gateway = "192.0.2.1"\n'
+                'forgejo_container_ipv4_address = "dhcp"\n'
+                'forgejo_container_ipv4_gateway = null\n'
+                'forgejo_lan_ip = "192.0.2.23"\n'
+                'infisical_container_ipv4_address = "dhcp"\n'
+                'infisical_container_ipv4_gateway = null\n'
+                'infisical_lan_ip = "192.0.2.26"\n',
+                encoding="utf-8",
+            )
+
+            changes = migrate_values.migrate(values)
+
+            tfvars_text = (values / "terraform.tfvars").read_text(encoding="utf-8")
+            self.assertIn('forgejo_container_ipv4_address = "192.0.2.23/24"', tfvars_text)
+            self.assertIn('forgejo_container_ipv4_gateway = "192.0.2.1"', tfvars_text)
+            self.assertIn('infisical_container_ipv4_address = "192.0.2.26/24"', tfvars_text)
+            self.assertIn('infisical_container_ipv4_gateway = "192.0.2.1"', tfvars_text)
+            self.assertIn("set forgejo static IPv4 address from forgejo_lan_ip", changes)
+
+    def test_rewrites_dns_named_technitium_api_url_to_direct_lxc_endpoint(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text(
+                "export TECHNITIUM_API_URL='https://dns.lab.example/api'\n",
+                encoding="utf-8",
+            )
+            (values / "terraform.tfvars").write_text(
+                'technitium_container_ipv4_address = "192.0.2.53/24"\n',
+                encoding="utf-8",
+            )
+
+            changes = migrate_values.migrate(values)
+
+            env_text = (values / ".env").read_text(encoding="utf-8")
+            self.assertIn("TECHNITIUM_API_URL=http://192.0.2.53:5380/api", env_text)
+            self.assertIn("set TECHNITIUM_API_URL to direct Technitium LXC API endpoint", changes)
 
     def test_idempotent_after_first_run(self) -> None:
         temp, values = self.make_values()

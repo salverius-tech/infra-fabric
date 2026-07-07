@@ -4,8 +4,12 @@
 
 {{ hermes_domain }} {
     encode zstd gzip
+{% if hermes_dashboard_enabled | default(true) %}
+    reverse_proxy 127.0.0.1:{{ hermes_dashboard_port | default(9119) }}
+{% else %}
     root * /var/www/hermes
     file_server
+{% endif %}
 
     tls {
         dns cloudflare {env.CF_DNS_API_TOKEN}

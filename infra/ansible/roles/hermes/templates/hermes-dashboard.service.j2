@@ -1,0 +1,15 @@
+[Unit]
+Description=Hermes Agent web dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/hermes-dashboard.env
+WorkingDirectory=/root
+ExecStart=/usr/local/bin/hermes dashboard --host {{ hermes_dashboard_host | default('0.0.0.0') }} --port {{ hermes_dashboard_port | default(9119) }} --no-open --insecure
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
