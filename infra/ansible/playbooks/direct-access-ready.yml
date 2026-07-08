@@ -1,0 +1,12 @@
+---
+- name: Document reusable direct service access handoff
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Describe direct access handoff boundary
+      ansible.builtin.debug:
+        msg:
+          - lxc_ready runs on the Proxmox host before this handoff.
+          - Controller-managed known_hosts is refreshed before direct service SSH.
+          - Direct SSH, Python, and root/become probes run before steady-state roles.
+          - Steady-state service configuration must not use Proxmox pct.

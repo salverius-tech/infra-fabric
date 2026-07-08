@@ -5,312 +5,102 @@
       - forgejo_domain is defined
       - forgejo_version is defined
     fail_msg: forgejo_domain and forgejo_version are required.
-
 - name: Install Forgejo OS dependencies in LXC
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - bash
       - -lc
-      - >-
-        set -euo pipefail;
-        packages="ca-certificates curl git git-lfs openssh-server sqlite3";
-        missing=0;
-        for package in ${packages}; do
-          dpkg-query -W "${package}" >/dev/null 2>&1 || missing=1;
-        done;
-        if [[ "${missing}" -eq 1 ]]; then
-          DEBIAN_FRONTEND=noninteractive apt-get update;
-          DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};
-        fi
+      - "set -euo pipefail; packages=\"ca-certificates curl git git-lfs openssh-server sqlite3\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi"  # yamllint disable-line rule:line-length
   changed_when: false
-
 - name: Enable Git LFS system hooks
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - git
       - lfs
       - install
       - --system
   changed_when: false
-
 - name: Ensure git user exists
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - bash
       - -lc
-      - >-
-        if ! id git >/dev/null 2>&1; then
-        adduser --system --shell /bin/bash --gecos 'Git Version Control'
-        --group --disabled-password --home /var/lib/forgejo git;
-        fi
+      - if ! id git >/dev/null 2>&1; then adduser --system --shell /bin/bash --gecos 'Git Version Control' --group --disabled-password --home /var/lib/forgejo git; fi  # yamllint disable-line rule:line-length
   changed_when: false
-
 - name: Ensure Forgejo directories exist
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - bash
       - -lc
-      - >-
-        install -d -m 0750 -o git -g git /var/lib/forgejo
-        /var/lib/forgejo/custom /var/lib/forgejo/data /var/lib/forgejo/log &&
-        install -d -m 0770 -o root -g git /etc/forgejo
+      - install -d -m 0750 -o git -g git /var/lib/forgejo /var/lib/forgejo/custom /var/lib/forgejo/data /var/lib/forgejo/log && install -d -m 0770 -o root -g git /etc/forgejo  # yamllint disable-line rule:line-length
   changed_when: false
-
 - name: Check installed Forgejo version
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - bash
       - -lc
       - /usr/local/bin/forgejo --version 2>/dev/null | grep -oE '[0-9]+[.][0-9]+[.][0-9]+' | head -n1
   register: forgejo_installed_version
   changed_when: false
   failed_when: false
-
 - name: Install requested Forgejo binary
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - bash
       - -lc
-      - >-
-        base={{ forgejo_download_base | default('https://code.forgejo.org/forgejo/forgejo/releases/download') }} &&
-        curl -fsSL -o /usr/local/bin/forgejo
-        "$base/v{{ forgejo_version }}/forgejo-{{ forgejo_version }}-linux-amd64" &&
-        chmod 0755 /usr/local/bin/forgejo
+      - base={{ forgejo_download_base | default('https://code.forgejo.org/forgejo/forgejo/releases/download') }} && curl -fsSL -o /usr/local/bin/forgejo "$base/v{{ forgejo_version }}/forgejo-{{ forgejo_version }}-linux-amd64" && chmod 0755 /usr/local/bin/forgejo  # yamllint disable-line rule:line-length
   when: forgejo_installed_version.stdout | trim != forgejo_version
   notify: Restart forgejo
-
-- name: Stage Forgejo systemd service on Proxmox host
+- name: Install Forgejo systemd service
   ansible.builtin.template:
     src: forgejo.service.j2
-    dest: /tmp/forgejo.service.{{ forgejo_vmid }}
-    mode: "0644"
-
-- name: Check Forgejo systemd service drift
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - >-
-        set -euo pipefail;
-        local_hash="$(sha256sum /tmp/forgejo.service.{{ forgejo_vmid }} | awk '{print $1}')";
-        remote_hash="$(pct exec {{ forgejo_vmid | quote }} -- sha256sum /etc/systemd/system/forgejo.service 2>/dev/null | awk '{print $1}')";
-        test "${local_hash}" = "${remote_hash}"
-  register: forgejo_service_drift
-  changed_when: false
-  failed_when: false
-
-- name: Push Forgejo systemd service into LXC
-  ansible.builtin.command:
-    argv:
-      - pct
-      - push
-      - "{{ forgejo_vmid | string }}"
-      - /tmp/forgejo.service.{{ forgejo_vmid }}
-      - /etc/systemd/system/forgejo.service
-  when: forgejo_service_drift.rc != 0
-  changed_when: true
-  notify: Restart forgejo
-
+    dest: /etc/systemd/system/forgejo.service
+    mode: '0644'
+    owner: root
+    group: root
 - name: Check Forgejo app.ini presence
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - test
       - -f
       - /etc/forgejo/app.ini
   register: forgejo_app_ini_check
   changed_when: false
   failed_when: false
-
-- name: Stage initial Forgejo app.ini on Proxmox host
+- name: Install initial Forgejo app.ini
   ansible.builtin.template:
     src: app.ini.j2
-    dest: /tmp/forgejo-app.ini.{{ forgejo_vmid }}
-    mode: "0640"
+    dest: /etc/forgejo/app.ini
+    mode: '0640'
+    owner: root
+    group: git
   when: forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0
-
-- name: Check initial Forgejo app.ini drift
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - >-
-        set -euo pipefail;
-        local_hash="$(sha256sum /tmp/forgejo-app.ini.{{ forgejo_vmid }} | awk '{print $1}')";
-        remote_hash="$(pct exec {{ forgejo_vmid | quote }} -- sha256sum /etc/forgejo/app.ini 2>/dev/null | awk '{print $1}')";
-        test "${local_hash}" = "${remote_hash}"
-  register: forgejo_app_ini_drift
-  changed_when: false
-  failed_when: false
-  when: forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0
-
-- name: Push initial Forgejo app.ini into LXC
-  ansible.builtin.command:
-    argv:
-      - pct
-      - push
-      - "{{ forgejo_vmid | string }}"
-      - /tmp/forgejo-app.ini.{{ forgejo_vmid }}
-      - /etc/forgejo/app.ini
-  when:
-    - forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0
-    - forgejo_app_ini_drift.rc | default(1) != 0
-  changed_when: true
-  notify: Restart forgejo
-
-- name: Secure Forgejo app.ini
-  ansible.builtin.command:
-    argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
-      - bash
-      - -lc
-      - chown root:git /etc/forgejo/app.ini && chmod 0640 /etc/forgejo/app.ini
-  changed_when: false
-
+  no_log: true
 - name: Configure Forgejo Actions settings
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - bash
       - -lc
-      - >-
-        set -euo pipefail;
-        file=/etc/forgejo/app.ini;
-        tmp="$(mktemp)";
-        awk -v enabled="true" -v url="{{ forgejo_actions_default_url | default('https://data.forgejo.org') }}" '
-        function emit_missing() {
-          if (in_actions) {
-            if (!seen_enabled) print "ENABLED = " enabled;
-            if (!seen_url) print "DEFAULT_ACTIONS_URL = " url;
-          }
-        }
-        /^\[.*\]$/ {
-          if (in_actions) emit_missing();
-          in_actions = ($0 == "[actions]");
-          if (in_actions) {
-            seen_actions = 1;
-            seen_enabled = 0;
-            seen_url = 0;
-          }
-          print;
-          next;
-        }
-        in_actions && /^[[:space:]]*ENABLED[[:space:]]*=/ {
-          print "ENABLED = " enabled;
-          seen_enabled = 1;
-          next;
-        }
-        in_actions && /^[[:space:]]*DEFAULT_ACTIONS_URL[[:space:]]*=/ {
-          print "DEFAULT_ACTIONS_URL = " url;
-          seen_url = 1;
-          next;
-        }
-        { print }
-        END {
-          if (in_actions) emit_missing();
-          if (!seen_actions) {
-            print "";
-            print "[actions]";
-            print "ENABLED = " enabled;
-            print "DEFAULT_ACTIONS_URL = " url;
-          }
-        }
-        ' "${file}" > "${tmp}";
-        if cmp -s "${file}" "${tmp}"; then
-          rm -f "${tmp}";
-          exit 0;
-        fi;
-        cat "${tmp}" > "${file}";
-        rm -f "${tmp}";
-        chown root:git "${file}";
-        chmod 0640 "${file}";
-        exit 1
+      - "set -euo pipefail; file=/etc/forgejo/app.ini; tmp=\"$(mktemp)\"; awk -v enabled=\"true\" -v url=\"{{ forgejo_actions_default_url | default('https://data.forgejo.org') }}\" ' function emit_missing() {\n  if (in_actions) {\n    if (!seen_enabled) print \"ENABLED = \" enabled;\n    if (!seen_url) print \"DEFAULT_ACTIONS_URL = \" url;\n  }\n} /^\\[.*\\]$/ {\n  if (in_actions) emit_missing();\n  in_actions = ($0 == \"[actions]\");\n  if (in_actions) {\n    seen_actions = 1;\n    seen_enabled = 0;\n    seen_url = 0;\n  }\n  print;\n  next;\n} in_actions && /^[[:space:]]*ENABLED[[:space:]]*=/ {\n  print \"ENABLED = \" enabled;\n  seen_enabled = 1;\n  next;\n} in_actions && /^[[:space:]]*DEFAULT_ACTIONS_URL[[:space:]]*=/ {\n  print \"DEFAULT_ACTIONS_URL = \" url;\n  seen_url = 1;\n  next;\n} { print } END {\n  if (in_actions) emit_missing();\n  if (!seen_actions) {\n    print \"\";\n    print \"[actions]\";\n    print \"ENABLED = \" enabled;\n    print \"DEFAULT_ACTIONS_URL = \" url;\n  }\n} ' \"${file}\" > \"${tmp}\"; if cmp -s \"${file}\" \"${tmp}\"; then\n  rm -f \"${tmp}\";\n  exit 0;\nfi; cat \"${tmp}\" > \"${file}\"; rm -f \"${tmp}\"; chown root:git \"${file}\"; chmod 0640 \"${file}\"; exit 1"  # yamllint disable-line rule:line-length
   register: forgejo_actions_settings
   changed_when: forgejo_actions_settings.rc == 1
   failed_when: forgejo_actions_settings.rc not in [0, 1]
   notify: Restart forgejo
   when: forgejo_actions_enabled | default(true) | bool
-
-- name: Stage Forgejo SSH integration config on Proxmox host
+- name: Install Forgejo SSH integration config
   ansible.builtin.template:
     src: forgejo-sshd.conf.j2
-    dest: /tmp/forgejo-sshd.conf.{{ forgejo_vmid }}
-    mode: "0644"
+    dest: /etc/ssh/sshd_config.d/forgejo.conf
+    mode: '0644'
+    owner: root
+    group: root
   when: forgejo_configure_system_ssh | default(true) | bool
-
-- name: Check Forgejo SSH integration config drift
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - >-
-        set -euo pipefail;
-        local_hash="$(sha256sum /tmp/forgejo-sshd.conf.{{ forgejo_vmid }} | awk '{print $1}')";
-        remote_hash="$(pct exec {{ forgejo_vmid | quote }} -- sha256sum /etc/ssh/sshd_config.d/forgejo.conf 2>/dev/null | awk '{print $1}')";
-        test "${local_hash}" = "${remote_hash}"
-  register: forgejo_sshd_config_drift
-  changed_when: false
-  failed_when: false
-  when: forgejo_configure_system_ssh | default(true) | bool
-
-- name: Push Forgejo SSH integration config into LXC
-  ansible.builtin.command:
-    argv:
-      - pct
-      - push
-      - "{{ forgejo_vmid | string }}"
-      - /tmp/forgejo-sshd.conf.{{ forgejo_vmid }}
-      - /etc/ssh/sshd_config.d/forgejo.conf
-  when:
-    - forgejo_configure_system_ssh | default(true) | bool
-    - forgejo_sshd_config_drift.rc | default(1) != 0
-  changed_when: true
-  notify: Restart ssh
-
 - name: Configure Caddy on Forgejo LXC
   ansible.builtin.include_tasks: caddy.yml
   when: forgejo_enable_caddy | default(false) | bool
-
 - name: Enable Forgejo service
   ansible.builtin.command:
     argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
       - systemctl
       - enable
       - --now

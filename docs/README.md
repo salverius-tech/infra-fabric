@@ -12,3 +12,5 @@ Public-safe documentation for this homelab infrastructure runbook.
 ## Workflow reminder
 
 Use the repository workflow from the main [README](../README.md): validate with `just validate`, review infrastructure changes with `just plan`, and apply only after explicit approval with `just apply`.
+
+Service diagnostics and steady-state Ansible configuration should use direct service inventory groups and endpoints, for example `ssh <user>@hermes.example.internal` or the service-local HTTPS URL. Proxmox host access is for lifecycle readiness, storage prep, explicit bootstrap/recovery, and host-boundary work, not routine in-service changes.

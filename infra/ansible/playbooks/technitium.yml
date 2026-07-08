@@ -1,10 +1,17 @@
 ---
-- name: Bootstrap Technitium DNS LXC
+- name: Prepare Technitium DNS LXC lifecycle boundary
   hosts: pve
   gather_facts: false
   roles:
     - role: lxc_ready
       vars:
-        lxc_ready_vmid: "{{ technitium_vmid }}"
+        lxc_ready_vmid: '{{ technitium_vmid }}'
         lxc_ready_name: technitium
+- name: Run direct access handoff for Technitium DNS
+  ansible.builtin.import_playbook: direct-access-ready.yml
+- name: Configure Technitium DNS service directly
+  hosts: technitium
+  gather_facts: false
+  become: true
+  roles:
     - technitium

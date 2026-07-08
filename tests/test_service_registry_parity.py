@@ -38,6 +38,18 @@ class ServiceRegistryParityTests(unittest.TestCase):
         for playbook in settings_script.all_ansible_playbooks():
             self.assertTrue((REPO / playbook).is_file(), playbook)
 
+    def test_direct_service_playbook_target_groups_are_known(self) -> None:
+        special = {
+            "infra/ansible/playbooks/caddy-proxy.yml": "technitium",
+            "infra/ansible/playbooks/technitium-dns.yml": "localhost",
+        }
+        groups = {service: config["group"] for service, config in tfvars_inventory.SERVICE_HOSTS.items()}
+        for service, config in settings_script.SERVICES.items():
+            for playbook in config["playbooks"]:
+                group = special.get(playbook, groups[service])
+                self.assertTrue(group == "localhost" or group in groups.values(), playbook)
+        self.assertEqual(special["infra/ansible/playbooks/caddy-proxy.yml"], "technitium")
+
 
 if __name__ == "__main__":
     unittest.main()

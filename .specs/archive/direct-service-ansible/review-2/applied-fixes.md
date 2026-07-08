@@ -1,0 +1,20 @@
+# Applied Fix Plan
+
+| Finding | Category | Plan section(s) to edit | Edit intent | Checklist impact |
+|---------|----------|-------------------------|-------------|------------------|
+| Live/source execution ambiguity | substantive defect | Constraints; Risk & Manual Gate Decision; Automation Plan; Validation Contract; Archive rule | Define source-only, existing-live, and approved-fresh-rollout modes; make live probes conditional on live values/resources or approved deployment | Add/adjust validation gate wording; no items marked complete |
+| Host-key trust/persistence unsafe | substantive defect | Constraints; Automation Plan; T1; T2; Success Criteria; Validation Contract | Require managed `values/ansible/known_hosts`, Proxmox-authenticated fingerprint source, fail-closed changed keys, new-session persistence validation | Add acceptance criteria under T2/T1; no items marked complete |
+| direct_access_ready execution context flawed | substantive defect | Constraints; Automation Plan; T2; T3; Success Criteria | Define handoff as explicit pve/controller/direct plays or helper with delegate/run_once semantics, not a direct role | Clarify T2/T3 checklist items only |
+| Bootstrap backdoor risk | substantive defect | Constraints; T2; Validation Contract | Add strict allowlist and approval semantics for bootstrap mutations | Clarify T2 acceptance criteria |
+| Helper CLI false-positive risk | substantive defect | T2; QA/T8; Validation Contract | Add CLI contract, exit codes, real Ansible invocation, public fixtures, redaction boundaries | Add/adjust T2/T8 acceptance criteria |
+| Masked syntax and duplicate validation | process defect | T2 AC4; Validation Contract | Remove `|| true`; deduplicate/renumber validation commands | No new checklist items |
+| Handler/idempotence/file ownership gaps | substantive defect | T4; T5; T8; Success Criteria | Add explicit owner/mode for all managed files, handler/daemon_reload/Caddy validation, idempotence checks | Clarify role task acceptance criteria |
+| Check-mode exception weakness | substantive defect | T4; V3; Validation Contract | Require exception budget with task path, idempotence guard, compensating evidence | Clarify validation gates |
+| Subjective DRY check | low-value/theater | Automation Plan; T4; T8; Success Criteria; Validation Contract | Replace `dry-run-dryness` with concrete `structure` checks for handoff/shared primitive use and service-local exceptions | Rename command in validation gates |
+| Root direct access controls | hardening | Constraints; T1; Validation Contract; Explicit Deferrals | Add scoped key/no agent forwarding/UserKnownHostsFile controls and non-root user deferral issue | No new executable task; included in T1/T2 criteria |
+| Wave 3 collision risk | process defect | Execution Waves; Dependency Graph | Split T3 skeleton before role cohorts or add file ownership/integrator rules | Adjust dependency graph and wave text |
+| Redaction fixture gaps | hardening | T2; T8; Validation Contract | Replace literal grep with fixture-based sanitizer tests and public-safety check; allow placeholders | Clarify T2/T8 acceptance criteria |
+| Invocation inconsistency | process defect | Automation Plan; task verify commands; Validation Contract | Standardize host-side `scripts/python.sh`; in-container `python scripts/check...` | Command text only |
+| Standalone blocker: source-only live gates still unconditional | process defect | T1/V2/V3/V4; Validation Contract | Added execution-mode gate, source-only substitute evidence, and conditional live probes | Checklist task names updated; no items marked complete |
+| Standalone blocker: handoff wrapper ambiguous | process defect | T2; direct_access_ready files/AC4 | Required `infra/ansible/playbooks/direct-access-ready.yml` as stable wrapper | No new checklist item; T2 scope clarified |
+| Standalone hardening: success-criteria command drift | hardening | Success Criteria | Normalized live direct-probe command to use managed known_hosts and `python` inside run-infra | No checklist change |

@@ -173,8 +173,9 @@ OpenTofu manages:
 Ansible manages:
 
 - Proxmox host ZFS dataset/storage preparation before OpenTofu apply
+- LXC lifecycle readiness on the Proxmox host, followed by direct SSH/become service configuration on each service host
 - Technitium installation
-- Caddy installation/configuration on the Technitium LXC. The scaffold exposes the Technitium UI at both `dns.example.internal` and `technitium.example.internal`; set `caddy_server_names` in private inventory for your real domain aliases.
+- Caddy installation/configuration directly on the Technitium LXC. The scaffold exposes the Technitium UI at both `dns.example.internal` and `technitium.example.internal`; set `caddy_server_names` in private inventory for your real domain aliases.
 - Forgejo installation/configuration, including Actions settings
 - Caddy and OpenSSH integration on the Forgejo LXC
 - Forgejo Actions runner installation/registration on a separate LXC
@@ -184,7 +185,7 @@ Ansible manages:
 - Optional Tailscale installation and private backup restore on the Tailscale client LXC
 - Technitium DNS records/settings through `infra/ansible/playbooks/technitium-dns.yml`
 
-Ansible inventory combines `values/ansible/inventory/local.yml` with `infra/ansible/inventory/tfvars.py`, which derives service hosts, VMIDs, and addresses from `values/terraform.tfvars` using `python-hcl2`.
+Ansible inventory combines `values/ansible/inventory/local.yml` with `infra/ansible/inventory/tfvars.py`, which derives service hosts, VMIDs, and addresses from `values/terraform.tfvars` using `python-hcl2`. Normal service diagnostics and steady-state configuration use each service's direct inventory group, such as `technitium`, `forgejo`, `infisical`, or `hermes`; Proxmox access is reserved for lifecycle readiness, storage prep, bootstrap/recovery, and explicit host-boundary work.
 
 ## Safety
 
@@ -213,4 +214,4 @@ claim a live SearXNG backend exists.
 
 `values/.env` is parsed as dotenv-style data by `scripts/parse-env.py`; it is not sourced as shell. Keep required variables from `scaffold/.env.example` in sync with your private `values/.env`.
 
-The tooling container runs as the unprivileged `anvil` user and mounts `${HOST_SSH_DIR:-${HOME}/.ssh}` read-only. It copies public SSH support files into `/home/anvil/.ssh` by default; set `INFRA_COPY_SSH_KEYS=true` only when private keys must be copied into the container for a run.
+The tooling container runs as the unprivileged `anvil` user and mounts `${HOST_SSH_DIR:-${HOME}/.ssh}` read-only. It copies public SSH support files into `/home/anvil/.ssh` by default; set `INFRA_COPY_SSH_KEYS=true` only when private keys must be copied into the container for a run. Direct service runs should use strict host-key checking with a gitignored managed known-hosts file such as `values/ansible/known_hosts`; changed trusted keys should be treated as a safety event, not refreshed silently.

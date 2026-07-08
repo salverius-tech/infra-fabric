@@ -166,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("services")
     ansible_playbooks_parser = subparsers.add_parser("ansible-playbooks")
     ansible_playbooks_parser.add_argument("--all", action="store_true")
+    ansible_playbooks_parser.add_argument("--settings", type=Path, default=None)
     subparsers.add_parser("summary")
     subparsers.add_parser("tofu-var")
     args = parser.parse_args(argv)

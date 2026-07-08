@@ -35,6 +35,7 @@ Private values files include:
 - Do not commit secrets, live domains/IPs/hostnames, `values/`, `settings.local.json`, state files, plans, or generated local credentials.
 - Keep non-public material in `values/` or outside the checkout; do not add another sensitive-data directory to this repo.
 - Treat DNS, Forgejo, and HTTPS/SSH endpoints as critical infrastructure. Prefer reviewed plans over ad hoc mutation.
+- Prefer direct service access for service diagnostics and operator guidance. Do not default to SSHing into the Proxmox host and then using `pct exec`/`pct enter` when a service has its own LAN IP, DNS name, SSH daemon, or HTTPS endpoint. Proxmox host access is for Proxmox/LXC lifecycle diagnostics, console recovery, or cases where direct service access is unavailable or explicitly requested.
 - Do not mutate production routers/firewalls unless explicitly requested.
 - If changing service IPs, hostnames, SSH ports, proxy topology, or service-selection behavior, update scaffold examples, private values as requested, README, and any migration notes together.
 
@@ -78,6 +79,17 @@ Forgejo Actions deployment monitoring helpers exist as private workflow plumbing
 8. Do not add new public `just` recipes unless the user explicitly asks for that exact command. Prefer scripts or internal helpers for implementation details, and keep the public command surface limited to requested commands.
 9. If plan verification fails, rerun `just plan` instead of reusing or editing saved plan files.
 10. For in-LXC service configuration, prefer Ansible playbooks via `just apply` over ad hoc shell changes.
+11. For live diagnostics, use the service's direct endpoint first: SSH to the service DNS name/IP with its configured service user, or use the service HTTPS URL. Use Proxmox `pct exec`/`pct enter` only when debugging Proxmox/container lifecycle, recovering a broken service that cannot be reached directly, or following explicit operator instructions.
+
+## Service Access Pattern
+
+Services are intended to be accessible directly on the LAN by their service DNS names or IPs. Do not present Proxmox host SSH plus `pct enter` as the normal operator access path for services.
+
+Examples:
+
+- Hermes operator shell access should be described as direct SSH to the Hermes service endpoint and configured user, e.g. `ssh <user>@hermes.example.internal`, not `ssh <proxmox-host>` followed by `pct enter`.
+- Browser access should use the service-local HTTPS endpoint, e.g. `https://hermes.example.internal`.
+- Proxmox host access is appropriate for OpenTofu/Ansible bootstrap, LXC lifecycle checks, console recovery, or when direct SSH/HTTPS is unavailable and the operator approves that diagnostic path.
 
 ## Service HTTPS / Caddy Pattern
 

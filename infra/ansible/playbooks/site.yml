@@ -1,70 +1,17 @@
 ---
-- name: Bootstrap Technitium DNS LXC
-  hosts: pve
-  gather_facts: false
-  roles:
-    - role: lxc_ready
-      vars:
-        lxc_ready_vmid: "{{ technitium_vmid }}"
-        lxc_ready_name: technitium
-    - technitium
-
+- name: Configure Technitium DNS service
+  ansible.builtin.import_playbook: technitium.yml
 - name: Configure Technitium Caddy HTTPS proxy
-  hosts: pve
-  gather_facts: false
-  roles:
-    - role: lxc_ready
-      vars:
-        lxc_ready_vmid: "{{ technitium_vmid }}"
-        lxc_ready_name: technitium
-    - caddy_proxy
-
+  ansible.builtin.import_playbook: caddy-proxy.yml
 - name: Sync Technitium DNS records
   ansible.builtin.import_playbook: technitium-dns.yml
-
-- name: Bootstrap Forgejo LXC
-  hosts: pve
-  gather_facts: false
-  roles:
-    - role: lxc_ready
-      vars:
-        lxc_ready_vmid: "{{ forgejo_vmid }}"
-        lxc_ready_name: forgejo
-    - forgejo
-
-- name: Bootstrap Infisical LXC
-  hosts: pve
-  gather_facts: false
-  roles:
-    - role: lxc_ready
-      vars:
-        lxc_ready_vmid: "{{ infisical_vmid }}"
-        lxc_ready_name: infisical
-    - infisical
-
-- name: Bootstrap Hermes management LXC
-  hosts: pve
-  gather_facts: false
-  roles:
-    - role: lxc_ready
-      vars:
-        lxc_ready_vmid: "{{ hermes_vmid }}"
-        lxc_ready_name: hermes
-    - hermes
-
+- name: Configure Forgejo service
+  ansible.builtin.import_playbook: forgejo.yml
+- name: Configure Infisical service
+  ansible.builtin.import_playbook: infisical.yml
+- name: Configure Hermes management service
+  ansible.builtin.import_playbook: hermes.yml
 - name: Prepare Debian Podman onramp host for Onramp
-  hosts: onramp_host
-  gather_facts: true
-  become: true
-  roles:
-    - onramp_host
-
-- name: Bootstrap Tailscale client LXC
-  hosts: pve
-  gather_facts: false
-  roles:
-    - role: lxc_ready
-      vars:
-        lxc_ready_vmid: "{{ tailscale_client_vmid }}"
-        lxc_ready_name: tailscale_client
-    - tailscale_client
+  ansible.builtin.import_playbook: onramp-host.yml
+- name: Configure Tailscale client
+  ansible.builtin.import_playbook: tailscale-client.yml

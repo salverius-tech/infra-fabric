@@ -1,10 +1,17 @@
 ---
-- name: Bootstrap Forgejo Actions runner LXC
+- name: Prepare Forgejo Actions runner LXC lifecycle boundary
   hosts: pve
   gather_facts: false
   roles:
     - role: lxc_ready
       vars:
-        lxc_ready_vmid: "{{ forgejo_runner_vmid }}"
+        lxc_ready_vmid: '{{ forgejo_runner_vmid }}'
         lxc_ready_name: forgejo_runner
+- name: Run direct access handoff for Forgejo Actions runner
+  ansible.builtin.import_playbook: direct-access-ready.yml
+- name: Configure Forgejo Actions runner directly
+  hosts: forgejo_runner
+  gather_facts: false
+  become: true
+  roles:
     - forgejo_runner

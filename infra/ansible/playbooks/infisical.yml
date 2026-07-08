@@ -1,10 +1,17 @@
 ---
-- name: Bootstrap Infisical LXC
+- name: Prepare Infisical LXC lifecycle boundary
   hosts: pve
   gather_facts: false
   roles:
     - role: lxc_ready
       vars:
-        lxc_ready_vmid: "{{ infisical_vmid }}"
+        lxc_ready_vmid: '{{ infisical_vmid }}'
         lxc_ready_name: infisical
+- name: Run direct access handoff for Infisical
+  ansible.builtin.import_playbook: direct-access-ready.yml
+- name: Configure Infisical service directly
+  hosts: infisical
+  gather_facts: false
+  become: true
+  roles:
     - infisical

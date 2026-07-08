@@ -1,13 +1,6 @@
 ---
 - name: Restart tailscaled
-  ansible.builtin.command:
-    argv:
-      - pct
-      - exec
-      - "{{ tailscale_client_vmid | string }}"
-      - --
-      - systemctl
-      - restart
-      - tailscaled
-  changed_when: false
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: restarted
   when: tailscale_client_enabled | default(false) | bool

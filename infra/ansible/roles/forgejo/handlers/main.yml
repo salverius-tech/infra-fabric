@@ -1,36 +1,13 @@
 ---
 - name: Restart forgejo
-  ansible.builtin.command:
-    argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
-      - systemctl
-      - restart
-      - forgejo
-  changed_when: true
-
+  ansible.builtin.systemd:
+    name: forgejo
+    state: restarted
 - name: Restart ssh
-  ansible.builtin.command:
-    argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
-      - systemctl
-      - restart
-      - ssh
-  changed_when: true
-
+  ansible.builtin.systemd:
+    name: ssh
+    state: restarted
 - name: Restart caddy
-  ansible.builtin.command:
-    argv:
-      - pct
-      - exec
-      - "{{ forgejo_vmid | string }}"
-      - --
-      - systemctl
-      - restart
-      - caddy
-  changed_when: true
+  ansible.builtin.systemd:
+    name: caddy
+    state: restarted

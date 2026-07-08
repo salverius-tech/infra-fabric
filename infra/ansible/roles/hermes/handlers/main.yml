@@ -1,24 +1,9 @@
 ---
 - name: Restart hermes dashboard
-  ansible.builtin.command:
-    argv:
-      - pct
-      - exec
-      - "{{ hermes_vmid | string }}"
-      - --
-      - systemctl
-      - restart
-      - hermes-dashboard
-  changed_when: true
-
+  ansible.builtin.systemd:
+    name: hermes-dashboard
+    state: restarted
 - name: Restart caddy
-  ansible.builtin.command:
-    argv:
-      - pct
-      - exec
-      - "{{ hermes_vmid | string }}"
-      - --
-      - systemctl
-      - restart
-      - caddy
-  changed_when: true
+  ansible.builtin.systemd:
+    name: caddy
+    state: restarted
