@@ -26,6 +26,14 @@ tfplan             Local plan artifact
 
 Keep non-public material in `values/` or outside this checkout; do not add another sensitive-data directory to this repo.
 
+## Documentation
+
+- [Docs index](docs/README.md) lists public-safe operator and architecture notes.
+- [Hermes operator pilot PRD](docs/hermes-operator-pilot-prd.md) defines the Hermes cockpit requirements and safety boundaries.
+- [Onramp app-platform contract](docs/onramp-app-platform-contract.md) defines how `homelab-infra`, `onramp-vNext`, and Hermes split onramp-host ownership.
+- [Onramp SearXNG handoff](docs/onramp-searxng-handoff.md) documents the future Onramp-owned SearXNG service contract for Hermes.
+- [App-host runbook](docs/onramp-host-runbook.md) covers `onramp_host` rollback and future deployment validation.
+
 ## Fresh setup
 
 Local prerequisites are Git, Docker/Docker Compose, and `just`. Python, OpenTofu, Ansible, TFLint, ShellCheck, SSH client usage for setup/apply, and related tooling run inside the Docker tooling container. Your host SSH directory is mounted read-only so the container can use your existing Proxmox SSH key when a command opts in.
@@ -36,7 +44,7 @@ From a fresh checkout, optionally copy the local settings template:
 cp settings.example.json settings.local.json
 ```
 
-Edit `settings.local.json` if you want `just setup` to clone your private `values/` Git repo. For example, set `values_repo.remote` to your Forgejo SSH URL. The file is ignored by Git. Supported services are `technitium`, `forgejo`, `tailscale_client`, `forgejo_runner`, `infisical`, and `hermes`; `technitium` includes its Caddy proxy, browser-facing first-class services use in-LXC Caddy, and `forgejo_runner` creates/configures a separate Forgejo Actions runner LXC.
+Edit `settings.local.json` if you want `just setup` to clone your private `values/` Git repo. For example, set `values_repo.remote` to your Forgejo SSH URL. The file is ignored by Git. Supported services are `technitium`, `forgejo`, `tailscale_client`, `forgejo_runner`, `infisical`, `hermes`, and `onramp_host`; `technitium` includes its Caddy proxy, browser-facing first-class services use in-LXC Caddy, `onramp_host` prepares a Debian 13 Podman VM for Onramp-managed services, and `forgejo_runner` creates/configures a separate Forgejo Actions runner LXC.
 
 Then run:
 
@@ -159,6 +167,7 @@ OpenTofu manages:
 - Optional Forgejo Actions runner LXC when `forgejo_runner` is enabled in local settings
 - Optional Infisical secrets service LXC with a service-local Caddy frontend
 - Optional Hermes management LXC with SSH tooling and a service-local Caddy reverse proxy for the Hermes Agent web dashboard
+- Optional Debian 13 Podman `onramp_host` VM substrate for Onramp-managed app services. The boot source is a clean Debian 13 genericcloud image imported by OpenTofu from the URL declared in private `values/terraform.tfvars`.
 - LXC bind mount attachments for services that use host storage
 
 Ansible manages:
@@ -171,6 +180,7 @@ Ansible manages:
 - Forgejo Actions runner installation/registration on a separate LXC
 - Infisical Docker Compose stack, including PostgreSQL, Redis, and Caddy
 - Hermes management tooling, SSH-oriented bootstrap directories, the Hermes Agent web dashboard, and Caddy
+- App-host SSH hardening, rootless Podman readiness, deploy-user setup, default-deny host firewall policy, and Onramp deployment directory preparation
 - Optional Tailscale installation and private backup restore on the Tailscale client LXC
 - Technitium DNS records/settings through `infra/ansible/playbooks/technitium-dns.yml`
 
@@ -196,7 +206,10 @@ Hermes dashboard uses a form-login provider named `basic`. Store
 `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH` in private values instead of a
 plaintext password; generate it with `python scripts/hermes-password-hash.py`.
 The service-local Caddy config rewrites the upstream provider redirect to the
-form login route and proxies only to the loopback-bound dashboard.
+form login route and proxies only to the loopback-bound dashboard. A future
+Hermes `web-searxng` plugin/runtime should read `HERMES_WEB_SEARXNG_URL` from
+private values; this source slice documents the endpoint contract but does not
+claim a live SearXNG backend exists.
 
 `values/.env` is parsed as dotenv-style data by `scripts/parse-env.py`; it is not sourced as shell. Keep required variables from `scaffold/.env.example` in sync with your private `values/.env`.
 

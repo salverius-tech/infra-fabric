@@ -1,0 +1,7 @@
+README.md
+docs/README.md
+docs/hermes-operator-pilot-prd.md
+docs/onramp-app-platform-contract.md
+.specs/archive/onramp-host-pilot/plan.md
+.specs/archive/onramp-host-pilot/evidence/validation.jsonl
+.specs/archive/onramp-host-pilot/evidence/public-safety-files.txt
