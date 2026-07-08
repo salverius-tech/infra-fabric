@@ -78,6 +78,31 @@ output "hermes_ssh_target" {
   value       = local.hermes_enabled ? "root@${var.hermes_server_name}" : null
 }
 
+output "onramp_host_vmid" {
+  description = "Proxmox VMID for the optional onramp-host VM, or null when disabled."
+  value       = local.onramp_host_enabled ? proxmox_virtual_environment_vm.onramp_host[0].vm_id : null
+}
+
+output "onramp_host_ipv4_address" {
+  description = "Configured onramp-host VM IPv4 address without CIDR suffix, or null when disabled."
+  value       = local.onramp_host_enabled ? split("/", var.onramp_host_ipv4_address)[0] : null
+}
+
+output "onramp_host_hostname" {
+  description = "Hostname for the optional onramp-host VM, or null when disabled."
+  value       = local.onramp_host_enabled ? var.onramp_host_hostname : null
+}
+
+output "onramp_host_target" {
+  description = "Sanitized Onramp target summary for the onramp-host VM, or null when disabled."
+  value = local.onramp_host_enabled ? {
+    host       = var.onramp_host_hostname
+    address    = split("/", var.onramp_host_ipv4_address)[0]
+    user       = var.onramp_host_deploy_user
+    deploy_dir = var.onramp_host_deploy_dir
+  } : null
+}
+
 output "tailscale_client_container_vmid" {
   description = "Proxmox VMID for the Tailscale client LXC, or null when disabled."
   value       = local.tailscale_client_enabled ? proxmox_virtual_environment_container.tailscale_client[0].vm_id : null

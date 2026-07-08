@@ -76,6 +76,15 @@ resource "proxmox_virtual_environment_container" "forgejo" {
   }
 
   lifecycle {
+    precondition {
+      condition = (
+        var.forgejo_data_dataset != "" &&
+        var.forgejo_data_host_uid >= 0 &&
+        var.forgejo_data_host_gid >= 0
+      )
+      error_message = "Forgejo storage prep variables must define a dataset and non-negative host UID/GID values."
+    }
+
     ignore_changes = [
       initialization[0].user_account,
       operating_system[0].template_file_id,

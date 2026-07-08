@@ -5,9 +5,9 @@ variable "enabled_services" {
 
   validation {
     condition = alltrue([
-      for service in var.enabled_services : contains(["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes"], service)
+      for service in var.enabled_services : contains(["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes", "onramp_host"], service)
     ])
-    error_message = "enabled_services may contain only technitium, forgejo, tailscale_client, forgejo_runner, infisical, and hermes."
+    error_message = "enabled_services may contain only technitium, forgejo, tailscale_client, forgejo_runner, infisical, hermes, and onramp_host."
   }
 }
 
@@ -720,6 +720,230 @@ variable "hermes_startup_down_delay" {
   description = "Seconds to wait after shutting down the Hermes LXC before shutting down the next guest."
   type        = string
   default     = "10"
+}
+
+variable "onramp_host_vmid" {
+  description = "Proxmox VMID for the optional Debian 13 Podman onramp-host VM. Set in terraform.tfvars before enabling onramp_host."
+  type        = number
+  default     = 112
+
+  validation {
+    condition     = var.onramp_host_vmid > 0 && var.onramp_host_vmid < 1000000000
+    error_message = "onramp_host_vmid must be a positive Proxmox VMID."
+  }
+}
+
+variable "onramp_host_hostname" {
+  description = "Hostname for the optional onramp-host VM."
+  type        = string
+  default     = "onramp-host"
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$", var.onramp_host_hostname))
+    error_message = "onramp_host_hostname must be a valid single-label DNS hostname."
+  }
+}
+
+variable "onramp_host_description" {
+  description = "Description for the optional Debian 13 Podman onramp-host VM."
+  type        = string
+  default     = "Debian 13 Podman onramp host for Onramp-managed services."
+}
+
+variable "onramp_host_image_datastore_id" {
+  description = "Proxmox datastore for the Debian 13 cloud image imported for onramp-host VM creation."
+  type        = string
+  default     = "local"
+}
+
+variable "onramp_host_image_url" {
+  description = "Debian 13 genericcloud qcow2 image URL used to create a clean cloud-init onramp-host VM."
+  type        = string
+  default     = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+
+  validation {
+    condition     = can(regex("^https://", var.onramp_host_image_url))
+    error_message = "onramp_host_image_url must be an HTTPS URL for a Debian 13 cloud image."
+  }
+}
+
+variable "onramp_host_image_file_name" {
+  description = "File name for the imported Debian 13 genericcloud qcow2 image."
+  type        = string
+  default     = "debian-13-genericcloud-amd64.qcow2"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9._-]+\\.qcow2$", var.onramp_host_image_file_name))
+    error_message = "onramp_host_image_file_name must be a qcow2 file name."
+  }
+}
+
+variable "onramp_host_datastore_id" {
+  description = "Datastore for the onramp-host VM disk and cloud-init drive."
+  type        = string
+  default     = "local-lvm"
+}
+
+variable "onramp_host_ipv4_address" {
+  description = "Static IPv4 address/CIDR for the onramp-host VM. Use an address outside DHCP scope."
+  type        = string
+  default     = "192.0.2.72/24"
+
+  validation {
+    condition     = can(cidrhost(var.onramp_host_ipv4_address, 0))
+    error_message = "onramp_host_ipv4_address must be a valid IPv4 CIDR address, for example 192.0.2.72/24."
+  }
+}
+
+variable "onramp_host_ipv4_gateway" {
+  description = "IPv4 gateway for the onramp-host VM."
+  type        = string
+  default     = "192.0.2.1"
+}
+
+variable "onramp_host_dns_servers" {
+  description = "DNS servers used by the onramp-host VM."
+  type        = list(string)
+  default     = ["192.0.2.1"]
+}
+
+variable "onramp_host_search_domain" {
+  description = "DNS search domain for the onramp-host VM."
+  type        = string
+  default     = "example.internal"
+}
+
+variable "onramp_host_bridge" {
+  description = "Proxmox bridge for the onramp-host VM interface."
+  type        = string
+  default     = "vmbr0"
+}
+
+variable "onramp_host_vlan_id" {
+  description = "Optional VLAN tag for the onramp-host VM interface. Null leaves the interface untagged."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.onramp_host_vlan_id == null || (var.onramp_host_vlan_id >= 1 && var.onramp_host_vlan_id <= 4094)
+    error_message = "onramp_host_vlan_id must be null or a VLAN ID from 1 through 4094."
+  }
+}
+
+variable "onramp_host_cores" {
+  description = "CPU cores for the onramp-host VM."
+  type        = number
+  default     = 2
+}
+
+variable "onramp_host_memory_mb" {
+  description = "Dedicated memory for the onramp-host VM."
+  type        = number
+  default     = 4096
+}
+
+variable "onramp_host_disk_gb" {
+  description = "Root disk size in GB for the onramp-host VM."
+  type        = number
+  default     = 32
+}
+
+variable "onramp_host_cloud_init_user" {
+  description = "Initial non-root cloud-init user for SSH/bootstrap on the onramp-host VM."
+  type        = string
+  default     = "onramp"
+
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.onramp_host_cloud_init_user))
+    error_message = "onramp_host_cloud_init_user must be a valid Linux user name."
+  }
+}
+
+variable "onramp_host_ssh_public_keys" {
+  description = "SSH public keys authorized for the onramp-host cloud-init user. Store real keys in private values."
+  type        = list(string)
+  default     = []
+}
+
+variable "onramp_host_password_authentication" {
+  description = "Whether SSH password authentication should remain enabled on the onramp-host. Keep false by default."
+  type        = bool
+  default     = false
+}
+
+variable "onramp_host_permit_root_login" {
+  description = "Whether SSH root login should remain enabled on the onramp-host. Keep false by default."
+  type        = bool
+  default     = false
+}
+
+variable "onramp_host_deploy_user" {
+  description = "Non-root user Onramp should use for app deployment on the onramp-host VM."
+  type        = string
+  default     = "onramp"
+
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.onramp_host_deploy_user))
+    error_message = "onramp_host_deploy_user must be a valid Linux user name."
+  }
+}
+
+variable "onramp_host_deploy_dir" {
+  description = "Non-secret deployment directory owned by onramp_host_deploy_user for Onramp-managed services."
+  type        = string
+  default     = "/srv/onramp"
+
+  validation {
+    condition     = can(regex("^/[A-Za-z0-9_./:-]+$", var.onramp_host_deploy_dir))
+    error_message = "onramp_host_deploy_dir must be an absolute path without whitespace or shell metacharacters."
+  }
+}
+
+variable "onramp_host_allow_passwordless_sudo" {
+  description = "Allow the onramp-host deploy user minimal passwordless sudo for Podman/user-service readiness operations."
+  type        = bool
+  default     = true
+}
+
+variable "onramp_host_allowed_ssh_cidrs" {
+  description = "Private source CIDRs allowed to reach onramp-host SSH when host firewall is enabled. Use placeholders in tracked scaffold."
+  type        = list(string)
+  default     = ["192.0.2.0/24"]
+
+  validation {
+    condition     = alltrue([for cidr in var.onramp_host_allowed_ssh_cidrs : can(cidrhost(cidr, 0))])
+    error_message = "onramp_host_allowed_ssh_cidrs must contain valid IPv4 CIDR ranges."
+  }
+}
+
+variable "onramp_host_started" {
+  description = "Whether OpenTofu should start the onramp-host VM after creation."
+  type        = bool
+  default     = true
+}
+
+variable "onramp_host_start_on_boot" {
+  description = "Whether Proxmox should start the onramp-host VM on host boot."
+  type        = bool
+  default     = true
+}
+
+variable "onramp_host_startup_order" {
+  description = "Proxmox startup order for the onramp-host VM."
+  type        = string
+  default     = "7"
+}
+
+variable "onramp_host_startup_up_delay" {
+  description = "Seconds to wait after starting the onramp-host VM before starting the next guest."
+  type        = string
+  default     = "20"
+}
+
+variable "onramp_host_startup_down_delay" {
+  description = "Seconds to wait after shutting down the onramp-host VM before shutting down the next guest."
+  type        = string
+  default     = "20"
 }
 
 variable "tailscale_client_enabled" {

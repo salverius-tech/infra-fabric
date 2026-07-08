@@ -72,6 +72,26 @@ SERVICE_HOSTS = {
         "domain_var": "hermes_domain",
         "tf_domain": "hermes_server_name",
     },
+    "onramp_host": {
+        "host": "onramp_host_vm",
+        "group": "onramp_host",
+        "vmid_var": "onramp_host_vmid",
+        "tf_vmid": "onramp_host_vmid",
+        "tf_host": "onramp_host_ipv4_address",
+        "domain_var": "onramp_host_hostname",
+        "tf_domain": "onramp_host_hostname",
+        "user_var": "onramp_host_deploy_user",
+        "tf_user": "onramp_host_deploy_user",
+        "extra_play_vars": {
+            "onramp_host_cloud_init_user": "onramp_host_cloud_init_user",
+            "onramp_host_deploy_dir": "onramp_host_deploy_dir",
+            "onramp_host_ssh_public_keys": "onramp_host_ssh_public_keys",
+            "onramp_host_password_authentication": "onramp_host_password_authentication",
+            "onramp_host_permit_root_login": "onramp_host_permit_root_login",
+            "onramp_host_allow_passwordless_sudo": "onramp_host_allow_passwordless_sudo",
+            "onramp_host_allowed_ssh_cidrs": "onramp_host_allowed_ssh_cidrs",
+        },
+    },
 }
 
 
@@ -118,6 +138,10 @@ def service_play_vars(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
     tf_domain = config.get("tf_domain")
     if domain_var and tf_domain and tfvars.get(tf_domain):
         vars_for_play[domain_var] = tfvars[tf_domain]
+    user_var = config.get("user_var")
+    tf_user = config.get("tf_user")
+    if user_var and tf_user and tfvars.get(tf_user):
+        vars_for_play[user_var] = tfvars[tf_user]
     for var_name, tf_key in config.get("extra_play_vars", {}).items():
         if tf_key in tfvars:
             vars_for_play[var_name] = tfvars[tf_key]
@@ -131,6 +155,10 @@ def service_hostvars(service: str, tfvars: dict[str, Any]) -> tuple[str, str, di
     host = config["host"]
     group = config["group"]
     hostvars: dict[str, Any] = {"ansible_user": DEFAULT_ANSIBLE_USER}
+    tf_user = config.get("tf_user")
+    if tf_user and tfvars.get(tf_user):
+        hostvars["ansible_user"] = str(tfvars[tf_user])
+        hostvars["ansible_become"] = True
 
     address = host_address(tfvars.get(config["tf_host"]))
     if address:

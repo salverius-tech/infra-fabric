@@ -121,6 +121,37 @@ hermes_container_disk_gb   = 64
 hermes_started       = true
 hermes_start_on_boot = true
 
+# Optional Debian 13 Podman onramp-host VM for Onramp-managed services. Enable by adding onramp_host to settings.local.json services.
+# The onramp host is created from a clean Debian 13 genericcloud image, not from a mutable local template.
+onramp_host_vmid               = 112
+onramp_host_hostname           = "onramp-host"
+onramp_host_description        = "Debian 13 Podman onramp host for Onramp-managed services."
+onramp_host_image_datastore_id = "local"
+onramp_host_image_url          = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+onramp_host_image_file_name    = "debian-13-genericcloud-amd64.qcow2"
+onramp_host_datastore_id       = "local-lvm"
+onramp_host_ipv4_address       = "192.0.2.72/24"
+onramp_host_ipv4_gateway       = "192.0.2.1"
+onramp_host_dns_servers        = ["192.0.2.1"]
+onramp_host_search_domain      = "example.internal"
+onramp_host_bridge             = "vmbr0"
+onramp_host_vlan_id            = null
+
+onramp_host_cores     = 2
+onramp_host_memory_mb = 4096
+onramp_host_disk_gb   = 32
+
+onramp_host_cloud_init_user         = "onramp"
+onramp_host_ssh_public_keys         = []
+onramp_host_password_authentication = false
+onramp_host_permit_root_login       = false
+onramp_host_deploy_user             = "onramp"
+onramp_host_deploy_dir              = "/srv/onramp"
+onramp_host_allow_passwordless_sudo = true
+onramp_host_allowed_ssh_cidrs       = ["192.0.2.0/24"]
+onramp_host_started                 = true
+onramp_host_start_on_boot           = true
+
 # Optional Tailscale client LXC. Leave disabled until a reviewed plan should create it.
 tailscale_client_enabled       = false
 tailscale_client_vmid          = 108

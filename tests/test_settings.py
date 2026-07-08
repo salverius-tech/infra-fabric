@@ -104,6 +104,26 @@ class SettingsTests(unittest.TestCase):
             ],
         )
 
+    def test_onramp_host_adds_playbook_without_hermes_dependency(self) -> None:
+        path = self.write_settings({"services": ["onramp_host"]})
+        try:
+            settings = settings_script.load_settings(path)
+        finally:
+            path.unlink()
+        self.assertEqual(settings["services"], ["onramp_host"])
+        self.assertEqual(
+            settings_script.ansible_playbooks(settings["services"]),
+            ["infra/ansible/playbooks/onramp-host.yml"],
+        )
+
+    def test_hermes_does_not_require_onramp_host(self) -> None:
+        path = self.write_settings({"services": ["hermes"]})
+        try:
+            settings = settings_script.load_settings(path)
+        finally:
+            path.unlink()
+        self.assertEqual(settings["services"], ["hermes"])
+
     def test_playbooks_follow_service_order(self) -> None:
         path = self.write_settings({"services": ["technitium", "forgejo", "tailscale_client"]})
         try:

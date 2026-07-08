@@ -1,0 +1,7 @@
+---
+- name: Prepare Debian Podman onramp host for Onramp
+  hosts: onramp_host
+  gather_facts: true
+  become: true
+  roles:
+    - onramp_host

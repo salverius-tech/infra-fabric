@@ -45,6 +45,29 @@ class TfvarsInventoryTests(unittest.TestCase):
 
         self.assertNotIn("ansible_host", inventory["_meta"]["hostvars"]["forgejo_lxc"])
 
+    def test_onramp_host_uses_tfvars_address_user_and_policy_vars(self) -> None:
+        inventory = tfvars_inventory.build_inventory(
+            {
+                "onramp_host_vmid": 112,
+                "onramp_host_ipv4_address": "192.0.2.72/24",
+                "onramp_host_hostname": "onramp-host",
+                "onramp_host_deploy_user": "onramp",
+                "onramp_host_deploy_dir": "/srv/onramp",
+                "onramp_host_password_authentication": False,
+                "onramp_host_permit_root_login": False,
+                "onramp_host_allowed_ssh_cidrs": ["192.0.2.0/24"],
+            },
+            ["onramp_host"],
+        )
+
+        hostvars = inventory["_meta"]["hostvars"]["onramp_host_vm"]
+        self.assertEqual(hostvars["ansible_host"], "192.0.2.72")
+        self.assertEqual(hostvars["ansible_user"], "onramp")
+        self.assertTrue(hostvars["ansible_become"])
+        self.assertEqual(hostvars["onramp_host_vmid"], 112)
+        self.assertEqual(hostvars["onramp_host_deploy_dir"], "/srv/onramp")
+        self.assertEqual(inventory["services"]["children"], ["onramp_host"])
+
     def test_tailscale_enabled_is_promoted_to_all_vars(self) -> None:
         inventory = tfvars_inventory.build_inventory(
             {

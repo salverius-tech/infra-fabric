@@ -1,0 +1,211 @@
+---
+- name: Validate onramp-host required variables
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Debian"
+      - ansible_distribution_major_version | int >= 13
+      - onramp_host_deploy_user is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - onramp_host_deploy_user != 'root'
+      - onramp_host_deploy_dir is match('^/[A-Za-z0-9_./:-]+$')
+      - onramp_host_password_authentication is defined
+      - onramp_host_permit_root_login is defined
+      - onramp_host_allowed_ssh_cidrs | length > 0
+    fail_msg: onramp_host requires Debian 13+, a non-root deploy user, deploy directory, SSH policy, and private SSH source CIDRs.
+
+- name: Install Podman onramp-host packages
+  ansible.builtin.apt:
+    name: "{{ onramp_host_podman_packages }}"
+    state: present
+    update_cache: true
+
+- name: Ensure onramp-host deploy user exists
+  ansible.builtin.user:
+    name: "{{ onramp_host_deploy_user }}"
+    shell: /bin/bash
+    create_home: true
+    groups: users
+    append: true
+
+- name: Ensure onramp-host deploy SSH directory exists
+  ansible.builtin.file:
+    path: "/home/{{ onramp_host_deploy_user }}/.ssh"
+    state: directory
+    owner: "{{ onramp_host_deploy_user }}"
+    group: "{{ onramp_host_deploy_user }}"
+    mode: "0700"
+
+- name: Install onramp-host deploy authorized keys
+  ansible.builtin.copy:
+    dest: "/home/{{ onramp_host_deploy_user }}/.ssh/authorized_keys"
+    owner: "{{ onramp_host_deploy_user }}"
+    group: "{{ onramp_host_deploy_user }}"
+    mode: "0600"
+    content: "{{ (onramp_host_ssh_public_keys | default([])) | join('\n') }}{{ '\n' if (onramp_host_ssh_public_keys | default([]) | length) > 0 else '' }}"
+  no_log: true
+
+- name: Harden onramp-host SSH daemon policy
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/90-homelab-onramp-host.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      PasswordAuthentication {{ 'yes' if onramp_host_password_authentication | bool else 'no' }}
+      KbdInteractiveAuthentication no
+      PermitRootLogin {{ 'yes' if onramp_host_permit_root_login | bool else 'no' }}
+  notify: Restart ssh
+
+- name: Ensure onramp-host deployment directory exists
+  ansible.builtin.file:
+    path: "{{ onramp_host_deploy_dir }}"
+    state: directory
+    owner: "{{ onramp_host_deploy_user }}"
+    group: "{{ onramp_host_deploy_user }}"
+    mode: "0750"
+
+- name: Document onramp-host sudo policy
+  ansible.builtin.debug:
+    msg: "No broad sudo policy is installed by default; rootless Podman and deployment directory ownership are the Onramp runtime contract."
+
+- name: Enable linger for rootless Podman user services
+  ansible.builtin.command:
+    argv:
+      - loginctl
+      - enable-linger
+      - "{{ onramp_host_deploy_user }}"
+  changed_when: false
+
+- name: Configure default-deny onramp-host firewall
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - default
+      - deny
+      - incoming
+  changed_when: false
+
+- name: Allow onramp-host outbound traffic
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - default
+      - allow
+      - outgoing
+  changed_when: false
+
+- name: Allow onramp-host SSH only from approved source CIDRs
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - allow
+      - from
+      - "{{ item }}"
+      - to
+      - any
+      - port
+      - "22"
+      - proto
+      - tcp
+  loop: "{{ onramp_host_allowed_ssh_cidrs }}"
+  changed_when: false
+
+- name: Allow approved Onramp reverse-proxy ports only
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - allow
+      - "{{ item | string }}/tcp"
+  loop: "{{ onramp_host_allowed_reverse_proxy_ports }}"
+  changed_when: false
+
+- name: Enable onramp-host firewall
+  ansible.builtin.command:
+    argv:
+      - ufw
+      - --force
+      - enable
+  changed_when: false
+
+- name: Record onramp-host network exposure contract
+  ansible.builtin.debug:
+    msg: "Default-deny firewall is enabled; Onramp must not use host-published app service ports by default except through approved reverse proxy ports."
+
+- name: Verify onramp-host become path
+  ansible.builtin.command:
+    argv:
+      - whoami
+  register: onramp_host_become_user
+  changed_when: false
+  failed_when: onramp_host_become_user.stdout | trim != "root"
+
+- name: Verify rootless Podman info as deploy user
+  become: true
+  become_user: "{{ onramp_host_deploy_user }}"
+  ansible.builtin.command:
+    argv:
+      - podman
+      - info
+      - --format
+      - json
+  register: onramp_host_podman_info
+  changed_when: false
+
+- name: Verify Podman Compose provider as deploy user
+  become: true
+  become_user: "{{ onramp_host_deploy_user }}"
+  ansible.builtin.command:
+    argv:
+      - "{{ onramp_host_compose_provider_command }}"
+      - --version
+  register: onramp_host_compose_version
+  changed_when: false
+
+- name: Resolve onramp-host deploy user UID
+  ansible.builtin.command:
+    argv:
+      - id
+      - -u
+      - "{{ onramp_host_deploy_user }}"
+  register: onramp_host_deploy_user_uid
+  changed_when: false
+
+- name: Ensure rootless Podman socket unit is enabled for deploy user
+  become: true
+  become_user: "{{ onramp_host_deploy_user }}"
+  ansible.builtin.systemd_service:
+    name: podman.socket
+    scope: user
+    enabled: true
+    state: started
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ onramp_host_deploy_user_uid.stdout | trim }}"
+  when: onramp_host_enable_docker_compat_socket | bool
+
+- name: Verify onramp-host deployment directory ownership
+  ansible.builtin.stat:
+    path: "{{ onramp_host_deploy_dir }}"
+  register: onramp_host_deploy_dir_stat
+  changed_when: false
+  failed_when: >-
+    not onramp_host_deploy_dir_stat.stat.exists or
+    onramp_host_deploy_dir_stat.stat.pw_name != onramp_host_deploy_user or
+    onramp_host_deploy_dir_stat.stat.gr_name != onramp_host_deploy_user
+
+- name: Verify harmless rootless Podman smoke check
+  become: true
+  become_user: "{{ onramp_host_deploy_user }}"
+  ansible.builtin.command:
+    argv:
+      - podman
+      - run
+      - --rm
+      - --pull=never
+      - localhost/hello-world:homelab-smoke
+  register: onramp_host_podman_smoke
+  changed_when: false
+  failed_when: false
+
+- name: Document deferred onramp-host smoke image
+  ansible.builtin.debug:
+    msg: "Rootless Podman is installed; image-based smoke checks are deferred unless a local non-secret smoke image is present."
+  when: onramp_host_podman_smoke.rc != 0

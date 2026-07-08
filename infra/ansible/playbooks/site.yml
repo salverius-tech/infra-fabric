@@ -52,6 +52,13 @@
         lxc_ready_name: hermes
     - hermes
 
+- name: Prepare Debian Podman onramp host for Onramp
+  hosts: onramp_host
+  gather_facts: true
+  become: true
+  roles:
+    - onramp_host
+
 - name: Bootstrap Tailscale client LXC
   hosts: pve
   gather_facts: false

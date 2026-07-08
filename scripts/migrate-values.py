@@ -39,6 +39,7 @@ SECRET_KEYS = {
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
     "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
+    "HERMES_WEB_SEARXNG_URL",
 }
 
 ENV_TO_INVENTORY = {
@@ -82,6 +83,7 @@ MIGRATION_ENV_KEYS = {
     *GENERATED_SECRET_KEYS,
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
+    "HERMES_WEB_SEARXNG_URL",
     *ENV_TO_INVENTORY,
     *HISTORICAL_ENV_KEYS,
 }
@@ -351,6 +353,7 @@ def ensure_vlan_tfvars(tfvars_lines: list[str]) -> list[str]:
         "forgejo_runner",
         "infisical_container",
         "hermes_container",
+        "onramp_host",
         "tailscale_client",
     )
     for prefix in service_prefixes:
@@ -362,51 +365,93 @@ def ensure_vlan_tfvars(tfvars_lines: list[str]) -> list[str]:
     return changes
 
 
-def ensure_optional_service_tfvars(tfvars_lines: list[str]) -> list[str]:
+def ensure_optional_service_tfvars(tfvars_lines: list[str], optional_services: set[str]) -> list[str]:
     changes: list[str] = []
     domain = service_domain(tfvars_lines)
     bridge = tfvars_scalar_value(tfvars_lines, "forgejo_container_bridge") or tfvars_scalar_value(tfvars_lines, "technitium_container_bridge") or "vmbr0"
     dns_servers = tfvars_raw_value(tfvars_lines, "forgejo_container_dns_servers") or tfvars_raw_value(tfvars_lines, "technitium_container_dns_servers") or '["1.1.1.1", "9.9.9.9"]'
-    defaults = {
-        "infisical_container_vmid": "110",
-        "infisical_container_hostname": hcl_quote("infisical"),
-        "infisical_container_description": hcl_quote("Infisical secrets service managed by OpenTofu."),
-        "infisical_container_ipv4_address": hcl_quote("dhcp"),
-        "infisical_container_ipv4_gateway": "null",
-        "infisical_container_mac_address": hcl_quote("BC:24:11:00:00:03"),
-        "infisical_lan_ip": hcl_quote(subnet_ip(tfvars_lines, 70)),
-        "infisical_server_name": hcl_quote(f"infisical.{domain}"),
-        "infisical_container_dns_servers": dns_servers,
-        "infisical_container_search_domain": hcl_quote(domain),
-        "infisical_container_bridge": hcl_quote(bridge),
-        "infisical_container_cores": "2",
-        "infisical_container_memory_mb": "4096",
-        "infisical_container_swap_mb": "1024",
-        "infisical_container_disk_gb": "20",
-        "infisical_started": "true",
-        "infisical_start_on_boot": "true",
-        "hermes_container_vmid": "111",
-        "hermes_container_hostname": hcl_quote("hermes"),
-        "hermes_container_description": hcl_quote("Hermes management LXC managed by OpenTofu."),
-        "hermes_container_ipv4_address": hcl_quote("dhcp"),
-        "hermes_container_ipv4_gateway": "null",
-        "hermes_container_mac_address": hcl_quote("BC:24:11:00:00:04"),
-        "hermes_lan_ip": hcl_quote(subnet_ip(tfvars_lines, 71)),
-        "hermes_server_name": hcl_quote(f"hermes.{domain}"),
-        "hermes_container_dns_servers": dns_servers,
-        "hermes_container_search_domain": hcl_quote(domain),
-        "hermes_container_bridge": hcl_quote(bridge),
-        "hermes_container_cores": "2",
-        "hermes_container_memory_mb": "2048",
-        "hermes_container_swap_mb": "512",
-        "hermes_container_disk_gb": "64",
-        "hermes_started": "true",
-        "hermes_start_on_boot": "true",
-    }
+    defaults: dict[str, str] = {}
+    if "infisical" in optional_services:
+        defaults.update({
+            "infisical_container_vmid": "110",
+            "infisical_container_hostname": hcl_quote("infisical"),
+            "infisical_container_description": hcl_quote("Infisical secrets service managed by OpenTofu."),
+            "infisical_container_ipv4_address": hcl_quote("dhcp"),
+            "infisical_container_ipv4_gateway": "null",
+            "infisical_container_mac_address": hcl_quote("BC:24:11:00:00:03"),
+            "infisical_lan_ip": hcl_quote(subnet_ip(tfvars_lines, 70)),
+            "infisical_server_name": hcl_quote(f"infisical.{domain}"),
+            "infisical_container_dns_servers": dns_servers,
+            "infisical_container_search_domain": hcl_quote(domain),
+            "infisical_container_bridge": hcl_quote(bridge),
+            "infisical_container_cores": "2",
+            "infisical_container_memory_mb": "4096",
+            "infisical_container_swap_mb": "1024",
+            "infisical_container_disk_gb": "20",
+            "infisical_started": "true",
+            "infisical_start_on_boot": "true",
+        })
+    if "hermes" in optional_services:
+        defaults.update({
+            "hermes_container_vmid": "111",
+            "hermes_container_hostname": hcl_quote("hermes"),
+            "hermes_container_description": hcl_quote("Hermes management LXC managed by OpenTofu."),
+            "hermes_container_ipv4_address": hcl_quote("dhcp"),
+            "hermes_container_ipv4_gateway": "null",
+            "hermes_container_mac_address": hcl_quote("BC:24:11:00:00:04"),
+            "hermes_lan_ip": hcl_quote(subnet_ip(tfvars_lines, 71)),
+            "hermes_server_name": hcl_quote(f"hermes.{domain}"),
+            "hermes_container_dns_servers": dns_servers,
+            "hermes_container_search_domain": hcl_quote(domain),
+            "hermes_container_bridge": hcl_quote(bridge),
+            "hermes_container_cores": "2",
+            "hermes_container_memory_mb": "2048",
+            "hermes_container_swap_mb": "512",
+            "hermes_container_disk_gb": "64",
+            "hermes_started": "true",
+            "hermes_start_on_boot": "true",
+        })
+    if "onramp_host" in optional_services:
+        defaults.update({
+            "onramp_host_vmid": "112",
+            "onramp_host_hostname": hcl_quote("onramp-host"),
+            "onramp_host_description": hcl_quote("Debian 13 Podman onramp host for Onramp-managed services."),
+            "onramp_host_image_datastore_id": hcl_quote("local"),
+            "onramp_host_image_url": hcl_quote("https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"),
+            "onramp_host_image_file_name": hcl_quote("debian-13-genericcloud-amd64.qcow2"),
+            "onramp_host_datastore_id": hcl_quote("local-lvm"),
+            "onramp_host_ipv4_address": hcl_quote(f"{subnet_ip(tfvars_lines, 72)}/{cidr_prefix(tfvars_scalar_value(tfvars_lines, 'technitium_container_ipv4_address'))}"),
+            "onramp_host_ipv4_gateway": hcl_quote(tfvars_scalar_value(tfvars_lines, "technitium_container_ipv4_gateway") or "192.0.2.1"),
+            "onramp_host_dns_servers": dns_servers,
+            "onramp_host_search_domain": hcl_quote(domain),
+            "onramp_host_bridge": hcl_quote(bridge),
+            "onramp_host_vlan_id": "null",
+            "onramp_host_cores": "2",
+            "onramp_host_memory_mb": "4096",
+            "onramp_host_disk_gb": "32",
+            "onramp_host_cloud_init_user": hcl_quote("onramp"),
+            "onramp_host_ssh_public_keys": "[]",
+            "onramp_host_password_authentication": "false",
+            "onramp_host_permit_root_login": "false",
+            "onramp_host_deploy_user": hcl_quote("onramp"),
+            "onramp_host_deploy_dir": hcl_quote("/srv/onramp"),
+            "onramp_host_allow_passwordless_sudo": "true",
+            "onramp_host_allowed_ssh_cidrs": json.dumps(["192.0.2.0/24"]),
+            "onramp_host_started": "true",
+            "onramp_host_start_on_boot": "true",
+        })
     for key, raw_value in defaults.items():
         if set_tfvars_raw(tfvars_lines, key, raw_value):
             changes.append(f"added {key}")
-    for key in ("infisical_data_dataset", "infisical_data_host_path", "infisical_data_mount_path"):
+    obsolete_keys = (
+        "infisical_data_dataset",
+        "infisical_data_host_path",
+        "infisical_data_mount_path",
+        "onramp_host_template_vmid",
+        "onramp_host_template_node_name",
+        "onramp_host_clone_datastore_id",
+    )
+    for key in obsolete_keys:
         pattern = re.compile(rf"^\s*{re.escape(key)}\s*=")
         original_len = len(tfvars_lines)
         tfvars_lines[:] = [line for line in tfvars_lines if not pattern.match(line)]
@@ -486,7 +531,7 @@ def enabled_optional_services(values_dir: Path) -> set[str]:
     except json.JSONDecodeError:
         return set()
     services = data.get("services", [])
-    return {service for service in ("infisical", "hermes") if service in services}
+    return {service for service in ("infisical", "hermes", "onramp_host") if service in services}
 
 
 def migrate(values_dir: Path) -> list[str]:
@@ -511,7 +556,7 @@ def migrate(values_dir: Path) -> list[str]:
     optional_services = enabled_optional_services(values_dir)
     changes.extend(migrate_hermes_dashboard_password_hash(env_lines, env_entries))
     if optional_services:
-        changes.extend(ensure_optional_service_tfvars(tfvars_lines))
+        changes.extend(ensure_optional_service_tfvars(tfvars_lines, optional_services))
     changes.extend(ensure_vlan_tfvars(tfvars_lines))
     changes.extend(ensure_static_service_addresses(tfvars_lines))
     changes.extend(ensure_direct_technitium_api_url(env_lines, env_entries, tfvars_lines))
@@ -527,6 +572,9 @@ def migrate(values_dir: Path) -> list[str]:
         domain = service_domain(tfvars_lines)
         inventory_text, inventory_changes = ensure_inventory_vars(inventory_path, inventory_text, domain)
         changes.extend(inventory_changes)
+        if "hermes" in optional_services and "HERMES_WEB_SEARXNG_URL" not in env_entries:
+            set_env(env_lines, env_entries, "HERMES_WEB_SEARXNG_URL", "https://searxng.apps.example.net")
+            changes.append("added HERMES_WEB_SEARXNG_URL placeholder")
         changes.extend(
             ensure_dns_records(
                 values_dir / "dns-records.local.json",

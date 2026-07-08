@@ -1,0 +1,23 @@
+---
+onramp_host_deploy_user: onramp
+onramp_host_deploy_dir: /srv/onramp
+onramp_host_ssh_public_keys: []
+onramp_host_password_authentication: false
+onramp_host_permit_root_login: false
+onramp_host_allow_passwordless_sudo: true
+onramp_host_allowed_ssh_cidrs:
+  - 192.0.2.0/24
+onramp_host_podman_packages:
+  - podman
+  - podman-compose
+  - slirp4netns
+  - fuse-overlayfs
+  - uidmap
+  - dbus-user-session
+  - acl
+  - ufw
+onramp_host_compose_provider_command: podman-compose
+onramp_host_enable_docker_compat_socket: true
+onramp_host_allowed_reverse_proxy_ports:
+  - 80
+  - 443

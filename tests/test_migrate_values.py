@@ -174,6 +174,82 @@ class MigrateValuesTests(unittest.TestCase):
             self.assertIn("TECHNITIUM_API_URL=http://192.0.2.53:5380/api", env_text)
             self.assertIn("set TECHNITIUM_API_URL to direct Technitium LXC API endpoint", changes)
 
+    def test_adds_onramp_host_values_only_when_onramp_host_enabled(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("", encoding="utf-8")
+            (values / "terraform.tfvars").write_text(
+                'technitium_container_ipv4_address = "192.0.2.53/24"\n'
+                'technitium_container_ipv4_gateway = "192.0.2.1"\n'
+                'technitium_container_search_domain = "example.internal"\n'
+                'technitium_container_bridge = "vmbr0"\n'
+                'technitium_container_dns_servers = ["192.0.2.1"]\n',
+                encoding="utf-8",
+            )
+            settings = values.parent / "settings.local.json"
+            original = settings.read_text(encoding="utf-8") if settings.exists() else None
+            settings.write_text('{"services":["onramp_host"]}\n', encoding="utf-8")
+            original_cwd = Path.cwd()
+            try:
+                import os
+
+                os.chdir(values.parent)
+                changes = migrate_values.migrate(Path("values"))
+                second_changes = migrate_values.migrate(Path("values"))
+            finally:
+                os.chdir(original_cwd)
+                if original is None:
+                    settings.unlink(missing_ok=True)
+                else:
+                    settings.write_text(original, encoding="utf-8")
+
+            tfvars_text = (values / "terraform.tfvars").read_text(encoding="utf-8")
+            self.assertIn("onramp_host_vmid = 112", tfvars_text)
+            self.assertIn('onramp_host_hostname = "onramp-host"', tfvars_text)
+            self.assertIn('onramp_host_image_url = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"', tfvars_text)
+            self.assertIn('onramp_host_ipv4_address = "192.0.2.72/24"', tfvars_text)
+            self.assertIn('onramp_host_deploy_user = "onramp"', tfvars_text)
+            self.assertNotIn("onramp_host_template_vmid", tfvars_text)
+            self.assertIn("added onramp_host_vmid", changes)
+            self.assertEqual(second_changes, [])
+
+    def test_onramp_host_absent_does_not_add_onramp_host_values(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("", encoding="utf-8")
+            (values / "terraform.tfvars").write_text("", encoding="utf-8")
+
+            changes = migrate_values.migrate(values)
+
+            self.assertNotIn("onramp_host", (values / "terraform.tfvars").read_text(encoding="utf-8"))
+            self.assertFalse(any("onramp_host" in change for change in changes))
+
+    def test_adds_hermes_searxng_placeholder_without_printing_value(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("", encoding="utf-8")
+            (values / "terraform.tfvars").write_text("", encoding="utf-8")
+            settings = values.parent / "settings.local.json"
+            original = settings.read_text(encoding="utf-8") if settings.exists() else None
+            settings.write_text('{"services":["hermes"]}\n', encoding="utf-8")
+            original_cwd = Path.cwd()
+            try:
+                import os
+
+                os.chdir(values.parent)
+                changes = migrate_values.migrate(Path("values"))
+            finally:
+                os.chdir(original_cwd)
+                if original is None:
+                    settings.unlink(missing_ok=True)
+                else:
+                    settings.write_text(original, encoding="utf-8")
+
+            env_text = (values / ".env").read_text(encoding="utf-8")
+            self.assertIn("HERMES_WEB_SEARXNG_URL=https://searxng.apps.example.net", env_text)
+            self.assertIn("added HERMES_WEB_SEARXNG_URL placeholder", changes)
+            self.assertNotIn("https://searxng.apps.example.net", "\n".join(changes))
+
     def test_idempotent_after_first_run(self) -> None:
         temp, values = self.make_values()
         with temp:
