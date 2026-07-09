@@ -41,6 +41,9 @@ all:
     hermes_vmid: 111
     hermes_domain: hermes.example.internal
     hermes_repo_path: /srv/homelab-infra
+    hermes_compression_threshold: 0.75
+    hermes_max_concurrent_children: 5
+    hermes_max_spawn_depth: 2
     hermes_dashboard_enabled: true
     hermes_dashboard_port: 9119
     hermes_dashboard_host: 127.0.0.1

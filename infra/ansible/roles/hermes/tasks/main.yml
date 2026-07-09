@@ -9,7 +9,13 @@
       - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_username is defined
       - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_password_hash is defined
       - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_secret is defined
-    fail_msg: hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token, and Hermes dashboard auth variables are required.
+      - hermes_compression_threshold | default(0.75) | float >= 0.5
+      - hermes_compression_threshold | default(0.75) | float <= 0.95
+      - hermes_max_concurrent_children | default(5) | int >= 1
+      - hermes_max_concurrent_children | default(5) | int <= 10
+      - hermes_max_spawn_depth | default(2) | int >= 1
+      - hermes_max_spawn_depth | default(2) | int <= 3
+    fail_msg: hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token, dashboard auth variables, and sane Hermes tuning values are required.
 - name: Install Hermes OS dependencies in LXC
   ansible.builtin.command:
     argv:
@@ -79,6 +85,28 @@
       - "set -euo pipefail; if ! command -v hermes >/dev/null 2>&1; then\n  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser;\nfi; cd /usr/local/lib/hermes-agent; python3 -m venv --upgrade-deps venv; venv/bin/python -m pip install -e \".[web,pty]\""  # yamllint disable-line rule:line-length
   when: hermes_dashboard_enabled | default(true) | bool
   changed_when: false
+- name: Configure Hermes context compression and delegation limits
+  ansible.builtin.command:
+    argv:
+      - hermes
+      - config
+      - set
+      - "{{ item.key }}"
+      - "{{ item.value | string }}"
+  environment:
+    HERMES_HOME: /root/.hermes
+  loop:
+    - key: compression.enabled
+      value: true
+    - key: compression.threshold
+      value: "{{ hermes_compression_threshold | default(0.75) }}"
+    - key: delegation.max_concurrent_children
+      value: "{{ hermes_max_concurrent_children | default(5) }}"
+    - key: delegation.max_spawn_depth
+      value: "{{ hermes_max_spawn_depth | default(2) }}"
+  changed_when: false
+  when: hermes_dashboard_enabled | default(true) | bool
+
 - name: Install Hermes dashboard env
   ansible.builtin.template:
     src: hermes-dashboard.env.j2

@@ -1,0 +1,110 @@
+---
+- name: Back up Hermes runtime state to controller values directory
+  hosts: hermes
+  gather_facts: false
+  become: true
+  vars:
+    hermes_state_source: "{{ lookup('env', 'HERMES_STATE_SOURCE') | default('/root/.hermes', true) }}"
+    hermes_state_backup_dir: "{{ lookup('env', 'HERMES_STATE_BACKUP_DIR') | default('/workspace/values/hermes-backups', true) }}"
+  tasks:
+    - name: Set Hermes backup archive paths
+      ansible.builtin.set_fact:
+        hermes_state_archive_name: "hermes-state-{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}.tar.gz"
+        hermes_state_remote_archive: ""
+        hermes_state_local_archive: ""
+
+    - name: Finalize Hermes backup archive paths
+      ansible.builtin.set_fact:
+        hermes_state_remote_archive: "/tmp/{{ hermes_state_archive_name }}"
+        hermes_state_local_archive: "{{ hermes_state_backup_dir }}/{{ hermes_state_archive_name }}"
+
+    - name: Validate Hermes state backup source
+      ansible.builtin.stat:
+        path: "{{ hermes_state_source }}"
+      register: hermes_state_source_stat
+
+    - name: Fail when Hermes state source is missing
+      ansible.builtin.fail:
+        msg: "Hermes state source {{ hermes_state_source }} does not exist."
+      when: not hermes_state_source_stat.stat.exists
+
+    - name: Ensure local Hermes backup directory exists
+      ansible.builtin.file:
+        path: "{{ hermes_state_backup_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
+    - name: Create temporary Hermes state snapshot directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: hermes-state
+      register: hermes_state_snapshot_dir
+
+    - name: Snapshot Hermes state before archiving
+      ansible.builtin.command:
+        argv:
+          - rsync
+          - -a
+          - --delete
+          - "{{ hermes_state_source }}/"
+          - "{{ hermes_state_snapshot_dir.path }}/{{ hermes_state_source | basename }}/"
+      changed_when: true
+
+    - name: Create Hermes state archive on service host
+      ansible.builtin.command:
+        argv:
+          - tar
+          - --numeric-owner
+          - -C
+          - "{{ hermes_state_snapshot_dir.path }}"
+          - -czf
+          - "{{ hermes_state_remote_archive }}"
+          - "{{ hermes_state_source | basename }}"
+      changed_when: true
+
+    - name: Remove temporary Hermes state snapshot directory
+      ansible.builtin.file:
+        path: "{{ hermes_state_snapshot_dir.path }}"
+        state: absent
+
+    - name: Fetch Hermes state archive into private values
+      ansible.builtin.fetch:
+        src: "{{ hermes_state_remote_archive }}"
+        dest: "{{ hermes_state_local_archive }}"
+        flat: true
+
+    - name: Restrict local Hermes state archive permissions
+      ansible.builtin.file:
+        path: "{{ hermes_state_local_archive }}"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
+    - name: Remove temporary Hermes state archive from service host
+      ansible.builtin.file:
+        path: "{{ hermes_state_remote_archive }}"
+        state: absent
+
+    - name: Calculate local Hermes archive checksum
+      ansible.builtin.command:
+        argv:
+          - sha256sum
+          - "{{ hermes_state_local_archive }}"
+      register: hermes_state_checksum
+      changed_when: false
+      delegate_to: localhost
+      become: false
+
+    - name: Write local Hermes backup manifest
+      ansible.builtin.copy:
+        dest: "{{ hermes_state_local_archive }}.sha256"
+        mode: "0600"
+        content: "{{ hermes_state_checksum.stdout }}\n"
+      delegate_to: localhost
+      become: false
+
+    - name: Report Hermes backup path
+      ansible.builtin.debug:
+        msg: "Hermes state backup written to {{ hermes_state_local_archive }}"

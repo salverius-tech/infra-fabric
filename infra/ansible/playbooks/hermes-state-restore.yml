@@ -1,0 +1,97 @@
+---
+- name: Restore Hermes runtime state from controller values directory
+  hosts: hermes
+  gather_facts: false
+  become: true
+  vars:
+    hermes_state_source: "{{ lookup('env', 'HERMES_STATE_SOURCE') | default('/root/.hermes', true) }}"
+    hermes_state_restore_file: "{{ lookup('env', 'HERMES_STATE_RESTORE_FILE') }}"
+  tasks:
+    - name: Set Hermes restore archive paths
+      ansible.builtin.set_fact:
+        hermes_state_restore_timestamp: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
+        hermes_state_remote_restore: ""
+        hermes_state_pre_restore: ""
+
+    - name: Finalize Hermes restore archive paths
+      ansible.builtin.set_fact:
+        hermes_state_remote_restore: "/tmp/hermes-state-restore-{{ hermes_state_restore_timestamp }}.tar.gz"
+        hermes_state_pre_restore: "{{ hermes_state_source }}.pre-restore-{{ hermes_state_restore_timestamp }}.tar.gz"
+
+    - name: Validate Hermes restore archive input
+      ansible.builtin.assert:
+        that:
+          - hermes_state_restore_file | length > 0
+          - hermes_state_restore_file is match('^/workspace/values/hermes-backups/.+\\.tar\\.gz$')
+        fail_msg: HERMES_STATE_RESTORE_FILE must point to /workspace/values/hermes-backups/<archive>.tar.gz.
+
+    - name: Check local Hermes restore archive exists
+      ansible.builtin.stat:
+        path: "{{ hermes_state_restore_file }}"
+      register: hermes_state_restore_stat
+      delegate_to: localhost
+      become: false
+
+    - name: Fail when local Hermes restore archive is missing
+      ansible.builtin.fail:
+        msg: "Hermes restore archive {{ hermes_state_restore_file }} does not exist."
+      when: not hermes_state_restore_stat.stat.exists
+
+    - name: Stop Hermes dashboard before restore
+      ansible.builtin.systemd_service:
+        name: hermes-dashboard
+        state: stopped
+      failed_when: false
+
+    - name: Check existing Hermes state source
+      ansible.builtin.stat:
+        path: "{{ hermes_state_source }}"
+      register: hermes_state_existing_stat
+
+    - name: Preserve current Hermes state before restore
+      ansible.builtin.command:
+        argv:
+          - tar
+          - --numeric-owner
+          - -C
+          - "{{ hermes_state_source | dirname }}"
+          - -czf
+          - "{{ hermes_state_pre_restore }}"
+          - "{{ hermes_state_source | basename }}"
+      when: hermes_state_existing_stat.stat.exists
+      changed_when: true
+
+    - name: Copy Hermes restore archive to service host
+      ansible.builtin.copy:
+        src: "{{ hermes_state_restore_file }}"
+        dest: "{{ hermes_state_remote_restore }}"
+        mode: "0600"
+
+    - name: Remove existing Hermes state directory before restore
+      ansible.builtin.file:
+        path: "{{ hermes_state_source }}"
+        state: absent
+
+    - name: Restore Hermes state archive
+      ansible.builtin.unarchive:
+        src: "{{ hermes_state_remote_restore }}"
+        dest: "{{ hermes_state_source | dirname }}"
+        remote_src: true
+        owner: root
+        group: root
+
+    - name: Remove temporary restore archive from service host
+      ansible.builtin.file:
+        path: "{{ hermes_state_remote_restore }}"
+        state: absent
+
+    - name: Restart Hermes dashboard after restore
+      ansible.builtin.systemd_service:
+        name: hermes-dashboard
+        state: restarted
+        enabled: true
+        daemon_reload: true
+
+    - name: Report Hermes restore result
+      ansible.builtin.debug:
+        msg: "Hermes state restored from {{ hermes_state_restore_file }}; previous state preserved at {{ hermes_state_pre_restore }} on the service host."

@@ -35,6 +35,18 @@ argument_specs:
         type: str
         required: false
         description: "Repository path written into the landing page helper (default: /srv/homelab-infra)."
+      hermes_compression_threshold:
+        type: float
+        required: false
+        description: "Hermes compression.threshold value to set in config.yaml (default: 0.75)."
+      hermes_max_concurrent_children:
+        type: int
+        required: false
+        description: "Hermes delegation.max_concurrent_children value to set in config.yaml (default: 5)."
+      hermes_max_spawn_depth:
+        type: int
+        required: false
+        description: "Hermes delegation.max_spawn_depth value to set in config.yaml (default: 2)."
       hermes_dashboard_port:
         type: int
         required: false
