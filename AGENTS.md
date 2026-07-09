@@ -35,6 +35,7 @@ Private values files include:
 - Do not commit secrets, live domains/IPs/hostnames, `values/`, `settings.local.json`, state files, plans, or generated local credentials.
 - Keep non-public material in `values/` or outside the checkout; do not add another sensitive-data directory to this repo.
 - Treat DNS, Forgejo, and HTTPS/SSH endpoints as critical infrastructure. Prefer reviewed plans over ad hoc mutation.
+- Service version changes must use managed pins and the `just update`/`just validate`/`just plan`/approved `just apply` path when a service has update support. Do not rerun upstream installers or ad hoc upgrade commands as the normal update mechanism.
 - Prefer direct service access for service diagnostics and operator guidance. Do not default to SSHing into the Proxmox host and then using `pct exec`/`pct enter` when a service has its own LAN IP, DNS name, SSH daemon, or HTTPS endpoint. Proxmox host access is for Proxmox/LXC lifecycle diagnostics, console recovery, or cases where direct service access is unavailable or explicitly requested.
 - Do not mutate production routers/firewalls unless explicitly requested.
 - If changing service IPs, hostnames, SSH ports, proxy topology, or service-selection behavior, update scaffold examples, private values as requested, README, and any migration notes together.
@@ -46,6 +47,7 @@ Preferred workflow:
 ```bash
 just setup      # first checkout only; or: just setup <private-values-repo-url>
 just validate
+just update     # when checking or changing managed version pins
 just plan
 just apply      # only after explicit approval
 ```
@@ -97,7 +99,7 @@ This repo generally uses service-local Caddy instances rather than one central r
 
 - Technitium LXC runs its own Caddy for the DNS/Technitium UI.
 - Forgejo LXC runs its own Caddy for Forgejo.
-- New browser-facing first-class services should usually follow the same pattern: app plus Caddy in the same LXC, with Caddy proxying to the app on loopback. Infisical and Hermes follow this pattern.
+- New browser-facing first-class LXC services should usually follow the same pattern: app plus Caddy in the same LXC, with Caddy proxying to the app on loopback. Hermes follows this pattern. Containerized app services that belong on `onramp_host`, such as Infisical onramp, should use the shared onramp Caddy instance with per-service snippets under `/etc/caddy/sites.d/`.
 - Caddy uses Cloudflare DNS-01 ACME via `CF_DNS_API_TOKEN`, so multiple service-local Caddy instances can obtain certificates without competing for HTTP-01 port 80 routing.
 - Avoid turning the Technitium/DNS LXC into a general ingress proxy unless there is an explicit design reason. `caddy_extra_vhosts` exists, but should not be the default for new first-class services.
 
@@ -114,6 +116,8 @@ The intended pattern is hybrid DNS:
 - The gateway should remain focused on DHCP/routing/firewall and eventually point DHCP DNS to Technitium.
 
 Technitium DNS sync runtime settings belong in `values/.env`: `TECHNITIUM_API_URL`, `TECHNITIUM_API_TOKEN`, and `DNS_RECORDS_FILE`. Keep application runtime workflow variables out of OpenTofu variables unless OpenTofu directly uses them.
+
+Technitium service updates must become a managed version/checksum workflow rather than relying on `curl https://download.technitium.com/dns/install.sh | bash` after first install. The upstream portable tarball URL is mutable, so the intended managed design is: read version metadata from the Technitium GitHub release, pin the desired version and SHA256 in private values, optionally cache the tarball under ignored `values/artifacts/technitium/`, and let Ansible update only when the installed marker differs from the pin. Do not add new ad hoc Technitium installer reruns as an update path.
 
 ## Response hygiene
 

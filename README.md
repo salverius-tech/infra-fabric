@@ -36,6 +36,7 @@ Keep non-public material in `values/` or outside this checkout; do not add anoth
 - [Onramp app-platform contract](docs/onramp-app-platform-contract.md) defines how `homelab-infra`, `onramp-vNext`, and Hermes split onramp-host ownership.
 - [Onramp SearXNG handoff](docs/onramp-searxng-handoff.md) documents the default future Onramp-owned SearXNG contract and the current temporary `homelab-infra` exception.
 - [App-host runbook](docs/onramp-host-runbook.md) covers `onramp_host` rollback and future deployment validation.
+- [Service update policy](docs/service-update-policy.md) defines managed version updates and the target Technitium update model.
 
 ## Fresh setup
 
@@ -100,7 +101,9 @@ Check for eligible pinned version updates without applying infrastructure change
 just update
 ```
 
-`just update` checks known upstream releases and only updates pins for releases at least 48 hours old. Review the resulting diff before continuing with validation and planning.
+`just update` checks known upstream releases and only updates pins for releases at least 48 hours old. It currently manages tool pins such as OpenTofu/TFLint and service pins such as Forgejo and Forgejo runner where the repo has a deterministic update target. Review the resulting diff before continuing with validation and planning.
+
+Technitium is planned to move into this managed update path. The intended model is to read Technitium release metadata from GitHub, pin the desired DNS Server version plus the SHA256 of the portable tarball in private values, optionally cache the tarball under ignored `values/artifacts/technitium/`, then let Ansible update the LXC only when the installed marker differs from the pin. Until that is implemented, do not treat rerunning the upstream `install.sh` as an acceptable routine update mechanism.
 
 Review infrastructure/DNS changes:
 
