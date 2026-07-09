@@ -75,7 +75,7 @@ output "hermes_https_url" {
 
 output "hermes_ssh_target" {
   description = "Hermes SSH target, or null when disabled."
-  value       = local.hermes_enabled ? "root@${var.hermes_server_name}" : null
+  value       = local.hermes_enabled ? "${var.hermes_runtime_user}@${var.hermes_server_name}" : null
 }
 
 output "onramp_host_vmid" {

@@ -1,0 +1,38 @@
+---
+services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    container_name: infisical-onramp-db
+    restart: unless-stopped
+    env_file:
+      - ./infisical.env
+    environment:
+      POSTGRES_USER: {{ infisical_onramp_postgres_user }}
+      POSTGRES_DB: {{ infisical_onramp_postgres_db }}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ infisical_onramp_postgres_user }} -d {{ infisical_onramp_postgres_db }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: infisical-onramp-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./data/redis:/data
+
+  infisical:
+    image: docker.io/infisical/infisical:{{ infisical_onramp_version }}
+    container_name: infisical-onramp
+    restart: unless-stopped
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./infisical.env
+    ports:
+      - "{{ infisical_onramp_bind_address }}:{{ infisical_onramp_container_port }}:8080"

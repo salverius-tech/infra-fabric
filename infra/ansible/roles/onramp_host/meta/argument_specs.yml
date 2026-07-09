@@ -23,6 +23,14 @@ argument_specs:
         type: list
         required: true
         description: "CIDRs allowed to connect to SSH port 22."
+      caddy_email:
+        type: str
+        required: true
+        description: "Caddy TLS contact email used by the shared onramp Caddy instance."
+      caddy_cloudflare_api_token:
+        type: str
+        required: true
+        description: "Cloudflare DNS API token used by shared onramp Caddy DNS-01 challenges."
       onramp_host_ssh_public_keys:
         type: list
         required: false

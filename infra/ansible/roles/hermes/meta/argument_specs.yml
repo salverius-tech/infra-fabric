@@ -35,6 +35,14 @@ argument_specs:
         type: str
         required: false
         description: "Repository path written into the landing page helper (default: /srv/homelab-infra)."
+      hermes_runtime_user:
+        type: str
+        required: false
+        description: "Non-root user that owns Hermes runtime state and runs the dashboard (default: anvil)."
+      hermes_ssh_public_keys:
+        type: list
+        required: false
+        description: "Authorized key entries installed for the Hermes runtime user (default: [])."
       hermes_compression_threshold:
         type: float
         required: false

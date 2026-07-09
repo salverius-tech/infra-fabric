@@ -1,0 +1,61 @@
+---
+argument_specs:
+  main:
+    short_description: "Deploy rootless Infisical on the shared onramp host."
+    options:
+      onramp_host_deploy_user:
+        type: str
+        required: true
+        description: "Rootless deploy user inherited from onramp host setup for service ownership."
+      onramp_host_deploy_dir:
+        type: str
+        required: true
+        description: "Base deploy directory used to place infisical_onramp_base_dir."
+      infisical_domain:
+        type: str
+        required: true
+        description: "Caddy server name and SITE_URL hostname for Infisical."
+      infisical_encryption_key:
+        type: str
+        required: true
+        description: "Infisical encryption key from private values."
+      infisical_auth_secret:
+        type: str
+        required: true
+        description: "Infisical auth secret from private values."
+      infisical_postgres_password:
+        type: str
+        required: true
+        description: "Infisical PostgreSQL password from private values."
+      infisical_onramp_base_dir:
+        type: str
+        required: false
+        description: "Local deployment directory for compose/env/data files (default: {{ onramp_host_deploy_dir }}/infisical)."
+      infisical_onramp_container_port:
+        type: int
+        required: false
+        description: "Host loopback port used by Infisical before Caddy (default: 8081)."
+      infisical_onramp_bind_address:
+        type: str
+        required: false
+        description: "Container host bind address for Infisical service (default: 127.0.0.1)."
+      infisical_onramp_compose_provider_command:
+        type: str
+        required: false
+        description: "Compose CLI used by user service (default: podman-compose)."
+      infisical_onramp_version:
+        type: str
+        required: false
+        description: "Infisical container image tag (default: latest)."
+      infisical_onramp_postgres_user:
+        type: str
+        required: false
+        description: "PostgreSQL username for Infisical (default: infisical)."
+      infisical_onramp_postgres_db:
+        type: str
+        required: false
+        description: "PostgreSQL database name for Infisical (default: infisical)."
+      infisical_onramp_required_packages:
+        type: list
+        required: false
+        description: "VM package dependencies for Infisical onramp install (default: [])."

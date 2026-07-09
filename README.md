@@ -47,7 +47,7 @@ From a fresh checkout, optionally copy the local settings template:
 cp settings.example.json settings.local.json
 ```
 
-Edit `settings.local.json` if you want `just setup` to clone your private `values/` Git repo. For example, set `values_repo.remote` to your Forgejo SSH URL. The file is ignored by Git. Supported services are defined in `infra/services.json` and currently include `technitium`, `forgejo`, `tailscale_client`, `forgejo_runner`, `infisical`, `hermes`, `onramp_host`, and `searxng_onramp`; `technitium` includes its Caddy proxy, browser-facing first-class services use in-LXC Caddy, `onramp_host` prepares a Debian 13 Podman VM, `searxng_onramp` temporarily deploys SearXNG on that VM, and `forgejo_runner` creates/configures a separate Forgejo Actions runner LXC.
+Edit `settings.local.json` if you want `just setup` to clone your private `values/` Git repo. For example, set `values_repo.remote` to your Forgejo SSH URL. The file is ignored by Git. Supported services are defined in `infra/services.json` and currently include `technitium`, `forgejo`, `tailscale_client`, `forgejo_runner`, `infisical`, `infisical_onramp`, `hermes`, `onramp_host`, and `searxng_onramp`; `technitium` includes its Caddy proxy, LXC browser-facing services use service-local Caddy, `onramp_host` prepares a Debian 13 Podman VM with shared Caddy, `infisical_onramp` and `searxng_onramp` deploy rootless services on that VM, and `forgejo_runner` creates/configures a separate Forgejo Actions runner LXC.
 
 Then run:
 
@@ -168,9 +168,9 @@ OpenTofu manages:
   `*_vlan_id` values are set in `values/terraform.tfvars`
 - Optional Tailscale client LXC shape, disabled by default until `tailscale_client_enabled` is set in private values
 - Optional Forgejo Actions runner LXC when `forgejo_runner` is enabled in local settings
-- Optional Infisical secrets service LXC with a service-local Caddy frontend
-- Optional Hermes management LXC with SSH tooling and a service-local Caddy reverse proxy for the Hermes Agent web dashboard
-- Optional Debian 13 Podman `onramp_host` VM substrate for app services. The boot source is a clean Debian 13 genericcloud image imported by OpenTofu from the URL declared in private `values/terraform.tfvars`.
+- Optional Infisical secrets service, either as the legacy LXC with service-local Caddy or as `infisical_onramp` on the shared onramp host
+- Optional Hermes management LXC with SSH tooling, a non-root `anvil` dashboard runtime user, and a service-local Caddy reverse proxy for the Hermes Agent web dashboard
+- Optional Debian 13 Podman `onramp_host` VM substrate for app services, using `anvil` as the default cloud-init/deploy user and a shared Caddy instance with per-service snippets. The boot source is a clean Debian 13 genericcloud image imported by OpenTofu from the URL declared in private `values/terraform.tfvars`.
 - LXC bind mount attachments for services that use host storage
 
 Ansible manages:
@@ -182,10 +182,10 @@ Ansible manages:
 - Forgejo installation/configuration, including Actions settings
 - Caddy and OpenSSH integration on the Forgejo LXC
 - Forgejo Actions runner installation/registration on a separate LXC
-- Infisical Docker Compose stack, including PostgreSQL, Redis, and Caddy
-- Hermes management tooling, SSH-oriented bootstrap directories, the Hermes Agent web dashboard, and Caddy
-- App-host SSH hardening, rootless Podman readiness, deploy-user setup, default-deny host firewall policy, and deployment directory preparation
-- Temporary SearXNG onramp workload deployment with rootless Podman, service-local Caddy, Technitium DNS record input, and Hermes endpoint env wiring when `searxng_onramp` is enabled
+- Infisical Docker Compose stack on the legacy LXC, or rootless Infisical Podman stack on `onramp_host` when `infisical_onramp` is enabled
+- Hermes management tooling, SSH-oriented bootstrap directories, the Hermes Agent web dashboard running as `anvil`, and Caddy
+- App-host SSH hardening, rootless Podman readiness, `anvil` deploy-user setup, shared Caddy setup, default-deny host firewall policy, and deployment directory preparation
+- Temporary SearXNG onramp workload deployment with rootless Podman, a shared Caddy site snippet, Technitium DNS record input, and Hermes endpoint env wiring when `searxng_onramp` is enabled
 - Optional Tailscale installation and private backup restore on the Tailscale client LXC
 - Technitium DNS records/settings through `infra/ansible/playbooks/technitium-dns.yml`
 

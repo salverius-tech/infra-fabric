@@ -1,0 +1,7 @@
+---
+- name: Configure Infisical on shared onramp host
+  hosts: onramp_host
+  gather_facts: true
+  become: true
+  roles:
+    - infisical_onramp

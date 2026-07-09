@@ -6,7 +6,4 @@ searxng_onramp_instance_name: "{{ searxng_instance_name | default('Homelab SearX
 searxng_onramp_enable_public_url: "{{ searxng_enable_public_url | default(true) }}"
 searxng_onramp_base_dir: "{{ onramp_host_deploy_dir }}/searxng"
 searxng_onramp_compose_provider_command: "{{ onramp_host_compose_provider_command | default('podman-compose') }}"
-searxng_onramp_required_packages:
-  - caddy
-  - curl
-  - golang
+searxng_onramp_required_packages: []

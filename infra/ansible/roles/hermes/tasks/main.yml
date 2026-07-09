@@ -15,13 +15,43 @@
       - hermes_max_concurrent_children | default(5) | int <= 10
       - hermes_max_spawn_depth | default(2) | int >= 1
       - hermes_max_spawn_depth | default(2) | int <= 3
-    fail_msg: hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token, dashboard auth variables, and sane Hermes tuning values are required.
+      - hermes_runtime_user | default('anvil') is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - hermes_runtime_user | default('anvil') != 'root'
+    fail_msg: >-
+      hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token,
+      dashboard auth variables, sane Hermes tuning values, and a non-root
+      runtime user are required.
+- name: Ensure Hermes runtime user exists
+  ansible.builtin.user:
+    name: "{{ hermes_runtime_user | default('anvil') }}"
+    shell: /bin/bash
+    create_home: true
+    groups: users
+    append: true
+
+- name: Ensure Hermes runtime SSH directory exists
+  ansible.builtin.file:
+    path: "/home/{{ hermes_runtime_user | default('anvil') }}/.ssh"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: "0700"
+
+- name: Install Hermes runtime authorized keys
+  ansible.builtin.copy:
+    dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.ssh/authorized_keys"
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: "0600"
+    content: "{{ (hermes_ssh_public_keys | default([])) | join('\n') }}{{ '\n' if (hermes_ssh_public_keys | default([]) | length) > 0 else '' }}"
+  no_log: true
+
 - name: Install Hermes OS dependencies in LXC
   ansible.builtin.command:
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; packages=\"build-essential ca-certificates caddy curl docker.io git gnupg jq openssh-client python3 python3-pip python3-venv rsync tar unzip xz-utils\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
+      - "set -euo pipefail; packages=\"build-essential ca-certificates caddy curl docker.io git gnupg jq openssh-client python3 python3-pip python3-venv rsync sudo tar unzip xz-utils\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Install Docker Compose CLI plugin in Hermes LXC
   ansible.builtin.command:
@@ -42,7 +72,7 @@
     argv:
       - bash
       - -lc
-      - "install -d -m 0755 /srv /var/www/hermes; if [[ ! -d {{ hermes_repo_path | default('/srv/homelab-infra') | quote }} ]]; then\n  install -d -m 0755 {{ hermes_repo_path | default('/srv/homelab-infra') | quote }};\nfi"  # yamllint disable-line rule:line-length
+      - "install -d -m 0755 /srv /var/www/hermes; if [[ ! -d {{ hermes_repo_path | default('/srv/homelab-infra') | quote }} ]]; then\n  install -d -m 0755 -o {{ (hermes_runtime_user | default('anvil')) | quote }} -g {{ (hermes_runtime_user | default('anvil')) | quote }} {{ hermes_repo_path | default('/srv/homelab-infra') | quote }};\nfi"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Install Hermes landing page
   ansible.builtin.template:
@@ -88,13 +118,17 @@
 - name: Configure Hermes context compression and delegation limits
   ansible.builtin.command:
     argv:
+      - runuser
+      - -u
+      - "{{ hermes_runtime_user | default('anvil') }}"
+      - --
+      - env
+      - "HERMES_HOME=/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
       - hermes
       - config
       - set
       - "{{ item.key }}"
       - "{{ item.value | string }}"
-  environment:
-    HERMES_HOME: /root/.hermes
   loop:
     - key: compression.enabled
       value: true
@@ -116,6 +150,7 @@
     group: root
   when: hermes_dashboard_enabled | default(true) | bool
   no_log: true
+  notify: Restart hermes dashboard
 - name: Install Hermes dashboard systemd unit
   ansible.builtin.template:
     src: hermes-dashboard.service.j2
@@ -124,6 +159,7 @@
     owner: root
     group: root
   when: hermes_dashboard_enabled | default(true) | bool
+  notify: Restart hermes dashboard
 - name: Enable Hermes dashboard service
   ansible.builtin.command:
     argv:

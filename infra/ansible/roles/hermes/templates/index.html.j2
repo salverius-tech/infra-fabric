@@ -13,7 +13,7 @@
   <h1>Hermes management host</h1>
   <p>This LXC is the SSH entry point for homelab infrastructure operations.</p>
   <ul>
-    <li>SSH: <code>ssh root@{{ hermes_domain }}</code></li>
+    <li>SSH: <code>ssh {{ hermes_runtime_user | default('anvil') }}@{{ hermes_domain }}</code></li>
     <li>Repo path: <code>{{ hermes_repo_path | default('/srv/homelab-infra') }}</code></li>
   </ul>
 </body>

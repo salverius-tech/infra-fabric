@@ -42,6 +42,8 @@ Container VLAN tags default to `null`, which leaves the LXC interface untagged.
 Set the matching `*_vlan_id` value to a VLAN ID from 1 through 4094 when the
 Proxmox bridge should tag that container interface.
 
+Hermes and the optional onramp host use `anvil` as their non-root runtime/deploy user by default. Add real public SSH keys to `lxc_ssh_public_keys`; the onramp cloud-init keys fall back to that list when `onramp_host_ssh_public_keys` is empty.
+
 After editing the copied files, run the normal validation entry point:
 
 ```bash

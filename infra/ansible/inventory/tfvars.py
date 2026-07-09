@@ -42,7 +42,28 @@ def load_tfvars(path: Path) -> dict[str, Any]:
         raise InventoryError(f"cannot parse {path}: {error}") from error
     if not isinstance(data, dict):
         raise InventoryError(f"{path} must contain an object")
+    add_env_tfvar_fallbacks(data)
     return data
+
+
+def env_list_var(name: str) -> list[str] | None:
+    raw_value = os.environ.get(name)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        parsed = [raw_value]
+    if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+        raise InventoryError(f"{name} must be a JSON string list when used by dynamic inventory")
+    return parsed
+
+
+def add_env_tfvar_fallbacks(tfvars: dict[str, Any]) -> None:
+    if not tfvars.get("lxc_ssh_public_keys"):
+        env_keys = env_list_var("TF_VAR_lxc_ssh_public_keys")
+        if env_keys:
+            tfvars["lxc_ssh_public_keys"] = env_keys
 
 
 def host_address(value: Any) -> str:
@@ -77,7 +98,10 @@ def service_play_vars(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
         vars_for_play[user_var] = tfvars[tf_user]
     for var_name, tf_key in config.get("extra_play_vars", {}).items():
         if tf_key in tfvars:
-            vars_for_play[var_name] = tfvars[tf_key]
+            value = tfvars[tf_key]
+            if var_name == "onramp_host_ssh_public_keys" and not value:
+                value = tfvars.get("lxc_ssh_public_keys", value)
+            vars_for_play[var_name] = value
     return vars_for_play
 
 

@@ -80,6 +80,30 @@
         "tf_domain": "infisical_server_name"
       }
     },
+    "infisical_onramp": {
+      "playbooks": [
+        "infra/ansible/playbooks/infisical-onramp.yml"
+      ],
+      "dependencies": [
+        "onramp_host"
+      ],
+      "inventory": {
+        "host": "onramp_host_vm",
+        "group": "onramp_host",
+        "vmid_var": "onramp_host_vmid",
+        "tf_vmid": "onramp_host_vmid",
+        "tf_host": "onramp_host_ipv4_address",
+        "domain_var": "infisical_domain",
+        "tf_domain": "infisical_server_name",
+        "user_var": "onramp_host_deploy_user",
+        "tf_user": "onramp_host_deploy_user",
+        "extra_play_vars": {
+          "onramp_host_deploy_dir": "onramp_host_deploy_dir",
+          "infisical_container_port": "infisical_container_port",
+          "infisical_bind_address": "infisical_bind_address"
+        }
+      }
+    },
     "hermes": {
       "playbooks": [
         "infra/ansible/playbooks/hermes.yml"
@@ -92,7 +116,12 @@
         "tf_vmid": "hermes_container_vmid",
         "tf_host": "hermes_lan_ip",
         "domain_var": "hermes_domain",
-        "tf_domain": "hermes_server_name"
+        "tf_domain": "hermes_server_name",
+        "tf_user": "hermes_ansible_user",
+        "extra_play_vars": {
+          "hermes_runtime_user": "hermes_runtime_user",
+          "hermes_ssh_public_keys": "lxc_ssh_public_keys"
+        }
       }
     },
     "onramp_host": {

@@ -10,7 +10,12 @@
       - onramp_host_password_authentication is defined
       - onramp_host_permit_root_login is defined
       - onramp_host_allowed_ssh_cidrs | length > 0
-    fail_msg: onramp_host requires Debian 13+, a non-root deploy user, deploy directory, SSH policy, and private SSH source CIDRs.
+      - caddy_email is defined
+      - caddy_cloudflare_api_token is defined
+    fail_msg: >-
+      onramp_host requires Debian 13+, a non-root deploy user, deploy
+      directory, SSH policy, private SSH source CIDRs, and Caddy DNS-01
+      variables.
 
 - name: Install Podman onramp-host packages
   ansible.builtin.apt:
@@ -62,6 +67,89 @@
     owner: "{{ onramp_host_deploy_user }}"
     group: "{{ onramp_host_deploy_user }}"
     mode: "0750"
+
+- name: Check whether onramp-host Caddy has Cloudflare DNS module
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
+  register: onramp_host_caddy_cloudflare_module
+  changed_when: false
+  failed_when: false
+
+- name: Build onramp-host Caddy with Cloudflare DNS module
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz && PATH=/usr/local/go/bin:${PATH} GOBIN=/usr/local/bin /usr/local/go/bin/go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && PATH=/usr/local/go/bin:${PATH} /usr/local/bin/xcaddy build --with github.com/caddy-dns/cloudflare --output /tmp/caddy-cloudflare && install -m 0755 /tmp/caddy-cloudflare /usr/bin/caddy  # yamllint disable-line rule:line-length
+  when: onramp_host_caddy_cloudflare_module.rc != 0
+  changed_when: true
+  notify: Restart caddy
+
+- name: Ensure onramp-host Caddy directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+  loop:
+    - /etc/caddy
+    - /etc/caddy/sites.d
+    - /etc/systemd/system/caddy.service.d
+
+- name: Install onramp-host Caddy env
+  ansible.builtin.template:
+    src: caddy.env.j2
+    dest: /etc/caddy/env
+    mode: "0600"
+    owner: root
+    group: caddy
+  no_log: true
+  notify: Restart caddy
+
+- name: Install onramp-host Caddy systemd override
+  ansible.builtin.template:
+    src: caddy-override.conf.j2
+    dest: /etc/systemd/system/caddy.service.d/override.conf
+    mode: "0644"
+    owner: root
+    group: root
+  notify: Restart caddy
+
+- name: Install onramp-host base Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /etc/caddy/Caddyfile
+    mode: "0644"
+    owner: root
+    group: root
+  notify: Restart caddy
+
+- name: Install onramp-host placeholder Caddy site snippet
+  ansible.builtin.copy:
+    dest: /etc/caddy/sites.d/00-placeholder.caddy
+    content: "# Placeholder so the base Caddyfile import glob is valid before app snippets exist.\n"
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Validate onramp-host base Caddy config
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - set -a && . /etc/caddy/env && set +a && caddy validate --config /etc/caddy/Caddyfile
+  changed_when: false
+
+- name: Enable onramp-host Caddy service
+  ansible.builtin.systemd_service:
+    name: caddy
+    enabled: true
+    state: started
+    daemon_reload: true
 
 - name: Document onramp-host sudo policy
   ansible.builtin.debug:

@@ -23,14 +23,6 @@ argument_specs:
         type: str
         required: true
         description: "Required secret value for SearXNG runtime configuration."
-      caddy_email:
-        type: str
-        required: true
-        description: "Caddy TLS contact email used in the onramp Caddyfile."
-      caddy_cloudflare_api_token:
-        type: str
-        required: true
-        description: "Cloudflare DNS API token used by Caddy DNS-01 challenge."
       searxng_onramp_bind_address:
         type: str
         required: false
@@ -42,7 +34,7 @@ argument_specs:
       searxng_onramp_required_packages:
         type: list
         required: false
-        description: "VM package dependencies for SearXNG onramp install (default: caddy, curl, golang)."
+        description: "VM package dependencies for SearXNG onramp install (default: [])."
       searxng_onramp_container_image:
         type: str
         required: false

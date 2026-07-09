@@ -1,0 +1,16 @@
+[Unit]
+Description=Infisical onramp Podman workload
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory={{ infisical_onramp_base_dir }}
+ExecStart={{ infisical_onramp_compose_provider_command }} -f {{ infisical_onramp_base_dir }}/docker-compose.yml up -d
+ExecStop={{ infisical_onramp_compose_provider_command }} -f {{ infisical_onramp_base_dir }}/docker-compose.yml down
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target
