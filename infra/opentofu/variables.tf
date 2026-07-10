@@ -125,6 +125,12 @@ variable "debian_template_file_name" {
   type        = string
 }
 
+variable "lxc_template_download_timeout_seconds" {
+  description = "Timeout, in seconds, for downloading the Debian LXC template into Proxmox storage."
+  type        = number
+  default     = 1800
+}
+
 variable "lxc_root_password" {
   description = "Initial root password for the LXC. Store only in terraform.tfvars or environment injection."
   type        = string

@@ -24,10 +24,11 @@ technitium_container_search_domain = "example.internal"
 technitium_container_bridge        = "vmbr0"
 technitium_container_vlan_id       = null
 
-rootfs_datastore_id       = "local-lvm"
-template_datastore_id     = "local"
-debian_template_url       = "http://download.proxmox.com/images/system/debian-12-standard_12.12-1_amd64.tar.zst"
-debian_template_file_name = "debian-12-standard_12.12-1_amd64.tar.zst"
+rootfs_datastore_id                   = "local-lvm"
+template_datastore_id                 = "local"
+debian_template_url                   = "http://download.proxmox.com/images/system/debian-12-standard_12.12-1_amd64.tar.zst"
+debian_template_file_name             = "debian-12-standard_12.12-1_amd64.tar.zst"
+lxc_template_download_timeout_seconds = 1800
 
 technitium_container_cores     = 1
 technitium_container_memory_mb = 1024

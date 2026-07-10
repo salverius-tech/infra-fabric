@@ -6,6 +6,7 @@ resource "proxmox_download_file" "debian_12_lxc_template" {
   file_name           = var.debian_template_file_name
   node_name           = var.proxmox_node_name
   url                 = var.debian_template_url
+  upload_timeout      = var.lxc_template_download_timeout_seconds
   overwrite           = false
   overwrite_unmanaged = false
 }
