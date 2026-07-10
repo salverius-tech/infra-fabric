@@ -31,7 +31,7 @@ Keep non-public material in `values/` or outside this checkout; do not add anoth
 - [Docs index](docs/README.md) lists public-safe operator and architecture notes.
 - [Debian baseline split](docs/debian-baseline.md) explains why LXCs use Debian 12 templates while `onramp_host` uses Debian 13 genericcloud.
 - [Hermes operator pilot PRD](docs/hermes-operator-pilot-prd.md) defines the Hermes cockpit requirements and safety boundaries.
-- [Hermes state backup and restore](docs/hermes-state-backup.md) covers private `values/` backups for Hermes memory/soul state.
+- [Managed service-state backup and restore](docs/service-state-backup.md) covers private `values/` backups for Hermes memory/soul state and other managed service state.
 - [Hermes tuning](docs/hermes-tuning.md) documents managed compression and delegation settings.
 - [Onramp app-platform contract](docs/onramp-app-platform-contract.md) defines how `homelab-infra`, `onramp-vNext`, and Hermes split onramp-host ownership.
 - [Onramp SearXNG handoff](docs/onramp-searxng-handoff.md) documents the default future Onramp-owned SearXNG contract and the current temporary `homelab-infra` exception.

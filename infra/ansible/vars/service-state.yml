@@ -1,0 +1,58 @@
+---
+managed_service_state_catalog:
+  hermes:
+    group: hermes
+    description: Hermes memory, soul, config, history, and dashboard runtime state.
+    services:
+      - hermes-dashboard
+    paths:
+      - "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
+  forgejo:
+    group: forgejo
+    description: Forgejo application configuration, repositories, database, attachments, and logs.
+    services:
+      - forgejo
+      - caddy
+    paths:
+      - /etc/forgejo
+      - /var/lib/forgejo
+  technitium:
+    group: technitium
+    description: Technitium DNS server configuration, zones, block lists, logs, and app data.
+    services:
+      - dns
+      - caddy
+    paths:
+      - /etc/dns
+  onramp_host:
+    group: onramp_host
+    description: Shared onramp host Caddy configuration and repo-managed app deployment directories.
+    services:
+      - caddy
+    paths:
+      - /etc/caddy
+      - "{{ onramp_host_deploy_dir }}"
+  infisical_onramp:
+    group: onramp_host
+    description: Infisical onramp compose/env files and container data under the onramp deploy directory.
+    services:
+      - infisical-onramp.service
+      - caddy
+    user_services:
+      - infisical-onramp.service
+    user_service_owner: "{{ onramp_host_deploy_user }}"
+    paths:
+      - "{{ onramp_host_deploy_dir }}/infisical"
+      - /etc/caddy/sites.d/infisical.caddy
+  searxng_onramp:
+    group: onramp_host
+    description: SearXNG onramp compose/env/settings files and container data under the onramp deploy directory.
+    services:
+      - searxng-onramp.service
+      - caddy
+    user_services:
+      - searxng-onramp.service
+    user_service_owner: "{{ onramp_host_deploy_user }}"
+    paths:
+      - "{{ onramp_host_deploy_dir }}/searxng"
+      - /etc/caddy/sites.d/searxng.caddy

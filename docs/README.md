@@ -5,7 +5,8 @@ Public-safe documentation for this homelab infrastructure runbook.
 ## Operator and platform docs
 
 - [Hermes operator pilot PRD](hermes-operator-pilot-prd.md) defines the Hermes cockpit requirements, safety boundaries, and SearXNG pilot classification.
-- [Hermes state backup and restore](hermes-state-backup.md) covers private `values/` backups for Hermes memory/soul state.
+- [Managed service-state backup and restore](service-state-backup.md) covers private `values/` backups for Hermes memory/soul state and other managed service state.
+- [Hermes state backup and restore](hermes-state-backup.md) keeps the Hermes-specific compatibility notes.
 - [Hermes tuning](hermes-tuning.md) documents managed compression and delegation settings.
 - [Onramp app-platform contract](onramp-app-platform-contract.md) defines the `homelab-infra`, `onramp-vNext`, and Hermes ownership split for onramp-host services.
 - [Debian baseline split](debian-baseline.md) explains the current LXC/host Debian versions, rationale, and the reviewed migration path.
