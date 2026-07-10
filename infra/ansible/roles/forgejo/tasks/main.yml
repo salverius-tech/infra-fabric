@@ -4,7 +4,11 @@
     that:
       - forgejo_domain is defined
       - forgejo_version is defined
-    fail_msg: forgejo_domain and forgejo_version are required.
+      - forgejo_secret_key is defined
+      - forgejo_internal_token is defined
+      - forgejo_oauth2_jwt_secret is defined
+      - forgejo_lfs_jwt_secret is defined
+    fail_msg: forgejo_domain, forgejo_version, and Forgejo persistent security secrets are required.
 - name: Install Forgejo OS dependencies in LXC
   ansible.builtin.command:
     argv:
@@ -84,6 +88,50 @@
     group: git
   when: forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0
   no_log: true
+- name: Mark Forgejo app.ini as installed for non-interactive service startup
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - |
+        from pathlib import Path
+        path = Path('/etc/forgejo/app.ini')
+        lines = path.read_text().splitlines()
+        out = []
+        in_security = False
+        saw_security = False
+        saw_install_lock = False
+        changed = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('[') and stripped.endswith(']'):
+                if in_security and not saw_install_lock:
+                    out.append('INSTALL_LOCK = true')
+                    changed = True
+                in_security = stripped.lower() == '[security]'
+                saw_security = saw_security or in_security
+            if in_security and stripped.lower().startswith('install_lock'):
+                if line != 'INSTALL_LOCK = true':
+                    line = 'INSTALL_LOCK = true'
+                    changed = True
+                saw_install_lock = True
+            out.append(line)
+        if in_security and not saw_install_lock:
+            out.append('INSTALL_LOCK = true')
+            changed = True
+        if not saw_security:
+            if out and out[-1] != '':
+                out.append('')
+            out.extend(['[security]', 'INSTALL_LOCK = true'])
+            changed = True
+        if changed:
+            path.write_text('\n'.join(out) + '\n')
+            raise SystemExit(1)
+  register: forgejo_install_lock
+  changed_when: forgejo_install_lock.rc == 1
+  failed_when: forgejo_install_lock.rc not in [0, 1]
+  notify: Restart forgejo
+
 - name: Configure Forgejo Actions settings
   ansible.builtin.command:
     argv:

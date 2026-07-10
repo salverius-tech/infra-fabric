@@ -40,6 +40,7 @@ resource "proxmox_virtual_environment_container" "this" {
 
     content {
       volume    = mount_point.value.volume
+      size      = mount_point.value.size
       path      = mount_point.value.path
       backup    = mount_point.value.backup
       read_only = mount_point.value.read_only

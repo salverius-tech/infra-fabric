@@ -17,6 +17,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from envfile import EnvEntry, EnvFileError, parse_env_lines as parse_envfile_lines, parse_scalar as envfile_parse_scalar, read_lines, remove_env, set_env, write_lines
 
 GENERATED_SECRET_KEYS = {
+    "FORGEJO_SECRET_KEY": lambda: secrets.token_urlsafe(32),
+    "FORGEJO_INTERNAL_TOKEN": lambda: secrets.token_urlsafe(48),
+    "FORGEJO_OAUTH2_JWT_SECRET": lambda: secrets.token_urlsafe(32),
+    "FORGEJO_LFS_JWT_SECRET": lambda: secrets.token_urlsafe(32),
     "INFISICAL_ENCRYPTION_KEY": lambda: secrets.token_hex(16),
     "INFISICAL_AUTH_SECRET": lambda: base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
     "INFISICAL_POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(32),
@@ -32,6 +36,10 @@ SECRET_KEYS = {
     "TF_VAR_container_root_password",
     "TF_VAR_lxc_root_password",
     "CF_DNS_API_TOKEN",
+    "FORGEJO_SECRET_KEY",
+    "FORGEJO_INTERNAL_TOKEN",
+    "FORGEJO_OAUTH2_JWT_SECRET",
+    "FORGEJO_LFS_JWT_SECRET",
     "FORGEJO_RUNNER_REGISTRATION_SECRET",
     "TAILSCALE_AUTH_KEY",
     "INFISICAL_ENCRYPTION_KEY",

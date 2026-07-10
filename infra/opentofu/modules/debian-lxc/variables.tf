@@ -75,6 +75,7 @@ variable "mount_points" {
   description = "Additional mount points for the LXC. Bind mounts use a host path volume; Proxmox-managed volumes use storage_id:size_gb."
   type = list(object({
     volume    = string
+    size      = optional(string)
     path      = string
     backup    = optional(bool, false)
     read_only = optional(bool, false)

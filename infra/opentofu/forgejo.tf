@@ -38,9 +38,10 @@ locals {
   forgejo_data_mountable = contains(["bind", "proxmox_volume"], local.forgejo_data_storage.type)
   forgejo_data_volume = (
     local.forgejo_data_storage.type == "bind" ? local.forgejo_data_storage.source :
-    local.forgejo_data_storage.type == "proxmox_volume" ? format("%s:%s", local.forgejo_data_storage.storage_id, local.forgejo_data_storage.size_gb) :
+    local.forgejo_data_storage.type == "proxmox_volume" ? local.forgejo_data_storage.storage_id :
     null
   )
+  forgejo_data_size = local.forgejo_data_storage.type == "proxmox_volume" ? format("%dG", local.forgejo_data_storage.size_gb) : null
 }
 
 resource "terraform_data" "forgejo_storage_validation" {
@@ -77,6 +78,7 @@ module "forgejo" {
   mount_points = local.forgejo_data_mountable ? [
     {
       volume    = local.forgejo_data_volume
+      size      = local.forgejo_data_size
       path      = local.forgejo_data_storage.target
       backup    = local.forgejo_data_storage.backup
       read_only = local.forgejo_data_storage.read_only
