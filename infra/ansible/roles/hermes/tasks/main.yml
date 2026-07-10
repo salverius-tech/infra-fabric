@@ -6,10 +6,10 @@
       - hermes_domain is defined
       - caddy_email is defined
       - caddy_cloudflare_api_token is defined
-      - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_username is defined
-      - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_password_hash is defined
-      - not (hermes_dashboard_enabled | default(true) | bool) or hermes_dashboard_basic_auth_secret is defined
-    fail_msg: hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token, and Hermes dashboard auth variables are required.
+      - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_username | default('') | length) > 0
+      - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_password_hash | default('') | length) > 0
+      - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_secret | default('') | length) > 0
+    fail_msg: hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token, and non-empty Hermes dashboard auth variables are required.
 - name: Install Hermes OS dependencies in LXC
   ansible.builtin.command:
     argv:
@@ -162,6 +162,10 @@
       - --max-time
       - '10'
       - http://127.0.0.1:{{ hermes_dashboard_port | default(9119) }}/login
+  register: hermes_dashboard_login_probe
+  retries: 12
+  delay: 5
+  until: hermes_dashboard_login_probe.rc == 0
   when: hermes_dashboard_enabled | default(true) | bool
   changed_when: false
 - name: Verify Hermes Caddy basic-auth login rewrite
@@ -174,5 +178,9 @@
       - --resolve
       - '{{ hermes_domain }}:443:127.0.0.1'
       - https://{{ hermes_domain }}/auth/login?provider=basic&next=%2F
+  register: hermes_caddy_login_probe
+  retries: 12
+  delay: 5
+  until: hermes_caddy_login_probe.rc == 0
   when: hermes_dashboard_enabled | default(true) | bool
   changed_when: false

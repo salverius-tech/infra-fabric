@@ -10,3 +10,40 @@
           - Controller-managed known_hosts is refreshed before direct service SSH.
           - Direct SSH, Python, and root/become probes run before steady-state roles.
           - Steady-state service configuration must not use Proxmox pct.
+
+- name: Refresh direct service SSH trust on controller
+  hosts: services
+  gather_facts: false
+  tasks:
+    - name: Refresh controller known_hosts for direct service endpoints
+      ansible.builtin.shell: |
+        set -euo pipefail
+        install -d -m 0700 "${HOME}/.ssh"
+        ssh-keygen -R {{ hostvars[service_inventory_host].ansible_host | quote }} >/dev/null 2>&1 || true
+        tmp="$(mktemp)"
+        ssh-keyscan -T 10 -H -t rsa,ecdsa,ed25519 {{ hostvars[service_inventory_host].ansible_host | quote }} > "${tmp}" 2>/dev/null
+        touch "${HOME}/.ssh/known_hosts"
+        cat "${tmp}" >> "${HOME}/.ssh/known_hosts"
+        rm -f "${tmp}"
+        chmod 0600 "${HOME}/.ssh/known_hosts"
+      args:
+        executable: /bin/bash
+      delegate_to: localhost
+      changed_when: false
+      run_once: true
+      loop: "{{ ansible_play_hosts }}"
+      loop_control:
+        loop_var: service_inventory_host
+      when:
+        - hostvars[service_inventory_host].ansible_host is defined
+        - hostvars[service_inventory_host].ansible_host | length > 0
+
+- name: Verify direct service SSH and Python readiness
+  hosts: services
+  gather_facts: false
+  tasks:
+    - name: Wait for direct service SSH
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+    - name: Probe direct service Python execution
+      ansible.builtin.ping:
