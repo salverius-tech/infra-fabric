@@ -85,6 +85,9 @@ def service_play_vars(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
     if config is None:
         return {}
     vars_for_play: dict[str, Any] = {}
+    storage = tfvars.get("service_storage", {})
+    if isinstance(storage, dict) and isinstance(storage.get(service), dict):
+        vars_for_play[f"{service}_storage"] = storage[service]
     vmid = tfvars.get(config["tf_vmid"])
     if vmid is not None:
         vars_for_play[config["vmid_var"]] = vmid

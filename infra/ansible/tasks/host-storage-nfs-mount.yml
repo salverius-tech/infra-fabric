@@ -1,0 +1,47 @@
+---
+- name: Install host NFS client packages
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+    update_cache: true
+
+- name: Create host NFS mountpoint
+  ansible.builtin.file:
+    path: "{{ storage_bind_mount.host_prepare.mountpoint }}"
+    state: directory
+    mode: "{{ storage_bind_mount.mode | default('0750') }}"
+
+- name: Build host NFS mount options
+  ansible.builtin.set_fact:
+    storage_host_mount_options: >-
+      {{ storage_bind_mount.host_prepare.options
+         if (storage_bind_mount.host_prepare.options | default([]) | length > 0)
+         else ['rw', '_netdev', 'nofail'] }}
+
+- name: Manage host NFS fstab entry
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ (storage_bind_mount.host_prepare.server ~ ':' ~ storage_bind_mount.host_prepare.export) | regex_escape() }}\\s+"
+    line: >-
+      {{ storage_bind_mount.host_prepare.server }}:{{ storage_bind_mount.host_prepare.export }}
+      {{ storage_bind_mount.host_prepare.mountpoint }} nfs {{ storage_host_mount_options | join(',') }} 0 0
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Mount host NFS storage
+  ansible.builtin.command:
+    argv:
+      - mount
+      - "{{ storage_bind_mount.host_prepare.mountpoint }}"
+  register: storage_host_nfs_mount
+  changed_when: storage_host_nfs_mount.rc == 0
+  failed_when: storage_host_nfs_mount.rc not in [0, 32]
+
+- name: Set host NFS storage ownership
+  ansible.builtin.file:
+    path: "{{ storage_bind_mount.host_prepare.mountpoint }}"
+    state: directory
+    owner: "{{ storage_bind_mount.uid }}"
+    group: "{{ storage_bind_mount.gid }}"
+    mode: "{{ storage_bind_mount.mode | default('0750') }}"

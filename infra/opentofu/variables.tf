@@ -254,42 +254,150 @@ variable "forgejo_container_disk_gb" {
   type        = number
 }
 
-variable "forgejo_data_dataset" {
-  description = "ZFS dataset that backs Forgejo data. Ansible storage prep creates it idempotently on the Proxmox host before OpenTofu apply."
-  type        = string
+variable "service_storage" {
+  description = "Per-service durable storage definitions. Keys are service names, then logical mount names such as data, config, backup, or cache."
+  type = map(map(object({
+    type = string
+
+    # bind
+    source        = optional(string)
+    create_source = optional(bool, true)
+    host_uid      = optional(number, 100000)
+    host_gid      = optional(number, 100000)
+    mode          = optional(string, "0750")
+    host_prepare = optional(object({
+      type             = string
+      dataset          = optional(string)
+      mountpoint       = optional(string)
+      server           = optional(string)
+      export           = optional(string)
+      share            = optional(string)
+      credentials_file = optional(string)
+      options          = optional(list(string), [])
+    }), { type = "directory" })
+
+    # proxmox_volume
+    storage_id = optional(string)
+    size_gb    = optional(number)
+    acl        = optional(bool, false)
+    quota      = optional(bool, false)
+    replicate  = optional(bool, false)
+
+    # guest_nfs / guest_cifs
+    server           = optional(string)
+    export           = optional(string)
+    share            = optional(string)
+    credentials_file = optional(string)
+    options          = optional(list(string), [])
+    owner            = optional(string)
+    group            = optional(string)
+    mount_unit       = optional(bool, true)
+
+    # all mounted types
+    target    = optional(string)
+    backup    = optional(bool, false)
+    read_only = optional(bool, false)
+  })))
+  default = {}
 
   validation {
-    condition     = can(regex("^[A-Za-z0-9_.:-]+(/[A-Za-z0-9_.:-]+)+$", var.forgejo_data_dataset))
-    error_message = "forgejo_data_dataset must be a ZFS dataset path containing only letters, numbers, dot, underscore, colon, dash, and slash."
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : contains(["bind", "proxmox_volume", "guest_nfs", "guest_cifs", "none"], mount.type)
+      ]
+    ]))
+    error_message = "service_storage entries must use one of: bind, proxmox_volume, guest_nfs, guest_cifs, none."
   }
-}
-
-variable "forgejo_data_host_path" {
-  description = "Proxmox host path bind-mounted into the Forgejo LXC."
-  type        = string
 
   validation {
-    condition     = can(regex("^/[A-Za-z0-9_./:-]+$", var.forgejo_data_host_path))
-    error_message = "forgejo_data_host_path must be an absolute path without whitespace or shell metacharacters."
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.type == "none" || try(can(regex("^/[A-Za-z0-9_./:-]+$", mount.target)), false)
+      ]
+    ]))
+    error_message = "Mounted service_storage entries must set target to an absolute path without whitespace or shell metacharacters."
   }
-}
 
-variable "forgejo_data_mount_path" {
-  description = "Mount path inside the Forgejo LXC."
-  type        = string
-  default     = "/var/lib/forgejo"
-}
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.type != "bind" || try(can(regex("^/[A-Za-z0-9_./:-]+$", mount.source)), false)
+      ]
+    ]))
+    error_message = "bind service_storage entries must set source to an absolute host path without whitespace or shell metacharacters."
+  }
 
-variable "forgejo_data_host_uid" {
-  description = "Host UID owner for the Forgejo bind mount. 100000 maps to root inside the default unprivileged LXC."
-  type        = number
-  default     = 100000
-}
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.type == "bind" || try(mount.host_prepare.type == "directory", true)
+      ]
+    ]))
+    error_message = "host_prepare may only be set on bind service_storage entries."
+  }
 
-variable "forgejo_data_host_gid" {
-  description = "Host GID owner for the Forgejo bind mount. 100000 maps to root inside the default unprivileged LXC."
-  type        = number
-  default     = 100000
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : contains(["none", "directory", "zfs_dataset", "host_nfs_mount", "host_cifs_mount"], mount.host_prepare.type)
+      ]
+    ]))
+    error_message = "host_prepare.type must be one of: none, directory, zfs_dataset, host_nfs_mount, host_cifs_mount."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.host_prepare.type != "zfs_dataset" || try(mount.host_prepare.dataset != "" && mount.host_prepare.mountpoint != "", false)
+      ]
+    ]))
+    error_message = "zfs_dataset host_prepare entries must set dataset and mountpoint."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.host_prepare.type != "host_nfs_mount" || try(mount.host_prepare.server != "" && mount.host_prepare.export != "" && mount.host_prepare.mountpoint != "", false)
+      ]
+    ]))
+    error_message = "host_nfs_mount host_prepare entries must set server, export, and mountpoint."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.host_prepare.type != "host_cifs_mount" || try(mount.host_prepare.server != "" && mount.host_prepare.share != "" && mount.host_prepare.mountpoint != "" && mount.host_prepare.credentials_file != "", false)
+      ]
+    ]))
+    error_message = "host_cifs_mount host_prepare entries must set server, share, mountpoint, and credentials_file."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.type != "proxmox_volume" || try(mount.storage_id != "" && mount.size_gb > 0, false)
+      ]
+    ]))
+    error_message = "proxmox_volume service_storage entries must set storage_id and a positive size_gb."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.type != "guest_nfs" || try(mount.server != "" && mount.export != "", false)
+      ]
+    ]))
+    error_message = "guest_nfs service_storage entries must set server and export."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for service_name, mounts in var.service_storage : [
+        for mount_name, mount in mounts : mount.type != "guest_cifs" || try(mount.server != "" && mount.share != "" && mount.credentials_file != "", false)
+      ]
+    ]))
+    error_message = "guest_cifs service_storage entries must set server, share, and credentials_file."
+  }
 }
 
 variable "forgejo_startup_order" {

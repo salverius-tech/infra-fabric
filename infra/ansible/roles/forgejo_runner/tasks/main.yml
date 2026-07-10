@@ -90,13 +90,27 @@
     mode: '0600'
     state: present
   delegate_to: pve
-- name: Trust Proxmox host key in Forgejo runner LXC
+- name: Read Proxmox host SSH public keys
   ansible.builtin.command:
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; install -d -m 0700 -o runner -g runner /var/lib/forgejo-runner/.ssh; tmp=\"$(mktemp)\"; ssh-keyscan -H {{ hostvars['pve'].ansible_host | quote }} > \"${tmp}\" 2>/dev/null; touch /var/lib/forgejo-runner/.ssh/known_hosts; if ! grep -Fxf \"${tmp}\" /var/lib/forgejo-runner/.ssh/known_hosts >/dev/null; then\n  cat \"${tmp}\" >> /var/lib/forgejo-runner/.ssh/known_hosts;\nfi; rm -f \"${tmp}\"; chown runner:runner /var/lib/forgejo-runner/.ssh/known_hosts; chmod 0644 /var/lib/forgejo-runner/.ssh/known_hosts"  # yamllint disable-line rule:line-length
+      - |
+        set -euo pipefail
+        for key in /etc/ssh/ssh_host_*_key.pub; do
+          awk -v host={{ hostvars['pve'].ansible_host | quote }} '{ print host " " $1 " " $2 }' "${key}"
+        done
+  register: forgejo_runner_proxmox_host_keys
   changed_when: false
+  delegate_to: pve
+
+- name: Trust Proxmox host key in Forgejo runner LXC
+  ansible.builtin.copy:
+    dest: /var/lib/forgejo-runner/.ssh/known_hosts
+    content: "{{ forgejo_runner_proxmox_host_keys.stdout }}\n"
+    owner: runner
+    group: runner
+    mode: '0644'
 - name: Check installed Forgejo runner version
   ansible.builtin.command:
     argv:
@@ -127,6 +141,7 @@
       - select ar.uuid from action_runner ar join repository r on r.id=ar.repo_id where ar.name='{{ forgejo_runner_name | default('homelab-deploy') }}' and lower(r.owner_name || '/' || r.lower_name)=lower('{{ forgejo_runner_scope }}') and ar.repo_id != 0 limit 1;  # yamllint disable-line rule:line-length
   register: forgejo_runner_existing_registration
   changed_when: false
+  failed_when: "forgejo_runner_existing_registration.rc != 0 and 'no such table: action_runner' not in forgejo_runner_existing_registration.stderr"
   delegate_to: "{{ groups['forgejo'][0] }}"
   no_log: true
 - name: Register Forgejo Actions runner with Forgejo
@@ -134,7 +149,7 @@
     argv:
       - bash
       - -lc
-      - 'set -euo pipefail; runuser -u git -- env "$(printf ''%s=%s'' FORGEJO_RUNNER_SECRET "${FORGEJO_RUNNER_SECRET}")" /usr/local/bin/forgejo --config /etc/forgejo/app.ini --work-path /var/lib/forgejo forgejo-cli actions register --name "$1" --scope "$2" --secret "${FORGEJO_RUNNER_SECRET}" | tail -n1 # public-safety: allow-secret'  # yamllint disable-line rule:line-length
+      - 'set -euo pipefail; runuser -u git -- env "$(printf ''%s=%s'' FORGEJO_RUNNER_SECRET "${FORGEJO_RUNNER_SECRET}")" /usr/local/bin/forgejo forgejo-cli actions register --config /etc/forgejo/app.ini --work-path /var/lib/forgejo --name "$1" --scope "$2" --secret "${FORGEJO_RUNNER_SECRET}" | tail -n1 # public-safety: allow-secret'  # yamllint disable-line rule:line-length
       - --
       - '{{ forgejo_runner_name | default(''homelab-deploy'') }}'
       - '{{ forgejo_runner_scope }}'

@@ -21,7 +21,17 @@
         install -d -m 0700 "${HOME}/.ssh"
         ssh-keygen -R {{ hostvars[service_inventory_host].ansible_host | quote }} >/dev/null 2>&1 || true
         tmp="$(mktemp)"
-        ssh-keyscan -T 10 -H -t rsa,ecdsa,ed25519 {{ hostvars[service_inventory_host].ansible_host | quote }} > "${tmp}" 2>/dev/null
+        deadline=$((SECONDS + {{ direct_access_ready_ssh_scan_timeout | default(180) }}))
+        until ssh-keyscan -T 10 -H -t rsa,ecdsa,ed25519 \
+          {{ hostvars[service_inventory_host].ansible_host | quote }} \
+          > "${tmp}" 2>/dev/null && [ -s "${tmp}" ]; do
+          if [ "${SECONDS}" -ge "${deadline}" ]; then
+            rm -f "${tmp}"
+            echo "Timed out waiting for SSH host keys from direct service endpoint" >&2
+            exit 1
+          fi
+          sleep 5
+        done
         touch "${HOME}/.ssh/known_hosts"
         cat "${tmp}" >> "${HOME}/.ssh/known_hosts"
         rm -f "${tmp}"
@@ -44,6 +54,6 @@
   tasks:
     - name: Wait for direct service SSH
       ansible.builtin.wait_for_connection:
-        timeout: 60
+        timeout: "{{ direct_access_ready_connection_timeout | default(180) }}"
     - name: Probe direct service Python execution
       ansible.builtin.ping:

@@ -7,10 +7,10 @@
       vars:
         lxc_ready_vmid: '{{ forgejo_runner_vmid }}'
         lxc_ready_name: forgejo_runner
-- name: Run direct access handoff for Forgejo Actions runner
+- name: Run direct access handoff for Forgejo Actions runner and delegated Forgejo tasks
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
-    direct_access_ready_hosts: forgejo_runner
+    direct_access_ready_hosts: forgejo_runner:forgejo
 - name: Configure Forgejo Actions runner directly
   hosts: forgejo_runner
   gather_facts: false

@@ -1,0 +1,16 @@
+---
+- name: Prepare host directory bind source
+  ansible.builtin.include_tasks: host-storage-directory.yml
+  when: storage_bind_mount.host_prepare.type | default('directory') == 'directory'
+
+- name: Prepare host ZFS dataset bind source
+  ansible.builtin.include_tasks: host-storage-zfs-dataset.yml
+  when: storage_bind_mount.host_prepare.type | default('directory') == 'zfs_dataset'
+
+- name: Prepare host NFS bind source
+  ansible.builtin.include_tasks: host-storage-nfs-mount.yml
+  when: storage_bind_mount.host_prepare.type | default('directory') == 'host_nfs_mount'
+
+- name: Prepare host CIFS bind source
+  ansible.builtin.include_tasks: host-storage-cifs-mount.yml
+  when: storage_bind_mount.host_prepare.type | default('directory') == 'host_cifs_mount'

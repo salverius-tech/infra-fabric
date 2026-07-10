@@ -109,6 +109,32 @@ class MigrateValuesTests(unittest.TestCase):
             with self.assertRaises(migrate_values.MigrationError):
                 migrate_values.migrate(values)
 
+    def test_migrates_legacy_forgejo_storage_to_service_storage(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("", encoding="utf-8")
+            (values / "terraform.tfvars").write_text(
+                'forgejo_data_dataset = "tank/forgejo"\n'
+                'forgejo_data_host_path = "/tank/forgejo"\n'
+                'forgejo_data_mount_path = "/var/lib/forgejo"\n'
+                'forgejo_data_host_uid = 100000\n'
+                'forgejo_data_host_gid = 100000\n',
+                encoding="utf-8",
+            )
+
+            changes = migrate_values.migrate(values)
+
+            tfvars_text = (values / "terraform.tfvars").read_text(encoding="utf-8")
+            self.assertIn("service_storage = {", tfvars_text)
+            self.assertIn('type          = "bind"', tfvars_text)
+            self.assertIn('source        = "/tank/forgejo"', tfvars_text)
+            self.assertIn('type       = "zfs_dataset"', tfvars_text)
+            self.assertIn('dataset    = "tank/forgejo"', tfvars_text)
+            self.assertIn('mountpoint = "/tank/forgejo"', tfvars_text)
+            self.assertNotRegex(tfvars_text, r"(?m)^forgejo_data_dataset\s*=")
+            self.assertNotRegex(tfvars_text, r"(?m)^forgejo_data_host_path\s*=")
+            self.assertIn("migrated Forgejo storage to service_storage", changes)
+
     def test_adds_missing_vlan_ids_for_existing_service_values(self) -> None:
         temp, values = self.make_values()
         with temp:

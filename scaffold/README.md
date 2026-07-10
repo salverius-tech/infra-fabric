@@ -43,6 +43,127 @@ Container VLAN tags default to `null`, which leaves the LXC interface untagged.
 Set the matching `*_vlan_id` value to a VLAN ID from 1 through 4094 when the
 Proxmox bridge should tag that container interface.
 
+## Service storage
+
+`service_storage` defines durable storage by service and logical mount name. The scaffold defaults Forgejo data to a Proxmox-managed volume so new deployments do not assume a host ZFS path.
+
+The storage `type` describes how the service receives storage. For `bind` only, optional `host_prepare` describes how the Proxmox node prepares the bind source before OpenTofu attaches it to the LXC.
+
+```hcl
+service_storage = {
+  forgejo = {
+    data = {
+      type       = "proxmox_volume"
+      storage_id = "local-lvm"
+      size_gb    = 32
+      target     = "/var/lib/forgejo"
+      backup     = true
+    }
+  }
+}
+```
+
+```hcl
+service_storage = {
+  forgejo = {
+    data = {
+      type   = "bind"
+      source = "/srv/homelab/forgejo"
+      target = "/var/lib/forgejo"
+
+      host_prepare = {
+        type = "directory"
+      }
+
+      host_uid = 100000
+      host_gid = 100000
+      mode     = "0750"
+    }
+  }
+}
+```
+
+```hcl
+service_storage = {
+  forgejo = {
+    data = {
+      type   = "bind"
+      source = "/tank/forgejo"
+      target = "/var/lib/forgejo"
+
+      host_prepare = {
+        type       = "zfs_dataset"
+        dataset    = "tank/forgejo"
+        mountpoint = "/tank/forgejo"
+      }
+    }
+  }
+}
+```
+
+```hcl
+service_storage = {
+  forgejo = {
+    data = {
+      type   = "bind"
+      source = "/mnt/storage/forgejo"
+      target = "/var/lib/forgejo"
+
+      host_prepare = {
+        type       = "host_nfs_mount"
+        server     = "storage.example.internal"
+        export     = "/exports/forgejo"
+        mountpoint = "/mnt/storage/forgejo"
+        options    = ["rw", "nfsvers=4.2", "_netdev", "nofail"]
+      }
+    }
+  }
+}
+```
+
+```hcl
+service_storage = {
+  forgejo = {
+    data = {
+      type    = "guest_nfs"
+      server  = "storage.example.internal"
+      export  = "/exports/forgejo"
+      target  = "/var/lib/forgejo"
+      options = ["rw", "nfsvers=4.2", "hard", "_netdev", "nofail"]
+      owner   = "git"
+      group   = "git"
+    }
+  }
+}
+```
+
+```hcl
+service_storage = {
+  forgejo = {
+    data = {
+      type             = "guest_cifs"
+      server           = "storage.example.internal"
+      share            = "forgejo"
+      target           = "/var/lib/forgejo"
+      credentials_file = "/etc/homelab/storage/forgejo-cifs.credentials"
+      options          = ["rw", "vers=3.1.1", "_netdev", "nofail"]
+    }
+  }
+}
+```
+
+```hcl
+service_storage = {
+  searxng_onramp = {
+    cache = {
+      type = "none"
+    }
+  }
+}
+```
+
+Use `bind` when the Proxmox host exposes a path to an LXC. `host_prepare.type` may be `none`, `directory`, `zfs_dataset`, `host_nfs_mount`, or `host_cifs_mount`. Use `proxmox_volume` when Proxmox should provision the volume from a configured storage ID. Use `guest_nfs` or `guest_cifs` when the service guest should mount network storage directly. Do not put CIFS credentials in `terraform.tfvars`; keep secrets in private ignored values files or a secret manager and reference only the guest credentials path here.
+
 Hermes and the optional onramp host use `anvil` as their non-root runtime/deploy user by default. Add real public SSH keys to `lxc_ssh_public_keys`; the onramp cloud-init keys fall back to that list when `onramp_host_ssh_public_keys` is empty.
 
 Technitium update management is intended to use private version/checksum pins and, if needed, cached release archives in ignored private storage. Keep live cached tarballs and checksums out of tracked source.

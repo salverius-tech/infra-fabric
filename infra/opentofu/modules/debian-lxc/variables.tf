@@ -72,10 +72,16 @@ variable "disk" {
 }
 
 variable "mount_points" {
-  description = "Bind mounts from the Proxmox host into the LXC."
+  description = "Additional mount points for the LXC. Bind mounts use a host path volume; Proxmox-managed volumes use storage_id:size_gb."
   type = list(object({
-    volume = string
-    path   = string
+    volume    = string
+    size      = optional(string)
+    path      = string
+    backup    = optional(bool, false)
+    read_only = optional(bool, false)
+    acl       = optional(bool, false)
+    quota     = optional(bool, false)
+    replicate = optional(bool, false)
   }))
   default = []
 }

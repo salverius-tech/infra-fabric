@@ -1,0 +1,81 @@
+---
+- name: Validate Forgejo guest storage definition
+  ansible.builtin.assert:
+    that:
+      - storage_mount.type in ['guest_nfs', 'guest_cifs']
+      - storage_mount.target is defined
+    fail_msg: Forgejo guest storage must define guest_nfs or guest_cifs storage with a target path.
+
+- name: Install Forgejo guest NFS client packages
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+    update_cache: true
+  when: storage_mount.type == 'guest_nfs'
+
+- name: Install Forgejo guest CIFS client packages
+  ansible.builtin.apt:
+    name: cifs-utils
+    state: present
+    update_cache: true
+  when: storage_mount.type == 'guest_cifs'
+
+- name: Create Forgejo guest storage mount target
+  ansible.builtin.file:
+    path: "{{ storage_mount.target }}"
+    state: directory
+    mode: "{{ storage_mount.mode | default('0750') }}"
+
+- name: Build Forgejo guest storage mount facts
+  ansible.builtin.set_fact:
+    forgejo_guest_storage_src: >-
+      {{ storage_mount.server ~ ':' ~ storage_mount.export
+         if storage_mount.type == 'guest_nfs'
+         else '//' ~ storage_mount.server ~ '/' ~ storage_mount.share }}
+    forgejo_guest_storage_fstype: "{{ 'nfs' if storage_mount.type == 'guest_nfs' else 'cifs' }}"
+    forgejo_guest_storage_base_options: >-
+      {{ storage_mount.options
+         if (storage_mount.options | default([]) | length > 0)
+         else ['rw', '_netdev', 'nofail'] }}
+
+- name: Build Forgejo CIFS credentials mount option
+  ansible.builtin.set_fact:
+    forgejo_guest_storage_base_options: "{{ forgejo_guest_storage_base_options + ['credentials=' ~ storage_mount.credentials_file] }}"
+  when: storage_mount.type == 'guest_cifs'
+
+- name: Manage Forgejo guest storage fstab entry
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ forgejo_guest_storage_src | regex_escape() }}\\s+{{ storage_mount.target | regex_escape() }}\\s+"
+    line: >-
+      {{ forgejo_guest_storage_src }} {{ storage_mount.target }} {{ forgejo_guest_storage_fstype }}
+      {{ forgejo_guest_storage_base_options | join(',') }} 0 0
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Check Forgejo guest storage mount status
+  ansible.builtin.command:
+    argv:
+      - mountpoint
+      - -q
+      - "{{ storage_mount.target }}"
+  register: forgejo_guest_storage_mountpoint
+  changed_when: false
+  failed_when: false
+
+- name: Mount Forgejo guest storage
+  ansible.builtin.command:
+    argv:
+      - mount
+      - "{{ storage_mount.target }}"
+  when: forgejo_guest_storage_mountpoint.rc != 0
+
+- name: Set Forgejo guest storage mount ownership
+  ansible.builtin.file:
+    path: "{{ storage_mount.target }}"
+    state: directory
+    owner: "{{ storage_mount.owner | default(omit) }}"
+    group: "{{ storage_mount.group | default(omit) }}"
+    mode: "{{ storage_mount.mode | default('0750') }}"
+  when: storage_mount.owner is defined or storage_mount.group is defined

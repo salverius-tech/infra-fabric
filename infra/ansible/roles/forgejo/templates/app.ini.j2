@@ -18,6 +18,15 @@ SSH_DOMAIN = {{ forgejo_domain }}
 SSH_PORT = {{ forgejo_ssh_port | default(22) }}
 SSH_USER = git
 START_SSH_SERVER = false
+LFS_JWT_SECRET = {{ forgejo_lfs_jwt_secret }}
+
+[security]
+INSTALL_LOCK = true
+SECRET_KEY = {{ forgejo_secret_key }}
+INTERNAL_TOKEN = {{ forgejo_internal_token }}
+
+[oauth2]
+JWT_SECRET = {{ forgejo_oauth2_jwt_secret }}
 
 [actions]
 ENABLED = {{ forgejo_actions_enabled | default(true) | bool | lower }}

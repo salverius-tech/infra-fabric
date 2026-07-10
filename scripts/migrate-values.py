@@ -17,6 +17,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from envfile import EnvEntry, EnvFileError, parse_env_lines as parse_envfile_lines, parse_scalar as envfile_parse_scalar, read_lines, remove_env, set_env, write_lines
 
 GENERATED_SECRET_KEYS = {
+    "FORGEJO_SECRET_KEY": lambda: secrets.token_urlsafe(32),
+    "FORGEJO_INTERNAL_TOKEN": lambda: secrets.token_urlsafe(48),
+    "FORGEJO_OAUTH2_JWT_SECRET": lambda: secrets.token_urlsafe(32),
+    "FORGEJO_LFS_JWT_SECRET": lambda: secrets.token_urlsafe(32),
     "INFISICAL_ENCRYPTION_KEY": lambda: secrets.token_hex(16),
     "INFISICAL_AUTH_SECRET": lambda: base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
     "INFISICAL_POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(32),
@@ -32,6 +36,10 @@ SECRET_KEYS = {
     "TF_VAR_container_root_password",
     "TF_VAR_lxc_root_password",
     "CF_DNS_API_TOKEN",
+    "FORGEJO_SECRET_KEY",
+    "FORGEJO_INTERNAL_TOKEN",
+    "FORGEJO_OAUTH2_JWT_SECRET",
+    "FORGEJO_LFS_JWT_SECRET",
     "FORGEJO_RUNNER_REGISTRATION_SECRET",
     "TAILSCALE_AUTH_KEY",
     "INFISICAL_ENCRYPTION_KEY",
@@ -360,6 +368,67 @@ def ensure_static_service_addresses(tfvars_lines: list[str]) -> list[str]:
     return changes
 
 
+def remove_tfvars_keys_by_name(tfvars_lines: list[str], keys: set[str]) -> list[str]:
+    removed: list[str] = []
+    patterns = {key: re.compile(rf"^\s*{re.escape(key)}\s*=") for key in keys}
+    kept: list[str] = []
+    for line in tfvars_lines:
+        matched_key = next((key for key, pattern in patterns.items() if pattern.match(line)), None)
+        if matched_key is None:
+            kept.append(line)
+            continue
+        removed.append(matched_key)
+    tfvars_lines[:] = kept
+    return sorted(set(removed))
+
+
+def ensure_service_storage_tfvars(tfvars_lines: list[str]) -> list[str]:
+    if tfvars_key_exists(tfvars_lines, "service_storage"):
+        removed = remove_tfvars_keys_by_name(
+            tfvars_lines,
+            {"forgejo_data_dataset", "forgejo_data_host_path", "forgejo_data_mount_path", "forgejo_data_host_uid", "forgejo_data_host_gid"},
+        )
+        return [f"removed legacy {key}" for key in removed]
+
+    forgejo_dataset = tfvars_scalar_value(tfvars_lines, "forgejo_data_dataset")
+    forgejo_host_path = tfvars_scalar_value(tfvars_lines, "forgejo_data_host_path")
+    forgejo_mount_path = tfvars_scalar_value(tfvars_lines, "forgejo_data_mount_path") or "/var/lib/forgejo"
+    forgejo_host_uid = tfvars_raw_value(tfvars_lines, "forgejo_data_host_uid") or "100000"
+    forgejo_host_gid = tfvars_raw_value(tfvars_lines, "forgejo_data_host_gid") or "100000"
+    if not forgejo_host_path:
+        return []
+
+    block = [
+        "service_storage = {",
+        "  forgejo = {",
+        "    data = {",
+        "      type          = \"bind\"",
+        f"      source        = {hcl_quote(forgejo_host_path)}",
+        f"      target        = {hcl_quote(forgejo_mount_path)}",
+        "      create_source = true",
+        f"      host_uid      = {forgejo_host_uid}",
+        f"      host_gid      = {forgejo_host_gid}",
+        "      mode          = \"0750\"",
+        "      host_prepare = {",
+        "        type       = \"zfs_dataset\"" if forgejo_dataset else "        type       = \"directory\"",
+        f"        dataset    = {hcl_quote(forgejo_dataset)}" if forgejo_dataset else None,
+        f"        mountpoint = {hcl_quote(forgejo_host_path)}" if forgejo_dataset else None,
+        "      }",
+        "    }",
+        "  }",
+        "}",
+    ]
+    block = [line for line in block if line is not None]
+    if tfvars_lines and tfvars_lines[-1].strip():
+        tfvars_lines.append("")
+    tfvars_lines.extend(block)
+    removed = remove_tfvars_keys_by_name(
+        tfvars_lines,
+        {"forgejo_data_dataset", "forgejo_data_host_path", "forgejo_data_mount_path", "forgejo_data_host_uid", "forgejo_data_host_gid"},
+    )
+    return ["migrated Forgejo storage to service_storage"] + [f"removed legacy {key}" for key in removed]
+
+
 def ensure_vlan_tfvars(tfvars_lines: list[str]) -> list[str]:
     changes: list[str] = []
     service_prefixes = (
@@ -595,6 +664,7 @@ def migrate(values_dir: Path) -> list[str]:
     for old_key, new_key in TECHNITIUM_TFVARS_RENAMES.items():
         if rename_tfvars_key(tfvars_lines, old_key, new_key):
             changes.append(f"renamed {old_key} to {new_key}")
+    changes.extend(ensure_service_storage_tfvars(tfvars_lines))
     optional_services = enabled_optional_services(values_dir)
     changes.extend(migrate_infisical_secret_formats(env_lines, env_entries))
     changes.extend(migrate_hermes_dashboard_password_hash(env_lines, env_entries))
