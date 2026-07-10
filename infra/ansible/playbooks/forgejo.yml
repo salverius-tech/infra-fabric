@@ -9,6 +9,8 @@
         lxc_ready_name: forgejo
 - name: Run direct access handoff for Forgejo
   ansible.builtin.import_playbook: direct-access-ready.yml
+  vars:
+    direct_access_ready_hosts: forgejo
 - name: Configure Forgejo service directly
   hosts: forgejo
   gather_facts: false

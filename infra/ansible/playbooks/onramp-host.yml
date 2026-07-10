@@ -1,4 +1,9 @@
 ---
+- name: Run direct access handoff for Onramp host
+  ansible.builtin.import_playbook: direct-access-ready.yml
+  vars:
+    direct_access_ready_hosts: onramp_host
+
 - name: Prepare Debian Podman onramp host for Onramp
   hosts: onramp_host
   gather_facts: true

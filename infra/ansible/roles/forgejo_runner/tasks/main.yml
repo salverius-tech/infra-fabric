@@ -79,6 +79,7 @@
     owner: root
     group: root
     mode: '0700'
+  delegate_to: pve
 - name: Authorize Forgejo runner SSH key on Proxmox host
   ansible.builtin.lineinfile:
     path: /root/.ssh/authorized_keys
@@ -88,12 +89,13 @@
     group: root
     mode: '0600'
     state: present
+  delegate_to: pve
 - name: Trust Proxmox host key in Forgejo runner LXC
   ansible.builtin.command:
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; install -d -m 0700 -o runner -g runner /var/lib/forgejo-runner/.ssh; tmp=\"$(mktemp)\"; ssh-keyscan -H {{ ansible_host | quote }} > \"${tmp}\" 2>/dev/null; touch /var/lib/forgejo-runner/.ssh/known_hosts; if ! grep -Fxf \"${tmp}\" /var/lib/forgejo-runner/.ssh/known_hosts >/dev/null; then\n  cat \"${tmp}\" >> /var/lib/forgejo-runner/.ssh/known_hosts;\nfi; rm -f \"${tmp}\"; chown runner:runner /var/lib/forgejo-runner/.ssh/known_hosts; chmod 0644 /var/lib/forgejo-runner/.ssh/known_hosts"  # yamllint disable-line rule:line-length
+      - "set -euo pipefail; install -d -m 0700 -o runner -g runner /var/lib/forgejo-runner/.ssh; tmp=\"$(mktemp)\"; ssh-keyscan -H {{ hostvars['pve'].ansible_host | quote }} > \"${tmp}\" 2>/dev/null; touch /var/lib/forgejo-runner/.ssh/known_hosts; if ! grep -Fxf \"${tmp}\" /var/lib/forgejo-runner/.ssh/known_hosts >/dev/null; then\n  cat \"${tmp}\" >> /var/lib/forgejo-runner/.ssh/known_hosts;\nfi; rm -f \"${tmp}\"; chown runner:runner /var/lib/forgejo-runner/.ssh/known_hosts; chmod 0644 /var/lib/forgejo-runner/.ssh/known_hosts"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Check installed Forgejo runner version
   ansible.builtin.command:

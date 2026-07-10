@@ -9,6 +9,8 @@
         lxc_ready_name: technitium
 - name: Run direct access handoff for Technitium Caddy proxy
   ansible.builtin.import_playbook: direct-access-ready.yml
+  vars:
+    direct_access_ready_hosts: technitium
 - name: Configure Technitium Caddy HTTPS proxy directly
   hosts: technitium
   gather_facts: false

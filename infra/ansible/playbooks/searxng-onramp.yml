@@ -1,4 +1,9 @@
 ---
+- name: Run direct access handoff for SearXNG onramp host
+  ansible.builtin.import_playbook: direct-access-ready.yml
+  vars:
+    direct_access_ready_hosts: onramp_host
+
 - name: Deploy temporary SearXNG on the Podman onramp host
   hosts: onramp_host
   gather_facts: true
