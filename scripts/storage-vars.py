@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import settings
@@ -17,14 +18,11 @@ except ImportError as error:  # pragma: no cover - exercised in tooling containe
     raise SystemExit(1) from error
 
 DEFAULT_TFVARS = Path("values/terraform.tfvars")
-
-STORAGE_SERVICES = {
-    "forgejo": {
-        "dataset": "forgejo_data_dataset",
-        "mountpoint": "forgejo_data_host_path",
-        "uid": "forgejo_data_host_uid",
-        "gid": "forgejo_data_host_gid",
-    },
+LEGACY_FORGEJO_STORAGE_KEYS = {
+    "dataset": "forgejo_data_dataset",
+    "mountpoint": "forgejo_data_host_path",
+    "uid": "forgejo_data_host_uid",
+    "gid": "forgejo_data_host_gid",
 }
 
 
@@ -32,7 +30,7 @@ class StorageVarsError(ValueError):
     pass
 
 
-def load_tfvars(path: Path) -> dict[str, str | int]:
+def load_tfvars(path: Path) -> dict[str, Any]:
     try:
         with path.open("r", encoding="utf-8") as file:
             data = hcl2.load(file)
@@ -42,48 +40,86 @@ def load_tfvars(path: Path) -> dict[str, str | int]:
         raise StorageVarsError(f"cannot parse {path}: {error}") from error
     if not isinstance(data, dict):
         raise StorageVarsError(f"{path} must contain an object")
+    return data
+
+
+def legacy_forgejo_storage(tfvars: dict[str, Any]) -> dict[str, Any] | None:
+    host_path = tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["mountpoint"])
+    if not host_path:
+        return None
     return {
-        key: value
-        for key, value in data.items()
-        if any(key == field for fields in STORAGE_SERVICES.values() for field in fields.values())
+        "type": "bind",
+        "source": host_path,
+        "target": tfvars.get("forgejo_data_mount_path", "/var/lib/forgejo"),
+        "create_source": True,
+        "host_uid": tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["uid"], 100000),
+        "host_gid": tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["gid"], 100000),
+        "mode": "0750",
+        "host_prepare": {
+            "type": "zfs_dataset",
+            "dataset": tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["dataset"], ""),
+            "mountpoint": host_path,
+        },
     }
 
 
-def build_storage_datasets(enabled_services: list[str], tfvars: dict[str, str | int]) -> list[dict[str, str | int]]:
-    datasets: list[dict[str, str | int]] = []
+def storage_definitions(tfvars: dict[str, Any], service: str) -> dict[str, dict[str, Any]]:
+    storage = tfvars.get("service_storage", {})
+    if isinstance(storage, dict) and isinstance(storage.get(service), dict):
+        return {
+            mount_name: definition
+            for mount_name, definition in storage[service].items()
+            if isinstance(definition, dict)
+        }
+    legacy = legacy_forgejo_storage(tfvars) if service == "forgejo" else None
+    return {"data": legacy} if legacy else {}
+
+
+def build_storage_mounts(enabled_services: list[str], tfvars: dict[str, Any]) -> list[dict[str, Any]]:
+    mounts: list[dict[str, Any]] = []
     for service in enabled_services:
-        fields = STORAGE_SERVICES.get(service)
-        if not fields:
-            continue
-        required = [fields["dataset"], fields["mountpoint"]]
-        missing = [name for name in required if name not in tfvars]
-        if missing:
-            raise StorageVarsError(f"missing storage tfvars for {service}: {', '.join(missing)}")
-        datasets.append(
-            {
-                "name": service,
-                "dataset": tfvars[fields["dataset"]],
-                "mountpoint": tfvars[fields["mountpoint"]],
-                "uid": tfvars.get(fields["uid"], 100000),
-                "gid": tfvars.get(fields["gid"], 100000),
-            }
-        )
-    return datasets
+        for mount_name, definition in storage_definitions(tfvars, service).items():
+            if definition.get("type") != "bind":
+                continue
+            source = definition.get("source")
+            if not source:
+                raise StorageVarsError(f"missing bind source for {service}.{mount_name}")
+            host_prepare = definition.get("host_prepare")
+            if not isinstance(host_prepare, dict):
+                host_prepare = {"type": "directory" if definition.get("create_source", True) else "none"}
+            if host_prepare.get("type", "directory") == "none":
+                continue
+            mounts.append(
+                {
+                    "name": service,
+                    "mount": mount_name,
+                    "source": source,
+                    "target": definition.get("target", ""),
+                    "uid": definition.get("host_uid", 100000),
+                    "gid": definition.get("host_gid", 100000),
+                    "mode": definition.get("mode", "0750"),
+                    "host_prepare": host_prepare,
+                }
+            )
+    return mounts
 
 
-def format_storage_summary(datasets: list[dict[str, str | int]]) -> str:
+def format_storage_summary(mounts: list[dict[str, Any]]) -> str:
     lines = ["Storage prep summary:"]
-    if not datasets:
+    if not mounts:
         lines.append("  none")
         return "\n".join(lines)
-    for dataset in datasets:
+    for mount in mounts:
         lines.append(
-            "  {name}: dataset={dataset} mountpoint={mountpoint} uid={uid} gid={gid}".format(
-                name=dataset["name"],
-                dataset=dataset["dataset"],
-                mountpoint=dataset["mountpoint"],
-                uid=dataset["uid"],
-                gid=dataset["gid"],
+            "  {name}.{mount}: {prepare} source={source} target={target} uid={uid} gid={gid} mode={mode}".format(
+                name=mount["name"],
+                mount=mount["mount"],
+                prepare=mount["host_prepare"].get("type", "directory"),
+                source=mount["source"],
+                target=mount["target"],
+                uid=mount["uid"],
+                gid=mount["gid"],
+                mode=mount["mode"],
             )
         )
     return "\n".join(lines)
@@ -99,13 +135,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         loaded_settings = settings.load_settings(args.settings)
         tfvars = load_tfvars(args.tfvars)
-        datasets = build_storage_datasets(loaded_settings["services"], tfvars)
-        payload = {"storage_datasets": datasets}
+        mounts = build_storage_mounts(loaded_settings["services"], tfvars)
+        payload = {"storage_bind_mounts": mounts}
     except (settings.SettingsError, StorageVarsError, OSError) as error:
         print(f"storage vars failed: {error}", file=sys.stderr)
         return 1
     if args.summary:
-        print(format_storage_summary(datasets))
+        print(format_storage_summary(mounts))
     else:
         print(json.dumps(payload, separators=(",", ":")))
     return 0

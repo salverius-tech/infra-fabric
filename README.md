@@ -142,6 +142,12 @@ Bootstrap order:
 
 After bootstrap, pushes to the private values repo can run the deployment workflow automatically when a matching runner is online.
 
+## Service storage
+
+Durable service storage is configured in `values/terraform.tfvars` through `service_storage`. The storage `type` describes how a service receives storage: `bind`, `proxmox_volume`, `guest_nfs`, `guest_cifs`, or `none`. For `bind` storage only, `host_prepare` describes optional Proxmox-node preparation of the bind source, such as `directory`, `zfs_dataset`, `host_nfs_mount`, or `host_cifs_mount`.
+
+The scaffold defaults Forgejo data to `proxmox_volume` to avoid assuming a host ZFS pool. Existing legacy Forgejo ZFS variables are migrated to `service_storage` automatically. See `scaffold/README.md` for complete examples.
+
 ## Private values repo
 
 `values/` is a separate Git repository nested inside this checkout. It is ignored by the public runbook repo and should be pushed only to a private remote, such as your Forgejo instance. `just setup` either clones that repo from `settings.local.json` / the CLI argument, or initializes a new local `values/` repo from `scaffold/`.
@@ -174,11 +180,11 @@ OpenTofu manages:
 - Optional Infisical secrets service, either as the legacy LXC with service-local Caddy or as `infisical_onramp` on the shared onramp host
 - Optional Hermes management LXC with SSH tooling, a non-root `anvil` dashboard runtime user, and a service-local Caddy reverse proxy for the Hermes Agent web dashboard
 - Optional Debian 13 Podman `onramp_host` VM substrate for app services, using `anvil` as the default cloud-init/deploy user and a shared Caddy instance with per-service snippets. The boot source is a clean Debian 13 genericcloud image imported by OpenTofu from the URL declared in private `values/terraform.tfvars`.
-- LXC bind mount attachments for services that use host storage
+- LXC bind mount or Proxmox-managed volume attachments for services that use durable storage
 
 Ansible manages:
 
-- Proxmox host ZFS dataset/storage preparation before OpenTofu apply
+- Optional Proxmox host storage preparation for bind mounts before OpenTofu apply
 - LXC lifecycle readiness on the Proxmox host, followed by direct SSH/become service configuration on each service host
 - Technitium installation
 - Caddy installation/configuration directly on the Technitium LXC. The scaffold exposes the Technitium UI at both `dns.example.internal` and `technitium.example.internal`; set `caddy_server_names` in private inventory for your real domain aliases.

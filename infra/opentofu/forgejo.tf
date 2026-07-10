@@ -1,20 +1,57 @@
+locals {
+  forgejo_default_data_storage = {
+    type          = "none"
+    source        = null
+    create_source = true
+    host_uid      = 100000
+    host_gid      = 100000
+    mode          = "0750"
+    host_prepare = {
+      type             = "directory"
+      dataset          = null
+      mountpoint       = null
+      server           = null
+      export           = null
+      share            = null
+      credentials_file = null
+      options          = []
+    }
+    storage_id       = null
+    size_gb          = null
+    acl              = false
+    quota            = false
+    replicate        = false
+    server           = null
+    export           = null
+    share            = null
+    credentials_file = null
+    options          = []
+    owner            = null
+    group            = null
+    mount_unit       = true
+    target           = null
+    backup           = false
+    read_only        = false
+  }
+  forgejo_storage        = lookup(var.service_storage, "forgejo", {})
+  forgejo_data_storage   = lookup(local.forgejo_storage, "data", local.forgejo_default_data_storage)
+  forgejo_data_mountable = contains(["bind", "proxmox_volume"], local.forgejo_data_storage.type)
+  forgejo_data_volume = (
+    local.forgejo_data_storage.type == "bind" ? local.forgejo_data_storage.source :
+    local.forgejo_data_storage.type == "proxmox_volume" ? format("%s:%s", local.forgejo_data_storage.storage_id, local.forgejo_data_storage.size_gb) :
+    null
+  )
+}
+
 resource "terraform_data" "forgejo_storage_validation" {
   count = local.forgejo_enabled ? 1 : 0
 
-  input = {
-    dataset  = var.forgejo_data_dataset
-    host_uid = var.forgejo_data_host_uid
-    host_gid = var.forgejo_data_host_gid
-  }
+  input = local.forgejo_data_storage
 
   lifecycle {
     precondition {
-      condition = (
-        var.forgejo_data_dataset != "" &&
-        var.forgejo_data_host_uid >= 0 &&
-        var.forgejo_data_host_gid >= 0
-      )
-      error_message = "Forgejo storage prep variables must define a dataset and non-negative host UID/GID values."
+      condition     = contains(["bind", "proxmox_volume", "guest_nfs", "guest_cifs"], local.forgejo_data_storage.type)
+      error_message = "Forgejo requires service_storage.forgejo.data to define durable storage."
     }
   }
 }
@@ -37,12 +74,17 @@ module "forgejo" {
     size_gb      = var.forgejo_container_disk_gb
   }
 
-  mount_points = [
+  mount_points = local.forgejo_data_mountable ? [
     {
-      volume = var.forgejo_data_host_path
-      path   = var.forgejo_data_mount_path
+      volume    = local.forgejo_data_volume
+      path      = local.forgejo_data_storage.target
+      backup    = local.forgejo_data_storage.backup
+      read_only = local.forgejo_data_storage.read_only
+      acl       = local.forgejo_data_storage.acl
+      quota     = local.forgejo_data_storage.quota
+      replicate = local.forgejo_data_storage.replicate
     },
-  ]
+  ] : []
 
   hostname      = var.forgejo_container_hostname
   search_domain = var.forgejo_container_search_domain

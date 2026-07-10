@@ -21,6 +21,20 @@ debian_template_url                   = "http://download.proxmox.com/images/syst
 debian_template_file_name             = "debian-12-standard_12.12-1_amd64.tar.zst"
 lxc_template_download_timeout_seconds = 1800
 
+# See scaffold/README.md for bind, host_prepare, guest_nfs, and guest_cifs examples.
+service_storage = {
+  forgejo = {
+    data = {
+      type       = "proxmox_volume"
+      storage_id = "local-lvm"
+      size_gb    = 32
+      target     = "/var/lib/forgejo"
+      backup     = true
+      read_only  = false
+    }
+  }
+}
+
 # Technitium DNS LXC
 technitium_container_vmid          = 106
 technitium_container_hostname      = "technitium-dns"
@@ -53,9 +67,6 @@ forgejo_container_cores         = 2
 forgejo_container_memory_mb     = 2048
 forgejo_container_swap_mb       = 512
 forgejo_container_disk_gb       = 8
-forgejo_data_dataset            = "tank/forgejo"
-forgejo_data_host_path          = "/tank/forgejo"
-forgejo_data_mount_path         = "/var/lib/forgejo"
 
 # Forgejo Actions runner LXC
 forgejo_runner_vmid          = 109

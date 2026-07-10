@@ -3,11 +3,11 @@
   hosts: pve
   gather_facts: false
   vars:
-    storage_datasets: []
+    storage_bind_mounts: []
   tasks:
-    - name: Prepare requested ZFS datasets
-      ansible.builtin.include_tasks: ../tasks/zfs-dataset.yml
-      loop: "{{ storage_datasets }}"
+    - name: Prepare requested host bind storage paths
+      ansible.builtin.include_tasks: ../tasks/host-storage.yml
+      loop: "{{ storage_bind_mounts }}"
       loop_control:
-        loop_var: storage_dataset
-        label: "{{ storage_dataset.name | default(storage_dataset.dataset) }}"
+        loop_var: storage_bind_mount
+        label: "{{ storage_bind_mount.name }}.{{ storage_bind_mount.mount }}"

@@ -39,8 +39,13 @@ resource "proxmox_virtual_environment_container" "this" {
     for_each = var.mount_points
 
     content {
-      volume = mount_point.value.volume
-      path   = mount_point.value.path
+      volume    = mount_point.value.volume
+      path      = mount_point.value.path
+      backup    = mount_point.value.backup
+      read_only = mount_point.value.read_only
+      acl       = mount_point.value.acl
+      quota     = mount_point.value.quota
+      replicate = mount_point.value.replicate
     }
   }
 

@@ -16,42 +16,83 @@ spec.loader.exec_module(storage_vars)
 
 
 class StorageVarsTests(unittest.TestCase):
-    def test_builds_enabled_storage_dataset_vars(self) -> None:
+    def test_builds_enabled_bind_mount_vars(self) -> None:
+        tfvars = {
+            "service_storage": {
+                "forgejo": {
+                    "data": {
+                        "type": "bind",
+                        "source": "/srv/homelab/forgejo",
+                        "target": "/var/lib/forgejo",
+                        "host_uid": 100000,
+                        "host_gid": 100000,
+                        "mode": "0750",
+                    }
+                },
+                "infisical": {
+                    "data": {
+                        "type": "proxmox_volume",
+                        "storage_id": "local-lvm",
+                        "size_gb": 20,
+                        "target": "/var/lib/infisical",
+                    }
+                },
+            }
+        }
+
+        mounts = storage_vars.build_storage_mounts(["technitium", "forgejo", "infisical"], tfvars)
+
+        self.assertEqual(
+            mounts,
+            [
+                {
+                    "name": "forgejo",
+                    "mount": "data",
+                    "source": "/srv/homelab/forgejo",
+                    "target": "/var/lib/forgejo",
+                    "uid": 100000,
+                    "gid": 100000,
+                    "mode": "0750",
+                    "host_prepare": {"type": "directory"},
+                }
+            ],
+        )
+
+    def test_builds_legacy_forgejo_bind_mount_vars(self) -> None:
         tfvars = {
             "forgejo_data_dataset": "tank/forgejo",
             "forgejo_data_host_path": "/tank/forgejo",
             "forgejo_data_host_uid": 100000,
             "forgejo_data_host_gid": 100000,
-            "infisical_data_dataset": "tank/infisical",
-            "infisical_data_host_path": "/tank/infisical",
-            "infisical_data_host_uid": 100000,
-            "infisical_data_host_gid": 100000,
         }
 
-        datasets = storage_vars.build_storage_datasets(["technitium", "forgejo"], tfvars)
+        mounts = storage_vars.build_storage_mounts(["forgejo"], tfvars)
 
-        self.assertEqual(
-            datasets,
-            [
-                {
-                    "name": "forgejo",
-                    "dataset": "tank/forgejo",
-                    "mountpoint": "/tank/forgejo",
-                    "uid": 100000,
-                    "gid": 100000,
-                }
-            ],
-        )
+        self.assertEqual(mounts[0]["source"], "/tank/forgejo")
+        self.assertEqual(mounts[0]["target"], "/var/lib/forgejo")
+        self.assertEqual(mounts[0]["host_prepare"]["type"], "zfs_dataset")
+        self.assertEqual(mounts[0]["host_prepare"]["dataset"], "tank/forgejo")
 
     def test_format_storage_summary_outputs_none(self) -> None:
         self.assertEqual(storage_vars.format_storage_summary([]), "Storage prep summary:\n  none")
 
-    def test_format_storage_summary_outputs_datasets(self) -> None:
+    def test_format_storage_summary_outputs_mounts(self) -> None:
         text = storage_vars.format_storage_summary(
-            [{"name": "forgejo", "dataset": "tank/forgejo", "mountpoint": "/tank/forgejo", "uid": 100000, "gid": 100000}]
+            [
+                {
+                    "name": "forgejo",
+                    "mount": "data",
+                    "source": "/srv/homelab/forgejo",
+                    "target": "/var/lib/forgejo",
+                    "uid": 100000,
+                    "gid": 100000,
+                    "mode": "0750",
+                    "host_prepare": {"type": "directory"},
+                }
+            ]
         )
-        self.assertIn("forgejo", text)
-        self.assertIn("dataset=tank/forgejo", text)
+        self.assertIn("forgejo.data", text)
+        self.assertIn("directory source=/srv/homelab/forgejo", text)
 
     def test_main_outputs_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -60,10 +101,15 @@ class StorageVarsTests(unittest.TestCase):
             tfvars_path = root / "terraform.tfvars"
             settings_path.write_text('{"services":["forgejo"]}\n', encoding="utf-8")
             tfvars_path.write_text(
-                'forgejo_data_dataset = "tank/forgejo"\n'
-                'forgejo_data_host_path = "/tank/forgejo"\n'
-                'forgejo_data_host_uid = 100000\n'
-                'forgejo_data_host_gid = 100000\n',
+                "service_storage = {\n"
+                "  forgejo = {\n"
+                "    data = {\n"
+                '      type = "bind"\n'
+                '      source = "/srv/homelab/forgejo"\n'
+                '      target = "/var/lib/forgejo"\n'
+                "    }\n"
+                "  }\n"
+                "}\n",
                 encoding="utf-8",
             )
 
@@ -78,7 +124,8 @@ class StorageVarsTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             output.append(buffer.getvalue())
             payload = json.loads(output[0])
-            self.assertEqual(payload["storage_datasets"][0]["dataset"], "tank/forgejo")
+            self.assertEqual(payload["storage_bind_mounts"][0]["source"], "/srv/homelab/forgejo")
+            self.assertEqual(payload["storage_bind_mounts"][0]["host_prepare"]["type"], "directory")
 
     def test_main_outputs_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

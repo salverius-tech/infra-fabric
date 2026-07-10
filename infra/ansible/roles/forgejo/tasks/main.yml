@@ -27,6 +27,14 @@
       - -lc
       - if ! id git >/dev/null 2>&1; then adduser --system --shell /bin/bash --gecos 'Git Version Control' --group --disabled-password --home /var/lib/forgejo git; fi  # yamllint disable-line rule:line-length
   changed_when: false
+- name: Configure Forgejo guest-managed storage
+  ansible.builtin.include_tasks: guest-storage.yml
+  vars:
+    storage_mount: "{{ forgejo_storage.data }}"
+  when:
+    - forgejo_storage is defined
+    - forgejo_storage.data is defined
+    - forgejo_storage.data.type in ['guest_nfs', 'guest_cifs']
 - name: Ensure Forgejo directories exist
   ansible.builtin.command:
     argv:

@@ -39,8 +39,12 @@ output "forgejo_ssh_clone_prefix" {
 }
 
 output "forgejo_data_mount" {
-  description = "Forgejo data bind mount from Proxmox host to LXC, or null when disabled."
-  value       = local.forgejo_enabled ? "${var.forgejo_data_host_path}:${var.forgejo_data_mount_path}" : null
+  description = "Forgejo data mount definition, or null when Forgejo is disabled."
+  value = local.forgejo_enabled ? {
+    type   = local.forgejo_data_storage.type
+    target = try(local.forgejo_data_storage.target, null)
+    volume = local.forgejo_data_volume
+  } : null
 }
 
 output "infisical_container_vmid" {

@@ -1,0 +1,8 @@
+---
+- name: Create host storage path {{ storage_bind_mount.source }}
+  ansible.builtin.file:
+    path: "{{ storage_bind_mount.source }}"
+    state: directory
+    owner: "{{ storage_bind_mount.uid }}"
+    group: "{{ storage_bind_mount.gid }}"
+    mode: "{{ storage_bind_mount.mode | default('0750') }}"
