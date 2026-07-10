@@ -1,14 +1,7 @@
 variable "enabled_services" {
-  description = "Services OpenTofu should build and maintain. Service selection is normally supplied from settings.local.json by just plan."
+  description = "Services OpenTofu should build and maintain. Service selection is normally supplied from settings.local.json by just plan. Null uses infra/services.json default_services."
   type        = list(string)
-  default     = ["technitium", "forgejo"]
-
-  validation {
-    condition = alltrue([
-      for service in var.enabled_services : contains(["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes", "onramp_host", "searxng_onramp"], service)
-    ])
-    error_message = "enabled_services may contain only technitium, forgejo, tailscale_client, forgejo_runner, infisical, hermes, onramp_host, and searxng_onramp."
-  }
+  default     = null
 }
 
 
@@ -704,6 +697,17 @@ variable "hermes_started" {
   default     = true
 }
 
+variable "hermes_runtime_user" {
+  description = "Non-root Hermes runtime/operator user managed by Ansible."
+  type        = string
+  default     = "anvil"
+
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.hermes_runtime_user)) && var.hermes_runtime_user != "root"
+    error_message = "hermes_runtime_user must be a valid non-root Linux user name."
+  }
+}
+
 variable "hermes_start_on_boot" {
   description = "Whether Proxmox should start the Hermes LXC on host boot."
   type        = bool
@@ -857,7 +861,7 @@ variable "onramp_host_disk_gb" {
 variable "onramp_host_cloud_init_user" {
   description = "Initial non-root cloud-init user for SSH/bootstrap on the onramp-host VM."
   type        = string
-  default     = "onramp"
+  default     = "anvil"
 
   validation {
     condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.onramp_host_cloud_init_user))
@@ -866,7 +870,7 @@ variable "onramp_host_cloud_init_user" {
 }
 
 variable "onramp_host_ssh_public_keys" {
-  description = "SSH public keys authorized for the onramp-host cloud-init user. Store real keys in private values."
+  description = "SSH public keys authorized for the onramp-host cloud-init user. Store real keys in private values. Falls back to lxc_ssh_public_keys when empty."
   type        = list(string)
   default     = []
 }
@@ -886,7 +890,7 @@ variable "onramp_host_permit_root_login" {
 variable "onramp_host_deploy_user" {
   description = "Non-root user Onramp should use for app deployment on the onramp-host VM."
   type        = string
-  default     = "onramp"
+  default     = "anvil"
 
   validation {
     condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.onramp_host_deploy_user))

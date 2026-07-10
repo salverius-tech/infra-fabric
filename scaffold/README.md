@@ -8,6 +8,7 @@ This directory is a public-safe template for `values/`, the nested private Git r
 
 - `.env` — local credentials and bootstrap environment variables, including Hermes Agent dashboard auth secrets.
 - `terraform.tfvars` — site-specific Proxmox/LXC/OpenTofu variables, including optional per-container VLAN tags and the optional disabled-by-default Tailscale client LXC.
+- Optional private artifact cache — if a future workflow caches release archives such as Technitium portable tarballs, keep those files in ignored private storage outside tracked `scaffold/`.
 - `dns-records.local.json` — site-specific Technitium DNS zones and records.
 - `ansible/inventory/local.yml` — site-specific Ansible inventory and role variables. The Technitium Caddy proxy uses `caddy_server_names` for DNS UI aliases such as `dns.example.internal` and `technitium.example.internal`.
 
@@ -42,6 +43,10 @@ Container VLAN tags default to `null`, which leaves the LXC interface untagged.
 Set the matching `*_vlan_id` value to a VLAN ID from 1 through 4094 when the
 Proxmox bridge should tag that container interface.
 
+Hermes and the optional onramp host use `anvil` as their non-root runtime/deploy user by default. Add real public SSH keys to `lxc_ssh_public_keys`; the onramp cloud-init keys fall back to that list when `onramp_host_ssh_public_keys` is empty.
+
+Technitium update management is intended to use private version/checksum pins and, if needed, cached release archives in ignored private storage. Keep live cached tarballs and checksums out of tracked source.
+
 After editing the copied files, run the normal validation entry point:
 
 ```bash
@@ -49,6 +54,8 @@ just validate
 ```
 
 Keep `.env` in dotenv-style `KEY=value` or `export KEY=value` format. The runbooks parse it as data and reject shell execution patterns.
+
+Optional EdgeRouter access uses `EDGEROUTER_ADDR` (for example, `firewall.example.internal`) and `EDGEROUTER_USER` (for example, `ubnt`). Configure that account for key-based, read-only SSH access. Do not store `EDGEROUTER_PASS`.
 
 For Hermes dashboard form login, store `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH`, not a plaintext password. Generate it with:
 

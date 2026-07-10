@@ -12,10 +12,10 @@
           - Steady-state service configuration must not use Proxmox pct.
 
 - name: Refresh direct service SSH trust on controller
-  hosts: "{{ direct_access_ready_hosts }}"
+  hosts: "{{ direct_access_ready_hosts | default('services') }}"
   gather_facts: false
   tasks:
-    - name: Refresh controller known_hosts for direct service endpoints
+    - name: Refresh controller known_hosts for direct service endpoints  # noqa: run-once[task]
       ansible.builtin.shell: |
         set -euo pipefail
         install -d -m 0700 "${HOME}/.ssh"
@@ -39,7 +39,7 @@
         - hostvars[service_inventory_host].ansible_host | length > 0
 
 - name: Verify direct service SSH and Python readiness
-  hosts: "{{ direct_access_ready_hosts }}"
+  hosts: "{{ direct_access_ready_hosts | default('services') }}"
   gather_facts: false
   tasks:
     - name: Wait for direct service SSH

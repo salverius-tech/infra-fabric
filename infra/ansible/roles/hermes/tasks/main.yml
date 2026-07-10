@@ -9,13 +9,50 @@
       - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_username | default('') | length) > 0
       - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_password_hash | default('') | length) > 0
       - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_secret | default('') | length) > 0
-    fail_msg: hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token, and non-empty Hermes dashboard auth variables are required.
+      - hermes_compression_threshold | default(0.75) | float >= 0.5
+      - hermes_compression_threshold | default(0.75) | float <= 0.95
+      - hermes_max_concurrent_children | default(5) | int >= 1
+      - hermes_max_concurrent_children | default(5) | int <= 10
+      - hermes_max_spawn_depth | default(2) | int >= 1
+      - hermes_max_spawn_depth | default(2) | int <= 3
+      - hermes_runtime_user | default('anvil') is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - hermes_runtime_user | default('anvil') != 'root'
+    fail_msg: >-
+      hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token,
+      non-empty dashboard auth variables, sane Hermes tuning values, and a
+      non-root runtime user are required.
+- name: Ensure Hermes runtime user exists
+  ansible.builtin.user:
+    name: "{{ hermes_runtime_user | default('anvil') }}"
+    shell: /bin/bash
+    create_home: true
+    groups: users
+    append: true
+
+- name: Ensure Hermes runtime SSH directory exists
+  ansible.builtin.file:
+    path: "/home/{{ hermes_runtime_user | default('anvil') }}/.ssh"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: "0700"
+
+- name: Install Hermes runtime authorized keys
+  ansible.builtin.copy:
+    dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.ssh/authorized_keys"
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: "0600"
+    content: "{{ (hermes_ssh_public_keys | default([])) | join('\n') }}{{ '\n' if (hermes_ssh_public_keys | default([]) | length) > 0 else '' }}"
+  no_log: true
+
+
 - name: Install Hermes OS dependencies in LXC
   ansible.builtin.command:
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; packages=\"build-essential ca-certificates caddy curl docker.io git gnupg jq openssh-client python3 python3-pip python3-venv rsync tar unzip xz-utils\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
+      - "set -euo pipefail; packages=\"build-essential ca-certificates caddy curl docker.io git gnupg jq openssh-client python3 python3-pip python3-venv rsync sudo tar unzip xz-utils\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Install Docker Compose CLI plugin in Hermes LXC
   ansible.builtin.command:
@@ -36,7 +73,7 @@
     argv:
       - bash
       - -lc
-      - "install -d -m 0755 /srv /var/www/hermes; if [[ ! -d {{ hermes_repo_path | default('/srv/homelab-infra') | quote }} ]]; then\n  install -d -m 0755 {{ hermes_repo_path | default('/srv/homelab-infra') | quote }};\nfi"  # yamllint disable-line rule:line-length
+      - "install -d -m 0755 /srv /var/www/hermes; if [[ ! -d {{ hermes_repo_path | default('/srv/homelab-infra') | quote }} ]]; then\n  install -d -m 0755 -o {{ (hermes_runtime_user | default('anvil')) | quote }} -g {{ (hermes_runtime_user | default('anvil')) | quote }} {{ hermes_repo_path | default('/srv/homelab-infra') | quote }};\nfi"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Install Hermes landing page
   ansible.builtin.template:
@@ -80,6 +117,32 @@
       - "set -euo pipefail; if ! command -v hermes >/dev/null 2>&1; then\n  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser;\nfi; cd /usr/local/lib/hermes-agent; python3 -m venv --upgrade-deps venv; venv/bin/python -m pip install -e \".[web,pty]\""  # yamllint disable-line rule:line-length
   when: hermes_dashboard_enabled | default(true) | bool
   changed_when: false
+- name: Configure Hermes context compression and delegation limits
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - "{{ hermes_runtime_user | default('anvil') }}"
+      - --
+      - env
+      - "HERMES_HOME=/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
+      - hermes
+      - config
+      - set
+      - "{{ item.key }}"
+      - "{{ item.value | string }}"
+  loop:
+    - key: compression.enabled
+      value: true
+    - key: compression.threshold
+      value: "{{ hermes_compression_threshold | default(0.75) }}"
+    - key: delegation.max_concurrent_children
+      value: "{{ hermes_max_concurrent_children | default(5) }}"
+    - key: delegation.max_spawn_depth
+      value: "{{ hermes_max_spawn_depth | default(2) }}"
+  changed_when: false
+  when: hermes_dashboard_enabled | default(true) | bool
+
 - name: Install Hermes dashboard env
   ansible.builtin.template:
     src: hermes-dashboard.env.j2
@@ -89,6 +152,7 @@
     group: root
   when: hermes_dashboard_enabled | default(true) | bool
   no_log: true
+  notify: Restart hermes dashboard
 - name: Install Hermes dashboard systemd unit
   ansible.builtin.template:
     src: hermes-dashboard.service.j2
@@ -97,6 +161,7 @@
     owner: root
     group: root
   when: hermes_dashboard_enabled | default(true) | bool
+  notify: Restart hermes dashboard
 - name: Enable Hermes dashboard service
   ansible.builtin.command:
     argv:
@@ -145,42 +210,74 @@
   changed_when: false
 - name: Flush Hermes service restarts before endpoint checks
   ansible.builtin.meta: flush_handlers
-- name: Verify Hermes dashboard services are active
+- name: Verify Hermes Caddy service is active
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - caddy
+  changed_when: false
+  register: hermes_caddy_active
+  retries: 6
+  delay: 5
+  until: hermes_caddy_active.rc == 0
+- name: Verify Hermes dashboard service is active
   ansible.builtin.command:
     argv:
       - systemctl
       - is-active
       - hermes-dashboard
-      - caddy
   when: hermes_dashboard_enabled | default(true) | bool
   changed_when: false
+  register: hermes_dashboard_active
+  retries: 6
+  delay: 5
+  until: hermes_dashboard_active.rc == 0
 - name: Verify Hermes dashboard login page
-  ansible.builtin.command:
-    argv:
-      - curl
-      - -fsS
-      - --max-time
-      - '10'
-      - http://127.0.0.1:{{ hermes_dashboard_port | default(9119) }}/login
-  register: hermes_dashboard_login_probe
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ hermes_dashboard_port | default(9119) }}/login"
+    status_code: 200
+    return_content: false
+  when: hermes_dashboard_enabled | default(true) | bool
+  register: hermes_dashboard_login_check
   retries: 12
   delay: 5
-  until: hermes_dashboard_login_probe.rc == 0
-  when: hermes_dashboard_enabled | default(true) | bool
-  changed_when: false
+  until: hermes_dashboard_login_check.status == 200
 - name: Verify Hermes Caddy basic-auth login rewrite
   ansible.builtin.command:
     argv:
       - curl
-      - -kfsS
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
       - --max-time
-      - '10'
+      - "10"
       - --resolve
-      - '{{ hermes_domain }}:443:127.0.0.1'
-      - https://{{ hermes_domain }}/auth/login?provider=basic&next=%2F
-  register: hermes_caddy_login_probe
+      - "{{ hermes_domain }}:443:127.0.0.1"
+      - "https://{{ hermes_domain }}/auth/login?provider=basic&next=%2F"
+  changed_when: false
+  when: hermes_dashboard_enabled | default(true) | bool
+  register: hermes_https_login_check
   retries: 12
   delay: 5
-  until: hermes_caddy_login_probe.rc == 0
-  when: hermes_dashboard_enabled | default(true) | bool
+  until: hermes_https_login_check.rc == 0
+- name: Verify Hermes static HTTPS route locally
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
+      - --max-time
+      - "10"
+      - --resolve
+      - "{{ hermes_domain }}:443:127.0.0.1"
+      - "https://{{ hermes_domain }}/"
   changed_when: false
+  when: not (hermes_dashboard_enabled | default(true) | bool)
+  register: hermes_static_https_check
+  retries: 12
+  delay: 5
+  until: hermes_static_https_check.rc == 0

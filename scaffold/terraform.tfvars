@@ -75,7 +75,7 @@ forgejo_runner_disk_gb       = 16
 forgejo_runner_started       = true
 forgejo_runner_start_on_boot = true
 
-# Infisical LXC
+# Infisical service
 infisical_container_vmid          = 110
 infisical_container_hostname      = "infisical"
 infisical_container_description   = "Infisical secrets service managed by OpenTofu."
@@ -112,6 +112,7 @@ hermes_container_cores         = 2
 hermes_container_memory_mb     = 2048
 hermes_container_swap_mb       = 512
 hermes_container_disk_gb       = 64
+hermes_runtime_user            = "anvil"
 hermes_started                 = true
 hermes_start_on_boot           = true
 
@@ -151,11 +152,11 @@ onramp_host_vlan_id                 = null
 onramp_host_cores                   = 2
 onramp_host_memory_mb               = 4096
 onramp_host_disk_gb                 = 32
-onramp_host_cloud_init_user         = "onramp"
+onramp_host_cloud_init_user         = "anvil"
 onramp_host_ssh_public_keys         = []
 onramp_host_password_authentication = false
 onramp_host_permit_root_login       = false
-onramp_host_deploy_user             = "onramp"
+onramp_host_deploy_user             = "anvil"
 onramp_host_deploy_dir              = "/srv/onramp"
 onramp_host_allow_passwordless_sudo = true
 onramp_host_allowed_ssh_cidrs       = ["192.0.2.0/24"]

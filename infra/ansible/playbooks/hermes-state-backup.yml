@@ -1,0 +1,10 @@
+---
+- name: Back up Hermes runtime state through the managed service-state workflow
+  ansible.builtin.import_playbook: service-state-backup.yml
+  vars:
+    service_state_service: hermes
+    service_state_hosts: hermes
+    service_state_backup_root: >-
+      {{ lookup('env', 'HERMES_STATE_BACKUP_DIR')
+         | default(lookup('env', 'SERVICE_STATE_BACKUP_ROOT')
+         | default('/workspace/values/service-backups', true), true) }}

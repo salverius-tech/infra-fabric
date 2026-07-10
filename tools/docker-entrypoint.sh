@@ -22,7 +22,7 @@ chown -R "${container_user}:${container_user}" "${container_home}/.terraform.d" 
 # Docker. This is intentionally narrow: do not recursively chown the private
 # values repo, but do repair local state/lock/plan files that OpenTofu must
 # rewrite or replace.
-for path in /workspace /workspace/infra/opentofu /workspace/values; do
+for path in /workspace /workspace/.ansible /workspace/infra/opentofu /workspace/values; do
   if [[ -e "${path}" ]]; then
     chown "${container_user}:${container_user}" "${path}" 2>/dev/null || true
   fi

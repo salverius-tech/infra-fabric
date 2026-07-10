@@ -1,5 +1,5 @@
 ---
-onramp_host_deploy_user: onramp
+onramp_host_deploy_user: anvil
 onramp_host_deploy_dir: /srv/onramp
 onramp_host_ssh_public_keys: []
 onramp_host_password_authentication: false
@@ -16,6 +16,9 @@ onramp_host_podman_packages:
   - dbus-user-session
   - acl
   - ufw
+  - caddy
+  - curl
+  - golang
 onramp_host_compose_provider_command: podman-compose
 onramp_host_enable_docker_compat_socket: true
 onramp_host_allowed_reverse_proxy_ports:

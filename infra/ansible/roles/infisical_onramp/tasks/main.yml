@@ -1,0 +1,187 @@
+---
+- name: Validate Infisical onramp required variables
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "Debian"
+      - ansible_distribution_major_version | int >= 13
+      - onramp_host_deploy_user is defined
+      - onramp_host_deploy_user is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - onramp_host_deploy_user != 'root'
+      - onramp_host_deploy_dir is defined
+      - onramp_host_deploy_dir is match('^/[A-Za-z0-9_./:-]+$')
+      - infisical_domain is defined
+      - infisical_domain is match('^[A-Za-z0-9.-]+$')
+      - infisical_encryption_key is defined
+      - infisical_encryption_key is match('^[0-9a-fA-F]{32}$')
+      - infisical_auth_secret is defined
+      - infisical_auth_secret | length >= 32
+      - infisical_postgres_password is defined
+      - infisical_postgres_password | length >= 16
+      - infisical_onramp_bind_address in ['127.0.0.1', '::1']
+      - infisical_onramp_container_port | int > 0
+      - infisical_onramp_container_port | int < 65536
+    fail_msg: >-
+      Infisical onramp requires a Debian 13 onramp host, loopback bind address,
+      Infisical hostname, and private Infisical runtime secrets.
+  no_log: true
+
+- name: Install Infisical onramp OS dependencies
+  ansible.builtin.apt:
+    name: "{{ infisical_onramp_required_packages }}"
+    state: present
+    update_cache: true
+  when: infisical_onramp_required_packages | length > 0
+
+- name: Ensure Infisical onramp deployment directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ onramp_host_deploy_user }}"
+    group: "{{ onramp_host_deploy_user }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ infisical_onramp_base_dir }}"
+      mode: "0750"
+    - path: "{{ infisical_onramp_base_dir }}/data"
+      mode: "0750"
+    - path: "{{ infisical_onramp_base_dir }}/data/postgres"
+      mode: "0750"
+    - path: "{{ infisical_onramp_base_dir }}/data/redis"
+      mode: "0750"
+    - path: "/home/{{ onramp_host_deploy_user }}/.config"
+      mode: "0750"
+    - path: "/home/{{ onramp_host_deploy_user }}/.config/systemd"
+      mode: "0750"
+    - path: "/home/{{ onramp_host_deploy_user }}/.config/systemd/user"
+      mode: "0750"
+
+- name: Install Infisical onramp env
+  ansible.builtin.template:
+    src: infisical.env.j2
+    dest: "{{ infisical_onramp_base_dir }}/infisical.env"
+    owner: "{{ onramp_host_deploy_user }}"
+    group: "{{ onramp_host_deploy_user }}"
+    mode: "0600"
+  no_log: true
+  notify: Restart infisical onramp
+
+- name: Install Infisical onramp compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ infisical_onramp_base_dir }}/docker-compose.yml"
+    owner: "{{ onramp_host_deploy_user }}"
+    group: "{{ onramp_host_deploy_user }}"
+    mode: "0640"
+  notify: Restart infisical onramp
+
+- name: Resolve Infisical onramp deploy user UID
+  ansible.builtin.command:
+    argv:
+      - id
+      - -u
+      - "{{ onramp_host_deploy_user }}"
+  register: infisical_onramp_deploy_user_uid
+  changed_when: false
+
+- name: Install Infisical onramp rootless systemd unit
+  ansible.builtin.template:
+    src: infisical-onramp.service.j2
+    dest: "/home/{{ onramp_host_deploy_user }}/.config/systemd/user/infisical-onramp.service"
+    owner: "{{ onramp_host_deploy_user }}"
+    group: "{{ onramp_host_deploy_user }}"
+    mode: "0644"
+  notify: Restart infisical onramp
+
+- name: Enable Infisical onramp rootless systemd unit
+  become: true
+  become_user: "{{ onramp_host_deploy_user }}"
+  ansible.builtin.systemd_service:
+    name: infisical-onramp.service
+    scope: user
+    daemon_reload: true
+    enabled: true
+    state: started
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ infisical_onramp_deploy_user_uid.stdout | trim }}"
+
+- name: Install Infisical onramp Caddy site snippet
+  ansible.builtin.template:
+    src: infisical.caddy.j2
+    dest: /etc/caddy/sites.d/infisical.caddy
+    mode: "0644"
+    owner: root
+    group: root
+  notify: Restart caddy
+
+- name: Validate Infisical onramp Caddy config
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - set -a && . /etc/caddy/env && set +a && caddy validate --config /etc/caddy/Caddyfile
+  changed_when: false
+
+- name: Flush Infisical onramp restarts before endpoint checks
+  ansible.builtin.meta: flush_handlers
+
+- name: Verify Infisical onramp rootless service is active
+  become: true
+  become_user: "{{ onramp_host_deploy_user }}"
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - --user
+      - is-active
+      - infisical-onramp.service
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ infisical_onramp_deploy_user_uid.stdout | trim }}"
+  changed_when: false
+  register: infisical_onramp_service_active
+  retries: 6
+  delay: 5
+  until: infisical_onramp_service_active.rc == 0
+
+- name: Verify Infisical onramp Caddy service is active
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - caddy
+  changed_when: false
+  register: infisical_onramp_caddy_active
+  retries: 6
+  delay: 5
+  until: infisical_onramp_caddy_active.rc == 0
+
+- name: Verify Infisical onramp loopback endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ infisical_onramp_container_port }}/"
+    status_code:
+      - 200
+      - 302
+      - 401
+      - 404
+    return_content: false
+  register: infisical_onramp_loopback_check
+  retries: 24
+  delay: 5
+  until: infisical_onramp_loopback_check.status in [200, 302, 401, 404]
+
+- name: Verify Infisical onramp HTTPS route locally
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
+      - --max-time
+      - "10"
+      - --resolve
+      - "{{ infisical_domain }}:443:127.0.0.1"
+      - "https://{{ infisical_domain }}/"
+  changed_when: false
+  register: infisical_onramp_https_check
+  retries: 24
+  delay: 5
+  until: infisical_onramp_https_check.rc == 0

@@ -1,0 +1,138 @@
+---
+- name: Back up managed service state to controller values directory
+  hosts: "{{ service_state_hosts | default('all') }}"
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../vars/service-state.yml
+  vars:
+    service_state_backup_root: "{{ lookup('env', 'SERVICE_STATE_BACKUP_ROOT') | default('/workspace/values/service-backups', true) }}"
+  tasks:
+    - name: Validate service-state backup input
+      ansible.builtin.assert:
+        that:
+          - service_state_service is defined
+          - service_state_service in managed_service_state_catalog
+          - service_state_hosts is defined
+        fail_msg: service_state_service and service_state_hosts are required for service state backup.
+
+    - name: Select managed service-state definition
+      ansible.builtin.set_fact:
+        service_state_definition: "{{ managed_service_state_catalog[service_state_service] }}"
+        service_state_timestamp: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
+
+    - name: Set service-state backup archive paths
+      ansible.builtin.set_fact:
+        service_state_archive_name: "{{ service_state_service }}-state-{{ service_state_timestamp }}.tar.gz"
+        service_state_local_dir: "{{ service_state_backup_root }}/{{ service_state_service }}"
+        service_state_remote_archive: "/tmp/{{ service_state_service }}-state-{{ service_state_timestamp }}.tar.gz"
+
+    - name: Ensure local service-state backup directory exists
+      ansible.builtin.file:
+        path: "{{ service_state_local_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
+    - name: Create temporary service-state snapshot directory
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "{{ service_state_service }}-state"
+      register: service_state_snapshot_dir
+
+    - name: Check managed service-state paths
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ service_state_definition.paths }}"
+      register: service_state_path_stats
+
+    - name: Build existing managed service-state path list
+      ansible.builtin.set_fact:
+        service_state_existing_paths: >-
+          {{ service_state_path_stats.results
+             | selectattr('stat.exists')
+             | map(attribute='item')
+             | list }}
+
+    - name: Fail when no managed service-state paths exist
+      ansible.builtin.fail:
+        msg: "None of the configured state paths exist for {{ service_state_service }}."
+      when: service_state_existing_paths | length == 0
+
+    - name: Snapshot managed service-state paths
+      ansible.builtin.command:
+        argv:
+          - rsync
+          - -aR
+          - "{{ item }}"
+          - "{{ service_state_snapshot_dir.path }}/"
+      loop: "{{ service_state_existing_paths }}"
+      changed_when: true
+
+    - name: Write service-state backup manifest
+      ansible.builtin.copy:
+        dest: "{{ service_state_snapshot_dir.path }}/MANIFEST.json"
+        mode: "0600"
+        content: |
+          {
+            "service": {{ service_state_service | to_json }},
+            "created_utc": {{ service_state_timestamp | to_json }},
+            "description": {{ service_state_definition.description | default('') | to_json }},
+            "paths": {{ service_state_existing_paths | to_json }}
+          }
+
+    - name: Create service-state archive on service host
+      ansible.builtin.command:
+        argv:
+          - tar
+          - --numeric-owner
+          - -C
+          - "{{ service_state_snapshot_dir.path }}"
+          - -czf
+          - "{{ service_state_remote_archive }}"
+          - .
+      changed_when: true
+
+    - name: Fetch service-state archive into private values
+      ansible.builtin.fetch:
+        src: "{{ service_state_remote_archive }}"
+        dest: "{{ service_state_local_dir }}/{{ service_state_archive_name }}"
+        flat: true
+
+    - name: Restrict local service-state archive permissions
+      ansible.builtin.file:
+        path: "{{ service_state_local_dir }}/{{ service_state_archive_name }}"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
+    - name: Remove temporary service-state artifacts from service host
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ service_state_snapshot_dir.path }}"
+        - "{{ service_state_remote_archive }}"
+
+    - name: Calculate local service-state archive checksum
+      ansible.builtin.command:
+        argv:
+          - sha256sum
+          - "{{ service_state_local_dir }}/{{ service_state_archive_name }}"
+      register: service_state_checksum
+      changed_when: false
+      delegate_to: localhost
+      become: false
+
+    - name: Write local service-state checksum manifest
+      ansible.builtin.copy:
+        dest: "{{ service_state_local_dir }}/{{ service_state_archive_name }}.sha256"
+        mode: "0600"
+        content: "{{ service_state_checksum.stdout }}\n"
+      delegate_to: localhost
+      become: false
+
+    - name: Report service-state backup path
+      ansible.builtin.debug:
+        msg: "{{ service_state_service }} state backup written to {{ service_state_local_dir }}/{{ service_state_archive_name }}"

@@ -23,96 +23,8 @@ DEFAULT_TFVARS = REPO / "values" / "terraform.tfvars"
 DEFAULT_ANSIBLE_USER = "root"
 
 SERVICE_HOSTS = {
-    "technitium": {
-        "host": "technitium_dns",
-        "group": "technitium",
-        "vmid_var": "technitium_vmid",
-        "tf_vmid": "technitium_container_vmid",
-        "tf_host": "technitium_container_ipv4_address",
-    },
-    "forgejo": {
-        "host": "forgejo_lxc",
-        "group": "forgejo",
-        "vmid_var": "forgejo_vmid",
-        "tf_vmid": "forgejo_container_vmid",
-        "tf_host": "forgejo_lan_ip",
-        "domain_var": "forgejo_domain",
-        "tf_domain": "forgejo_server_name",
-    },
-    "forgejo_runner": {
-        "host": "forgejo_runner_lxc",
-        "group": "forgejo_runner",
-        "vmid_var": "forgejo_runner_vmid",
-        "tf_vmid": "forgejo_runner_vmid",
-        "tf_host": "forgejo_runner_ipv4_address",
-    },
-    "tailscale_client": {
-        "host": "tailscale_client",
-        "group": "tailscale_client",
-        "vmid_var": "tailscale_client_vmid",
-        "tf_vmid": "tailscale_client_vmid",
-        "tf_host": "tailscale_client_ipv4_address",
-        "extra_play_vars": {"tailscale_client_enabled": "tailscale_client_enabled"},
-    },
-    "infisical": {
-        "host": "infisical_lxc",
-        "group": "infisical",
-        "vmid_var": "infisical_vmid",
-        "tf_vmid": "infisical_container_vmid",
-        "tf_host": "infisical_lan_ip",
-        "domain_var": "infisical_domain",
-        "tf_domain": "infisical_server_name",
-    },
-    "hermes": {
-        "host": "hermes_lxc",
-        "group": "hermes",
-        "vmid_var": "hermes_vmid",
-        "tf_vmid": "hermes_container_vmid",
-        "tf_host": "hermes_lan_ip",
-        "domain_var": "hermes_domain",
-        "tf_domain": "hermes_server_name",
-    },
-    "onramp_host": {
-        "host": "onramp_host_vm",
-        "group": "onramp_host",
-        "vmid_var": "onramp_host_vmid",
-        "tf_vmid": "onramp_host_vmid",
-        "tf_host": "onramp_host_ipv4_address",
-        "domain_var": "onramp_host_hostname",
-        "tf_domain": "onramp_host_hostname",
-        "user_var": "onramp_host_deploy_user",
-        "tf_user": "onramp_host_deploy_user",
-        "extra_play_vars": {
-            "onramp_host_cloud_init_user": "onramp_host_cloud_init_user",
-            "onramp_host_deploy_dir": "onramp_host_deploy_dir",
-            "onramp_host_ssh_public_keys": "onramp_host_ssh_public_keys",
-            "onramp_host_password_authentication": "onramp_host_password_authentication",
-            "onramp_host_permit_root_login": "onramp_host_permit_root_login",
-            "onramp_host_allow_passwordless_sudo": "onramp_host_allow_passwordless_sudo",
-            "onramp_host_allowed_ssh_cidrs": "onramp_host_allowed_ssh_cidrs",
-        },
-    },
-    "searxng_onramp": {
-        "host": "onramp_host_vm",
-        "group": "onramp_host",
-        "vmid_var": "onramp_host_vmid",
-        "tf_vmid": "onramp_host_vmid",
-        "tf_host": "onramp_host_ipv4_address",
-        "domain_var": "onramp_host_hostname",
-        "tf_domain": "onramp_host_hostname",
-        "user_var": "onramp_host_deploy_user",
-        "tf_user": "onramp_host_deploy_user",
-        "extra_play_vars": {
-            "onramp_host_deploy_dir": "onramp_host_deploy_dir",
-            "searxng_server_name": "searxng_server_name",
-            "searxng_public_url": "searxng_public_url",
-            "searxng_container_image": "searxng_container_image",
-            "searxng_container_port": "searxng_container_port",
-            "searxng_bind_address": "searxng_bind_address",
-            "searxng_instance_name": "searxng_instance_name",
-            "searxng_enable_public_url": "searxng_enable_public_url",
-        },
-    },
+    name: dict(config["inventory"])
+    for name, config in settings.SERVICE_REGISTRY_DATA["services"].items()
 }
 
 
@@ -130,7 +42,28 @@ def load_tfvars(path: Path) -> dict[str, Any]:
         raise InventoryError(f"cannot parse {path}: {error}") from error
     if not isinstance(data, dict):
         raise InventoryError(f"{path} must contain an object")
+    add_env_tfvar_fallbacks(data)
     return data
+
+
+def env_list_var(name: str) -> list[str] | None:
+    raw_value = os.environ.get(name)
+    if raw_value is None or raw_value.strip() == "":
+        return None
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        parsed = [raw_value]
+    if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+        raise InventoryError(f"{name} must be a JSON string list when used by dynamic inventory")
+    return parsed
+
+
+def add_env_tfvar_fallbacks(tfvars: dict[str, Any]) -> None:
+    if not tfvars.get("lxc_ssh_public_keys"):
+        env_keys = env_list_var("TF_VAR_lxc_ssh_public_keys")
+        if env_keys:
+            tfvars["lxc_ssh_public_keys"] = env_keys
 
 
 def host_address(value: Any) -> str:
@@ -165,7 +98,10 @@ def service_play_vars(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
         vars_for_play[user_var] = tfvars[tf_user]
     for var_name, tf_key in config.get("extra_play_vars", {}).items():
         if tf_key in tfvars:
-            vars_for_play[var_name] = tfvars[tf_key]
+            value = tfvars[tf_key]
+            if var_name == "onramp_host_ssh_public_keys" and not value:
+                value = tfvars.get("lxc_ssh_public_keys", value)
+            vars_for_play[var_name] = value
     return vars_for_play
 
 
