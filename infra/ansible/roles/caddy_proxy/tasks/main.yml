@@ -41,11 +41,20 @@
     owner: root
     group: caddy
   no_log: true
+  notify: Restart caddy
 - name: Install DNS LXC Caddyfile
   ansible.builtin.template:
     src: Caddyfile.j2
     dest: /etc/caddy/Caddyfile
     mode: '0644'
+    owner: root
+    group: root
+  notify: Restart caddy
+- name: Ensure DNS LXC Caddy systemd override directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/caddy.service.d
+    state: directory
+    mode: '0755'
     owner: root
     group: root
 - name: Install DNS LXC Caddy systemd override
@@ -55,15 +64,7 @@
     mode: '0644'
     owner: root
     group: root
-- name: Ensure DNS LXC Caddy systemd override directory exists
-  ansible.builtin.command:
-    argv:
-      - install
-      - -d
-      - -m
-      - '0755'
-      - /etc/systemd/system/caddy.service.d
-  changed_when: false
+  notify: Restart caddy
 - name: Validate DNS LXC Caddy config
   ansible.builtin.command:
     argv:

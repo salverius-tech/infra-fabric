@@ -71,6 +71,7 @@
     owner: root
     group: caddy
   no_log: true
+  notify: Restart caddy
 - name: Install Hermes Agent CLI and dashboard dependencies in LXC
   ansible.builtin.command:
     argv:
@@ -111,6 +112,14 @@
     mode: '0644'
     owner: root
     group: root
+  notify: Restart caddy
+- name: Ensure Hermes Caddy systemd override directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/system/caddy.service.d
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
 - name: Install Hermes Caddy systemd override
   ansible.builtin.template:
     src: caddy-override.conf.j2
@@ -118,15 +127,7 @@
     mode: '0644'
     owner: root
     group: root
-- name: Ensure Hermes Caddy systemd override directory exists
-  ansible.builtin.command:
-    argv:
-      - install
-      - -d
-      - -m
-      - '0755'
-      - /etc/systemd/system/caddy.service.d
-  changed_when: false
+  notify: Restart caddy
 - name: Validate Hermes Caddy config
   ansible.builtin.command:
     argv:
