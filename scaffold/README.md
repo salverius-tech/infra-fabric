@@ -45,17 +45,21 @@ Proxmox bridge should tag that container interface.
 
 ## Forgejo runtime, database, and service storage
 
-`forgejo_runtime` selects the platform used to run Forgejo. The default keeps Forgejo on a Debian LXC. VM mode is available as a Forgejo POC for cases where the service guest needs normal VM capabilities, such as mounting NFS directly inside the guest.
+`service_runtime` selects the platform used to run each service guest. The default is Debian LXC when a service is not listed. VM mode is available for Forgejo as a proven POC for cases where the service guest needs normal VM capabilities, such as mounting NFS directly inside the guest.
 
 ```hcl
-forgejo_runtime = {
-  type = "lxc"
+service_runtime = {
+  forgejo = {
+    type = "lxc"
+  }
 }
 ```
 
 ```hcl
-forgejo_runtime = {
-  type = "vm"
+service_runtime = {
+  forgejo = {
+    type = "vm"
+  }
 }
 ```
 

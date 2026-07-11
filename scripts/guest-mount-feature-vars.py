@@ -49,7 +49,10 @@ def build_feature_checks(enabled_services: list[str], tfvars: dict[str, Any]) ->
         config = SERVICE_HOSTS.get(service, {}).get("inventory", {})
         vmid_key = config.get("tf_vmid")
         vmid = tfvars.get(vmid_key) if vmid_key else None
-        runtime = tfvars.get(f"{service}_runtime", {})
+        runtimes = tfvars.get("service_runtime", {})
+        runtime = runtimes.get(service, {}) if isinstance(runtimes, dict) else {}
+        if not isinstance(runtime, dict) or not runtime:
+            runtime = tfvars.get(f"{service}_runtime", {})
         runtime_type = runtime.get("type", "lxc") if isinstance(runtime, dict) else "lxc"
         if runtime_type != "lxc":
             continue

@@ -36,8 +36,7 @@
         "tf_user": "forgejo_vm_cloud_init_user",
         "tf_user_runtime": "vm",
         "extra_play_vars": {
-          "forgejo_database": "forgejo_database",
-          "forgejo_runtime": "forgejo_runtime"
+          "forgejo_database": "forgejo_database"
         }
       }
     },

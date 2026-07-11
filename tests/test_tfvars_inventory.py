@@ -93,7 +93,7 @@ class TfvarsInventoryTests(unittest.TestCase):
             {
                 "forgejo_container_vmid": 107,
                 "forgejo_lan_ip": "192.0.2.62",
-                "forgejo_runtime": {"type": "vm"},
+                "service_runtime": {"forgejo": {"type": "vm"}},
                 "forgejo_vm_cloud_init_user": "forgejo-admin",
             },
             ["forgejo"],
@@ -118,7 +118,21 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(hostvars["ansible_user"], "root")
         self.assertNotIn("ansible_become", hostvars)
 
-    def test_forgejo_runtime_is_promoted_to_play_vars(self) -> None:
+    def test_service_runtime_is_promoted_to_service_play_vars(self) -> None:
+        runtime = {"type": "vm"}
+        inventory = tfvars_inventory.build_inventory(
+            {
+                "forgejo_container_vmid": 107,
+                "forgejo_lan_ip": "192.0.2.62",
+                "service_runtime": {"forgejo": runtime},
+            },
+            ["forgejo"],
+        )
+
+        self.assertEqual(inventory["all"]["vars"]["forgejo_runtime"], runtime)
+        self.assertEqual(inventory["_meta"]["hostvars"]["forgejo_lxc"]["forgejo_runtime"], runtime)
+
+    def test_legacy_forgejo_runtime_is_promoted_to_service_play_vars(self) -> None:
         runtime = {"type": "vm"}
         inventory = tfvars_inventory.build_inventory(
             {

@@ -33,7 +33,8 @@ locals {
     backup           = false
     read_only        = false
   }
-  forgejo_runtime_type   = var.forgejo_runtime.type
+  forgejo_runtime        = lookup(var.service_runtime, "forgejo", var.forgejo_runtime)
+  forgejo_runtime_type   = local.forgejo_runtime.type
   forgejo_storage        = lookup(var.service_storage, "forgejo", {})
   forgejo_data_storage   = lookup(local.forgejo_storage, "data", local.forgejo_default_data_storage)
   forgejo_data_mountable = contains(["bind", "proxmox_volume"], local.forgejo_data_storage.type)
@@ -53,7 +54,7 @@ resource "terraform_data" "forgejo_storage_validation" {
   count = local.forgejo_enabled ? 1 : 0
 
   input = {
-    runtime  = var.forgejo_runtime
+    runtime  = local.forgejo_runtime
     storage  = local.forgejo_data_storage
     database = var.forgejo_database
   }

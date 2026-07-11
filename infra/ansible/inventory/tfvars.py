@@ -80,6 +80,16 @@ def enabled_services(settings_path: Path | None) -> list[str]:
     return loaded["services"]
 
 
+def service_runtime(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
+    runtimes = tfvars.get("service_runtime", {})
+    if isinstance(runtimes, dict) and isinstance(runtimes.get(service), dict):
+        return runtimes[service]
+    legacy_runtime = tfvars.get(f"{service}_runtime", {})
+    if isinstance(legacy_runtime, dict):
+        return legacy_runtime
+    return {}
+
+
 def service_play_vars(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
     config = SERVICE_HOSTS.get(service)
     if config is None:
@@ -88,6 +98,9 @@ def service_play_vars(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
     storage = tfvars.get("service_storage", {})
     if isinstance(storage, dict) and isinstance(storage.get(service), dict):
         vars_for_play[f"{service}_storage"] = storage[service]
+    runtime = service_runtime(service, tfvars)
+    if runtime:
+        vars_for_play[f"{service}_runtime"] = runtime
     vmid = tfvars.get(config["tf_vmid"])
     if vmid is not None:
         vars_for_play[config["vmid_var"]] = vmid
@@ -117,8 +130,8 @@ def service_hostvars(service: str, tfvars: dict[str, Any]) -> tuple[str, str, di
     hostvars: dict[str, Any] = {"ansible_user": DEFAULT_ANSIBLE_USER}
     tf_user = config.get("tf_user")
     user_runtime = config.get("tf_user_runtime")
-    service_runtime = tfvars.get(f"{service}_runtime", {})
-    runtime_type = service_runtime.get("type", "lxc") if isinstance(service_runtime, dict) else "lxc"
+    runtime = service_runtime(service, tfvars)
+    runtime_type = runtime.get("type", "lxc") if isinstance(runtime, dict) else "lxc"
     if tf_user and tfvars.get(tf_user) and (user_runtime is None or runtime_type == user_runtime):
         hostvars["ansible_user"] = str(tfvars[tf_user])
         hostvars["ansible_become"] = True

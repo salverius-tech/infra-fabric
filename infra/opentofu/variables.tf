@@ -254,8 +254,21 @@ variable "forgejo_container_disk_gb" {
   type        = number
 }
 
+variable "service_runtime" {
+  description = "Per-service platform runtime selection. Runtime type defaults to lxc when a service is not listed."
+  type = map(object({
+    type = optional(string, "lxc")
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for service_name, runtime in var.service_runtime : contains(["lxc", "vm"], runtime.type)])
+    error_message = "service_runtime entries must use type lxc or vm."
+  }
+}
+
 variable "forgejo_runtime" {
-  description = "Forgejo platform runtime. Defaults to lxc; use vm when Forgejo needs normal guest capabilities such as NFS mounts."
+  description = "Deprecated Forgejo-specific runtime compatibility alias. Prefer service_runtime.forgejo."
   type = object({
     type = optional(string, "lxc")
   })

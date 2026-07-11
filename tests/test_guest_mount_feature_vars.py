@@ -19,7 +19,7 @@ class GuestMountFeatureVarsTests(unittest.TestCase):
             ["forgejo"],
             {
                 "forgejo_container_vmid": 107,
-                "forgejo_runtime": {"type": "lxc"},
+                "service_runtime": {"forgejo": {"type": "lxc"}},
                 "service_storage": {
                     "forgejo": {
                         "data": {
@@ -49,7 +49,7 @@ class GuestMountFeatureVarsTests(unittest.TestCase):
             ["forgejo"],
             {
                 "forgejo_container_vmid": 107,
-                "forgejo_runtime": {"type": "vm"},
+                "service_runtime": {"forgejo": {"type": "vm"}},
                 "service_storage": {
                     "forgejo": {
                         "data": {
