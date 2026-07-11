@@ -42,17 +42,29 @@ locals {
     null
   )
   forgejo_data_size = local.forgejo_data_storage.type == "proxmox_volume" ? format("%dG", local.forgejo_data_storage.size_gb) : null
+  forgejo_guest_mount_features = compact([
+    local.forgejo_data_storage.type == "guest_nfs" ? "nfs" : "",
+    local.forgejo_data_storage.type == "guest_cifs" ? "cifs" : "",
+  ])
 }
 
 resource "terraform_data" "forgejo_storage_validation" {
   count = local.forgejo_enabled ? 1 : 0
 
-  input = local.forgejo_data_storage
+  input = {
+    storage  = local.forgejo_data_storage
+    database = var.forgejo_database
+  }
 
   lifecycle {
     precondition {
       condition     = contains(["bind", "proxmox_volume", "guest_nfs", "guest_cifs"], local.forgejo_data_storage.type)
       error_message = "Forgejo requires service_storage.forgejo.data to define durable storage."
+    }
+
+    precondition {
+      condition     = !(contains(["guest_nfs", "guest_cifs"], local.forgejo_data_storage.type) && local.forgejo_data_storage.target == "/var/lib/forgejo" && var.forgejo_database.type == "sqlite")
+      error_message = "Do not place Forgejo SQLite on guest network storage. Set forgejo_database.type to postgres or mount only non-database Forgejo paths."
     }
   }
 }
@@ -69,6 +81,10 @@ module "forgejo" {
   cores     = var.forgejo_container_cores
   memory_mb = var.forgejo_container_memory_mb
   swap_mb   = var.forgejo_container_swap_mb
+
+  features = length(local.forgejo_guest_mount_features) > 0 ? {
+    mount = local.forgejo_guest_mount_features
+  } : {}
 
   disk = {
     datastore_id = var.rootfs_datastore_id

@@ -17,7 +17,10 @@ resource "proxmox_virtual_environment_container" "this" {
   }
 
   features {
+    fuse    = var.features.fuse
     keyctl  = var.features.keyctl
+    mknod   = var.features.mknod
+    mount   = var.features.mount
     nesting = var.features.nesting
   }
 

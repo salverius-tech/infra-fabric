@@ -1,0 +1,30 @@
+---
+- name: Verify Proxmox LXC guest mount feature prerequisites
+  hosts: pve
+  gather_facts: false
+  vars:
+    guest_mount_feature_checks: []
+  tasks:
+    - name: Check LXC config for guest mount feature prerequisites
+      ansible.builtin.command:
+        argv:
+          - pct
+          - config
+          - "{{ item.vmid }}"
+      register: guest_mount_feature_config
+      changed_when: false
+      loop: "{{ guest_mount_feature_checks }}"
+      loop_control:
+        label: "{{ item.service }}.{{ item.mount }} vmid={{ item.vmid }} mount={{ item.feature }}"
+
+    - name: Validate required guest mount features are already enabled
+      ansible.builtin.assert:
+        that:
+          - item.stdout is regex('(?m)^features:.*mount=[^\n]*' ~ item.item.feature ~ '($|[,;\n])')
+        fail_msg: >-
+          {{ item.item.service }}.{{ item.item.mount }} uses {{ item.item.storage_type }}, but CT {{ item.item.vmid }}
+          is missing Proxmox LXC feature mount={{ item.item.feature }}. Set it with Proxmox root access, for example:
+          pct set {{ item.item.vmid }} -features nesting=1,mount={{ item.item.feature }}
+      loop: "{{ guest_mount_feature_config.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.service }}.{{ item.item.mount }} vmid={{ item.item.vmid }} mount={{ item.item.feature }}"

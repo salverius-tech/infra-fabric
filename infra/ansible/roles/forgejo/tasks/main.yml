@@ -14,13 +14,21 @@
       - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_owner_email is defined
       - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_owner_password is defined
       - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_runner_scope is defined
-    fail_msg: Forgejo requires domain, version, persistent security secrets, and bootstrap admin/repo values when bootstrap is enabled.
+      - forgejo_database is not defined or forgejo_database.type | default('sqlite') in ['sqlite', 'postgres']
+      - forgejo_database is not defined or forgejo_database.type | default('sqlite') != 'postgres' or forgejo_database.managed | default(true) | bool
+    fail_msg: >-
+      Forgejo requires domain, version, persistent security secrets, supported database settings,
+      and bootstrap admin/repo values when bootstrap is enabled.
+- name: Set Forgejo database defaults
+  ansible.builtin.set_fact:
+    forgejo_database: "{{ {'type': 'sqlite'} | combine(forgejo_database | default({}), recursive=True) }}"
+
 - name: Install Forgejo OS dependencies in LXC
   ansible.builtin.command:
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; packages=\"ca-certificates curl git git-lfs openssh-server sqlite3\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi"  # yamllint disable-line rule:line-length
+      - "set -euo pipefail; packages=\"ca-certificates curl git git-lfs openssh-server{% if forgejo_database.type | default('sqlite') == 'sqlite' %} sqlite3{% endif %}\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Enable Git LFS system hooks
   ansible.builtin.command:
@@ -37,6 +45,11 @@
       - -lc
       - if ! id git >/dev/null 2>&1; then adduser --system --shell /bin/bash --gecos 'Git Version Control' --group --disabled-password --home /var/lib/forgejo git; fi  # yamllint disable-line rule:line-length
   changed_when: false
+- name: Configure managed Forgejo PostgreSQL
+  ansible.builtin.include_tasks: postgres.yml
+  when:
+    - forgejo_database.type | default('sqlite') == 'postgres'
+    - forgejo_database.managed | default(true) | bool
 - name: Configure Forgejo guest-managed storage
   ansible.builtin.include_tasks: guest-storage.yml
   vars:
@@ -92,8 +105,9 @@
     mode: '0640'
     owner: root
     group: git
-  when: forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0
+  when: forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0 or forgejo_database.type | default('sqlite') == 'postgres'
   no_log: true
+  notify: Restart forgejo
 - name: Mark Forgejo app.ini as installed for non-interactive service startup
   ansible.builtin.command:
     argv:
@@ -206,7 +220,7 @@
     fail_msg: Forgejo bootstrap requires forgejo_runner_scope in owner/repository form.
   when: forgejo_bootstrap_enabled | default(false) | bool
 
-- name: Check Forgejo bootstrap admin user
+- name: Check Forgejo bootstrap admin user in SQLite
   ansible.builtin.command:
     argv:
       - runuser
@@ -216,8 +230,37 @@
       - sqlite3
       - /var/lib/forgejo/data/forgejo.db
       - "select id from user where lower_name=lower('{{ forgejo_bootstrap_admin_username }}') limit 1;"
-  register: forgejo_bootstrap_admin_check
+  register: forgejo_bootstrap_admin_check_sqlite
   changed_when: false
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_database.type | default('sqlite') == 'sqlite'
+
+- name: Check Forgejo bootstrap admin user in PostgreSQL
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - postgres
+      - --
+      - psql
+      - -At
+      - -d
+      - "{{ forgejo_database.name | default('forgejo') }}"
+      - -c
+      - "select id from \"user\" where lower_name=lower('{{ forgejo_bootstrap_admin_username }}') limit 1;"
+  register: forgejo_bootstrap_admin_check_postgres
+  changed_when: false
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_database.type | default('sqlite') == 'postgres'
+
+- name: Set Forgejo bootstrap admin user check result
+  ansible.builtin.set_fact:
+    forgejo_bootstrap_admin_exists: >-
+      {{ (forgejo_bootstrap_admin_check_postgres.stdout | default(forgejo_bootstrap_admin_check_sqlite.stdout | default(''))) | trim != '' }}
   no_log: true
   when: forgejo_bootstrap_enabled | default(false) | bool
 
@@ -239,9 +282,9 @@
   no_log: true
   when:
     - forgejo_bootstrap_enabled | default(false) | bool
-    - forgejo_bootstrap_admin_check.stdout | trim == ""
+    - not forgejo_bootstrap_admin_exists
 
-- name: Check Forgejo bootstrap repository owner user
+- name: Check Forgejo bootstrap repository owner user in SQLite
   ansible.builtin.command:
     argv:
       - runuser
@@ -251,8 +294,37 @@
       - sqlite3
       - /var/lib/forgejo/data/forgejo.db
       - "select id from user where lower_name=lower('{{ forgejo_bootstrap_repo_owner }}') limit 1;"
-  register: forgejo_bootstrap_owner_check
+  register: forgejo_bootstrap_owner_check_sqlite
   changed_when: false
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_database.type | default('sqlite') == 'sqlite'
+
+- name: Check Forgejo bootstrap repository owner user in PostgreSQL
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - postgres
+      - --
+      - psql
+      - -At
+      - -d
+      - "{{ forgejo_database.name | default('forgejo') }}"
+      - -c
+      - "select id from \"user\" where lower_name=lower('{{ forgejo_bootstrap_repo_owner }}') limit 1;"
+  register: forgejo_bootstrap_owner_check_postgres
+  changed_when: false
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_database.type | default('sqlite') == 'postgres'
+
+- name: Set Forgejo bootstrap repository owner check result
+  ansible.builtin.set_fact:
+    forgejo_bootstrap_owner_exists: >-
+      {{ (forgejo_bootstrap_owner_check_postgres.stdout | default(forgejo_bootstrap_owner_check_sqlite.stdout | default(''))) | trim != '' }}
   no_log: true
   when: forgejo_bootstrap_enabled | default(false) | bool
 
@@ -274,9 +346,9 @@
   no_log: true
   when:
     - forgejo_bootstrap_enabled | default(false) | bool
-    - forgejo_bootstrap_owner_check.stdout | trim == ""
+    - not forgejo_bootstrap_owner_exists
 
-- name: Check Forgejo bootstrap repository
+- name: Check Forgejo bootstrap repository in SQLite
   ansible.builtin.command:
     argv:
       - runuser
@@ -289,8 +361,40 @@
         select r.id from repository r join user u on u.id=r.owner_id
         where u.lower_name=lower('{{ forgejo_bootstrap_repo_owner }}')
         and r.lower_name=lower('{{ forgejo_bootstrap_repo_name }}') limit 1;
-  register: forgejo_bootstrap_repo_check
+  register: forgejo_bootstrap_repo_check_sqlite
   changed_when: false
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_database.type | default('sqlite') == 'sqlite'
+
+- name: Check Forgejo bootstrap repository in PostgreSQL
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - postgres
+      - --
+      - psql
+      - -At
+      - -d
+      - "{{ forgejo_database.name | default('forgejo') }}"
+      - -c
+      - >-
+        select r.id from repository r join "user" u on u.id=r.owner_id
+        where u.lower_name=lower('{{ forgejo_bootstrap_repo_owner }}')
+        and r.lower_name=lower('{{ forgejo_bootstrap_repo_name }}') limit 1;
+  register: forgejo_bootstrap_repo_check_postgres
+  changed_when: false
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_database.type | default('sqlite') == 'postgres'
+
+- name: Set Forgejo bootstrap repository check result
+  ansible.builtin.set_fact:
+    forgejo_bootstrap_repo_exists: >-
+      {{ (forgejo_bootstrap_repo_check_postgres.stdout | default(forgejo_bootstrap_repo_check_sqlite.stdout | default(''))) | trim != '' }}
   no_log: true
   when: forgejo_bootstrap_enabled | default(false) | bool
 
@@ -310,7 +414,7 @@
   no_log: true
   when:
     - forgejo_bootstrap_enabled | default(false) | bool
-    - forgejo_bootstrap_repo_check.stdout | trim == ""
+    - not forgejo_bootstrap_repo_exists
 - name: Verify Forgejo Caddy service is active
   ansible.builtin.command:
     argv:

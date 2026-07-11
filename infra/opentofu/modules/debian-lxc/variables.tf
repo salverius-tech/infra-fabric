@@ -48,7 +48,10 @@ variable "swap_mb" {
 variable "features" {
   description = "Container features. keyctl left null keeps the Proxmox default."
   type = object({
+    fuse    = optional(bool)
     keyctl  = optional(bool)
+    mknod   = optional(bool)
+    mount   = optional(list(string))
     nesting = optional(bool, true)
   })
   default = {}

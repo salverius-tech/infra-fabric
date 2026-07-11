@@ -1,0 +1,101 @@
+---
+- name: Validate Forgejo managed PostgreSQL variables
+  ansible.builtin.assert:
+    that:
+      - forgejo_database.name is defined
+      - forgejo_database.user is defined
+      - forgejo_postgres_password is defined
+      - forgejo_postgres_password | length > 0
+      - forgejo_database.name is match('^[A-Za-z_][A-Za-z0-9_]*$')
+      - forgejo_database.user is match('^[A-Za-z_][A-Za-z0-9_]*$')
+    fail_msg: Managed Forgejo PostgreSQL requires forgejo_database.name, forgejo_database.user, and forgejo_postgres_password.
+  no_log: true
+
+- name: Install Forgejo PostgreSQL packages
+  ansible.builtin.apt:
+    name:
+      - postgresql
+      - postgresql-client
+    state: present
+    update_cache: true
+
+- name: Enable PostgreSQL service
+  ansible.builtin.systemd:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Check Forgejo PostgreSQL role
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - postgres
+      - --
+      - psql
+      - -At
+      - -c
+      - "select 1 from pg_roles where rolname='{{ forgejo_database.user }}';"
+  register: forgejo_postgres_role_check
+  changed_when: false
+  no_log: true
+
+- name: Create Forgejo PostgreSQL role
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - postgres
+      - --
+      - psql
+      - -v
+      - ON_ERROR_STOP=1
+      - -c
+      - >-
+        create role {{ forgejo_database.user }} with login password '{{ forgejo_postgres_password | replace("'", "''") }}';
+  when: forgejo_postgres_role_check.stdout | trim == ""
+  no_log: true
+
+- name: Check Forgejo PostgreSQL database
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - postgres
+      - --
+      - psql
+      - -At
+      - -c
+      - "select 1 from pg_database where datname='{{ forgejo_database.name }}';"
+  register: forgejo_postgres_database_check
+  changed_when: false
+  no_log: true
+
+- name: Create Forgejo PostgreSQL database
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - postgres
+      - --
+      - createdb
+      - --owner={{ forgejo_database.user }}
+      - "{{ forgejo_database.name }}"
+  when: forgejo_postgres_database_check.stdout | trim == ""
+  no_log: true
+
+- name: Update Forgejo PostgreSQL role password
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - postgres
+      - --
+      - psql
+      - -v
+      - ON_ERROR_STOP=1
+      - -c
+      - >-
+        alter role {{ forgejo_database.user }} with password '{{ forgejo_postgres_password | replace("'", "''") }}';
+  changed_when: false
+  no_log: true

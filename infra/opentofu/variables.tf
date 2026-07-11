@@ -254,6 +254,37 @@ variable "forgejo_container_disk_gb" {
   type        = number
 }
 
+variable "forgejo_database" {
+  description = "Forgejo database configuration. Defaults to SQLite. Use type=postgres with managed=true for a local PostgreSQL server inside the Forgejo LXC. Store passwords in values/.env, not terraform.tfvars."
+  type = object({
+    type     = optional(string, "sqlite")
+    managed  = optional(bool, true)
+    host     = optional(string, "127.0.0.1")
+    port     = optional(number, 5432)
+    name     = optional(string, "forgejo")
+    user     = optional(string, "forgejo")
+    ssl_mode = optional(string, "disable")
+  })
+  default = {
+    type = "sqlite"
+  }
+
+  validation {
+    condition     = contains(["sqlite", "postgres"], var.forgejo_database.type)
+    error_message = "forgejo_database.type must be sqlite or postgres."
+  }
+
+  validation {
+    condition     = var.forgejo_database.type != "postgres" || try(var.forgejo_database.name != "" && var.forgejo_database.user != "", false)
+    error_message = "PostgreSQL Forgejo database configuration must set name and user."
+  }
+
+  validation {
+    condition     = var.forgejo_database.type != "postgres" || try(can(regex("^[A-Za-z_][A-Za-z0-9_]*$", var.forgejo_database.name)) && can(regex("^[A-Za-z_][A-Za-z0-9_]*$", var.forgejo_database.user)), false)
+    error_message = "PostgreSQL Forgejo database name and user must be simple SQL identifiers."
+  }
+}
+
 variable "service_storage" {
   description = "Per-service durable storage definitions. Keys are service names, then logical mount names such as data, config, backup, or cache."
   type = map(map(object({

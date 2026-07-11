@@ -43,7 +43,26 @@ Container VLAN tags default to `null`, which leaves the LXC interface untagged.
 Set the matching `*_vlan_id` value to a VLAN ID from 1 through 4094 when the
 Proxmox bridge should tag that container interface.
 
-## Service storage
+## Forgejo database and service storage
+
+`forgejo_database` selects Forgejo's database backend. The default keeps the simple SQLite deployment.
+
+```hcl
+forgejo_database = {
+  type = "sqlite"
+}
+```
+
+Use managed PostgreSQL when Forgejo data is on network storage and SQLite file locking would be risky. The PostgreSQL server runs inside the Forgejo LXC and stores its database under the guest's normal local PostgreSQL data directory. Store the password in `values/.env` as `FORGEJO_POSTGRES_PASSWORD`.
+
+```hcl
+forgejo_database = {
+  type    = "postgres"
+  managed = true
+  name    = "forgejo"
+  user    = "forgejo"
+}
+```
 
 `service_storage` defines durable storage by service and logical mount name. The scaffold defaults Forgejo data to a Proxmox-managed volume so new deployments do not assume a host ZFS path.
 
@@ -162,7 +181,7 @@ service_storage = {
 }
 ```
 
-Use `bind` when the Proxmox host exposes a path to an LXC. `host_prepare.type` may be `none`, `directory`, `zfs_dataset`, `host_nfs_mount`, or `host_cifs_mount`. Use `proxmox_volume` when Proxmox should provision the volume from a configured storage ID. Use `guest_nfs` or `guest_cifs` when the service guest should mount network storage directly. Do not put CIFS credentials in `terraform.tfvars`; keep secrets in private ignored values files or a secret manager and reference only the guest credentials path here.
+Use `bind` when the Proxmox host exposes a path to an LXC. `host_prepare.type` may be `none`, `directory`, `zfs_dataset`, `host_nfs_mount`, or `host_cifs_mount`. Use `proxmox_volume` when Proxmox should provision the volume from a configured storage ID. Use `guest_nfs` or `guest_cifs` when the service guest should mount network storage directly. When mounting all Forgejo data on NFS, prefer `forgejo_database.type = "postgres"` so SQLite is not stored on network storage. Do not put CIFS credentials in `terraform.tfvars`; keep secrets in private ignored values files or a secret manager and reference only the guest credentials path here.
 
 Hermes and the optional onramp host use `anvil` as their non-root runtime/deploy user by default. Add real public SSH keys to `lxc_ssh_public_keys`; the onramp cloud-init keys fall back to that list when `onramp_host_ssh_public_keys` is empty.
 

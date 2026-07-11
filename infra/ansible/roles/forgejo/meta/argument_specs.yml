@@ -51,3 +51,12 @@ argument_specs:
         type: str
         required: false
         description: "Default actions runner endpoint URL (default: https://data.forgejo.org)."
+      forgejo_database:
+        type: dict
+        required: false
+        description: "Forgejo database configuration. Defaults to SQLite; supports managed local PostgreSQL."
+      forgejo_postgres_password:
+        type: str
+        required: false
+        no_log: true
+        description: "Password for the managed local Forgejo PostgreSQL role when forgejo_database.type is postgres."

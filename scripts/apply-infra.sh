@@ -31,6 +31,14 @@ python scripts/tfplan-metadata.py verify --plan tfplan --metadata tfplan.meta.js
 python scripts/tfplan-metadata.py summary --metadata tfplan.meta.json
 python scripts/settings.py summary
 python scripts/storage-vars.py --summary
+python scripts/guest-mount-feature-vars.py --summary
+
+guest_mount_feature_vars="$(python scripts/guest-mount-feature-vars.py)"
+ansible-playbook \
+  -i values/ansible/inventory/local.yml \
+  -i infra/ansible/inventory/tfvars.py \
+  -e "${guest_mount_feature_vars}" \
+  infra/ansible/playbooks/guest-mount-feature-preflight.yml
 
 printf "Applying verified tfplan created by just plan.\n"
 trap "rm -f tfplan tfplan.meta.json ./*.tfplan ./*.tfplan.meta.json" EXIT

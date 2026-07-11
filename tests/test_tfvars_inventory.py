@@ -88,6 +88,20 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(inventory["all"]["vars"]["searxng_public_url"], "https://searxng.apps.example.net")
         self.assertEqual(inventory["services"]["children"], ["onramp_host"])
 
+    def test_forgejo_database_is_promoted_to_play_vars(self) -> None:
+        database = {"type": "postgres", "managed": True, "name": "forgejo", "user": "forgejo"}
+        inventory = tfvars_inventory.build_inventory(
+            {
+                "forgejo_container_vmid": 107,
+                "forgejo_lan_ip": "192.0.2.62",
+                "forgejo_database": database,
+            },
+            ["forgejo"],
+        )
+
+        self.assertEqual(inventory["all"]["vars"]["forgejo_database"], database)
+        self.assertEqual(inventory["_meta"]["hostvars"]["forgejo_lxc"]["forgejo_database"], database)
+
     def test_tailscale_enabled_is_promoted_to_all_vars(self) -> None:
         inventory = tfvars_inventory.build_inventory(
             {

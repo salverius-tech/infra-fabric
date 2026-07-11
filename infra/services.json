@@ -31,7 +31,10 @@
         "tf_vmid": "forgejo_container_vmid",
         "tf_host": "forgejo_lan_ip",
         "domain_var": "forgejo_domain",
-        "tf_domain": "forgejo_server_name"
+        "tf_domain": "forgejo_server_name",
+        "extra_play_vars": {
+          "forgejo_database": "forgejo_database"
+        }
       }
     },
     "tailscale_client": {

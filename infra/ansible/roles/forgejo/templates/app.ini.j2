@@ -3,8 +3,17 @@ RUN_USER = git
 WORK_PATH = /var/lib/forgejo
 
 [database]
+{% if forgejo_database.type | default('sqlite') == 'postgres' %}
+DB_TYPE = postgres
+HOST = {{ forgejo_database.host | default('127.0.0.1') }}:{{ forgejo_database.port | default(5432) }}
+NAME = {{ forgejo_database.name | default('forgejo') }}
+USER = {{ forgejo_database.user | default('forgejo') }}
+PASSWD = {{ forgejo_postgres_password }}
+SSL_MODE = {{ forgejo_database.ssl_mode | default('disable') }}
+{% else %}
 DB_TYPE = sqlite3
 PATH = /var/lib/forgejo/data/forgejo.db
+{% endif %}
 
 [repository]
 ROOT = /var/lib/forgejo/data/gitea-repositories

@@ -73,7 +73,7 @@ class AnsibleSafetyTests(unittest.TestCase):
     def test_forgejo_runner_secret_tasks_are_no_log(self) -> None:
         for name in (
             "Validate Forgejo Actions runner variables",
-            "Check existing Forgejo Actions runner registration",
+            "Set existing Forgejo Actions runner registration result",
             "Register Forgejo Actions runner with Forgejo",
             "Set Forgejo runner UUID",
             "Validate Forgejo runner UUID was resolved",
@@ -115,32 +115,38 @@ class AnsibleSafetyTests(unittest.TestCase):
             self.assertNotEqual(task.get("failed_when"), False, rel_path)
 
     def test_forgejo_runner_registration_is_guarded_by_existing_lookup(self) -> None:
-        existing = task_by_name(RUNNER_TASKS, "Check existing Forgejo Actions runner registration")
+        existing_sqlite = task_by_name(RUNNER_TASKS, "Check existing Forgejo Actions runner registration in SQLite")
+        existing_postgres = task_by_name(RUNNER_TASKS, "Check existing Forgejo Actions runner registration in PostgreSQL")
         registration = task_by_name(RUNNER_TASKS, "Register Forgejo Actions runner with Forgejo")
         config = task_by_name(RUNNER_TASKS, "Install Forgejo runner config")
 
-        existing_text = command_text(existing)
-        self.assertIn("action_runner", existing_text)
-        self.assertIn("repository", existing_text)
-        self.assertIn("repo_id", existing_text)
-        self.assertIn("forgejo_runner_scope", existing_text)
-        self.assertIn("forgejo_runner_name", existing_text)
-        self.assertEqual(existing.get("changed_when"), False)
-        self.assertIn('forgejo_runner_existing_registration.stdout | trim == ""', str(registration.get("when")))
-        self.assertEqual(existing.get("delegate_to"), "{{ groups['forgejo'][0] }}")
+        for existing in (existing_sqlite, existing_postgres):
+            existing_text = command_text(existing)
+            self.assertIn("action_runner", existing_text)
+            self.assertIn("repository", existing_text)
+            self.assertIn("repo_id", existing_text)
+            self.assertIn("forgejo_runner_scope", existing_text)
+            self.assertIn("forgejo_runner_name", existing_text)
+            self.assertEqual(existing.get("changed_when"), False)
+            self.assertEqual(existing.get("delegate_to"), "{{ groups['forgejo'][0] }}")
+        self.assertIn('forgejo_runner_existing_registration_stdout | trim == ""', str(registration.get("when")))
         self.assertEqual(registration.get("delegate_to"), "{{ groups['forgejo'][0] }}")
-        self.assertEqual(task_by_name(RUNNER_TASKS, "Normalize Forgejo repository-scoped runner ownership").get("delegate_to"), "{{ groups['forgejo'][0] }}")
+        self.assertEqual(task_by_name(RUNNER_TASKS, "Normalize Forgejo repository-scoped runner ownership in SQLite").get("delegate_to"), "{{ groups['forgejo'][0] }}")
+        self.assertEqual(task_by_name(RUNNER_TASKS, "Normalize Forgejo repository-scoped runner ownership in PostgreSQL").get("delegate_to"), "{{ groups['forgejo'][0] }}")
         self.assertNotIn("forgejo_runner_registration.stdout", str(config))
         self.assertIn("forgejo_runner_uuid", str(task_by_name(RUNNER_TASKS, "Set Forgejo runner UUID")))
 
     def test_forgejo_runner_registration_task_order(self) -> None:
         names = task_names(RUNNER_TASKS)
         ordered = [
-            "Check existing Forgejo Actions runner registration",
+            "Check existing Forgejo Actions runner registration in SQLite",
+            "Check existing Forgejo Actions runner registration in PostgreSQL",
+            "Set existing Forgejo Actions runner registration result",
             "Register Forgejo Actions runner with Forgejo",
             "Set Forgejo runner UUID",
             "Validate Forgejo runner UUID was resolved",
-            "Normalize Forgejo repository-scoped runner ownership",
+            "Normalize Forgejo repository-scoped runner ownership in SQLite",
+            "Normalize Forgejo repository-scoped runner ownership in PostgreSQL",
             "Install Forgejo runner config",
         ]
         indexes = [names.index(name) for name in ordered]
