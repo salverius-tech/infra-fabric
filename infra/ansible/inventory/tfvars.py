@@ -116,7 +116,10 @@ def service_hostvars(service: str, tfvars: dict[str, Any]) -> tuple[str, str, di
     group = config["group"]
     hostvars: dict[str, Any] = {"ansible_user": DEFAULT_ANSIBLE_USER}
     tf_user = config.get("tf_user")
-    if tf_user and tfvars.get(tf_user):
+    user_runtime = config.get("tf_user_runtime")
+    service_runtime = tfvars.get(f"{service}_runtime", {})
+    runtime_type = service_runtime.get("type", "lxc") if isinstance(service_runtime, dict) else "lxc"
+    if tf_user and tfvars.get(tf_user) and (user_runtime is None or runtime_type == user_runtime):
         hostvars["ansible_user"] = str(tfvars[tf_user])
         hostvars["ansible_become"] = True
 

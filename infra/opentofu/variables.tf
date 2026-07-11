@@ -250,8 +250,62 @@ variable "forgejo_container_swap_mb" {
 }
 
 variable "forgejo_container_disk_gb" {
-  description = "Root filesystem size in GB for the Forgejo LXC."
+  description = "Root filesystem size in GB for the Forgejo guest."
   type        = number
+}
+
+variable "forgejo_runtime" {
+  description = "Forgejo platform runtime. Defaults to lxc; use vm when Forgejo needs normal guest capabilities such as NFS mounts."
+  type = object({
+    type = optional(string, "lxc")
+  })
+  default = {
+    type = "lxc"
+  }
+
+  validation {
+    condition     = contains(["lxc", "vm"], var.forgejo_runtime.type)
+    error_message = "forgejo_runtime.type must be lxc or vm."
+  }
+}
+
+variable "forgejo_vm_image_datastore_id" {
+  description = "Proxmox datastore for the Forgejo VM cloud image when forgejo_runtime.type is vm."
+  type        = string
+  default     = "local"
+}
+
+variable "forgejo_vm_image_url" {
+  description = "Debian cloud image URL used when Forgejo runs as a VM."
+  type        = string
+  default     = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+
+  validation {
+    condition     = can(regex("^https://", var.forgejo_vm_image_url))
+    error_message = "forgejo_vm_image_url must be an HTTPS URL."
+  }
+}
+
+variable "forgejo_vm_image_file_name" {
+  description = "Cloud image file name used when Forgejo runs as a VM."
+  type        = string
+  default     = "debian-13-genericcloud-amd64.qcow2"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9._-]+\\.qcow2$", var.forgejo_vm_image_file_name))
+    error_message = "forgejo_vm_image_file_name must be a qcow2 file name."
+  }
+}
+
+variable "forgejo_vm_cloud_init_user" {
+  description = "Cloud-init SSH/bootstrap user when Forgejo runs as a VM."
+  type        = string
+  default     = "root"
+
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.forgejo_vm_cloud_init_user))
+    error_message = "forgejo_vm_cloud_init_user must be a valid Linux user name."
+  }
 }
 
 variable "forgejo_database" {

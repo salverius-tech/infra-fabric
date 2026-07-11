@@ -21,6 +21,10 @@ debian_template_url                   = "http://download.proxmox.com/images/syst
 debian_template_file_name             = "debian-12-standard_12.12-1_amd64.tar.zst"
 lxc_template_download_timeout_seconds = 1800
 
+forgejo_runtime = {
+  type = "lxc"
+}
+
 forgejo_database = {
   type = "sqlite"
 }

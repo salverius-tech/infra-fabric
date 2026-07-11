@@ -7,6 +7,7 @@
       vars:
         lxc_ready_vmid: '{{ forgejo_vmid }}'
         lxc_ready_name: forgejo
+      when: forgejo_runtime.type | default('lxc') == 'lxc'
 - name: Run direct access handoff for Forgejo
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:

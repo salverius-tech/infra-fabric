@@ -33,6 +33,7 @@ locals {
     backup           = false
     read_only        = false
   }
+  forgejo_runtime_type   = var.forgejo_runtime.type
   forgejo_storage        = lookup(var.service_storage, "forgejo", {})
   forgejo_data_storage   = lookup(local.forgejo_storage, "data", local.forgejo_default_data_storage)
   forgejo_data_mountable = contains(["bind", "proxmox_volume"], local.forgejo_data_storage.type)
@@ -52,6 +53,7 @@ resource "terraform_data" "forgejo_storage_validation" {
   count = local.forgejo_enabled ? 1 : 0
 
   input = {
+    runtime  = var.forgejo_runtime
     storage  = local.forgejo_data_storage
     database = var.forgejo_database
   }
@@ -71,7 +73,7 @@ resource "terraform_data" "forgejo_storage_validation" {
 
 module "forgejo" {
   source = "./modules/debian-lxc"
-  count  = local.forgejo_enabled ? 1 : 0
+  count  = local.forgejo_enabled && local.forgejo_runtime_type == "lxc" ? 1 : 0
 
   description = var.forgejo_container_description
   node_name   = var.proxmox_node_name
@@ -120,6 +122,54 @@ module "forgejo" {
   }
 
   template_file_id = proxmox_download_file.debian_12_lxc_template[0].id
+
+  startup = {
+    order      = var.forgejo_startup_order
+    up_delay   = var.forgejo_startup_up_delay
+    down_delay = var.forgejo_startup_down_delay
+  }
+
+  depends_on = [terraform_data.forgejo_storage_validation]
+}
+
+module "forgejo_vm" {
+  source = "./modules/debian-vm"
+  count  = local.forgejo_enabled && local.forgejo_runtime_type == "vm" ? 1 : 0
+
+  description = var.forgejo_container_description
+  node_name   = var.proxmox_node_name
+  vm_id       = var.forgejo_container_vmid
+  name        = var.forgejo_container_hostname
+  tags        = ["forgejo", "git", "opentofu"]
+
+  cores     = var.forgejo_container_cores
+  memory_mb = var.forgejo_container_memory_mb
+
+  image = {
+    datastore_id = var.forgejo_vm_image_datastore_id
+    url          = var.forgejo_vm_image_url
+    file_name    = var.forgejo_vm_image_file_name
+    file_id      = local.onramp_host_enabled ? proxmox_download_file.debian_13_onramp_host_image[0].id : null
+  }
+
+  disk = {
+    datastore_id = var.rootfs_datastore_id
+    size_gb      = var.forgejo_container_disk_gb
+  }
+
+  search_domain = var.forgejo_container_search_domain
+  dns_servers   = var.forgejo_container_dns_servers
+  ipv4_address  = var.forgejo_container_ipv4_address
+  ipv4_gateway  = var.forgejo_container_ipv4_gateway
+
+  cloud_init_user = var.forgejo_vm_cloud_init_user
+  ssh_public_keys = var.lxc_ssh_public_keys
+
+  network = {
+    bridge      = var.forgejo_container_bridge
+    mac_address = var.forgejo_container_mac_address
+    vlan_id     = var.forgejo_container_vlan_id
+  }
 
   startup = {
     order      = var.forgejo_startup_order

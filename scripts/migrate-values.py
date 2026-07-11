@@ -645,6 +645,7 @@ def ensure_forgejo_inventory_vars(text: str, domain: str, inferred_scope: str) -
         "forgejo_internal_token": "    forgejo_internal_token: \"{{ lookup('env', 'FORGEJO_INTERNAL_TOKEN') }}\"",
         "forgejo_oauth2_jwt_secret": "    forgejo_oauth2_jwt_secret: \"{{ lookup('env', 'FORGEJO_OAUTH2_JWT_SECRET') }}\"",
         "forgejo_lfs_jwt_secret": "    forgejo_lfs_jwt_secret: \"{{ lookup('env', 'FORGEJO_LFS_JWT_SECRET') }}\"",
+        "forgejo_runtime": "    forgejo_runtime:\n      type: lxc",
         "forgejo_postgres_password": "    forgejo_postgres_password: \"{{ lookup('env', 'FORGEJO_POSTGRES_PASSWORD') }}\"",
         "forgejo_bootstrap_enabled": "    forgejo_bootstrap_enabled: true",
         "forgejo_bootstrap_admin_username": "    forgejo_bootstrap_admin_username: \"{{ lookup('env', 'FORGEJO_ADMIN_USERNAME') }}\"",

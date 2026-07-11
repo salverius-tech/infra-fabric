@@ -43,7 +43,21 @@ Container VLAN tags default to `null`, which leaves the LXC interface untagged.
 Set the matching `*_vlan_id` value to a VLAN ID from 1 through 4094 when the
 Proxmox bridge should tag that container interface.
 
-## Forgejo database and service storage
+## Forgejo runtime, database, and service storage
+
+`forgejo_runtime` selects the platform used to run Forgejo. The default keeps Forgejo on a Debian LXC. VM mode is available as a Forgejo POC for cases where the service guest needs normal VM capabilities, such as mounting NFS directly inside the guest.
+
+```hcl
+forgejo_runtime = {
+  type = "lxc"
+}
+```
+
+```hcl
+forgejo_runtime = {
+  type = "vm"
+}
+```
 
 `forgejo_database` selects Forgejo's database backend. The default keeps the simple SQLite deployment.
 

@@ -88,6 +88,50 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(inventory["all"]["vars"]["searxng_public_url"], "https://searxng.apps.example.net")
         self.assertEqual(inventory["services"]["children"], ["onramp_host"])
 
+    def test_forgejo_vm_uses_cloud_init_user_when_runtime_is_vm(self) -> None:
+        inventory = tfvars_inventory.build_inventory(
+            {
+                "forgejo_container_vmid": 107,
+                "forgejo_lan_ip": "192.0.2.62",
+                "forgejo_runtime": {"type": "vm"},
+                "forgejo_vm_cloud_init_user": "forgejo-admin",
+            },
+            ["forgejo"],
+        )
+
+        hostvars = inventory["_meta"]["hostvars"]["forgejo_lxc"]
+        self.assertEqual(hostvars["ansible_user"], "forgejo-admin")
+        self.assertTrue(hostvars["ansible_become"])
+
+    def test_forgejo_lxc_ignores_vm_cloud_init_user(self) -> None:
+        inventory = tfvars_inventory.build_inventory(
+            {
+                "forgejo_container_vmid": 107,
+                "forgejo_lan_ip": "192.0.2.62",
+                "forgejo_runtime": {"type": "lxc"},
+                "forgejo_vm_cloud_init_user": "forgejo-admin",
+            },
+            ["forgejo"],
+        )
+
+        hostvars = inventory["_meta"]["hostvars"]["forgejo_lxc"]
+        self.assertEqual(hostvars["ansible_user"], "root")
+        self.assertNotIn("ansible_become", hostvars)
+
+    def test_forgejo_runtime_is_promoted_to_play_vars(self) -> None:
+        runtime = {"type": "vm"}
+        inventory = tfvars_inventory.build_inventory(
+            {
+                "forgejo_container_vmid": 107,
+                "forgejo_lan_ip": "192.0.2.62",
+                "forgejo_runtime": runtime,
+            },
+            ["forgejo"],
+        )
+
+        self.assertEqual(inventory["all"]["vars"]["forgejo_runtime"], runtime)
+        self.assertEqual(inventory["_meta"]["hostvars"]["forgejo_lxc"]["forgejo_runtime"], runtime)
+
     def test_forgejo_database_is_promoted_to_play_vars(self) -> None:
         database = {"type": "postgres", "managed": True, "name": "forgejo", "user": "forgejo"}
         inventory = tfvars_inventory.build_inventory(

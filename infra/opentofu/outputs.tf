@@ -19,8 +19,10 @@ output "technitium_dns_endpoint" {
 }
 
 output "forgejo_container_vmid" {
-  description = "Proxmox VMID for the Forgejo LXC, or null when disabled."
-  value       = local.forgejo_enabled ? module.forgejo[0].vm_id : null
+  description = "Proxmox VMID for the Forgejo guest, or null when disabled."
+  value = local.forgejo_enabled ? (
+    local.forgejo_runtime_type == "vm" ? module.forgejo_vm[0].vm_id : module.forgejo[0].vm_id
+  ) : null
 }
 
 output "forgejo_lan_ip" {
@@ -29,7 +31,7 @@ output "forgejo_lan_ip" {
 }
 
 output "forgejo_https_url" {
-  description = "Forgejo HTTPS URL when the Forgejo hostname points at the Forgejo LXC Caddy instance, or null when disabled."
+  description = "Forgejo HTTPS URL when the Forgejo hostname points at the Forgejo service-local Caddy instance, or null when disabled."
   value       = local.forgejo_enabled ? "https://${var.forgejo_server_name}/" : null
 }
 

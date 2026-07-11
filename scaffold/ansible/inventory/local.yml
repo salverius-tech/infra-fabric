@@ -14,6 +14,8 @@ all:
     forgejo_enable_caddy: true
     forgejo_configure_system_ssh: true
     forgejo_write_initial_config: false
+    forgejo_runtime:
+      type: lxc
     forgejo_secret_key: "{{ lookup('env', 'FORGEJO_SECRET_KEY') }}"
     forgejo_internal_token: "{{ lookup('env', 'FORGEJO_INTERNAL_TOKEN') }}"
     forgejo_oauth2_jwt_secret: "{{ lookup('env', 'FORGEJO_OAUTH2_JWT_SECRET') }}"

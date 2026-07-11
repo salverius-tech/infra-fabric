@@ -51,6 +51,10 @@ argument_specs:
         type: str
         required: false
         description: "Default actions runner endpoint URL (default: https://data.forgejo.org)."
+      forgejo_runtime:
+        type: dict
+        required: false
+        description: "Forgejo platform runtime descriptor. Defaults to lxc; supports vm for Forgejo VM POC."
       forgejo_database:
         type: dict
         required: false

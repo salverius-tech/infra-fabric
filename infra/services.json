@@ -32,8 +32,12 @@
         "tf_host": "forgejo_lan_ip",
         "domain_var": "forgejo_domain",
         "tf_domain": "forgejo_server_name",
+        "user_var": "forgejo_ansible_user",
+        "tf_user": "forgejo_vm_cloud_init_user",
+        "tf_user_runtime": "vm",
         "extra_play_vars": {
-          "forgejo_database": "forgejo_database"
+          "forgejo_database": "forgejo_database",
+          "forgejo_runtime": "forgejo_runtime"
         }
       }
     },
