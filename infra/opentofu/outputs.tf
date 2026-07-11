@@ -1,6 +1,8 @@
 output "technitium_container_vmid" {
-  description = "Proxmox VMID for the Technitium DNS LXC, or null when disabled."
-  value       = local.technitium_enabled ? module.technitium_dns[0].vm_id : null
+  description = "Proxmox VMID for the Technitium DNS guest, or null when disabled."
+  value = local.technitium_enabled ? (
+    local.technitium_runtime_type == "vm" ? module.technitium_dns_vm[0].vm_id : module.technitium_dns[0].vm_id
+  ) : null
 }
 
 output "technitium_dns_ip" {
@@ -50,8 +52,10 @@ output "forgejo_data_mount" {
 }
 
 output "infisical_container_vmid" {
-  description = "Proxmox VMID for the Infisical LXC, or null when disabled."
-  value       = local.infisical_enabled ? module.infisical[0].vm_id : null
+  description = "Proxmox VMID for the Infisical guest, or null when disabled."
+  value = local.infisical_enabled ? (
+    local.infisical_runtime_type == "vm" ? module.infisical_vm[0].vm_id : module.infisical[0].vm_id
+  ) : null
 }
 
 output "infisical_lan_ip" {
@@ -65,8 +69,10 @@ output "infisical_https_url" {
 }
 
 output "hermes_container_vmid" {
-  description = "Proxmox VMID for the Hermes management LXC, or null when disabled."
-  value       = local.hermes_enabled ? module.hermes[0].vm_id : null
+  description = "Proxmox VMID for the Hermes management guest, or null when disabled."
+  value = local.hermes_enabled ? (
+    local.hermes_runtime_type == "vm" ? module.hermes_vm[0].vm_id : module.hermes[0].vm_id
+  ) : null
 }
 
 output "hermes_lan_ip" {
@@ -110,8 +116,10 @@ output "onramp_host_target" {
 }
 
 output "tailscale_client_container_vmid" {
-  description = "Proxmox VMID for the Tailscale client LXC, or null when disabled."
-  value       = local.tailscale_client_enabled ? module.tailscale_client[0].vm_id : null
+  description = "Proxmox VMID for the Tailscale client guest, or null when disabled."
+  value = local.tailscale_client_enabled ? (
+    local.tailscale_client_runtime_type == "vm" ? module.tailscale_client_vm[0].vm_id : module.tailscale_client[0].vm_id
+  ) : null
 }
 
 output "tailscale_client_ipv4_address" {

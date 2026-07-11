@@ -1,8 +1,11 @@
 locals {
-  service_registry         = jsondecode(file("${path.module}/../services.json"))
-  service_names            = keys(local.service_registry.services)
-  enabled_services         = toset(coalesce(var.enabled_services, local.service_registry.default_services))
-  invalid_enabled_services = setsubtract(local.enabled_services, toset(local.service_names))
+  service_registry                  = jsondecode(file("${path.module}/../services.json"))
+  service_names                     = keys(local.service_registry.services)
+  runtime_service_names             = ["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes", "onramp_host"]
+  enabled_services                  = toset(coalesce(var.enabled_services, local.service_registry.default_services))
+  invalid_enabled_services          = setsubtract(local.enabled_services, toset(local.service_names))
+  invalid_service_runtime_services  = setsubtract(toset(keys(var.service_runtime)), toset(local.runtime_service_names))
+  onramp_host_runtime_lxc_requested = contains(keys(var.service_runtime), "onramp_host") && local.onramp_host_runtime_type == "lxc"
 
   technitium_enabled       = contains(local.enabled_services, "technitium")
   forgejo_enabled          = contains(local.enabled_services, "forgejo")
@@ -12,7 +15,28 @@ locals {
   hermes_enabled           = contains(local.enabled_services, "hermes")
   onramp_host_enabled      = contains(local.enabled_services, "onramp_host")
 
-  lxc_template_enabled = local.technitium_enabled || local.forgejo_enabled || local.tailscale_client_enabled || local.forgejo_runner_enabled || local.infisical_enabled || local.hermes_enabled
+  technitium_runtime       = lookup(var.service_runtime, "technitium", { type = "lxc", cloud_init_user = null })
+  tailscale_client_runtime = lookup(var.service_runtime, "tailscale_client", { type = "lxc", cloud_init_user = null })
+  forgejo_runner_runtime   = lookup(var.service_runtime, "forgejo_runner", { type = "lxc", cloud_init_user = null })
+  infisical_runtime        = lookup(var.service_runtime, "infisical", { type = "lxc", cloud_init_user = null })
+  hermes_runtime           = lookup(var.service_runtime, "hermes", { type = "lxc", cloud_init_user = null })
+  onramp_host_runtime      = lookup(var.service_runtime, "onramp_host", { type = "vm", cloud_init_user = null })
+
+  technitium_runtime_type       = local.technitium_runtime.type
+  tailscale_client_runtime_type = local.tailscale_client_runtime.type
+  forgejo_runner_runtime_type   = local.forgejo_runner_runtime.type
+  infisical_runtime_type        = local.infisical_runtime.type
+  hermes_runtime_type           = local.hermes_runtime.type
+  onramp_host_runtime_type      = local.onramp_host_runtime.type
+
+  technitium_lxc_enabled       = local.technitium_enabled && local.technitium_runtime_type == "lxc"
+  tailscale_client_lxc_enabled = local.tailscale_client_enabled && local.tailscale_client_runtime_type == "lxc"
+  forgejo_runner_lxc_enabled   = local.forgejo_runner_enabled && local.forgejo_runner_runtime_type == "lxc"
+  infisical_lxc_enabled        = local.infisical_enabled && local.infisical_runtime_type == "lxc"
+  hermes_lxc_enabled           = local.hermes_enabled && local.hermes_runtime_type == "lxc"
+
+  service_vm_image_enabled = (local.technitium_enabled && local.technitium_runtime_type == "vm") || (local.tailscale_client_enabled && local.tailscale_client_runtime_type == "vm") || (local.forgejo_runner_enabled && local.forgejo_runner_runtime_type == "vm") || (local.infisical_enabled && local.infisical_runtime_type == "vm") || (local.hermes_enabled && local.hermes_runtime_type == "vm")
+  lxc_template_enabled     = local.technitium_lxc_enabled || (local.forgejo_enabled && local.forgejo_runtime_type == "lxc") || local.tailscale_client_lxc_enabled || local.forgejo_runner_lxc_enabled || local.infisical_lxc_enabled || local.hermes_lxc_enabled
 }
 
 resource "terraform_data" "enabled_services_validation" {
@@ -22,6 +46,16 @@ resource "terraform_data" "enabled_services_validation" {
     precondition {
       condition     = length(local.invalid_enabled_services) == 0
       error_message = "enabled_services may contain only ${join(", ", local.service_names)}."
+    }
+
+    precondition {
+      condition     = length(local.invalid_service_runtime_services) == 0
+      error_message = "service_runtime may contain only guest services: ${join(", ", local.runtime_service_names)}."
+    }
+
+    precondition {
+      condition     = !local.onramp_host_runtime_lxc_requested
+      error_message = "onramp_host is VM-only and does not support service_runtime.onramp_host.type = lxc."
     }
   }
 }

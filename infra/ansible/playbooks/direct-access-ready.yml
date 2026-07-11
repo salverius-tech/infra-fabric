@@ -57,3 +57,10 @@
         timeout: "{{ direct_access_ready_connection_timeout | default(180) }}"
     - name: Probe direct service Python execution
       ansible.builtin.ping:
+    - name: Wait for VM cloud-init completion before steady-state roles
+      ansible.builtin.command: cloud-init status --wait
+      become: true
+      register: direct_access_ready_cloud_init
+      changed_when: false
+      failed_when: direct_access_ready_cloud_init.rc not in [0, 2]
+      when: service_runtime_current.type | default('lxc') == 'vm'

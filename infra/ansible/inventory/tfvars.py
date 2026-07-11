@@ -101,6 +101,7 @@ def service_play_vars(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
     runtime = service_runtime(service, tfvars)
     if runtime:
         vars_for_play[f"{service}_runtime"] = runtime
+        vars_for_play["service_runtime_current"] = runtime
     vmid = tfvars.get(config["tf_vmid"])
     if vmid is not None:
         vars_for_play[config["vmid_var"]] = vmid
@@ -132,6 +133,9 @@ def service_hostvars(service: str, tfvars: dict[str, Any]) -> tuple[str, str, di
     user_runtime = config.get("tf_user_runtime")
     runtime = service_runtime(service, tfvars)
     runtime_type = runtime.get("type", "lxc") if isinstance(runtime, dict) else "lxc"
+    if runtime_type == "vm" and isinstance(runtime, dict) and runtime.get("cloud_init_user"):
+        hostvars["ansible_user"] = str(runtime["cloud_init_user"])
+        hostvars["ansible_become"] = hostvars["ansible_user"] != DEFAULT_ANSIBLE_USER
     if tf_user and tfvars.get(tf_user) and (user_runtime is None or runtime_type == user_runtime):
         hostvars["ansible_user"] = str(tfvars[tf_user])
         hostvars["ansible_become"] = True

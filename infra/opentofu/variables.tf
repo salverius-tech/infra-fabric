@@ -257,13 +257,58 @@ variable "forgejo_container_disk_gb" {
 variable "service_runtime" {
   description = "Per-service platform runtime selection. Runtime type defaults to lxc when a service is not listed."
   type = map(object({
-    type = optional(string, "lxc")
+    type            = optional(string, "lxc")
+    cloud_init_user = optional(string)
   }))
   default = {}
 
   validation {
     condition     = alltrue([for service_name, runtime in var.service_runtime : contains(["lxc", "vm"], runtime.type)])
     error_message = "service_runtime entries must use type lxc or vm."
+  }
+
+  validation {
+    condition     = alltrue([for service_name, runtime in var.service_runtime : runtime.cloud_init_user == null || can(regex("^[a-z_][a-z0-9_-]{0,31}$", runtime.cloud_init_user))])
+    error_message = "service_runtime cloud_init_user values must be valid Linux user names."
+  }
+}
+
+variable "guest_vm_image_datastore_id" {
+  description = "Proxmox datastore for shared service VM cloud images. Defaults to local; set to an import-capable datastore."
+  type        = string
+  default     = "local"
+}
+
+variable "guest_vm_image_url" {
+  description = "Debian cloud image URL used by services running as VMs."
+  type        = string
+  default     = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+
+  validation {
+    condition     = can(regex("^https://", var.guest_vm_image_url))
+    error_message = "guest_vm_image_url must be an HTTPS URL."
+  }
+}
+
+variable "guest_vm_image_file_name" {
+  description = "Shared cloud image file name used by services running as VMs."
+  type        = string
+  default     = "debian-13-genericcloud-amd64.qcow2"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9._-]+\\.qcow2$", var.guest_vm_image_file_name))
+    error_message = "guest_vm_image_file_name must be a qcow2 file name."
+  }
+}
+
+variable "guest_vm_cloud_init_user" {
+  description = "Default cloud-init SSH/bootstrap user for service VMs unless service_runtime.<service>.cloud_init_user overrides it."
+  type        = string
+  default     = "root"
+
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.guest_vm_cloud_init_user))
+    error_message = "guest_vm_cloud_init_user must be a valid Linux user name."
   }
 }
 

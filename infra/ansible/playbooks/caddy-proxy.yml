@@ -7,6 +7,7 @@
       vars:
         lxc_ready_vmid: '{{ technitium_vmid }}'
         lxc_ready_name: technitium
+      when: technitium_runtime.type | default('lxc') == 'lxc'
 - name: Run direct access handoff for Technitium Caddy proxy
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:

@@ -103,6 +103,21 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(hostvars["ansible_user"], "forgejo-admin")
         self.assertTrue(hostvars["ansible_become"])
 
+    def test_service_vm_uses_runtime_cloud_init_user(self) -> None:
+        inventory = tfvars_inventory.build_inventory(
+            {
+                "hermes_container_vmid": 111,
+                "hermes_lan_ip": "192.0.2.71",
+                "service_runtime": {"hermes": {"type": "vm", "cloud_init_user": "hermes-admin"}},
+            },
+            ["hermes"],
+        )
+
+        hostvars = inventory["_meta"]["hostvars"]["hermes_lxc"]
+        self.assertEqual(hostvars["ansible_user"], "hermes-admin")
+        self.assertTrue(hostvars["ansible_become"])
+        self.assertEqual(hostvars["hermes_runtime"], {"type": "vm", "cloud_init_user": "hermes-admin"})
+
     def test_forgejo_lxc_ignores_vm_cloud_init_user(self) -> None:
         inventory = tfvars_inventory.build_inventory(
             {

@@ -7,6 +7,7 @@
       vars:
         lxc_ready_vmid: '{{ infisical_vmid }}'
         lxc_ready_name: infisical
+      when: infisical_runtime.type | default('lxc') == 'lxc'
 - name: Run direct access handoff for Infisical
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:

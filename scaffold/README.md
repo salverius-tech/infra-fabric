@@ -43,9 +43,9 @@ Container VLAN tags default to `null`, which leaves the LXC interface untagged.
 Set the matching `*_vlan_id` value to a VLAN ID from 1 through 4094 when the
 Proxmox bridge should tag that container interface.
 
-## Forgejo runtime, database, and service storage
+## Service runtime, Forgejo database, and service storage
 
-`service_runtime` selects the platform used to run each service guest. The default is Debian LXC when a service is not listed. VM mode is available for Forgejo as a proven POC for cases where the service guest needs normal VM capabilities, such as mounting NFS directly inside the guest.
+`service_runtime` selects the platform used to run each first-class service guest. Services default to Debian LXC when they are not listed. VM mode is available for `technitium`, `forgejo`, `tailscale_client`, `forgejo_runner`, `infisical`, and `hermes` when a service needs normal VM capabilities, such as mounting NFS directly inside the guest. `onramp_host` is VM-only.
 
 ```hcl
 service_runtime = {
@@ -58,10 +58,13 @@ service_runtime = {
 ```hcl
 service_runtime = {
   forgejo = {
-    type = "vm"
+    type            = "vm"
+    cloud_init_user = "forgejo-admin"
   }
 }
 ```
+
+VM guests use `guest_vm_image_*` defaults unless they can reuse the onramp host image. If `cloud_init_user` is omitted, `guest_vm_cloud_init_user` is used.
 
 `forgejo_database` selects Forgejo's database backend. The default keeps the simple SQLite deployment.
 

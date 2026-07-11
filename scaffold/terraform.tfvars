@@ -21,6 +21,11 @@ debian_template_url                   = "http://download.proxmox.com/images/syst
 debian_template_file_name             = "debian-12-standard_12.12-1_amd64.tar.zst"
 lxc_template_download_timeout_seconds = 1800
 
+guest_vm_image_datastore_id = "local"
+guest_vm_image_url          = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+guest_vm_image_file_name    = "debian-13-genericcloud-amd64.qcow2"
+guest_vm_cloud_init_user    = "root"
+
 service_runtime = {
   forgejo = {
     type = "lxc"

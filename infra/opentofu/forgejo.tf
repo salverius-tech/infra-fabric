@@ -33,7 +33,7 @@ locals {
     backup           = false
     read_only        = false
   }
-  forgejo_runtime        = lookup(var.service_runtime, "forgejo", var.forgejo_runtime)
+  forgejo_runtime        = lookup(var.service_runtime, "forgejo", { type = var.forgejo_runtime.type, cloud_init_user = null })
   forgejo_runtime_type   = local.forgejo_runtime.type
   forgejo_storage        = lookup(var.service_storage, "forgejo", {})
   forgejo_data_storage   = lookup(local.forgejo_storage, "data", local.forgejo_default_data_storage)
@@ -54,7 +54,7 @@ resource "terraform_data" "forgejo_storage_validation" {
   count = local.forgejo_enabled ? 1 : 0
 
   input = {
-    runtime  = local.forgejo_runtime
+    runtime  = { type = local.forgejo_runtime_type }
     storage  = local.forgejo_data_storage
     database = var.forgejo_database
   }
