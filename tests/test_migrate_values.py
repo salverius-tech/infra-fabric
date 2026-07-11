@@ -252,6 +252,43 @@ class MigrateValuesTests(unittest.TestCase):
             self.assertIn("added onramp_host_vmid", changes)
             self.assertEqual(second_changes, [])
 
+    def test_forgejo_bootstrap_defaults_to_dedicated_admin_and_remote_owner(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("", encoding="utf-8")
+            (values / "terraform.tfvars").write_text(
+                'technitium_container_search_domain = "example.internal"\n',
+                encoding="utf-8",
+            )
+            settings = values.parent / "settings.local.json"
+            settings.write_text('{"services":["forgejo","forgejo_runner"]}\n', encoding="utf-8")
+            original_cwd = Path.cwd()
+            original_values_remote_scope = migrate_values.values_remote_scope
+            try:
+                import os
+
+                migrate_values.values_remote_scope = lambda _values_dir: "salverius/homelab-values"
+                os.chdir(values.parent)
+                changes = migrate_values.migrate(Path("values"))
+                second_changes = migrate_values.migrate(Path("values"))
+            finally:
+                os.chdir(original_cwd)
+                migrate_values.values_remote_scope = original_values_remote_scope
+
+            env_text = (values / ".env").read_text(encoding="utf-8")
+            inventory_text = (values / "ansible" / "inventory" / "local.yml").read_text(encoding="utf-8")
+            self.assertIn("FORGEJO_ADMIN_USERNAME=anvil", env_text)
+            self.assertIn("FORGEJO_ADMIN_EMAIL=anvil@example.internal", env_text)
+            self.assertIn("FORGEJO_ADMIN_PASSWORD=", env_text)  # public-safety: allow-secret
+            self.assertIn("FORGEJO_REPO_OWNER_EMAIL=salverius@example.internal", env_text)
+            self.assertIn("FORGEJO_REPO_OWNER_PASSWORD=", env_text)  # public-safety: allow-secret
+            self.assertIn("forgejo_bootstrap_admin_username: \"{{ lookup('env', 'FORGEJO_ADMIN_USERNAME') }}\"", inventory_text)
+            self.assertIn("forgejo_bootstrap_owner_email: \"{{ lookup('env', 'FORGEJO_REPO_OWNER_EMAIL') }}\"", inventory_text)
+            self.assertIn("forgejo_bootstrap_owner_password: \"{{ lookup('env', 'FORGEJO_REPO_OWNER_PASSWORD') }}\"", inventory_text)
+            self.assertIn("forgejo_runner_scope: salverius/homelab-values", inventory_text)
+            self.assertIn("added FORGEJO_ADMIN_USERNAME default", changes)
+            self.assertEqual(second_changes, [])
+
     def test_onramp_host_absent_does_not_add_onramp_host_values(self) -> None:
         temp, values = self.make_values()
         with temp:

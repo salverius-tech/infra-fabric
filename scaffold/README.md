@@ -184,4 +184,8 @@ For Hermes dashboard form login, store `HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HAS
 python scripts/hermes-password-hash.py
 ```
 
-For Forgejo Actions deployment, set `FORGEJO_RUNNER_REGISTRATION_SECRET` to a persistent 40-character hex secret and enable `forgejo_runner` in `settings.local.json` services before planning the runner LXC.
+For Forgejo Actions deployment, set the persistent Forgejo security secrets (`FORGEJO_SECRET_KEY`, `FORGEJO_INTERNAL_TOKEN`, `FORGEJO_OAUTH2_JWT_SECRET`, and `FORGEJO_LFS_JWT_SECRET`), admin credentials (`FORGEJO_ADMIN_USERNAME`, `FORGEJO_ADMIN_EMAIL`, `FORGEJO_ADMIN_PASSWORD`), repository-owner credentials (`FORGEJO_REPO_OWNER_EMAIL`, `FORGEJO_REPO_OWNER_PASSWORD`), and `FORGEJO_RUNNER_REGISTRATION_SECRET` in `values/.env`. The default admin username is `anvil`; override `FORGEJO_ADMIN_USERNAME` if needed. The runner registration secret must be exactly 40 hex characters.
+
+When `forgejo` or `forgejo_runner` is enabled, `scripts/migrate-values.py` fills missing Forgejo secrets and writes explicit bootstrap inventory values. If `forgejo_runner_scope` is missing or still set to the scaffold placeholder, migration tries to infer `owner/repo` from the private `values` Git remote and records that value in `values/ansible/inventory/local.yml`. Future applies use the recorded inventory value, not the Git remote dynamically.
+
+The Forgejo role bootstraps a dedicated admin user and a separate repository-owner user derived from `forgejo_runner_scope`, then creates the runner repository under that owner. If you want the runner scoped to an organization, create the organization/repository manually and set `forgejo_bootstrap_enabled: false` after the initial Forgejo install.

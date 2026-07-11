@@ -8,7 +8,13 @@
       - forgejo_internal_token is defined
       - forgejo_oauth2_jwt_secret is defined
       - forgejo_lfs_jwt_secret is defined
-    fail_msg: forgejo_domain, forgejo_version, and Forgejo persistent security secrets are required.
+      - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_admin_username is defined
+      - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_admin_email is defined
+      - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_admin_password is defined
+      - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_owner_email is defined
+      - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_owner_password is defined
+      - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_runner_scope is defined
+    fail_msg: Forgejo requires domain, version, persistent security secrets, and bootstrap admin/repo values when bootstrap is enabled.
 - name: Install Forgejo OS dependencies in LXC
   ansible.builtin.command:
     argv:
@@ -184,6 +190,127 @@
   retries: 12
   delay: 5
   until: forgejo_health_check.status == 200
+
+- name: Derive Forgejo bootstrap repository scope
+  ansible.builtin.set_fact:
+    forgejo_bootstrap_repo_owner: "{{ forgejo_runner_scope.split('/')[0] }}"
+    forgejo_bootstrap_repo_name: "{{ forgejo_runner_scope.split('/')[1] }}"
+  when: forgejo_bootstrap_enabled | default(false) | bool
+
+- name: Validate Forgejo bootstrap repository scope
+  ansible.builtin.assert:
+    that:
+      - forgejo_runner_scope.split('/') | length == 2
+      - forgejo_bootstrap_repo_owner | length > 0
+      - forgejo_bootstrap_repo_name | length > 0
+    fail_msg: Forgejo bootstrap requires forgejo_runner_scope in owner/repository form.
+  when: forgejo_bootstrap_enabled | default(false) | bool
+
+- name: Check Forgejo bootstrap admin user
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - git
+      - --
+      - sqlite3
+      - /var/lib/forgejo/data/forgejo.db
+      - "select id from user where lower_name=lower('{{ forgejo_bootstrap_admin_username }}') limit 1;"
+  register: forgejo_bootstrap_admin_check
+  changed_when: false
+  no_log: true
+  when: forgejo_bootstrap_enabled | default(false) | bool
+
+- name: Create Forgejo bootstrap admin user
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        runuser -u git -- /usr/local/bin/forgejo admin user create
+        --config /etc/forgejo/app.ini --work-path /var/lib/forgejo
+        --username "$1" --password "$2" --email "$3" --admin
+        --must-change-password=false
+      - --
+      - "{{ forgejo_bootstrap_admin_username }}"
+      - "{{ forgejo_bootstrap_admin_password }}"
+      - "{{ forgejo_bootstrap_admin_email }}"
+  changed_when: true
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_bootstrap_admin_check.stdout | trim == ""
+
+- name: Check Forgejo bootstrap repository owner user
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - git
+      - --
+      - sqlite3
+      - /var/lib/forgejo/data/forgejo.db
+      - "select id from user where lower_name=lower('{{ forgejo_bootstrap_repo_owner }}') limit 1;"
+  register: forgejo_bootstrap_owner_check
+  changed_when: false
+  no_log: true
+  when: forgejo_bootstrap_enabled | default(false) | bool
+
+- name: Create Forgejo bootstrap repository owner user
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        runuser -u git -- /usr/local/bin/forgejo admin user create
+        --config /etc/forgejo/app.ini --work-path /var/lib/forgejo
+        --username "$1" --password "$2" --email "$3"
+        --must-change-password=false
+      - --
+      - "{{ forgejo_bootstrap_repo_owner }}"
+      - "{{ forgejo_bootstrap_owner_password }}"
+      - "{{ forgejo_bootstrap_owner_email }}"
+  changed_when: true
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_bootstrap_owner_check.stdout | trim == ""
+
+- name: Check Forgejo bootstrap repository
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - git
+      - --
+      - sqlite3
+      - /var/lib/forgejo/data/forgejo.db
+      - >-
+        select r.id from repository r join user u on u.id=r.owner_id
+        where u.lower_name=lower('{{ forgejo_bootstrap_repo_owner }}')
+        and r.lower_name=lower('{{ forgejo_bootstrap_repo_name }}') limit 1;
+  register: forgejo_bootstrap_repo_check
+  changed_when: false
+  no_log: true
+  when: forgejo_bootstrap_enabled | default(false) | bool
+
+- name: Create Forgejo bootstrap repository
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:3000/api/v1/admin/users/{{ forgejo_bootstrap_repo_owner }}/repos"
+    method: POST
+    user: "{{ forgejo_bootstrap_admin_username }}"
+    password: "{{ forgejo_bootstrap_admin_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      name: "{{ forgejo_bootstrap_repo_name }}"
+      private: true
+    status_code: [201, 409]
+    return_content: false
+  no_log: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - forgejo_bootstrap_repo_check.stdout | trim == ""
 - name: Verify Forgejo Caddy service is active
   ansible.builtin.command:
     argv:

@@ -134,11 +134,12 @@ The optional `forgejo_runner` service creates a separate Forgejo Actions runner 
 
 Bootstrap order:
 
-1. Add `forgejo_runner` to `settings.local.json` services.
-2. Set `FORGEJO_RUNNER_REGISTRATION_SECRET` in `values/.env` to a persistent 40-character hex secret.
-3. Configure `forgejo_runner_scope` in private inventory as the private values repo owner/name.
-4. Run `just validate`, review `just plan`, then run `just apply` after approval.
-5. Commit and push `values/.forgejo/workflows/deploy.yml` in the private values repo.
+1. Add `forgejo` and `forgejo_runner` to `settings.local.json` services.
+2. Keep Forgejo persistent secrets and bootstrap credentials in `values/.env`: `FORGEJO_SECRET_KEY`, `FORGEJO_INTERNAL_TOKEN`, `FORGEJO_OAUTH2_JWT_SECRET`, `FORGEJO_LFS_JWT_SECRET`, `FORGEJO_ADMIN_USERNAME`, `FORGEJO_ADMIN_EMAIL`, `FORGEJO_ADMIN_PASSWORD`, `FORGEJO_REPO_OWNER_EMAIL`, `FORGEJO_REPO_OWNER_PASSWORD`, and `FORGEJO_RUNNER_REGISTRATION_SECRET`. The default admin username is `anvil`; override `FORGEJO_ADMIN_USERNAME` if needed. The runner registration secret must be exactly 40 hex characters.
+3. Configure `forgejo_runner_scope` in private inventory as the private values repo owner/name. If it is missing or still the scaffold placeholder, `scripts/migrate-values.py` tries to infer it once from the `values` Git remote and writes the explicit value into private inventory.
+4. By default, the Forgejo role creates the dedicated admin user and a separate repository-owner user derived from `forgejo_runner_scope`, then creates the runner repository under that owner. For organizations, create the organization/repository manually and disable `forgejo_bootstrap_enabled` after initial install.
+5. Run `just validate`, review `just plan`, then run `just apply` after approval.
+6. Commit and push `values/.forgejo/workflows/deploy.yml` in the private values repo.
 
 After bootstrap, pushes to the private values repo can run the deployment workflow automatically when a matching runner is online.
 

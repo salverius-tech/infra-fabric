@@ -18,6 +18,12 @@ all:
     forgejo_internal_token: "{{ lookup('env', 'FORGEJO_INTERNAL_TOKEN') }}"
     forgejo_oauth2_jwt_secret: "{{ lookup('env', 'FORGEJO_OAUTH2_JWT_SECRET') }}"
     forgejo_lfs_jwt_secret: "{{ lookup('env', 'FORGEJO_LFS_JWT_SECRET') }}"
+    forgejo_bootstrap_enabled: true
+    forgejo_bootstrap_admin_username: "{{ lookup('env', 'FORGEJO_ADMIN_USERNAME') }}"
+    forgejo_bootstrap_admin_email: "{{ lookup('env', 'FORGEJO_ADMIN_EMAIL') }}"
+    forgejo_bootstrap_admin_password: "{{ lookup('env', 'FORGEJO_ADMIN_PASSWORD') }}"
+    forgejo_bootstrap_owner_email: "{{ lookup('env', 'FORGEJO_REPO_OWNER_EMAIL') }}"
+    forgejo_bootstrap_owner_password: "{{ lookup('env', 'FORGEJO_REPO_OWNER_PASSWORD') }}"
     forgejo_actions_enabled: true
     forgejo_actions_default_url: https://data.forgejo.org
     forgejo_runner_vmid: 109

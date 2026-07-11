@@ -9,6 +9,7 @@ import ipaddress
 import json
 import re
 import secrets
+import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -21,6 +22,8 @@ GENERATED_SECRET_KEYS = {
     "FORGEJO_INTERNAL_TOKEN": lambda: secrets.token_urlsafe(48),
     "FORGEJO_OAUTH2_JWT_SECRET": lambda: secrets.token_urlsafe(32),
     "FORGEJO_LFS_JWT_SECRET": lambda: secrets.token_urlsafe(32),
+    "FORGEJO_ADMIN_PASSWORD": lambda: secrets.token_urlsafe(32),
+    "FORGEJO_REPO_OWNER_PASSWORD": lambda: secrets.token_urlsafe(32),
     "INFISICAL_ENCRYPTION_KEY": lambda: secrets.token_hex(16),
     "INFISICAL_AUTH_SECRET": lambda: base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
     "INFISICAL_POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(32),
@@ -40,6 +43,8 @@ SECRET_KEYS = {
     "FORGEJO_INTERNAL_TOKEN",
     "FORGEJO_OAUTH2_JWT_SECRET",
     "FORGEJO_LFS_JWT_SECRET",
+    "FORGEJO_ADMIN_PASSWORD",
+    "FORGEJO_REPO_OWNER_PASSWORD",
     "FORGEJO_RUNNER_REGISTRATION_SECRET",
     "TAILSCALE_AUTH_KEY",
     "INFISICAL_ENCRYPTION_KEY",
@@ -91,6 +96,9 @@ MIGRATION_ENV_KEYS = {
     "TECHNITIUM_API_URL",
     "DNS_RECORDS_FILE",
     *GENERATED_SECRET_KEYS,
+    "FORGEJO_ADMIN_USERNAME",
+    "FORGEJO_ADMIN_EMAIL",
+    "FORGEJO_REPO_OWNER_EMAIL",
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
     "HERMES_WEB_SEARXNG_URL",
@@ -604,6 +612,69 @@ def ensure_inventory_vars(path: Path, text: str, domain: str) -> tuple[str, list
     return "\n".join(lines) + "\n", changes
 
 
+def values_remote_scope(values_dir: Path) -> str:
+    try:
+        remote = subprocess.check_output(
+            ["git", "-C", str(values_dir), "remote", "get-url", "origin"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return ""
+    if not remote:
+        return ""
+    parsed = urlparse(remote)
+    path = parsed.path.lstrip("/") if parsed.scheme else remote.rsplit(":", 1)[-1]
+    parts = [part for part in path.split("/") if part]
+    if len(parts) < 2:
+        return ""
+    owner = parts[-2]
+    repo = re.sub(r"\\.git$", "", parts[-1])
+    if not owner or not repo:
+        return ""
+    return f"{owner}/{repo}"
+
+
+def ensure_forgejo_inventory_vars(text: str, domain: str, inferred_scope: str) -> tuple[str, list[str]]:
+    changes: list[str] = []
+    scope = inferred_scope or "owner/homelab-infra-values"
+    additions = {
+        "forgejo_secret_key": "    forgejo_secret_key: \"{{ lookup('env', 'FORGEJO_SECRET_KEY') }}\"",
+        "forgejo_internal_token": "    forgejo_internal_token: \"{{ lookup('env', 'FORGEJO_INTERNAL_TOKEN') }}\"",
+        "forgejo_oauth2_jwt_secret": "    forgejo_oauth2_jwt_secret: \"{{ lookup('env', 'FORGEJO_OAUTH2_JWT_SECRET') }}\"",
+        "forgejo_lfs_jwt_secret": "    forgejo_lfs_jwt_secret: \"{{ lookup('env', 'FORGEJO_LFS_JWT_SECRET') }}\"",
+        "forgejo_bootstrap_enabled": "    forgejo_bootstrap_enabled: true",
+        "forgejo_bootstrap_admin_username": "    forgejo_bootstrap_admin_username: \"{{ lookup('env', 'FORGEJO_ADMIN_USERNAME') }}\"",
+        "forgejo_bootstrap_admin_email": "    forgejo_bootstrap_admin_email: \"{{ lookup('env', 'FORGEJO_ADMIN_EMAIL') }}\"",
+        "forgejo_bootstrap_admin_password": "    forgejo_bootstrap_admin_password: \"{{ lookup('env', 'FORGEJO_ADMIN_PASSWORD') }}\"",
+        "forgejo_bootstrap_owner_email": "    forgejo_bootstrap_owner_email: \"{{ lookup('env', 'FORGEJO_REPO_OWNER_EMAIL') }}\"",
+        "forgejo_bootstrap_owner_password": "    forgejo_bootstrap_owner_password: \"{{ lookup('env', 'FORGEJO_REPO_OWNER_PASSWORD') }}\"",
+        "forgejo_runner_scope": f"    forgejo_runner_scope: {scope}",
+    }
+    lines = text.rstrip().splitlines() if text.strip() else ["---", "all:", "  vars:"]
+    joined = "\n".join(lines)
+    for key, line in additions.items():
+        if inventory_has_key(joined, key):
+            continue
+        lines.append(line)
+        joined = "\n".join(lines)
+        changes.append(f"added inventory {key}")
+    text = "\n".join(lines) + "\n"
+    placeholder_scope = "owner/homelab-infra-values"
+    if inferred_scope and re.search(r"^\s*forgejo_runner_scope:\s*" + re.escape(placeholder_scope) + r"\s*$", text, re.MULTILINE):
+        text = re.sub(r"^(\s*forgejo_runner_scope:\s*).+$", rf"\1{inferred_scope}", text, flags=re.MULTILINE)
+        changes.append("derived forgejo_runner_scope from values remote")
+    if re.search(r"^\s*forgejo_bootstrap_admin_username:\s*owner\s*$", text, re.MULTILINE):
+        text = re.sub(
+            r"^(\s*forgejo_bootstrap_admin_username:\s*).+$",
+            r"\1\"{{ lookup('env', 'FORGEJO_ADMIN_USERNAME') }}\"",
+            text,
+            flags=re.MULTILINE,
+        )
+        changes.append("migrated Forgejo bootstrap admin username to env lookup")
+    return text, changes
+
+
 def ensure_dns_records(
     path: Path,
     domain: str,
@@ -631,7 +702,7 @@ def ensure_dns_records(
     return changes
 
 
-def enabled_optional_services(values_dir: Path) -> set[str]:
+def enabled_services(values_dir: Path) -> set[str]:
     if values_dir != Path("values"):
         return set()
     settings_path = Path("settings.local.json")
@@ -642,6 +713,11 @@ def enabled_optional_services(values_dir: Path) -> set[str]:
     except json.JSONDecodeError:
         return set()
     services = data.get("services", [])
+    return {service for service in services if isinstance(service, str)}
+
+
+def enabled_optional_services(values_dir: Path) -> set[str]:
+    services = enabled_services(values_dir)
     return {service for service in ("infisical", "hermes", "onramp_host", "searxng_onramp") if service in services}
 
 
@@ -665,7 +741,9 @@ def migrate(values_dir: Path) -> list[str]:
         if rename_tfvars_key(tfvars_lines, old_key, new_key):
             changes.append(f"renamed {old_key} to {new_key}")
     changes.extend(ensure_service_storage_tfvars(tfvars_lines))
-    optional_services = enabled_optional_services(values_dir)
+    services = enabled_services(values_dir)
+    optional_services = {service for service in ("infisical", "hermes", "onramp_host", "searxng_onramp") if service in services}
+    forgejo_bootstrap_services = {"forgejo", "forgejo_runner"} & services
     changes.extend(migrate_infisical_secret_formats(env_lines, env_entries))
     changes.extend(migrate_hermes_dashboard_password_hash(env_lines, env_entries))
     if optional_services:
@@ -676,15 +754,34 @@ def migrate(values_dir: Path) -> list[str]:
     tfvars_values = parse_tfvars(tfvars_lines, tfvars_path)
 
     inventory_changes: list[str] = []
-    if optional_services:
+    if optional_services or forgejo_bootstrap_services:
         for key, generator in GENERATED_SECRET_KEYS.items():
             if key not in env_entries:
                 set_env(env_lines, env_entries, key, generator())
                 changes.append(f"generated {key}")
 
         domain = service_domain(tfvars_lines)
-        inventory_text, inventory_changes = ensure_inventory_vars(inventory_path, inventory_text, domain)
-        changes.extend(inventory_changes)
+        inferred_scope = values_remote_scope(values_dir)
+        inferred_owner = inferred_scope.split("/", 1)[0] if inferred_scope else "owner"
+        if forgejo_bootstrap_services and "FORGEJO_ADMIN_USERNAME" not in env_entries:
+            set_env(env_lines, env_entries, "FORGEJO_ADMIN_USERNAME", "anvil")
+            changes.append("added FORGEJO_ADMIN_USERNAME default")
+        if forgejo_bootstrap_services and "FORGEJO_ADMIN_EMAIL" not in env_entries:
+            set_env(env_lines, env_entries, "FORGEJO_ADMIN_EMAIL", f"anvil@{domain}")
+            changes.append("added FORGEJO_ADMIN_EMAIL default")
+        if forgejo_bootstrap_services and "FORGEJO_REPO_OWNER_EMAIL" not in env_entries:
+            set_env(env_lines, env_entries, "FORGEJO_REPO_OWNER_EMAIL", f"{inferred_owner}@{domain}")
+            changes.append("added FORGEJO_REPO_OWNER_EMAIL default")
+        if forgejo_bootstrap_services:
+            inventory_text, forgejo_inventory_changes = ensure_forgejo_inventory_vars(
+                inventory_text,
+                domain,
+                inferred_scope,
+            )
+            changes.extend(forgejo_inventory_changes)
+        if optional_services:
+            inventory_text, inventory_changes = ensure_inventory_vars(inventory_path, inventory_text, domain)
+            changes.extend(inventory_changes)
         if "searxng_onramp" in optional_services and "HERMES_WEB_SEARXNG_URL" not in env_entries:
             set_env(env_lines, env_entries, "HERMES_WEB_SEARXNG_URL", f"https://searxng.apps.{domain}")
             changes.append("added HERMES_WEB_SEARXNG_URL for SearXNG onramp")
