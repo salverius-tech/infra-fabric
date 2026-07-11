@@ -143,7 +143,18 @@ def bootstrap(env_file: Path, retries: int, delay: int, token_name: str) -> bool
 
     user = env_value(entries, "TECHNITIUM_ADMIN_USER") or "admin"
     admin_password = ensure_admin_password(client, status, env_file, env_lines, entries, user)
-    session_token = login(client, user, admin_password)
+    try:
+        session_token = login(client, user, admin_password)
+    except BootstrapError:
+        if not bool(status.get("hasDefaultCredentials")):
+            raise
+        new_password = secrets.token_urlsafe(32)
+        default_session_token = login(client, user, "admin")
+        client.call("/user/changePassword", {"pass": "admin", "newPass": new_password}, token=default_session_token)
+        set_env(env_lines, entries, "TECHNITIUM_ADMIN_PASSWORD", new_password)
+        write_lines(env_file, env_lines)
+        print("Replaced stale Technitium admin password from default credentials.")
+        session_token = login(client, user, new_password)
     api_token = create_api_token(client, session_token, token_name)
     set_env(env_lines, entries, "TECHNITIUM_API_TOKEN", api_token)
     write_lines(env_file, env_lines)
