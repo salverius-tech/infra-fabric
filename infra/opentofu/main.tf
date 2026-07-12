@@ -6,6 +6,8 @@ resource "proxmox_download_file" "debian_13_lxc_template" {
   file_name           = var.debian_template_file_name
   node_name           = var.proxmox_node_name
   url                 = var.debian_template_url
+  checksum            = var.debian_template_checksum
+  checksum_algorithm  = var.debian_template_checksum_algorithm
   upload_timeout      = var.lxc_template_download_timeout_seconds
   overwrite           = false
   overwrite_unmanaged = false
@@ -19,6 +21,8 @@ resource "proxmox_download_file" "debian_13_service_vm_image" {
   file_name           = var.guest_vm_image_file_name
   node_name           = var.proxmox_node_name
   url                 = var.guest_vm_image_url
+  checksum            = var.guest_vm_image_checksum
+  checksum_algorithm  = var.guest_vm_image_checksum_algorithm
   overwrite           = false
   overwrite_unmanaged = false
 }

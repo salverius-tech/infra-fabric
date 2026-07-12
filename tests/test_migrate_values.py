@@ -44,6 +44,25 @@ class MigrateValuesTests(unittest.TestCase):
         )
         return temp, values
 
+    def test_ensure_lxc_template_integrity_tfvars_adds_missing_pins(self) -> None:
+        lines = ['debian_template_url = "http://download.proxmox.com/images/system/debian-13-standard_13.1-2_amd64.tar.zst"\n']
+
+        changes = migrate_values.ensure_lxc_template_integrity_tfvars(lines)
+
+        self.assertIn("added debian_template_checksum", changes)
+        self.assertIn("guest_vm_image_checksum", "\n".join(lines))
+        self.assertEqual(migrate_values.ensure_lxc_template_integrity_tfvars(lines), [])
+
+    def test_ensure_technitium_pin_inventory_vars_adds_missing_pins(self) -> None:
+        text, changes = migrate_values.ensure_technitium_pin_inventory_vars("all:\n  vars:\n")
+
+        self.assertIn('technitium_discovery_version: "15.2.0"', text)
+        self.assertIn("technitium_portable_sha256:", text)
+        self.assertIn("added inventory technitium_discovery_version", changes)
+        text_again, changes_again = migrate_values.ensure_technitium_pin_inventory_vars(text)
+        self.assertEqual(text_again, text)
+        self.assertEqual(changes_again, [])
+
     def test_ensure_hermes_pin_inventory_vars_adds_missing_pins(self) -> None:
         text, changes = migrate_values.ensure_hermes_pin_inventory_vars("all:\n  vars:\n    hermes_domain: hermes.example.internal\n")
 
@@ -364,6 +383,7 @@ class MigrateValuesTests(unittest.TestCase):
             )
             (values / "terraform.tfvars").write_text("", encoding="utf-8")
 
+            self.assertIn("added debian_template_checksum", migrate_values.migrate(values))
             self.assertEqual(migrate_values.migrate(values), [])
 
 

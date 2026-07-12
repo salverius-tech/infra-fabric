@@ -118,6 +118,26 @@ variable "debian_template_file_name" {
   type        = string
 }
 
+variable "debian_template_checksum_algorithm" {
+  description = "Digest algorithm for the pinned Debian 13 LXC template."
+  type        = string
+
+  validation {
+    condition     = contains(["sha256", "sha512"], var.debian_template_checksum_algorithm)
+    error_message = "debian_template_checksum_algorithm must be sha256 or sha512."
+  }
+}
+
+variable "debian_template_checksum" {
+  description = "Digest for the pinned Debian 13 LXC template."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{64}$|^[0-9a-f]{128}$", var.debian_template_checksum))
+    error_message = "debian_template_checksum must be a lowercase SHA-256 or SHA-512 digest."
+  }
+}
+
 variable "lxc_template_download_timeout_seconds" {
   description = "Timeout, in seconds, for downloading the Debian LXC template into Proxmox storage."
   type        = number
@@ -298,6 +318,26 @@ variable "guest_vm_image_file_name" {
   validation {
     condition     = can(regex("^[A-Za-z0-9._-]+\\.qcow2$", var.guest_vm_image_file_name))
     error_message = "guest_vm_image_file_name must be a qcow2 file name."
+  }
+}
+
+variable "guest_vm_image_checksum_algorithm" {
+  description = "Digest algorithm for the shared Debian cloud image."
+  type        = string
+
+  validation {
+    condition     = contains(["sha256", "sha512"], var.guest_vm_image_checksum_algorithm)
+    error_message = "guest_vm_image_checksum_algorithm must be sha256 or sha512."
+  }
+}
+
+variable "guest_vm_image_checksum" {
+  description = "Digest for the shared Debian cloud image."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{64}$|^[0-9a-f]{128}$", var.guest_vm_image_checksum))
+    error_message = "guest_vm_image_checksum must be a lowercase SHA-256 or SHA-512 digest."
   }
 }
 

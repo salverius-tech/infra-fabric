@@ -114,6 +114,23 @@ HERMES_SCRYPT_R = 8
 HERMES_SCRYPT_P = 1
 HERMES_SCRYPT_DKLEN = 32
 HERMES_SCRYPT_SALT_BYTES = 16
+LEGACY_GUEST_VM_IMAGE_URL = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+PINNED_GUEST_VM_IMAGE_URL = "https://cloud.debian.org/images/cloud/trixie/20260623-2518/debian-13-genericcloud-amd64-20260623-2518.qcow2"
+LEGACY_GUEST_VM_IMAGE_FILE_NAME = "debian-13-genericcloud-amd64.qcow2"
+PINNED_GUEST_VM_IMAGE_FILE_NAME = "debian-13-genericcloud-amd64-20260623-2518.qcow2"
+
+LXC_TEMPLATE_INTEGRITY_DEFAULTS = {
+    "debian_template_checksum_algorithm": '"sha512"',
+    "debian_template_checksum": '"5aec4ab2ac5c16c7c8ecb87bfeeb10213abe96db6b85e2463585cea492fc861d7c390b3f9c95629bf690b95e9dfe1037207fc69c0912429605f208d5cb2621f8"',
+    "guest_vm_image_checksum_algorithm": '"sha512"',
+    "guest_vm_image_checksum": '"df2bd468b08566c0409a7982d6489d73499ad22f9a28646b538c2f21d08f15040a5e4737952ca209e9ad4488cd00793191791be9f135dee93082c86fcca3300c"',
+}
+
+TECHNITIUM_PIN_DEFAULTS = {
+    "technitium_discovery_version": '    technitium_discovery_version: "15.2.0"',
+    "technitium_portable_sha256": "    technitium_portable_sha256: 2e39fb8d0718475790cc025e083a1bcfd837a5e79e4a1d0ed775881bd90287ef",
+}
+
 HERMES_PIN_DEFAULTS = {
     "hermes_discovery_version": '    hermes_discovery_version: "0.18.0"',
     "hermes_discovery_tag": '    hermes_discovery_tag: "v2026.7.1"',
@@ -401,6 +418,23 @@ def remove_tfvars_keys_by_name(tfvars_lines: list[str], keys: set[str]) -> list[
     return sorted(set(removed))
 
 
+def ensure_lxc_template_integrity_tfvars(tfvars_lines: list[str]) -> list[str]:
+    changes: list[str] = []
+    if tfvars_scalar_value(tfvars_lines, "guest_vm_image_url") == LEGACY_GUEST_VM_IMAGE_URL:
+        if replace_tfvars_raw(tfvars_lines, "guest_vm_image_url", hcl_quote(PINNED_GUEST_VM_IMAGE_URL)):
+            changes.append("pinned guest_vm_image_url")
+    if tfvars_scalar_value(tfvars_lines, "guest_vm_image_file_name") == LEGACY_GUEST_VM_IMAGE_FILE_NAME:
+        if replace_tfvars_raw(tfvars_lines, "guest_vm_image_file_name", hcl_quote(PINNED_GUEST_VM_IMAGE_FILE_NAME)):
+            changes.append("pinned guest_vm_image_file_name")
+    for key, value in LXC_TEMPLATE_INTEGRITY_DEFAULTS.items():
+        if set_tfvars_raw(tfvars_lines, key, value):
+            changes.append(f"added {key}")
+        elif tfvars_raw_value(tfvars_lines, key) != value:
+            if replace_tfvars_raw(tfvars_lines, key, value):
+                changes.append(f"normalized {key}")
+    return changes
+
+
 def ensure_service_storage_tfvars(tfvars_lines: list[str]) -> list[str]:
     if tfvars_key_exists(tfvars_lines, "service_storage"):
         removed = remove_tfvars_keys_by_name(
@@ -646,6 +680,19 @@ def values_remote_scope(values_dir: Path) -> str:
     return f"{owner}/{repo}"
 
 
+def ensure_technitium_pin_inventory_vars(text: str) -> tuple[str, list[str]]:
+    changes: list[str] = []
+    lines = text.rstrip().splitlines() if text.strip() else ["---", "all:", "  vars:"]
+    joined = "\n".join(lines)
+    for key, line in TECHNITIUM_PIN_DEFAULTS.items():
+        if inventory_has_key(joined, key):
+            continue
+        lines.append(line)
+        joined = "\n".join(lines)
+        changes.append(f"added inventory {key}")
+    return "\n".join(lines) + "\n", changes
+
+
 def ensure_hermes_pin_inventory_vars(text: str) -> tuple[str, list[str]]:
     changes: list[str] = []
     lines = text.rstrip().splitlines() if text.strip() else ["---", "all:", "  vars:"]
@@ -766,6 +813,7 @@ def migrate(values_dir: Path) -> list[str]:
     for old_key, new_key in TECHNITIUM_TFVARS_RENAMES.items():
         if rename_tfvars_key(tfvars_lines, old_key, new_key):
             changes.append(f"renamed {old_key} to {new_key}")
+    changes.extend(ensure_lxc_template_integrity_tfvars(tfvars_lines))
     changes.extend(ensure_service_storage_tfvars(tfvars_lines))
     services = enabled_services(values_dir)
     optional_services = {service for service in ("infisical", "hermes", "onramp_host", "searxng_onramp") if service in services}
@@ -780,7 +828,7 @@ def migrate(values_dir: Path) -> list[str]:
     tfvars_values = parse_tfvars(tfvars_lines, tfvars_path)
 
     inventory_changes: list[str] = []
-    if optional_services or forgejo_bootstrap_services:
+    if optional_services or forgejo_bootstrap_services or "technitium" in services:
         for key, generator in GENERATED_SECRET_KEYS.items():
             if key not in env_entries:
                 set_env(env_lines, env_entries, key, generator())
@@ -805,6 +853,9 @@ def migrate(values_dir: Path) -> list[str]:
                 inferred_scope,
             )
             changes.extend(forgejo_inventory_changes)
+        if "technitium" in services:
+            inventory_text, technitium_pin_changes = ensure_technitium_pin_inventory_vars(inventory_text)
+            changes.extend(technitium_pin_changes)
         if "hermes" in optional_services:
             inventory_text, hermes_pin_changes = ensure_hermes_pin_inventory_vars(inventory_text)
             changes.extend(hermes_pin_changes)

@@ -19,12 +19,16 @@ rootfs_datastore_id                   = "local-lvm"
 template_datastore_id                 = "local"
 debian_template_url                   = "http://download.proxmox.com/images/system/debian-13-standard_13.1-2_amd64.tar.zst"
 debian_template_file_name             = "debian-13-standard_13.1-2_amd64.tar.zst"
+debian_template_checksum_algorithm    = "sha512"
+debian_template_checksum              = "5aec4ab2ac5c16c7c8ecb87bfeeb10213abe96db6b85e2463585cea492fc861d7c390b3f9c95629bf690b95e9dfe1037207fc69c0912429605f208d5cb2621f8"
 lxc_template_download_timeout_seconds = 1800
 
-guest_vm_image_datastore_id = "local"
-guest_vm_image_url          = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
-guest_vm_image_file_name    = "debian-13-genericcloud-amd64.qcow2"
-guest_vm_cloud_init_user    = "root"
+guest_vm_image_datastore_id       = "local"
+guest_vm_image_url                = "https://cloud.debian.org/images/cloud/trixie/20260623-2518/debian-13-genericcloud-amd64-20260623-2518.qcow2"
+guest_vm_image_file_name          = "debian-13-genericcloud-amd64-20260623-2518.qcow2"
+guest_vm_image_checksum_algorithm = "sha512"
+guest_vm_image_checksum           = "df2bd468b08566c0409a7982d6489d73499ad22f9a28646b538c2f21d08f15040a5e4737952ca209e9ad4488cd00793191791be9f135dee93082c86fcca3300c"
+guest_vm_cloud_init_user          = "root"
 
 service_runtime = {
   forgejo = {
