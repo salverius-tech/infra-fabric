@@ -99,6 +99,8 @@ class AnsibleSafetyTests(unittest.TestCase):
     def test_browser_facing_service_roles_have_http_smoke_checks(self) -> None:
         for path in SERVICE_SMOKE_TASK_FILES:
             text = path.read_text(encoding="utf-8")
+            if path == REPO / "infra" / "ansible" / "roles" / "technitium" / "tasks" / "main.yml":
+                text += (path.parent / "health.yml").read_text(encoding="utf-8")
             has_http_check = "ansible.builtin.uri:" in text or "      - curl\n" in text
             self.assertTrue(has_http_check, str(path))
             self.assertIn("retries:", text, str(path))
