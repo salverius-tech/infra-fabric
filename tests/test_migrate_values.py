@@ -44,6 +44,17 @@ class MigrateValuesTests(unittest.TestCase):
         )
         return temp, values
 
+    def test_ensure_hermes_pin_inventory_vars_adds_missing_pins(self) -> None:
+        text, changes = migrate_values.ensure_hermes_pin_inventory_vars("all:\n  vars:\n    hermes_domain: hermes.example.internal\n")
+
+        self.assertIn('hermes_discovery_version: "0.18.0"', text)
+        self.assertIn('hermes_node_version: "22.23.1"', text)
+        self.assertIn("hermes_node_sha256_amd64:", text)
+        self.assertIn("added inventory hermes_discovery_version", changes)
+        text_again, changes_again = migrate_values.ensure_hermes_pin_inventory_vars(text)
+        self.assertEqual(text_again, text)
+        self.assertEqual(changes_again, [])
+
     def test_migrates_technitium_values_from_old_locations(self) -> None:
         temp, values = self.make_values()
         with temp:

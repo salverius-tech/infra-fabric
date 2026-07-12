@@ -114,6 +114,15 @@ HERMES_SCRYPT_R = 8
 HERMES_SCRYPT_P = 1
 HERMES_SCRYPT_DKLEN = 32
 HERMES_SCRYPT_SALT_BYTES = 16
+HERMES_PIN_DEFAULTS = {
+    "hermes_discovery_version": '    hermes_discovery_version: "0.18.0"',
+    "hermes_discovery_tag": '    hermes_discovery_tag: "v2026.7.1"',
+    "hermes_discovery_commit": "    hermes_discovery_commit: 7c1a029553d87c43ecff8a3821336bc95872213b",
+    "hermes_discovery_wheel_sha256": "    hermes_discovery_wheel_sha256: bf75c02d59f7c464cd0d85026fb7ee2e6bb15f003beccab3442b572f1ae1fd37",
+    "hermes_node_version": '    hermes_node_version: "22.23.1"',
+    "hermes_node_sha256_amd64": "    hermes_node_sha256_amd64: 9749e988f437343b7fa832c69ded82a312e41a03116d766797ac14f6f9eee578",
+    "hermes_node_sha256_arm64": "    hermes_node_sha256_arm64: 543fa39e57d4c07855939459a323f4deb9a79dd1bb45e6e99458b0f2de10db8d",
+}
 
 
 class MigrationError(ValueError):
@@ -637,6 +646,19 @@ def values_remote_scope(values_dir: Path) -> str:
     return f"{owner}/{repo}"
 
 
+def ensure_hermes_pin_inventory_vars(text: str) -> tuple[str, list[str]]:
+    changes: list[str] = []
+    lines = text.rstrip().splitlines() if text.strip() else ["---", "all:", "  vars:"]
+    joined = "\n".join(lines)
+    for key, line in HERMES_PIN_DEFAULTS.items():
+        if inventory_has_key(joined, key):
+            continue
+        lines.append(line)
+        joined = "\n".join(lines)
+        changes.append(f"added inventory {key}")
+    return "\n".join(lines) + "\n", changes
+
+
 def ensure_forgejo_inventory_vars(text: str, domain: str, inferred_scope: str) -> tuple[str, list[str]]:
     changes: list[str] = []
     scope = inferred_scope or "owner/homelab-infra-values"
@@ -783,6 +805,9 @@ def migrate(values_dir: Path) -> list[str]:
                 inferred_scope,
             )
             changes.extend(forgejo_inventory_changes)
+        if "hermes" in optional_services:
+            inventory_text, hermes_pin_changes = ensure_hermes_pin_inventory_vars(inventory_text)
+            changes.extend(hermes_pin_changes)
         if optional_services:
             inventory_text, inventory_changes = ensure_inventory_vars(inventory_path, inventory_text, domain)
             changes.extend(inventory_changes)

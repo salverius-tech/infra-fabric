@@ -17,10 +17,16 @@
       - hermes_max_spawn_depth | default(2) | int <= 3
       - hermes_runtime_user | default('anvil') is match('^[a-z_][a-z0-9_-]{0,31}$')
       - hermes_runtime_user | default('anvil') != 'root'
+      - hermes_node_version is defined
+      - hermes_node_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
+      - hermes_node_sha256_amd64 is defined
+      - hermes_node_sha256_amd64 is match('^[0-9a-f]{64}$')
+      - hermes_node_sha256_arm64 is defined
+      - hermes_node_sha256_arm64 is match('^[0-9a-f]{64}$')
     fail_msg: >-
       hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token,
-      non-empty dashboard auth variables, sane Hermes tuning values, and a
-      non-root runtime user are required.
+      non-empty dashboard auth variables, sane Hermes tuning values, a
+      non-root runtime user, and complete managed Node.js pins are required.
 - name: Ensure Hermes runtime user exists
   ansible.builtin.user:
     name: "{{ hermes_runtime_user | default('anvil') }}"
@@ -28,6 +34,22 @@
     create_home: true
     groups: users
     append: true
+
+- name: Ensure Hermes runtime state directory exists
+  ansible.builtin.file:
+    path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0700'
+
+- name: Enable linger for Hermes runtime user services
+  ansible.builtin.command:
+    argv:
+      - loginctl
+      - enable-linger
+      - "{{ hermes_runtime_user | default('anvil') }}"
+  changed_when: false
 
 - name: Ensure Hermes runtime SSH directory exists
   ansible.builtin.file:
@@ -109,22 +131,166 @@
     group: caddy
   no_log: true
   notify: Restart caddy
-- name: Install Node.js runtime for Hermes dashboard build
+- name: Select Hermes managed Node.js artifact
+  ansible.builtin.set_fact:
+    hermes_node_arch: "{{ 'x64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+    hermes_node_sha256: >-
+      {{ hermes_node_sha256_amd64
+         if ansible_architecture == 'x86_64'
+         else hermes_node_sha256_arm64 }}
+  when: ansible_architecture in ['x86_64', 'aarch64']
+
+- name: Reject unsupported Hermes managed Node.js architecture
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in ['x86_64', 'aarch64']
+    fail_msg: Hermes managed Node.js supports only amd64 and arm64.
+
+- name: Detect Hermes managed wheel runtime support
+  ansible.builtin.set_fact:
+    hermes_managed_runtime_supported: >-
+      {{ ansible_distribution == 'Debian' and
+         ansible_distribution_major_version == '13' and
+         ansible_architecture == 'x86_64' and
+         ansible_python.version.major == 3 and
+         ansible_python.version.minor == 13 }}
+
+- name: Install verified managed Node.js runtime
   ansible.builtin.command:
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; version=\"{{ hermes_node_version | default('22.12.0') }}\"; current=\"$(node --version 2>/dev/null | sed 's/^v//' || true)\"; if [[ \"${current}\" != \"${version}\" ]]; then\n  arch=\"$(uname -m)\";\n  case \"${arch}\" in x86_64) node_arch=x64 ;; aarch64) node_arch=arm64 ;; *) echo \"unsupported Node.js arch: ${arch}\" >&2; exit 1 ;; esac;\n  tmp=\"$(mktemp -d)\";\n  trap 'rm -rf \"${tmp}\"' EXIT;\n  curl -fsSL -o \"${tmp}/node.tar.xz\" \"https://nodejs.org/dist/v${version}/node-v${version}-linux-${node_arch}.tar.xz\";\n  rm -rf /usr/local/lib/nodejs;\n  install -d -m 0755 /usr/local/lib/nodejs;\n  tar -xJf \"${tmp}/node.tar.xz\" -C /usr/local/lib/nodejs --strip-components=1;\n  ln -sf /usr/local/lib/nodejs/bin/node /usr/local/bin/node;\n  ln -sf /usr/local/lib/nodejs/bin/npm /usr/local/bin/npm;\n  ln -sf /usr/local/lib/nodejs/bin/npx /usr/local/bin/npx;\nfi"  # yamllint disable-line rule:line-length
+      - |
+        set -euo pipefail
+        version={{ hermes_node_version | quote }}
+        arch={{ hermes_node_arch | quote }}
+        sha256={{ hermes_node_sha256 | trim | quote }}
+        root=/usr/local/lib/hermes-node
+        release="${root}/releases/${version}-${sha256:0:12}"
+        changed=0
+
+        install -d -m 0755 "${root}/releases"
+        if [[ ! -f "${release}/.artifact-sha256" ]]; then
+          [[ ! -e "${release}" ]] || {
+            echo "existing Hermes Node.js release is incomplete: ${release}" >&2
+            exit 1
+          }
+          archive="$(mktemp)"
+          staging="$(mktemp -d "${root}/releases/.${version}.XXXXXX")"
+          trap 'rm -f "${archive}"; [[ -z "${staging:-}" ]] || rm -rf "${staging}"' EXIT
+          curl -fsSL -o "${archive}" \
+            "https://nodejs.org/dist/v${version}/node-v${version}-linux-${arch}.tar.xz"
+          printf '%s  %s\n' "${sha256}" "${archive}" | sha256sum -c -
+          tar -xJf "${archive}" --strip-components=1 -C "${staging}"
+          [[ "$("${staging}/bin/node" --version)" = "v${version}" ]]
+          chmod 0755 "${staging}"
+          printf '%s\n' "${sha256}" > "${staging}/.artifact-sha256"
+          mv "${staging}" "${release}"
+          staging=
+          changed=1
+        fi
+
+        [[ "$(cat "${release}/.artifact-sha256")" = "${sha256}" ]]
+        if [[ "$(stat -c %a "${release}")" != 755 ]]; then
+          chmod 0755 "${release}"
+          changed=1
+        fi
+        current="$(readlink -f "${root}/current" 2>/dev/null || true)"
+        if [[ "${current}" != "${release}" ]]; then
+          ln -s "${release}" "${root}/.current-new"
+          mv -Tf "${root}/.current-new" "${root}/current"
+          changed=1
+        fi
+        [[ "$("${root}/current/bin/node" --version)" = "v${version}" ]]
+        [[ "${changed}" -eq 0 ]] || echo changed
+  register: hermes_node_install
+  changed_when: "'changed' in hermes_node_install.stdout_lines"
   when: hermes_dashboard_enabled | default(true) | bool
-  changed_when: false
-- name: Install Hermes Agent CLI and dashboard dependencies in LXC
+
+- name: Install legacy Hermes Agent CLI and dashboard dependencies
   ansible.builtin.command:
     argv:
       - bash
       - -lc
       - "set -euo pipefail; if ! command -v hermes >/dev/null 2>&1; then\n  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser;\nfi; pnpm_version=\"{{ hermes_pnpm_version | default('10.24.0') }}\"; if [[ \"$(pnpm --version 2>/dev/null || true)\" != \"${pnpm_version}\" ]]; then\n  tmp=\"$(mktemp -d)\"; trap 'rm -rf \"${tmp}\"' EXIT; curl -fsSL -o \"${tmp}/pnpm.tgz\" \"https://registry.npmjs.org/pnpm/-/pnpm-${pnpm_version}.tgz\"; rm -rf /usr/local/lib/pnpm; install -d -m 0755 /usr/local/lib/pnpm; tar -xzf \"${tmp}/pnpm.tgz\" -C /usr/local/lib/pnpm --strip-components=1; ln -sf /usr/local/lib/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm;\nfi; cd /usr/local/lib/hermes-agent; python3 -m venv --upgrade-deps venv; venv/bin/python -m pip install -e \".[web,pty]\"; cd /usr/local/lib/hermes-agent/web; pnpm install --frozen-lockfile=false; pnpm run build"  # yamllint disable-line rule:line-length
-  when: hermes_dashboard_enabled | default(true) | bool
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - not hermes_managed_runtime_supported | default(false) | bool
   changed_when: false
+
+- name: Ensure local libexec directory exists
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+
+- name: Install Hermes dashboard preflight
+  ansible.builtin.template:
+    src: hermes-dashboard-preflight.sh.j2
+    dest: /usr/local/libexec/hermes-dashboard-preflight
+    mode: '0755'
+    owner: root
+    group: root
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+  notify: Restart hermes dashboard
+
+- name: Install Hermes dashboard env
+  ansible.builtin.template:
+    src: hermes-dashboard.env.j2
+    dest: /etc/hermes-dashboard.env
+    mode: '0600'
+    owner: root
+    group: root
+  when: hermes_dashboard_enabled | default(true) | bool
+  no_log: true
+  notify: Restart hermes dashboard
+
+- name: Install Hermes dashboard systemd unit
+  ansible.builtin.template:
+    src: hermes-dashboard.service.j2
+    dest: /etc/systemd/system/hermes-dashboard.service
+    mode: '0644'
+    owner: root
+    group: root
+  when: hermes_dashboard_enabled | default(true) | bool
+  notify: Restart hermes dashboard
+
+- name: Ensure Hermes TUI bundle directory exists
+  ansible.builtin.file:
+    path: /usr/local/lib/hermes-agent/tui/dist
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+
+- name: Install managed Hermes Agent runtime
+  ansible.builtin.include_tasks: managed-runtime.yml
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+
+- name: Link Hermes dashboard TUI bundle to the active release
+  ansible.builtin.file:
+    src: /usr/local/lib/hermes-agent/venv/lib/python3.13/site-packages/hermes_cli/tui_dist/entry.js
+    dest: /usr/local/lib/hermes-agent/tui/dist/entry.js
+    state: link
+    force: true
+    owner: root
+    group: root
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+  notify: Restart hermes dashboard
 - name: Configure Hermes context compression and delegation limits
   ansible.builtin.command:
     argv:
@@ -151,25 +317,14 @@
   changed_when: false
   when: hermes_dashboard_enabled | default(true) | bool
 
-- name: Install Hermes dashboard env
-  ansible.builtin.template:
-    src: hermes-dashboard.env.j2
-    dest: /etc/hermes-dashboard.env
-    mode: '0600'
-    owner: root
-    group: root
-  when: hermes_dashboard_enabled | default(true) | bool
-  no_log: true
-  notify: Restart hermes dashboard
-- name: Install Hermes dashboard systemd unit
-  ansible.builtin.template:
-    src: hermes-dashboard.service.j2
-    dest: /etc/systemd/system/hermes-dashboard.service
-    mode: '0644'
-    owner: root
-    group: root
-  when: hermes_dashboard_enabled | default(true) | bool
-  notify: Restart hermes dashboard
+- name: Record Hermes startup journal boundary
+  ansible.builtin.command:
+    argv:
+      - date
+      - +%s
+  register: hermes_deployment_started_epoch
+  changed_when: false
+
 - name: Enable Hermes dashboard service
   ansible.builtin.command:
     argv:
@@ -270,6 +425,21 @@
   retries: 12
   delay: 5
   until: hermes_https_login_check.rc == 0
+- name: Reject Hermes startup journal errors
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        if journalctl --unit hermes-dashboard
+        --since "@{{ hermes_deployment_started_epoch.stdout | trim }}"
+        --no-pager --output=cat |
+        grep -Eqi
+        'HERMES_PREFLIGHT_|Chat unavailable|node not found|npm not found|Traceback \(most recent call last\)|ModuleNotFoundError|ImportError:';
+        then echo 'Hermes startup journal contains a fatal readiness marker.' >&2; exit 1; fi
+  changed_when: false
+  when: hermes_dashboard_enabled | default(true) | bool
 - name: Verify Hermes static HTTPS route locally
   ansible.builtin.command:
     argv:
