@@ -17,6 +17,7 @@ DEFAULT_MAX_AGE_HOURS = 24
 INPUT_GLOBS = (
     "infra/opentofu/**/*.tf",
     "infra/opentofu/.terraform.lock.hcl",
+    "infra/services.json",
     "infra/ansible/scripts/apply-technitium-dns.py",
     "infra/ansible/**/*",
     "scripts/*.py",
@@ -108,9 +109,48 @@ def load_plan_json(plan: Path, repo: Path) -> dict[str, Any]:
     return data
 
 
-def summarize_plan(plan_json: dict[str, Any]) -> dict[str, Any]:
+def enabled_stateful_services_by_address(repo: Path) -> dict[str, list[str]]:
+    registry_path = repo / "infra" / "services.json"
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise MetadataError(f"cannot read service registry: {registry_path}") from error
+    services = registry.get("services", {})
+    settings_path = repo / "settings.local.json"
+    try:
+        local_settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
+    except json.JSONDecodeError as error:
+        raise MetadataError(f"cannot parse operator settings: {settings_path}") from error
+    enabled = local_settings.get("services", registry.get("default_services", []))
+    if not isinstance(services, dict) or not isinstance(enabled, list):
+        raise MetadataError("service registry or operator settings has an invalid service list")
+
+    result: dict[str, list[str]] = {}
+    for service in enabled:
+        config = services.get(service)
+        if not isinstance(config, dict) or not config.get("state_capable"):
+            continue
+        prefixes = config.get("terraform_addresses", [])
+        if not isinstance(prefixes, list):
+            continue
+        for prefix in prefixes:
+            if isinstance(prefix, str) and prefix:
+                result.setdefault(prefix, []).append(str(service))
+    return result
+
+
+def stateful_services_for_address(address: str, stateful_by_address: dict[str, list[str]]) -> tuple[str | None, list[str]]:
+    for prefix, services in stateful_by_address.items():
+        if address.startswith(prefix):
+            return prefix, services
+    return None, []
+
+
+def summarize_plan(plan_json: dict[str, Any], repo: Path | None = None) -> dict[str, Any]:
     counts = {"create": 0, "update": 0, "replace": 0, "delete": 0, "read": 0, "no_op": 0}
-    destructive_changes: list[dict[str, str]] = []
+    destructive_changes: list[dict[str, Any]] = []
+    stateful_changes: list[dict[str, Any]] = []
+    stateful_by_address = enabled_stateful_services_by_address(repo) if repo is not None else {}
     for change in plan_json.get("resource_changes", []):
         if not isinstance(change, dict):
             continue
@@ -118,12 +158,13 @@ def summarize_plan(plan_json: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(actions, list):
             continue
         address = str(change.get("address", "unknown"))
+        destructive_item: dict[str, Any] | None = None
         if "delete" in actions and "create" in actions:
             counts["replace"] += 1
-            destructive_changes.append({"address": address, "actions": "/".join(actions)})
+            destructive_item = {"address": address, "actions": "/".join(actions)}
         elif actions == ["delete"]:
             counts["delete"] += 1
-            destructive_changes.append({"address": address, "actions": "delete"})
+            destructive_item = {"address": address, "actions": "delete"}
         elif actions == ["create"]:
             counts["create"] += 1
         elif actions == ["update"]:
@@ -133,11 +174,21 @@ def summarize_plan(plan_json: dict[str, Any]) -> dict[str, Any]:
         elif actions == ["no-op"]:
             counts["no_op"] += 1
         elif "delete" in actions:
-            destructive_changes.append({"address": address, "actions": "/".join(actions)})
+            destructive_item = {"address": address, "actions": "/".join(actions)}
+        if destructive_item is not None:
+            target, services = stateful_services_for_address(address, stateful_by_address)
+            if target and services:
+                destructive_item["stateful_target"] = target
+                destructive_item["stateful_services"] = services
+                stateful_changes.append(destructive_item)
+            destructive_changes.append(destructive_item)
     return {
         "resource_changes": counts,
         "destructive": bool(destructive_changes),
         "destructive_changes": destructive_changes,
+        "stateful_changes": stateful_changes,
+        "stateful_targets": sorted({change["stateful_target"] for change in stateful_changes}),
+        "stateful_services": sorted({service for change in stateful_changes for service in change["stateful_services"]}),
     }
 
 
@@ -154,13 +205,24 @@ def format_plan_summary(summary: dict[str, Any]) -> str:
     if destructive_changes:
         lines.append("Destructive changes:")
         for item in destructive_changes[:20]:
-            lines.append(f"  - {item.get('address', 'unknown')}: {item.get('actions', 'delete')}")
+            suffix = ""
+            if item.get("stateful_services"):
+                suffix = f" [stateful: {', '.join(item.get('stateful_services', []))}]"
+            lines.append(f"  - {item.get('address', 'unknown')}: {item.get('actions', 'delete')}{suffix}")
         remaining = len(destructive_changes) - 20
         if remaining > 0:
             lines.append(f"  ... and {remaining} more")
         lines.append("Apply is gated. Set INFRA_ALLOW_DESTROY=1 only after review.")
     else:
         lines.append("Destructive changes: none")
+    stateful_targets = summary.get("stateful_targets", [])
+    if stateful_targets:
+        lines.append(f"Stateful infrastructure targets: {', '.join(stateful_targets)}")
+        lines.append(f"Affected stateful services: {', '.join(summary.get('stateful_services', []))}")
+        if len(stateful_targets) > 1:
+            lines.append(
+                "Stateful batch is blocked. Split the rollout or set INFRA_ALLOW_STATEFUL_BATCH=1 after review."
+            )
     return "\n".join(lines)
 
 
@@ -174,7 +236,7 @@ def create_metadata(
     if not plan.is_file():
         raise MetadataError(f"Missing plan file: {plan}")
     now = datetime.now(timezone.utc)
-    summary = summarize_plan(plan_json if plan_json is not None else load_plan_json(plan, repo))
+    summary = summarize_plan(plan_json if plan_json is not None else load_plan_json(plan, repo), repo)
     data: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "created_at": now.isoformat(),
@@ -204,6 +266,14 @@ def validate_summary(summary: Any) -> dict[str, Any]:
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     if not isinstance(summary.get("destructive_changes"), list):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
+    if not isinstance(summary.get("stateful_changes"), list):
+        raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
+    stateful_targets = summary.get("stateful_targets")
+    stateful_services = summary.get("stateful_services")
+    if not isinstance(stateful_targets, list) or not all(isinstance(target, str) for target in stateful_targets):
+        raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
+    if not isinstance(stateful_services, list) or not all(isinstance(service, str) for service in stateful_services):
+        raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     return summary
 
 
@@ -224,7 +294,13 @@ def load_metadata(metadata: Path) -> dict[str, Any]:
     return data
 
 
-def verify_metadata(plan: Path, metadata: Path, repo: Path, allow_destroy: bool = False) -> None:
+def verify_metadata(
+    plan: Path,
+    metadata: Path,
+    repo: Path,
+    allow_destroy: bool = False,
+    allow_stateful_batch: bool = False,
+) -> None:
     if not plan.is_file():
         raise MetadataError("Saved tfplan is missing. Run `just plan` again.")
     data = load_metadata(metadata)
@@ -257,6 +333,13 @@ def verify_metadata(plan: Path, metadata: Path, repo: Path, allow_destroy: bool 
             "with `INFRA_ALLOW_DESTROY=1 just apply` only if the deletes/replacements are intended."
         )
 
+    stateful_targets = summary["stateful_targets"]
+    if len(stateful_targets) > 1 and not allow_stateful_batch:
+        raise MetadataError(
+            "Saved tfplan changes multiple stateful services. Split the rollout where practical. "
+            "Use INFRA_ALLOW_STATEFUL_BATCH=1 only for an explicitly reviewed exception."
+        )
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -273,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--plan", type=Path, required=True)
     verify.add_argument("--metadata", type=Path, required=True)
     verify.add_argument("--allow-destroy", action="store_true")
+    verify.add_argument("--allow-stateful-batch", action="store_true")
 
     summary = subparsers.add_parser("summary")
     summary.add_argument("--metadata", type=Path, required=True)
@@ -285,7 +369,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.print_summary:
                 print(format_plan_summary(data["summary"]))
         elif args.command == "verify":
-            verify_metadata(args.plan, args.metadata, repo, args.allow_destroy)
+            verify_metadata(args.plan, args.metadata, repo, args.allow_destroy, args.allow_stateful_batch)
         elif args.command == "summary":
             print(format_plan_summary(load_metadata(args.metadata)["summary"]))
     except MetadataError as error:

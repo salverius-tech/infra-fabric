@@ -5,6 +5,12 @@
   ],
   "services": {
     "technitium": {
+      "state_capable": true,
+      "state_order": 3,
+      "terraform_addresses": [
+        "module.technitium_dns[",
+        "module.technitium_dns_vm["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/technitium.yml",
         "infra/ansible/playbooks/caddy-proxy.yml",
@@ -20,6 +26,13 @@
       }
     },
     "forgejo": {
+      "state_capable": true,
+      "state_order": 2,
+      "terraform_addresses": [
+        "module.forgejo[",
+        "module.forgejo_vm[",
+        "terraform_data.forgejo_storage_validation["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/forgejo.yml"
       ],
@@ -41,6 +54,11 @@
       }
     },
     "tailscale_client": {
+      "state_capable": false,
+      "terraform_addresses": [
+        "module.tailscale_client[",
+        "module.tailscale_client_vm["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/tailscale-client.yml"
       ],
@@ -57,6 +75,11 @@
       }
     },
     "forgejo_runner": {
+      "state_capable": false,
+      "terraform_addresses": [
+        "module.forgejo_runner[",
+        "module.forgejo_runner_vm["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/forgejo-runner.yml"
       ],
@@ -72,6 +95,11 @@
       }
     },
     "infisical": {
+      "state_capable": false,
+      "terraform_addresses": [
+        "module.infisical[",
+        "module.infisical_vm["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/infisical.yml"
       ],
@@ -87,6 +115,11 @@
       }
     },
     "infisical_onramp": {
+      "state_capable": true,
+      "state_order": 5,
+      "terraform_addresses": [
+        "proxmox_virtual_environment_vm.onramp_host["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/infisical-onramp.yml"
       ],
@@ -111,6 +144,12 @@
       }
     },
     "hermes": {
+      "state_capable": true,
+      "state_order": 1,
+      "terraform_addresses": [
+        "module.hermes[",
+        "module.hermes_vm["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/hermes.yml"
       ],
@@ -131,6 +170,11 @@
       }
     },
     "onramp_host": {
+      "state_capable": true,
+      "state_order": 4,
+      "terraform_addresses": [
+        "proxmox_virtual_environment_vm.onramp_host["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/onramp-host.yml"
       ],
@@ -157,6 +201,11 @@
       }
     },
     "searxng_onramp": {
+      "state_capable": true,
+      "state_order": 6,
+      "terraform_addresses": [
+        "proxmox_virtual_environment_vm.onramp_host["
+      ],
       "playbooks": [
         "infra/ansible/playbooks/searxng-onramp.yml"
       ],

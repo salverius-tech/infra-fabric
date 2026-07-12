@@ -20,6 +20,24 @@ class TfplanMetadataTests(unittest.TestCase):
         (repo / "infra" / "ansible" / "scripts").mkdir(parents=True)
         (repo / "infra" / "opentofu").mkdir(parents=True)
         (repo / "infra" / "opentofu" / "main.tf").write_text("terraform {}\n")
+        (repo / "infra" / "services.json").write_text(
+            tfplan_metadata.json.dumps(
+                {
+                    "default_services": ["forgejo", "hermes"],
+                    "services": {
+                        "forgejo": {
+                            "state_capable": True,
+                            "terraform_addresses": ["module.forgejo_vm["],
+                        },
+                        "hermes": {
+                            "state_capable": True,
+                            "terraform_addresses": ["module.hermes["],
+                        },
+                    },
+                }
+            )
+            + "\n"
+        )
         (repo / "infra" / "ansible" / "scripts" / "apply-technitium-dns.py").write_text("# helper\n")
         (repo / "values" / "ansible" / "inventory").mkdir(parents=True)
         (repo / "values" / "terraform.tfvars").write_text("x = 1\n")
@@ -102,6 +120,38 @@ class TfplanMetadataTests(unittest.TestCase):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
             tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
 
+    def test_multi_service_stateful_destructive_plan_requires_allow_stateful_batch(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            tfplan_metadata.create_metadata(
+                plan,
+                metadata,
+                repo,
+                24,
+                {
+                    "resource_changes": [
+                        {"address": "module.forgejo_vm[0].resource", "change": {"actions": ["delete"]}},
+                        {"address": "module.hermes[0].resource", "change": {"actions": ["delete"]}},
+                    ]
+                },
+            )
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
+            tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True, allow_stateful_batch=True)
+
+    def test_single_service_stateful_destructive_plan_does_not_require_batch_override(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            data = tfplan_metadata.create_metadata(
+                plan,
+                metadata,
+                repo,
+                24,
+                {"resource_changes": [{"address": "module.forgejo_vm[0].resource", "change": {"actions": ["delete"]}}]},
+            )
+            self.assertEqual(data["summary"]["stateful_services"], ["forgejo"])
+            tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
+
     def test_missing_summary_fails_closed(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
@@ -117,6 +167,9 @@ class TfplanMetadataTests(unittest.TestCase):
                 "resource_changes": {"create": 0, "update": 0, "replace": 1, "delete": 0},
                 "destructive": True,
                 "destructive_changes": [{"address": "resource.replace", "actions": "delete/create"}],
+                "stateful_changes": [],
+                "stateful_targets": [],
+                "stateful_services": [],
             }
         )
 
