@@ -262,6 +262,18 @@
   when: hermes_dashboard_enabled | default(true) | bool
   notify: Restart hermes dashboard
 
+- name: Install Hermes gateway systemd unit
+  ansible.builtin.template:
+    src: hermes-gateway.service.j2
+    dest: /etc/systemd/system/hermes-gateway.service
+    mode: '0644'
+    owner: root
+    group: root
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+  notify: Restart hermes gateway
+
 - name: Ensure Hermes TUI bundle directory exists
   ansible.builtin.file:
     path: /usr/local/lib/hermes-agent/tui/dist
@@ -291,6 +303,18 @@
     - hermes_dashboard_enabled | default(true) | bool
     - hermes_managed_runtime_supported | default(false) | bool
   notify: Restart hermes dashboard
+
+- name: Verify active Hermes messaging imports
+  ansible.builtin.command:
+    argv:
+      - /usr/local/lib/hermes-agent/venv/bin/python
+      - -c
+      - import aiohttp, discord, slack_bolt, telegram
+  changed_when: false
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+
 - name: Configure Hermes context compression and delegation limits
   ansible.builtin.command:
     argv:
@@ -333,6 +357,15 @@
       - systemctl daemon-reload && systemctl enable --now hermes-dashboard
   when: hermes_dashboard_enabled | default(true) | bool
   changed_when: false
+- name: Enable Hermes gateway service
+  ansible.builtin.systemd:
+    name: hermes-gateway
+    enabled: true
+    state: started
+    daemon_reload: true
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
 - name: Install Hermes Caddyfile
   ansible.builtin.template:
     src: Caddyfile.j2
@@ -384,6 +417,20 @@
   retries: 6
   delay: 5
   until: hermes_caddy_active.rc == 0
+- name: Verify Hermes gateway service is active
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - hermes-gateway
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+  changed_when: false
+  register: hermes_gateway_active
+  retries: 6
+  delay: 5
+  until: hermes_gateway_active.rc == 0
 - name: Verify Hermes dashboard service is active
   ansible.builtin.command:
     argv:
@@ -432,7 +479,7 @@
       - -lc
       - >-
         set -euo pipefail;
-        if journalctl --unit hermes-dashboard
+        if journalctl --unit hermes-dashboard --unit hermes-gateway
         --since "@{{ hermes_deployment_started_epoch.stdout | trim }}"
         --no-pager --output=cat |
         grep -Eqi
