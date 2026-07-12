@@ -64,6 +64,7 @@ all:
     hermes_node_sha256_amd64: 9749e988f437343b7fa832c69ded82a312e41a03116d766797ac14f6f9eee578
     hermes_node_sha256_arm64: 543fa39e57d4c07855939459a323f4deb9a79dd1bb45e6e99458b0f2de10db8d
     hermes_runtime_passwordless_sudo: false
+    hermes_allow_legacy_runtime: false
     hermes_compression_threshold: 0.75
     hermes_max_concurrent_children: 5
     hermes_max_spawn_depth: 2

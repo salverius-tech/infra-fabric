@@ -58,8 +58,10 @@ class HermesRuntimeContractTests(unittest.TestCase):
 
     def test_managed_runtime_uses_hashed_wheels_and_legacy_fallback_is_scoped(self) -> None:
         self.assertIn("Detect Hermes managed wheel runtime support", self.main)
+        self.assertIn("Reject unsupported Hermes runtime without explicit legacy opt-in", self.main)
         self.assertIn("Install legacy Hermes Agent CLI and dashboard dependencies", self.main)
         self.assertIn("not hermes_managed_runtime_supported", self.main)
+        self.assertIn("hermes_allow_legacy_runtime", self.main)
         self.assertIn("--require-hashes", self.tasks)
         self.assertIn("--only-binary=:all:", self.tasks)
         self.assertIn("https://pypi.org/simple", self.tasks)

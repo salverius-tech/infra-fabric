@@ -71,6 +71,10 @@ argument_specs:
         type: bool
         required: false
         description: "Install a validated NOPASSWD sudoers policy for the Hermes runtime user (default: false)."
+      hermes_allow_legacy_runtime:
+        type: bool
+        required: false
+        description: "Permit the mutable legacy Hermes installer on unsupported managed-runtime platforms (default: false)."
       hermes_ssh_public_keys:
         type: list
         required: false

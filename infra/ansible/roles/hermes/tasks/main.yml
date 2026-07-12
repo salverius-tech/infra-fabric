@@ -171,6 +171,14 @@
          ansible_python.version.major == 3 and
          ansible_python.version.minor == 13 }}
 
+- name: Reject unsupported Hermes runtime without explicit legacy opt-in
+  ansible.builtin.assert:
+    that:
+      - hermes_managed_runtime_supported | bool or hermes_allow_legacy_runtime | default(false) | bool
+    fail_msg: >-
+      Hermes requires Debian 13 amd64 with Python 3.13 for the managed runtime.
+      Set hermes_allow_legacy_runtime=true only for an explicitly accepted legacy installer exception.
+
 - name: Install verified managed Node.js runtime
   ansible.builtin.command:
     argv:
@@ -232,6 +240,7 @@
   when:
     - hermes_dashboard_enabled | default(true) | bool
     - not hermes_managed_runtime_supported | default(false) | bool
+    - hermes_allow_legacy_runtime | default(false) | bool
   changed_when: false
 
 - name: Ensure local libexec directory exists
