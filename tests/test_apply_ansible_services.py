@@ -93,6 +93,18 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         finally:
             path.unlink()
 
+    def test_summary_identifies_unattempted_services(self) -> None:
+        result = apply_ansible_services.ServiceResult("forgejo", (), 0, Path("/tmp/forgejo.log"))
+        import contextlib
+        import io
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            apply_ansible_services.summarize_results(["forgejo", "hermes"], [result])
+
+        self.assertIn("forgejo: configured", buffer.getvalue())
+        self.assertIn("hermes: not attempted", buffer.getvalue())
+
     def test_sequential_stops_after_first_failure(self) -> None:
         commands: list[list[str]] = []
 

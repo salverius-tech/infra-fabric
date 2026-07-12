@@ -175,6 +175,19 @@ def run_parallel(
     return results
 
 
+def summarize_results(services: list[str], results: list[ServiceResult]) -> None:
+    by_service = {result.service: result for result in results}
+    print("Ansible service apply summary:", flush=True)
+    for service in services:
+        result = by_service.get(service)
+        if result is None:
+            print(f"  {service}: not attempted", flush=True)
+        elif result.returncode == 0:
+            print(f"  {service}: configured", flush=True)
+        else:
+            print(f"  {service}: failed; log {result.log_path}", flush=True)
+
+
 def summarize_failures(results: list[ServiceResult]) -> int:
     failed = [result for result in results if result.returncode != 0]
     if not failed:
@@ -213,6 +226,7 @@ def main(argv: list[str] | None = None) -> int:
         results = run_sequential(services, inventories, log_dir, args.env_file, base_env)
     else:
         results = run_parallel(services, inventories, log_dir, args.env_file, base_env, max(1, args.max_workers))
+    summarize_results(services, results)
     return summarize_failures(results)
 
 
