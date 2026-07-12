@@ -300,9 +300,9 @@ variable "guest_vm_image_datastore_id" {
 }
 
 variable "guest_vm_image_url" {
-  description = "Debian cloud image URL used by services running as VMs."
+  description = "Pinned Debian cloud image URL used by services running as VMs."
   type        = string
-  default     = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+  default     = "https://cloud.debian.org/images/cloud/trixie/20260623-2518/debian-13-genericcloud-amd64-20260623-2518.qcow2"
 
   validation {
     condition     = can(regex("^https://", var.guest_vm_image_url))
@@ -374,9 +374,9 @@ variable "forgejo_vm_image_datastore_id" {
 }
 
 variable "forgejo_vm_image_url" {
-  description = "Debian cloud image URL used when Forgejo runs as a VM."
+  description = "Pinned Debian cloud image URL used when Forgejo runs as a VM."
   type        = string
-  default     = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+  default     = "https://cloud.debian.org/images/cloud/trixie/20260623-2518/debian-13-genericcloud-amd64-20260623-2518.qcow2"
 
   validation {
     condition     = can(regex("^https://", var.forgejo_vm_image_url))
@@ -1058,13 +1058,35 @@ variable "onramp_host_image_datastore_id" {
 }
 
 variable "onramp_host_image_url" {
-  description = "Debian 13 genericcloud qcow2 image URL used to create a clean cloud-init onramp-host VM."
+  description = "Pinned Debian 13 genericcloud qcow2 image URL used to create a clean cloud-init onramp-host VM."
   type        = string
-  default     = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"
+  default     = "https://cloud.debian.org/images/cloud/trixie/20260623-2518/debian-13-genericcloud-amd64-20260623-2518.qcow2"
 
   validation {
     condition     = can(regex("^https://", var.onramp_host_image_url))
     error_message = "onramp_host_image_url must be an HTTPS URL for a Debian 13 cloud image."
+  }
+}
+
+variable "onramp_host_image_checksum_algorithm" {
+  description = "Checksum algorithm for the pinned onramp-host image."
+  type        = string
+  default     = "sha512"
+
+  validation {
+    condition     = contains(["sha256", "sha512"], var.onramp_host_image_checksum_algorithm)
+    error_message = "onramp_host_image_checksum_algorithm must be sha256 or sha512."
+  }
+}
+
+variable "onramp_host_image_checksum" {
+  description = "Checksum for the pinned onramp-host image."
+  type        = string
+  default     = "df2bd468b08566c0409a7982d6489d73499ad22f9a28646b538c2f21d08f15040a5e4737952ca209e9ad4488cd00793191791be9f135dee93082c86fcca3300c"
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{64}$|^[0-9a-f]{128}$", var.onramp_host_image_checksum))
+    error_message = "onramp_host_image_checksum must be a lowercase SHA-256 or SHA-512 digest."
   }
 }
 
@@ -1382,42 +1404,51 @@ variable "tailscale_client_startup_down_delay" {
   default     = "10"
 }
 
+# These values are consumed by the Ansible inventory generator. They remain
+# declared here because values/terraform.tfvars is also the inventory source.
+# tflint-ignore: terraform_unused_declarations
 variable "searxng_server_name" {
   description = "DNS hostname for the temporary SearXNG onramp workload. Ansible/DNS consume this value."
   type        = string
   default     = "searxng.apps.example.net"
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "searxng_public_url" {
   description = "Public HTTPS URL for the temporary SearXNG onramp workload. Hermes can consume this value."
   type        = string
   default     = "https://searxng.apps.example.net"
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "searxng_container_image" {
-  description = "Container image used by the SearXNG onramp workload."
+  description = "Pinned container image used by the SearXNG onramp workload."
   type        = string
-  default     = "docker.io/searxng/searxng:latest"
+  default     = "docker.io/searxng/searxng@sha256:f433294b46a93564993c4371005341e013d94aa8ea4662d8ee521cd2cccb08e8"
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "searxng_container_port" {
   description = "Loopback port exposed by the rootless SearXNG container for Caddy."
   type        = number
   default     = 8080
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "searxng_bind_address" {
   description = "Host address that receives the rootless SearXNG container port. Keep this loopback-only."
   type        = string
   default     = "127.0.0.1"
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "searxng_instance_name" {
   description = "Display name for the SearXNG instance."
   type        = string
   default     = "Homelab SearXNG"
 }
 
+# tflint-ignore: terraform_unused_declarations
 variable "searxng_enable_public_url" {
   description = "Whether SearXNG should advertise searxng_public_url in its settings."
   type        = bool

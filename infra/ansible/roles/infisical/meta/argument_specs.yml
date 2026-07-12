@@ -50,4 +50,4 @@ argument_specs:
       infisical_version:
         type: str
         required: false
-        description: "Infisical container image tag to deploy (default: latest)."
+        description: "Infisical container image tag and optional digest to deploy."

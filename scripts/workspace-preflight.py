@@ -39,6 +39,23 @@ def check_glob_writable(root: Path, pattern: str) -> None:
         check_file_writable(path)
 
 
+def check_no_unexpected_artifacts(repo: Path) -> None:
+    """Reject crash/state artifacts outside the private values repository."""
+    forbidden = (
+        repo / "infra" / "opentofu" / "errored.tfstate",
+        repo / "infra" / "opentofu" / "crash.log",
+        repo / "infra" / "opentofu" / "crash.*.log",
+    )
+    for pattern in forbidden:
+        matches = [pattern] if "*" not in pattern.name else list(pattern.parent.glob(pattern.name))
+        for path in matches:
+            if path.exists():
+                raise PreflightError(
+                    f"unexpected OpenTofu artifact outside values/: {path}. "
+                    "Remove it before continuing."
+                )
+
+
 def check_no_state_lock(values: Path) -> None:
     lock_file = values / ".terraform.tfstate.lock.info"
     if lock_file.exists():
@@ -52,6 +69,7 @@ def run(root: Path, require_values: bool) -> None:
     repo = root.resolve()
     check_directory_writable(repo)
     check_directory_writable(repo / "infra" / "opentofu")
+    check_no_unexpected_artifacts(repo)
     check_file_writable(repo / "infra" / "opentofu" / ".terraform.lock.hcl")
     check_glob_writable(repo, "tfplan*")
     check_glob_writable(repo, "*.tfplan*")

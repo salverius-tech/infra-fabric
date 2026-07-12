@@ -143,7 +143,7 @@
     argv:
       - bash
       - -lc
-      - curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz && PATH=/usr/local/go/bin:${PATH} GOBIN=/usr/local/bin /usr/local/go/bin/go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest && PATH=/usr/local/go/bin:${PATH} /usr/local/bin/xcaddy build --with github.com/caddy-dns/cloudflare --output /tmp/caddy-cloudflare && install -m 0755 /tmp/caddy-cloudflare /usr/bin/caddy  # yamllint disable-line rule:line-length
+      - curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz && PATH=/usr/local/go/bin:${PATH} GOBIN=/usr/local/bin /usr/local/go/bin/go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.6 && PATH=/usr/local/go/bin:${PATH} /usr/local/bin/xcaddy build --with github.com/caddy-dns/cloudflare@v0.2.4 --output /tmp/caddy-cloudflare && install -m 0755 /tmp/caddy-cloudflare /usr/bin/caddy  # yamllint disable-line rule:line-length
   when: hermes_caddy_cloudflare_module.rc != 0
   changed_when: true
   notify: Restart caddy
@@ -245,7 +245,7 @@
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; if ! command -v hermes >/dev/null 2>&1; then\n  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser;\nfi; pnpm_version=\"{{ hermes_pnpm_version | default('10.24.0') }}\"; if [[ \"$(pnpm --version 2>/dev/null || true)\" != \"${pnpm_version}\" ]]; then\n  tmp=\"$(mktemp -d)\"; trap 'rm -rf \"${tmp}\"' EXIT; curl -fsSL -o \"${tmp}/pnpm.tgz\" \"https://registry.npmjs.org/pnpm/-/pnpm-${pnpm_version}.tgz\"; rm -rf /usr/local/lib/pnpm; install -d -m 0755 /usr/local/lib/pnpm; tar -xzf \"${tmp}/pnpm.tgz\" -C /usr/local/lib/pnpm --strip-components=1; ln -sf /usr/local/lib/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm;\nfi; cd /usr/local/lib/hermes-agent; python3 -m venv --upgrade-deps venv; venv/bin/python -m pip install -e \".[web,pty]\"; cd /usr/local/lib/hermes-agent/web; pnpm install --frozen-lockfile=false; pnpm run build"  # yamllint disable-line rule:line-length
+      - "set -euo pipefail; if ! command -v hermes >/dev/null 2>&1; then\n  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser;\nfi; pnpm_version=\"{{ hermes_pnpm_version | default('10.24.0') }}\"; if [[ \"$(pnpm --version 2>/dev/null || true)\" != \"${pnpm_version}\" ]]; then\n  tmp=\"$(mktemp -d)\"; trap 'rm -rf \"${tmp}\"' EXIT; curl -fsSL -o \"${tmp}/pnpm.tgz\" \"https://registry.npmjs.org/pnpm/-/pnpm-${pnpm_version}.tgz\"; rm -rf /usr/local/lib/pnpm; install -d -m 0755 /usr/local/lib/pnpm; tar -xzf \"${tmp}/pnpm.tgz\" -C /usr/local/lib/pnpm --strip-components=1; ln -sf /usr/local/lib/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm;\nfi; cd /usr/local/lib/hermes-agent; python3 -m venv --upgrade-deps venv; venv/bin/python -m pip install -e \".[web,pty]\"; cd /usr/local/lib/hermes-agent/web; pnpm install --frozen-lockfile; pnpm run build"  # yamllint disable-line rule:line-length
   when:
     - hermes_dashboard_enabled | default(true) | bool
     - not hermes_managed_runtime_supported | default(false) | bool

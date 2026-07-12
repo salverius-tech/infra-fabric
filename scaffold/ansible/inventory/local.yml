@@ -46,7 +46,7 @@ all:
         address: 192.0.2.62
     infisical_vmid: 110
     infisical_domain: infisical.example.internal
-    infisical_version: latest
+    infisical_version: v0.162.3@sha256:75e74ee1cc11bdc1b504acb9846940484501ce3f1c54cb3af77cdd09a6c05893
     infisical_data_dir: /var/lib/infisical
     infisical_encryption_key: "{{ lookup('env', 'INFISICAL_ENCRYPTION_KEY') }}"
     infisical_auth_secret: "{{ lookup('env', 'INFISICAL_AUTH_SECRET') }}"
@@ -78,7 +78,7 @@ all:
     searxng_server_name: searxng.apps.example.net
     searxng_public_url: https://searxng.apps.example.net
     searxng_secret_key: "{{ lookup('env', 'SEARXNG_SECRET_KEY') }}"
-    searxng_container_image: docker.io/searxng/searxng:latest
+    searxng_container_image: docker.io/searxng/searxng@sha256:f433294b46a93564993c4371005341e013d94aa8ea4662d8ee521cd2cccb08e8
     searxng_container_port: 8080
     searxng_bind_address: 127.0.0.1
     searxng_instance_name: Homelab SearXNG

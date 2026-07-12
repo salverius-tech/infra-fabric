@@ -6,6 +6,8 @@ resource "proxmox_download_file" "debian_13_onramp_host_image" {
   file_name           = var.onramp_host_image_file_name
   node_name           = var.proxmox_node_name
   url                 = var.onramp_host_image_url
+  checksum            = var.onramp_host_image_checksum
+  checksum_algorithm  = var.onramp_host_image_checksum_algorithm
   overwrite           = false
   overwrite_unmanaged = false
 }

@@ -45,6 +45,14 @@ class WorkspacePreflightTests(unittest.TestCase):
             (root / "infra" / "opentofu").mkdir(parents=True)
             self.assertIsNone(workspace_preflight.run(root, require_values=False))
 
+    def test_unexpected_opentofu_artifact_fails(self) -> None:
+        temp, root = self.make_repo()
+        with temp:
+            artifact = root / "infra" / "opentofu" / "errored.tfstate"
+            artifact.write_text("{}\n", encoding="utf-8")
+            with self.assertRaises(workspace_preflight.PreflightError):
+                workspace_preflight.run(root, require_values=True)
+
     def test_state_lock_fails(self) -> None:
         temp, root = self.make_repo()
         with temp:
