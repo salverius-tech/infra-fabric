@@ -37,6 +37,26 @@ class DirectServiceAnsibleHelperTests(unittest.TestCase):
         self.assertIn("direct_access_ready", result.stdout)
         self.assertIn("known_hosts", result.stdout)
 
+    def test_proxmox_access_is_bootstrapped_before_host_tasks(self) -> None:
+        playbook = (REPO / "infra" / "ansible" / "playbooks" / "proxmox-access-ready.yml").read_text(encoding="utf-8")
+        self.assertIn("hosts: localhost", playbook)
+        self.assertIn("hostvars['pve'].ansible_host", playbook)
+        self.assertIn("proxmox_access_ready_accept_host_key_change", playbook)
+        self.assertIn("Proxmox SSH host key changed", playbook)
+        for name in (
+            "hermes",
+            "forgejo",
+            "forgejo-runner",
+            "technitium",
+            "infisical",
+            "tailscale-client",
+            "caddy-proxy",
+            "storage-prep",
+            "guest-mount-feature-preflight",
+        ):
+            content = (REPO / "infra" / "ansible" / "playbooks" / f"{name}.yml").read_text(encoding="utf-8")
+            self.assertIn("import_playbook: proxmox-access-ready.yml", content)
+
     def test_direct_access_known_hosts_fails_closed_on_unapproved_key_change(self) -> None:
         playbook = (REPO / "infra" / "ansible" / "playbooks" / "direct-access-ready.yml").read_text(encoding="utf-8")
         self.assertIn("/workspace/values/ansible/known_hosts", playbook)

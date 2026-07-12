@@ -1,4 +1,6 @@
 ---
+- name: Refresh Proxmox SSH trust before guest feature checks
+  ansible.builtin.import_playbook: proxmox-access-ready.yml
 - name: Verify Proxmox LXC guest mount feature prerequisites
   hosts: pve
   gather_facts: false

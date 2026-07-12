@@ -1,4 +1,6 @@
 ---
+- name: Refresh Proxmox SSH trust before Caddy lifecycle checks
+  ansible.builtin.import_playbook: proxmox-access-ready.yml
 - name: Prepare Technitium Caddy proxy lifecycle boundary
   hosts: pve
   gather_facts: false

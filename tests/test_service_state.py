@@ -29,6 +29,12 @@ class ServiceStateTests(unittest.TestCase):
         self.assertIn("/etc/infisical", definition["paths"])
         self.assertIn("infisical_data_dir", "\n".join(definition["paths"]))
 
+    def test_hermes_backup_includes_gateway_and_dashboard(self) -> None:
+        self.assertEqual(
+            self.catalog["hermes"]["services"],
+            ["hermes-gateway", "hermes-dashboard"],
+        )
+
     def test_forgejo_postgres_backup_and_restore_are_managed(self) -> None:
         backup = BACKUP.read_text(encoding="utf-8")
         restore = RESTORE.read_text(encoding="utf-8")

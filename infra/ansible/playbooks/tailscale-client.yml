@@ -1,4 +1,6 @@
 ---
+- name: Refresh Proxmox SSH trust before Tailscale lifecycle checks
+  ansible.builtin.import_playbook: proxmox-access-ready.yml
 - name: Prepare Tailscale client LXC lifecycle boundary
   hosts: pve
   gather_facts: false

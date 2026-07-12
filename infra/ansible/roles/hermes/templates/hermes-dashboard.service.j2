@@ -8,6 +8,8 @@ Type=simple
 User={{ hermes_runtime_user | default('anvil') }}
 Group={{ hermes_runtime_user | default('anvil') }}
 EnvironmentFile=/etc/hermes-dashboard.env
+# Make Hermes recognize the LXC as a container so the dashboard does not mutate managed releases.
+Environment="KUBERNETES_SERVICE_HOST=hermes-managed-runtime"
 WorkingDirectory=/home/{{ hermes_runtime_user | default('anvil') }}
 {% if hermes_managed_runtime_supported | default(false) | bool %}
 ExecStartPre=/usr/local/libexec/hermes-dashboard-preflight

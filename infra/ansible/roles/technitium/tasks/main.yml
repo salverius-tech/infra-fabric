@@ -67,6 +67,22 @@
         path: /var/tmp/packages-microsoft-prod.deb
         state: absent
 
+- name: Check whether Technitium is currently running
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - dns
+  register: technitium_service_active
+  changed_when: false
+  failed_when: false
+
+- name: Stop Technitium before changing its service account
+  ansible.builtin.systemd:
+    name: dns
+    state: stopped
+  when: technitium_service_active.rc == 0
+
 - name: Ensure Technitium service account exists
   ansible.builtin.user:
     name: dns-server
@@ -74,6 +90,12 @@
     shell: /usr/sbin/nologin
     home: /var/lib/dns-server
     create_home: false
+
+- name: Restart Technitium after changing its service account
+  ansible.builtin.systemd:
+    name: dns
+    state: started
+  when: technitium_service_active.rc == 0
 
 - name: Ensure Technitium persistent and release directories exist
   ansible.builtin.file:
@@ -103,6 +125,10 @@
       owner: dns-server
       group: dns-server
       mode: '0750'
+    - path: /usr/local/libexec
+      owner: root
+      group: root
+      mode: '0755'
 
 - name: Install Technitium archive validator
   ansible.builtin.copy:
@@ -274,10 +300,22 @@
         name: dns
         state: stopped
       register: technitium_stop
+    - name: Wait for Technitium service to stop before activation
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - dns
+      register: technitium_inactive
+      changed_when: false
+      failed_when: false
+      retries: 30
+      delay: 2
+      until: technitium_inactive.stdout | trim in ['inactive', 'failed']
     - name: Verify Technitium service is inactive before activation
       ansible.builtin.assert:
         that:
-          - technitium_stop.status.ActiveState == 'inactive'
+          - technitium_inactive.stdout | trim in ['inactive', 'failed']
         fail_msg: Technitium service must be inactive before changing the application link.
     - name: Replace previous Technitium state snapshot staging directory
       ansible.builtin.file:

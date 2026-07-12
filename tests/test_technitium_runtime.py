@@ -69,6 +69,16 @@ class TechnitiumRoleContractTests(unittest.TestCase):
         self.assertIn("checksum_algorithm: sha256", self.tasks)
         self.assertIn("technitium_staged_archive.stat.checksum != technitium_portable_sha256", self.tasks)
 
+    def test_service_account_changes_stop_and_restore_active_service(self) -> None:
+        self.assertIn("Check whether Technitium is currently running", self.tasks)
+        self.assertIn("Stop Technitium before changing its service account", self.tasks)
+        self.assertIn("Restart Technitium after changing its service account", self.tasks)
+        self.assertIn("when: technitium_service_active.rc == 0", self.tasks)
+
+    def test_runtime_support_directory_is_created_before_validator_install(self) -> None:
+        self.assertIn("- path: /usr/local/libexec", self.tasks)
+        self.assertIn("dest: /usr/local/libexec/validate-technitium-archive.py", self.tasks)
+
     def test_marker_match_gates_all_runtime_staging_and_activation(self) -> None:
         self.assertIn("technitium_installed_version.stdout | trim != technitium_discovery_version", self.tasks)
         self.assertIn("when: technitium_update_required | bool", self.tasks)
@@ -88,8 +98,9 @@ class TechnitiumRoleContractTests(unittest.TestCase):
             "    - name: Replace previous Technitium state snapshot staging directory", 1
         )[0]
         self.assertIn("register: technitium_stop", stop_and_verify)
-        self.assertIn("technitium_stop.status.ActiveState == 'inactive'", stop_and_verify)
-        self.assertNotIn("failed_when: false", stop_and_verify)
+        self.assertIn("register: technitium_inactive", stop_and_verify)
+        self.assertIn("technitium_inactive.stdout | trim in ['inactive', 'failed']", stop_and_verify)
+        self.assertIn("retries: 30", stop_and_verify)
 
     def test_state_is_outside_release_directories(self) -> None:
         self.assertIn("technitium_state_directory: /etc/dns", (TASKS.parent.parent / "defaults/main.yml").read_text(encoding="utf-8"))

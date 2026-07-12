@@ -35,6 +35,9 @@
     groups: users
     append: true
 
+- name: Restore guarded private Hermes state during bootstrap
+  ansible.builtin.include_tasks: bootstrap-state.yml
+
 - name: Ensure Hermes runtime state directory exists
   ansible.builtin.file:
     path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
@@ -76,6 +79,12 @@
       - -lc
       - "set -euo pipefail; packages=\"build-essential ca-certificates caddy curl docker.io git gnupg jq openssh-client python3 python3-pip python3-venv rsync sudo tar unzip xz-utils\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
   changed_when: false
+- name: Grant Hermes runtime user access to Docker
+  ansible.builtin.user:
+    name: "{{ hermes_runtime_user | default('anvil') }}"
+    groups: docker
+    append: true
+  notify: Restart hermes gateway
 - name: Install passwordless sudo policy for Hermes runtime user
   ansible.builtin.copy:
     dest: /etc/sudoers.d/hermes-runtime
@@ -111,7 +120,7 @@
     argv:
       - bash
       - -lc
-      - "install -d -m 0755 /srv /var/www/hermes; if [[ ! -d {{ hermes_repo_path | default('/srv/homelab-infra') | quote }} ]]; then\n  install -d -m 0755 -o {{ (hermes_runtime_user | default('anvil')) | quote }} -g {{ (hermes_runtime_user | default('anvil')) | quote }} {{ hermes_repo_path | default('/srv/homelab-infra') | quote }};\nfi"  # yamllint disable-line rule:line-length
+      - "install -d -m 0755 /srv /var/www/hermes; install -d -m 0755 -o {{ (hermes_runtime_user | default('anvil')) | quote }} -g {{ (hermes_runtime_user | default('anvil')) | quote }} {{ hermes_repo_path | default('/srv/homelab-infra') | quote }}"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Install Hermes landing page
   ansible.builtin.template:

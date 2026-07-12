@@ -42,6 +42,11 @@ Restore stops the managed service units declared for the service, writes a
 pre-restore archive of the current state into `values/service-backups/<service>/`,
 restores the selected archive, and starts the managed units again.
 
+Hermes is also restored automatically during guarded bootstrap when its live
+`.hermes` directory is missing or empty. The role validates the newest complete
+private archive and requires customized `SOUL.md` state before restoring it. An
+existing non-empty Hermes state directory is never replaced automatically.
+
 ## Supported targets
 
 Current service-state targets are:
@@ -62,8 +67,8 @@ there when this repo starts managing a new stateful service.
 - Run backups before rebuilding or replacing a service host.
 - Review and commit/push the private `values/` repo after a successful backup if
   you want the archive stored in the private remote.
-- Restore is intentionally explicit and service-scoped; it should not run as part
-  of normal `just apply`.
+- Restore is normally explicit and service-scoped. Hermes is the exception during
+  guarded bootstrap: only missing or empty live state can be restored automatically.
 - Use `restore-if-present` for first-run/rebuild flows that should continue when
   no prior private backup exists.
 - The workflow uses the normal direct Ansible inventory group for each service.

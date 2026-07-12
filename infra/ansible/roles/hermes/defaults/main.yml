@@ -3,6 +3,9 @@ hermes_runtime_user: anvil
 hermes_runtime_passwordless_sudo: false
 hermes_allow_legacy_runtime: false
 hermes_ssh_public_keys: []
+hermes_default_soul_sha256:
+  - 2765a846e1bb371d78d3b93b403dfb0f8d1ba1a9895edb5f608367abfe81194d
+  - 29993087d2d7a0fb9f71c589f878b3c5b28c67f61765d51a13f9740fcf82e189
 hermes_discovery_version: "0.18.0"
 hermes_discovery_tag: "v2026.7.1"
 hermes_discovery_commit: 7c1a029553d87c43ecff8a3821336bc95872213b

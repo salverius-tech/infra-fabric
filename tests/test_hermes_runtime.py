@@ -9,6 +9,8 @@ ROLE = ROOT / "infra" / "ansible" / "roles" / "hermes"
 LOCK = ROLE / "files" / "requirements-0.18.0.lock"
 RUNTIME_TASKS = ROLE / "tasks" / "managed-runtime.yml"
 MAIN_TASKS = ROLE / "tasks" / "main.yml"
+BOOTSTRAP_TASKS = ROLE / "tasks" / "bootstrap-state.yml"
+DEFAULTS = ROLE / "defaults" / "main.yml"
 UNIT = ROLE / "templates" / "hermes-dashboard.service.j2"
 GATEWAY_UNIT = ROLE / "templates" / "hermes-gateway.service.j2"
 ENV = ROLE / "templates" / "hermes-dashboard.env.j2"
@@ -53,8 +55,15 @@ class HermesRuntimeContractTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.tasks = RUNTIME_TASKS.read_text(encoding="utf-8")
         cls.main = MAIN_TASKS.read_text(encoding="utf-8")
+        cls.bootstrap = BOOTSTRAP_TASKS.read_text(encoding="utf-8")
+        cls.defaults = DEFAULTS.read_text(encoding="utf-8")
         cls.unit = UNIT.read_text(encoding="utf-8")
         cls.gateway_unit = GATEWAY_UNIT.read_text(encoding="utf-8")
+
+    def test_runtime_user_can_run_containerized_tasks(self) -> None:
+        self.assertIn("Grant Hermes runtime user access to Docker", self.main)
+        self.assertIn("groups: docker", self.main)
+        self.assertIn("install -d -m 0755 -o", self.main)
 
     def test_managed_runtime_uses_hashed_wheels_and_legacy_fallback_is_scoped(self) -> None:
         self.assertIn("Detect Hermes managed wheel runtime support", self.main)
@@ -85,6 +94,7 @@ class HermesRuntimeContractTests(unittest.TestCase):
         self.assertIn("exec /usr/local/lib/hermes-agent/venv/bin/hermes", self.tasks)
         self.assertIn("ExecStartPre=/usr/local/libexec/hermes-dashboard-preflight", self.unit)
         self.assertIn("ExecStart=/usr/local/bin/hermes dashboard", self.unit)
+        self.assertIn('Environment="KUBERNETES_SERVICE_HOST=hermes-managed-runtime"', self.unit)
         self.assertIn("hermes_managed_runtime_supported", self.main)
         self.assertIn("dest: /etc/systemd/system/hermes-gateway.service", self.main)
         self.assertIn("hermes_managed_runtime_supported", self.main)
@@ -97,6 +107,19 @@ class HermesRuntimeContractTests(unittest.TestCase):
         self.assertIn("HERMES_SKIP_NODE_BOOTSTRAP=1", env)
         self.assertIn("HERMES_DISABLE_LAZY_INSTALLS=1", env)
         self.assertIn("PATH=/usr/local/lib/hermes-node/current/bin:", env)
+
+    def test_full_state_bootstrap_restore_is_guarded_and_validated(self) -> None:
+        self.assertIn("Restore guarded private Hermes state during bootstrap", self.main)
+        self.assertIn("hermes-state-pre-restore-", self.bootstrap)
+        self.assertIn("validate-service-state-archive.py", self.bootstrap)
+        self.assertIn("Require customized soul state before automatic full restore", self.bootstrap)
+        self.assertIn("Restore complete Hermes runtime state", self.bootstrap)
+        self.assertIn("Repair restored Hermes runtime state ownership", self.bootstrap)
+        self.assertIn("hermes_default_soul_sha256", self.defaults)
+        self.assertLess(
+            self.main.index("Restore guarded private Hermes state during bootstrap"),
+            self.main.index("Ensure Hermes runtime state directory exists"),
+        )
 
     def test_dashboard_dependencies_are_preflighted_and_logs_are_gated(self) -> None:
         preflight = PREFLIGHT.read_text(encoding="utf-8")

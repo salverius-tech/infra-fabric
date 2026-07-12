@@ -1,4 +1,6 @@
 ---
+- name: Refresh Proxmox SSH trust before Forgejo runner lifecycle checks
+  ansible.builtin.import_playbook: proxmox-access-ready.yml
 - name: Prepare Forgejo Actions runner LXC lifecycle boundary
   hosts: pve
   gather_facts: false

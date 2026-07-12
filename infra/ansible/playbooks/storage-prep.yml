@@ -1,4 +1,6 @@
 ---
+- name: Refresh Proxmox SSH trust before storage preparation
+  ansible.builtin.import_playbook: proxmox-access-ready.yml
 - name: Prepare Proxmox host storage
   hosts: pve
   gather_facts: false
