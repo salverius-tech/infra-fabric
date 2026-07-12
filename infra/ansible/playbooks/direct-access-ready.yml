@@ -15,27 +15,39 @@
   hosts: "{{ direct_access_ready_hosts | default('services') }}"
   gather_facts: false
   tasks:
-    - name: Refresh controller known_hosts for direct service endpoints  # noqa: run-once[task]
+    - name: Verify or enroll controller known_hosts for direct service endpoints  # noqa: run-once[task]
       ansible.builtin.shell: |
         set -euo pipefail
-        install -d -m 0700 "${HOME}/.ssh"
-        ssh-keygen -R {{ hostvars[service_inventory_host].ansible_host | quote }} >/dev/null 2>&1 || true
+        host={{ hostvars[service_inventory_host].ansible_host | quote }}
+        known_hosts={{ direct_access_ready_known_hosts_file | default('/workspace/values/ansible/known_hosts') | quote }}
+        accept_change={{ direct_access_ready_accept_host_key_change | default(false) | bool | ternary('true', 'false') }}
+        install -d -m 0700 "$(dirname "${known_hosts}")"
+        touch "${known_hosts}"
+        chmod 0600 "${known_hosts}"
         tmp="$(mktemp)"
+        trap 'rm -f "${tmp}"' EXIT
         deadline=$((SECONDS + {{ direct_access_ready_ssh_scan_timeout | default(180) }}))
-        until ssh-keyscan -T 10 -H -t rsa,ecdsa,ed25519 \
-          {{ hostvars[service_inventory_host].ansible_host | quote }} \
-          > "${tmp}" 2>/dev/null && [ -s "${tmp}" ]; do
+        until ssh-keyscan -T 10 -H -t rsa,ecdsa,ed25519 "${host}" > "${tmp}" 2>/dev/null && [ -s "${tmp}" ]; do
           if [ "${SECONDS}" -ge "${deadline}" ]; then
-            rm -f "${tmp}"
             echo "Timed out waiting for SSH host keys from direct service endpoint" >&2
             exit 1
           fi
           sleep 5
         done
-        touch "${HOME}/.ssh/known_hosts"
-        cat "${tmp}" >> "${HOME}/.ssh/known_hosts"
-        rm -f "${tmp}"
-        chmod 0600 "${HOME}/.ssh/known_hosts"
+        scanned="$(ssh-keygen -lf "${tmp}" | awk '{print $2}' | sort -u)"
+        existing="$(ssh-keygen -F "${host}" -f "${known_hosts}" 2>/dev/null | ssh-keygen -lf - 2>/dev/null | awk '{print $2}' | sort -u || true)"
+        if [ -z "${existing}" ]; then
+          cat "${tmp}" >> "${known_hosts}"
+          exit 0
+        fi
+        if [ "${existing}" != "${scanned}" ]; then
+          if [ "${accept_change}" != true ]; then
+            echo "SSH host key changed for ${host}; inspect the guest and rerun with direct_access_ready_accept_host_key_change=true only after verification." >&2
+            exit 1
+          fi
+          ssh-keygen -R "${host}" -f "${known_hosts}" >/dev/null
+          cat "${tmp}" >> "${known_hosts}"
+        fi
       args:
         executable: /bin/bash
       delegate_to: localhost

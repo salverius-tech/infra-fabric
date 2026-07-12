@@ -37,6 +37,13 @@ class DirectServiceAnsibleHelperTests(unittest.TestCase):
         self.assertIn("direct_access_ready", result.stdout)
         self.assertIn("known_hosts", result.stdout)
 
+    def test_direct_access_known_hosts_fails_closed_on_unapproved_key_change(self) -> None:
+        playbook = (REPO / "infra" / "ansible" / "playbooks" / "direct-access-ready.yml").read_text(encoding="utf-8")
+        self.assertIn("/workspace/values/ansible/known_hosts", playbook)
+        self.assertIn("direct_access_ready_accept_host_key_change", playbook)
+        self.assertIn("SSH host key changed", playbook)
+        self.assertNotIn("ssh-keygen -R {{ hostvars", playbook)
+
     def test_redaction_blocks_private_values(self) -> None:
         spec = importlib.util.spec_from_file_location("check_direct_service_ansible", HELPER)
         assert spec and spec.loader

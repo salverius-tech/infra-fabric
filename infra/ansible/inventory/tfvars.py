@@ -152,7 +152,11 @@ def service_hostvars(service: str, tfvars: dict[str, Any]) -> tuple[str, str, di
 def build_inventory(tfvars: dict[str, Any], services: list[str]) -> dict[str, Any]:
     inventory: dict[str, Any] = {
         "_meta": {"hostvars": {}},
-        "all": {"vars": {}},
+        "all": {
+            "vars": {
+                "ansible_ssh_common_args": "-o UserKnownHostsFile=/workspace/values/ansible/known_hosts -o StrictHostKeyChecking=yes",
+            }
+        },
         "services": {"children": []},
     }
     hostvars = inventory["_meta"]["hostvars"]

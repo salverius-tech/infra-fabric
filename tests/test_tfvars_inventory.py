@@ -36,6 +36,10 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(inventory["all"]["vars"]["forgejo_vmid"], 107)
         self.assertEqual(inventory["all"]["vars"]["forgejo_domain"], "git.example.internal")
         self.assertEqual(inventory["services"]["children"], ["technitium", "forgejo"])
+        self.assertEqual(
+            inventory["all"]["vars"]["ansible_ssh_common_args"],
+            "-o UserKnownHostsFile=/workspace/values/ansible/known_hosts -o StrictHostKeyChecking=yes",
+        )
 
     def test_dhcp_address_is_not_used_as_ansible_host(self) -> None:
         inventory = tfvars_inventory.build_inventory(
