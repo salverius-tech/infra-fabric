@@ -52,11 +52,16 @@ if [[ -d /ssh-ro ]]; then
   done
 
   if [[ "${INFRA_COPY_SSH_KEYS:-false}" == "true" ]]; then
-    find /ssh-ro -maxdepth 1 -type f \
-      ! -name '*.pub' \
-      ! -name known_hosts \
-      ! -name config \
-      -exec cp {} "${ssh_dir}/" \;
+    identity_file="${INFRA_SSH_IDENTITY_FILE:-}"
+    if [[ ! "${identity_file}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      printf 'INFRA_SSH_IDENTITY_FILE must name one SSH identity file when INFRA_COPY_SSH_KEYS=true.\n' >&2
+      exit 2
+    fi
+    if [[ ! -f "/ssh-ro/${identity_file}" ]]; then
+      printf 'Selected SSH identity file is not available under /ssh-ro: %s\n' "${identity_file}" >&2
+      exit 2
+    fi
+    cp "/ssh-ro/${identity_file}" "${ssh_dir}/${identity_file}"
   fi
 
   chown -R "${container_user}:${container_user}" "${ssh_dir}"
