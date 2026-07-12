@@ -67,6 +67,10 @@ argument_specs:
         type: str
         required: false
         description: "Non-root user that owns Hermes runtime state and runs the dashboard (default: anvil)."
+      hermes_runtime_passwordless_sudo:
+        type: bool
+        required: false
+        description: "Install a validated NOPASSWD sudoers policy for the Hermes runtime user (default: false)."
       hermes_ssh_public_keys:
         type: list
         required: false

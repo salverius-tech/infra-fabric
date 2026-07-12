@@ -167,6 +167,19 @@ class AnsibleSafetyTests(unittest.TestCase):
             self.assertTrue(any(task.get("no_log") for task in matches), rel_path)
             self.assertTrue(any("mode" in str(task) for task in matches), rel_path)
 
+    def test_hermes_passwordless_sudo_policy_is_opt_in_and_validated(self) -> None:
+        task = task_by_name(
+            REPO / "infra" / "ansible" / "roles" / "hermes" / "tasks" / "main.yml",
+            "Install passwordless sudo policy for Hermes runtime user",
+        )
+        copy = task["ansible.builtin.copy"]
+        self.assertEqual(copy["dest"], "/etc/sudoers.d/hermes-runtime")
+        self.assertEqual(copy["mode"], "0440")
+        self.assertEqual(copy["validate"], "/usr/sbin/visudo -cf %s")
+        self.assertIn("NOPASSWD: ALL", copy["content"])  # public-safety: allow-secret
+        when = task["when"] if isinstance(task["when"], str) else "\n".join(task["when"])
+        self.assertIn("hermes_runtime_passwordless_sudo", when)
+
     def test_hermes_exports_native_searxng_url_key(self) -> None:
         template = REPO / "infra" / "ansible" / "roles" / "hermes" / "templates" / "hermes-dashboard.env.j2"
         text = template.read_text(encoding="utf-8")
