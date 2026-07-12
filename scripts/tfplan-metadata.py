@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 DEFAULT_MAX_AGE_HOURS = 24
 INPUT_GLOBS = (
     "infra/opentofu/**/*.tf",
@@ -226,12 +226,20 @@ def format_plan_summary(summary: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def plan_scope(target_service: str = "", replace_service: str = "") -> dict[str, str]:
+    if replace_service and target_service != replace_service:
+        raise MetadataError("A replacement plan must target the same service.")
+    return {"target_service": target_service, "replace_service": replace_service}
+
+
 def create_metadata(
     plan: Path,
     metadata: Path,
     repo: Path,
     max_age_hours: int,
     plan_json: dict[str, Any] | None = None,
+    target_service: str = "",
+    replace_service: str = "",
 ) -> dict[str, Any]:
     if not plan.is_file():
         raise MetadataError(f"Missing plan file: {plan}")
@@ -247,6 +255,7 @@ def create_metadata(
             "sha256": sha256_file(plan),
         },
         "summary": summary,
+        "scope": plan_scope(target_service, replace_service),
         "inputs": matching_inputs(repo),
     }
     metadata.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -290,6 +299,10 @@ def load_metadata(metadata: Path) -> dict[str, Any]:
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     if not isinstance(data.get("inputs"), dict):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
+    scope = data.get("scope")
+    if not isinstance(scope, dict) or not all(isinstance(scope.get(key), str) for key in ("target_service", "replace_service")):
+        raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
+    plan_scope(scope["target_service"], scope["replace_service"])
     data["summary"] = validate_summary(data.get("summary"))
     return data
 
@@ -300,6 +313,8 @@ def verify_metadata(
     repo: Path,
     allow_destroy: bool = False,
     allow_stateful_batch: bool = False,
+    target_service: str = "",
+    replace_service: str = "",
 ) -> None:
     if not plan.is_file():
         raise MetadataError("Saved tfplan is missing. Run `just plan` again.")
@@ -326,6 +341,9 @@ def verify_metadata(
     if expected_commit and current_commit and expected_commit != current_commit:
         raise MetadataError("Saved tfplan git commit changed. Run `just plan` again.")
 
+    if data["scope"] != plan_scope(target_service, replace_service):
+        raise MetadataError("Saved tfplan scope differs from this apply. Run `just plan` again.")
+
     summary = data["summary"]
     if summary.get("destructive") and not allow_destroy:
         raise MetadataError(
@@ -351,12 +369,16 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--metadata", type=Path, required=True)
     create.add_argument("--max-age-hours", type=int, default=DEFAULT_MAX_AGE_HOURS)
     create.add_argument("--print-summary", action="store_true")
+    create.add_argument("--target-service", default="")
+    create.add_argument("--replace-service", default="")
 
     verify = subparsers.add_parser("verify")
     verify.add_argument("--plan", type=Path, required=True)
     verify.add_argument("--metadata", type=Path, required=True)
     verify.add_argument("--allow-destroy", action="store_true")
     verify.add_argument("--allow-stateful-batch", action="store_true")
+    verify.add_argument("--target-service", default="")
+    verify.add_argument("--replace-service", default="")
 
     summary = subparsers.add_parser("summary")
     summary.add_argument("--metadata", type=Path, required=True)
@@ -365,11 +387,26 @@ def main(argv: list[str] | None = None) -> int:
     repo = args.repo.resolve()
     try:
         if args.command == "create":
-            data = create_metadata(args.plan, args.metadata, repo, args.max_age_hours)
+            data = create_metadata(
+                args.plan,
+                args.metadata,
+                repo,
+                args.max_age_hours,
+                target_service=args.target_service,
+                replace_service=args.replace_service,
+            )
             if args.print_summary:
                 print(format_plan_summary(data["summary"]))
         elif args.command == "verify":
-            verify_metadata(args.plan, args.metadata, repo, args.allow_destroy, args.allow_stateful_batch)
+            verify_metadata(
+                args.plan,
+                args.metadata,
+                repo,
+                args.allow_destroy,
+                args.allow_stateful_batch,
+                args.target_service,
+                args.replace_service,
+            )
         elif args.command == "summary":
             print(format_plan_summary(load_metadata(args.metadata)["summary"]))
     except MetadataError as error:

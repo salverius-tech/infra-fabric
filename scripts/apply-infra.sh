@@ -10,6 +10,14 @@ if [[ "${INFRA_ALLOW_STATEFUL_BATCH:-}" == "1" ]]; then
   stateful_batch_verify_flag="--allow-stateful-batch"
 fi
 target_service="${INFRA_TARGET_SERVICE:-}"
+replace_service="${INFRA_REPLACE_SERVICE:-}"
+if [[ -n "${replace_service}" ]]; then
+  if [[ -n "${target_service}" && "${target_service}" != "${replace_service}" ]]; then
+    printf 'INFRA_TARGET_SERVICE and INFRA_REPLACE_SERVICE must match when both are set.\n' >&2
+    exit 2
+  fi
+  target_service="${replace_service}"
+fi
 
 # shellcheck disable=SC2016
 INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh bash -euo pipefail -c '
@@ -29,14 +37,20 @@ if [[ ! -f tfplan.meta.json ]]; then
 fi
 
 target_service="${1:-}"
-shift || true
+replace_service="${2:-}"
+shift 2 || true
 verify_args=()
 for verify_arg in "$@"; do
   if [[ -n "${verify_arg}" ]]; then
     verify_args+=("${verify_arg}")
   fi
 done
-python scripts/tfplan-metadata.py verify --plan tfplan --metadata tfplan.meta.json "${verify_args[@]}"
+python scripts/tfplan-metadata.py verify \
+  --plan tfplan \
+  --metadata tfplan.meta.json \
+  --target-service "${target_service}" \
+  --replace-service "${replace_service}" \
+  "${verify_args[@]}"
 python scripts/tfplan-metadata.py summary --metadata tfplan.meta.json
 python scripts/settings.py summary
 storage_vars_args=()
@@ -76,4 +90,4 @@ python scripts/apply-ansible-services.py \
   --inventory infra/ansible/inventory/tfvars.py \
   --env-file values/.env \
   "${ansible_service_args[@]}"
-' bash "${target_service}" "${destroy_verify_flag}" "${stateful_batch_verify_flag}"
+' bash "${target_service}" "${replace_service}" "${destroy_verify_flag}" "${stateful_batch_verify_flag}"

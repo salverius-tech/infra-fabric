@@ -43,10 +43,11 @@ if [[ -n "${1:-}" ]]; then
   printf "Creating one-service canary plan for %s. A full plan is required after this rollout.\n" "${1}"
 fi
 if [[ -n "${2:-}" ]]; then
+  replace_runtime="$(python scripts/service-runtime.py "${2}")"
   while IFS= read -r target; do
     [[ -n "${target}" ]] && replace_args+=("-replace=${target}")
-  done < <(python scripts/settings.py tofu-replace-targets "${2}")
-  printf "Forcing replacement of service %s resources. Review destroy/create output carefully.\n" "${2}"
+  done < <(python scripts/settings.py tofu-replace-targets "${2}" --runtime "${replace_runtime}")
+  printf "Forcing replacement of %s service resources for runtime %s. Review destroy/create output carefully.\n" "${2}" "${replace_runtime}"
 fi
 
 tofu -chdir=infra/opentofu plan \
@@ -58,5 +59,10 @@ tofu -chdir=infra/opentofu plan \
   -out=../../tfplan
 
 tofu -chdir=infra/opentofu show ../../tfplan
-python scripts/tfplan-metadata.py create --plan tfplan --metadata tfplan.meta.json --print-summary
+python scripts/tfplan-metadata.py create \
+  --plan tfplan \
+  --metadata tfplan.meta.json \
+  --target-service "${1:-}" \
+  --replace-service "${2:-}" \
+  --print-summary
 ' bash "${target_service}" "${replace_service}"

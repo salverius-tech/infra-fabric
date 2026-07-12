@@ -152,6 +152,27 @@ class TfplanMetadataTests(unittest.TestCase):
             self.assertEqual(data["summary"]["stateful_services"], ["forgejo"])
             tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
 
+    def test_targeted_plan_scope_must_match_apply_scope(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            tfplan_metadata.create_metadata(
+                plan,
+                metadata,
+                repo,
+                24,
+                {"resource_changes": []},
+                target_service="forgejo",
+            )
+            tfplan_metadata.verify_metadata(plan, metadata, repo, target_service="forgejo")
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo, target_service="hermes")
+
+    def test_replacement_scope_requires_matching_target_service(self) -> None:
+        with self.assertRaises(tfplan_metadata.MetadataError):
+            tfplan_metadata.plan_scope("forgejo", "hermes")
+
     def test_missing_summary_fails_closed(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
