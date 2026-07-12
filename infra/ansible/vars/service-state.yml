@@ -16,6 +16,15 @@ managed_service_state_catalog:
     paths:
       - /etc/forgejo
       - /var/lib/forgejo
+  infisical:
+    group: infisical
+    description: Legacy Infisical application configuration, PostgreSQL, Redis, and attachment data.
+    services:
+      - docker
+      - caddy
+    paths:
+      - /etc/infisical
+      - "{{ infisical_data_dir | default('/var/lib/infisical') }}"
   technitium:
     group: technitium
     description: Technitium DNS server configuration, zones, block lists, logs, and app data.

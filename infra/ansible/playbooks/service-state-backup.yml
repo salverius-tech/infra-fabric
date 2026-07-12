@@ -41,6 +41,31 @@
         suffix: "{{ service_state_service }}-state"
       register: service_state_snapshot_dir
 
+    - name: Ensure Forgejo database snapshot directory exists
+      ansible.builtin.file:
+        path: "{{ service_state_snapshot_dir.path }}/.service-state"
+        state: directory
+        mode: "0700"
+      when:
+        - service_state_service == "forgejo"
+        - forgejo_database.type | default("sqlite") == "postgres"
+
+    - name: Export managed Forgejo PostgreSQL database
+      ansible.builtin.command:
+        argv:
+          - runuser
+          - -u
+          - postgres
+          - --
+          - pg_dump
+          - --format=custom
+          - --file={{ service_state_snapshot_dir.path }}/.service-state/forgejo-postgres.dump
+          - "{{ forgejo_database.name }}"
+      changed_when: true
+      when:
+        - service_state_service == "forgejo"
+        - forgejo_database.type | default("sqlite") == "postgres"
+
     - name: Check managed service-state paths
       ansible.builtin.stat:
         path: "{{ item }}"

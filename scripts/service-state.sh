@@ -20,6 +20,7 @@ backup_root="${SERVICE_STATE_BACKUP_ROOT:-/workspace/values/service-backups}"
 supported_services=(
   hermes
   forgejo
+  infisical
   technitium
   onramp_host
   infisical_onramp

@@ -42,7 +42,8 @@
         fi
         if [ "${existing}" != "${scanned}" ]; then
           if [ "${accept_change}" != true ]; then
-            echo "SSH host key changed for ${host}; inspect the guest and rerun with direct_access_ready_accept_host_key_change=true only after verification." >&2
+            echo "SSH host key changed for ${host}; inspect the guest first." >&2
+            echo "Then rerun with direct_access_ready_accept_host_key_change=true." >&2
             exit 1
           fi
           ssh-keygen -R "${host}" -f "${known_hosts}" >/dev/null

@@ -185,6 +185,39 @@
         dest: /
         remote_src: true
 
+    - name: Check restored Forgejo PostgreSQL database dump
+      ansible.builtin.stat:
+        path: /.service-state/forgejo-postgres.dump
+      register: forgejo_state_postgres_dump
+      when:
+        - service_state_service == "forgejo"
+        - forgejo_database.type | default("sqlite") == "postgres"
+
+    - name: Restore managed Forgejo PostgreSQL database
+      ansible.builtin.command:
+        argv:
+          - runuser
+          - -u
+          - postgres
+          - --
+          - pg_restore
+          - --clean
+          - --if-exists
+          - --no-owner
+          - --dbname={{ forgejo_database.name }}
+          - /.service-state/forgejo-postgres.dump
+      changed_when: true
+      when:
+        - service_state_service == "forgejo"
+        - forgejo_database.type | default("sqlite") == "postgres"
+        - forgejo_state_postgres_dump.stat.exists
+
+    - name: Remove restored service-state database artifacts
+      ansible.builtin.file:
+        path: /.service-state
+        state: absent
+      when: service_state_service == "forgejo"
+
     - name: Remove temporary service-state restore artifacts from service host
       ansible.builtin.file:
         path: "{{ item }}"
