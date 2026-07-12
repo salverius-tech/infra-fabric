@@ -1,17 +1,11 @@
-# Debian baseline split
+# Debian baseline
 
-This runbook currently uses a mixed Debian baseline:
+This runbook uses Debian 13 as the default guest baseline:
 
-- **LXCs** (Technitium, Forgejo, Infisical, Hermes, and related services) are installed from the Proxmox `debian-12` container templates represented by the `debian_template_*` OpenTofu variables.
-- **`onramp_host`** is provisioned as a Debian 13 genericcloud VM.
+- **LXCs** (Technitium, Forgejo runner, Infisical, Hermes, Tailscale client, and LXC-mode services) are created from the Proxmox `debian-13` standard container template represented by the `debian_template_*` OpenTofu variables.
+- **Service VMs** use Debian 13 genericcloud images through the shared VM image variables.
+- **`onramp_host`** remains provisioned as a Debian 13 genericcloud VM.
 
-Why this split is in use:
+Changing `debian_template_*` affects newly created LXCs. Existing containers do not change operating-system baselines in place because the LXC module ignores `operating_system[0].template_file_id` drift to avoid accidental guest replacement. To move an existing LXC to the current Debian 13 template, rebuild that guest through the reviewed `just plan` / approved `just apply` workflow.
 
-- Debian 12 LXC templates are lightweight and currently the stable baseline for most containerized service LXCs.
-- Debian 13 genericcloud is used for onramp services because Podman workloads and rootless tooling are cleaner on that VM image path, with fewer constraints than LXC defaults.
-
-A future migration of LXC hosts to Debian 13 should be a reviewed infrastructure change:
-
-- Update private `values/terraform.tfvars` (`debian_template_*` family and related template inputs).
-- Validate any service compatibility impact (Compose/system package behavior, rootless access assumptions).
-- Re-run regular validation and planning before applying.
+When rebuilding stateful services, review the plan carefully and confirm any replacements explicitly. Preserve service data with external storage or backups when desired; this repository does not automatically migrate arbitrary in-guest state between OS baseline rebuilds.

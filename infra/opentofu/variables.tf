@@ -109,12 +109,12 @@ variable "template_datastore_id" {
 }
 
 variable "debian_template_url" {
-  description = "Debian 12 standard LXC template URL. Set in terraform.tfvars."
+  description = "Debian 13 standard LXC template URL. Set in terraform.tfvars."
   type        = string
 }
 
 variable "debian_template_file_name" {
-  description = "File name for the downloaded Debian 12 LXC template. Set in terraform.tfvars."
+  description = "File name for the downloaded Debian 13 LXC template. Set in terraform.tfvars."
   type        = string
 }
 

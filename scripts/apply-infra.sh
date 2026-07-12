@@ -57,7 +57,7 @@ printf "Applying verified tfplan created by just plan.\n"
 trap "rm -f tfplan tfplan.meta.json ./*.tfplan ./*.tfplan.meta.json" EXIT
 
 storage_vars="$(python scripts/storage-vars.py "${storage_vars_args[@]}")"
-if python -c "import json, sys; raise SystemExit(0 if json.loads(sys.argv[1]).get('storage_bind_mounts') else 1)" "${storage_vars}"; then
+if python -c "import json, sys; raise SystemExit(0 if json.loads(sys.argv[1]).get(\"storage_bind_mounts\") else 1)" "${storage_vars}"; then
   ansible-playbook \
     -i values/ansible/inventory/local.yml \
     -i infra/ansible/inventory/tfvars.py \

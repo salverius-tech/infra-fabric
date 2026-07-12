@@ -17,8 +17,8 @@ lxc_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA_REPLACE_ME user@hos
 # Shared storage and template settings
 rootfs_datastore_id                   = "local-lvm"
 template_datastore_id                 = "local"
-debian_template_url                   = "http://download.proxmox.com/images/system/debian-12-standard_12.12-1_amd64.tar.zst"
-debian_template_file_name             = "debian-12-standard_12.12-1_amd64.tar.zst"
+debian_template_url                   = "http://download.proxmox.com/images/system/debian-13-standard_13.1-2_amd64.tar.zst"
+debian_template_file_name             = "debian-13-standard_13.1-2_amd64.tar.zst"
 lxc_template_download_timeout_seconds = 1800
 
 guest_vm_image_datastore_id = "local"

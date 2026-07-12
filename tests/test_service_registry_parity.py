@@ -41,6 +41,7 @@ class ServiceRegistryParityTests(unittest.TestCase):
                 "playbooks": tuple(config["playbooks"]),
                 "dependencies": tuple(config["dependencies"]),
                 "terraform_addresses": tuple(config.get("terraform_addresses", ())),
+                "terraform_replace_addresses": tuple(config.get("terraform_replace_addresses", ())),
             }
             for name, config in service_registry["services"].items()
         }

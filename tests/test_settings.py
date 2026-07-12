@@ -180,6 +180,18 @@ class SettingsTests(unittest.TestCase):
             ["module.forgejo", "module.forgejo_vm", "terraform_data.forgejo_storage_validation"],
         )
 
+    def test_tofu_replace_targets_are_derived_from_enabled_service_registry(self) -> None:
+        path = self.write_settings({"services": ["hermes"]})
+        try:
+            loaded = settings_script.load_settings(path)
+        finally:
+            path.unlink()
+
+        self.assertEqual(
+            settings_script.tofu_replace_targets("hermes", loaded["services"]),
+            ["module.hermes[0].proxmox_virtual_environment_container.this"],
+        )
+
     def test_tofu_targets_require_enabled_service(self) -> None:
         path = self.write_settings({"services": ["technitium"]})
         try:

@@ -1,4 +1,4 @@
-resource "proxmox_download_file" "debian_12_lxc_template" {
+resource "proxmox_download_file" "debian_13_lxc_template" {
   count = local.lxc_template_enabled ? 1 : 0
 
   content_type        = "vztmpl"
@@ -55,7 +55,7 @@ module "technitium_dns" {
     vlan_id = var.technitium_container_vlan_id
   }
 
-  template_file_id = proxmox_download_file.debian_12_lxc_template[0].id
+  template_file_id = proxmox_download_file.debian_13_lxc_template[0].id
 
   startup = {
     order      = "1"

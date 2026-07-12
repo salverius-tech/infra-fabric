@@ -4,6 +4,14 @@ set -euo pipefail
 rm -f tfplan tfplan.meta.json ./*.tfplan ./*.tfplan.meta.json
 
 target_service="${INFRA_TARGET_SERVICE:-}"
+replace_service="${INFRA_REPLACE_SERVICE:-}"
+if [[ -n "${replace_service}" ]]; then
+  if [[ -n "${target_service}" && "${target_service}" != "${replace_service}" ]]; then
+    printf 'INFRA_TARGET_SERVICE and INFRA_REPLACE_SERVICE must match when both are set.\n' >&2
+    exit 2
+  fi
+  target_service="${replace_service}"
+fi
 
 # shellcheck disable=SC2016
 INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh bash -euo pipefail -c '
@@ -27,11 +35,18 @@ tofu -chdir=infra/opentofu init
 
 enabled_services="$(python scripts/settings.py tofu-var)"
 target_args=()
+replace_args=()
 if [[ -n "${1:-}" ]]; then
   while IFS= read -r target; do
     [[ -n "${target}" ]] && target_args+=("-target=${target}")
   done < <(python scripts/settings.py tofu-targets "${1}")
   printf "Creating one-service canary plan for %s. A full plan is required after this rollout.\n" "${1}"
+fi
+if [[ -n "${2:-}" ]]; then
+  while IFS= read -r target; do
+    [[ -n "${target}" ]] && replace_args+=("-replace=${target}")
+  done < <(python scripts/settings.py tofu-replace-targets "${2}")
+  printf "Forcing replacement of service %s resources. Review destroy/create output carefully.\n" "${2}"
 fi
 
 tofu -chdir=infra/opentofu plan \
@@ -39,8 +54,9 @@ tofu -chdir=infra/opentofu plan \
   -var-file=../../values/terraform.tfvars \
   -state=../../values/terraform.tfstate \
   "${target_args[@]}" \
+  "${replace_args[@]}" \
   -out=../../tfplan
 
 tofu -chdir=infra/opentofu show ../../tfplan
 python scripts/tfplan-metadata.py create --plan tfplan --metadata tfplan.meta.json --print-summary
-' bash "${target_service}"
+' bash "${target_service}" "${replace_service}"

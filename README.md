@@ -29,7 +29,7 @@ Keep non-public material in `values/` or outside this checkout; do not add anoth
 ## Documentation
 
 - [Docs index](docs/README.md) lists public-safe operator and architecture notes.
-- [Debian baseline split](docs/debian-baseline.md) explains why LXCs use Debian 12 templates while `onramp_host` uses Debian 13 genericcloud.
+- [Debian baseline](docs/debian-baseline.md) explains the Debian 13 baseline for LXCs and service VMs.
 - [Hermes operator pilot PRD](docs/hermes-operator-pilot-prd.md) defines the Hermes cockpit requirements and safety boundaries.
 - [Managed service-state backup and restore](docs/service-state-backup.md) covers private `values/` backups for Hermes memory/soul state and other managed service state.
 - [Hermes tuning](docs/hermes-tuning.md) documents managed compression and delegation settings.
