@@ -37,7 +37,11 @@ SERVICES = {
         "playbooks": tuple(config["playbooks"]),
         "dependencies": tuple(config["dependencies"]),
         "terraform_addresses": tuple(config.get("terraform_addresses", ())),
-        "terraform_replace_addresses": tuple(config.get("terraform_replace_addresses", ())),
+        "terraform_replace_addresses": {
+            runtime: tuple(addresses)
+            for runtime, addresses in config.get("terraform_replace_addresses", {}).items()
+            if isinstance(runtime, str) and isinstance(addresses, list)
+        },
     }
     for name, config in SERVICE_REGISTRY_DATA["services"].items()
 }
@@ -116,12 +120,14 @@ def tofu_targets(service: str, enabled_services: list[str]) -> list[str]:
     return targets
 
 
-def tofu_replace_targets(service: str, enabled_services: list[str]) -> list[str]:
+def tofu_replace_targets(service: str, enabled_services: list[str], runtime_type: str) -> list[str]:
     if service not in SERVICE_NAMES:
         raise SettingsError(f"unknown service: {service}")
     if service not in enabled_services:
         raise SettingsError(f"service is not enabled: {service}")
-    targets = [target for target in SERVICES[service]["terraform_replace_addresses"] if target]
+    if runtime_type not in {"lxc", "vm"}:
+        raise SettingsError(f"unsupported service runtime: {runtime_type}")
+    targets = [target for target in SERVICES[service]["terraform_replace_addresses"].get(runtime_type, ()) if target]
     if not targets:
         raise SettingsError(f"service has no OpenTofu replacement targets: {service}")
     return list(dict.fromkeys(targets))
@@ -197,6 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     tofu_target_parser.add_argument("service")
     tofu_replace_parser = subparsers.add_parser("tofu-replace-targets")
     tofu_replace_parser.add_argument("service")
+    tofu_replace_parser.add_argument("--runtime", required=True, choices=("lxc", "vm"))
     args = parser.parse_args(argv)
 
     try:
@@ -223,7 +230,7 @@ def main(argv: list[str] | None = None) -> int:
         for target in tofu_targets(args.service, settings["services"]):
             print(target)
     elif args.command == "tofu-replace-targets":
-        for target in tofu_replace_targets(args.service, settings["services"]):
+        for target in tofu_replace_targets(args.service, settings["services"], args.runtime):
             print(target)
     return 0
 

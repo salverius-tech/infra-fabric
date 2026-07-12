@@ -11,9 +11,10 @@
         "module.technitium_dns[",
         "module.technitium_dns_vm["
       ],
-      "terraform_replace_addresses": [
-        "module.technitium_dns[0].proxmox_virtual_environment_container.this"
-      ],
+      "terraform_replace_addresses": {
+        "lxc": ["module.technitium_dns[0].proxmox_virtual_environment_container.this"],
+        "vm": ["module.technitium_dns_vm[0].proxmox_virtual_environment_vm.this"]
+      },
       "playbooks": [
         "infra/ansible/playbooks/technitium.yml",
         "infra/ansible/playbooks/caddy-proxy.yml",
@@ -36,9 +37,10 @@
         "module.forgejo_vm[",
         "terraform_data.forgejo_storage_validation["
       ],
-      "terraform_replace_addresses": [
-        "module.forgejo[0].proxmox_virtual_environment_container.this"
-      ],
+      "terraform_replace_addresses": {
+        "lxc": ["module.forgejo[0].proxmox_virtual_environment_container.this"],
+        "vm": ["module.forgejo_vm[0].proxmox_virtual_environment_vm.this"]
+      },
       "playbooks": [
         "infra/ansible/playbooks/forgejo.yml"
       ],
@@ -65,9 +67,10 @@
         "module.tailscale_client[",
         "module.tailscale_client_vm["
       ],
-      "terraform_replace_addresses": [
-        "module.tailscale_client[0].proxmox_virtual_environment_container.this"
-      ],
+      "terraform_replace_addresses": {
+        "lxc": ["module.tailscale_client[0].proxmox_virtual_environment_container.this"],
+        "vm": ["module.tailscale_client_vm[0].proxmox_virtual_environment_vm.this"]
+      },
       "playbooks": [
         "infra/ansible/playbooks/tailscale-client.yml"
       ],
@@ -89,9 +92,10 @@
         "module.forgejo_runner[",
         "module.forgejo_runner_vm["
       ],
-      "terraform_replace_addresses": [
-        "module.forgejo_runner[0].proxmox_virtual_environment_container.this"
-      ],
+      "terraform_replace_addresses": {
+        "lxc": ["module.forgejo_runner[0].proxmox_virtual_environment_container.this"],
+        "vm": ["module.forgejo_runner_vm[0].proxmox_virtual_environment_vm.this"]
+      },
       "playbooks": [
         "infra/ansible/playbooks/forgejo-runner.yml"
       ],
@@ -107,14 +111,16 @@
       }
     },
     "infisical": {
-      "state_capable": false,
+      "state_capable": true,
+      "state_order": 5,
       "terraform_addresses": [
         "module.infisical[",
         "module.infisical_vm["
       ],
-      "terraform_replace_addresses": [
-        "module.infisical[0].proxmox_virtual_environment_container.this"
-      ],
+      "terraform_replace_addresses": {
+        "lxc": ["module.infisical[0].proxmox_virtual_environment_container.this"],
+        "vm": ["module.infisical_vm[0].proxmox_virtual_environment_vm.this"]
+      },
       "playbooks": [
         "infra/ansible/playbooks/infisical.yml"
       ],
@@ -165,9 +171,10 @@
         "module.hermes[",
         "module.hermes_vm["
       ],
-      "terraform_replace_addresses": [
-        "module.hermes[0].proxmox_virtual_environment_container.this"
-      ],
+      "terraform_replace_addresses": {
+        "lxc": ["module.hermes[0].proxmox_virtual_environment_container.this"],
+        "vm": ["module.hermes_vm[0].proxmox_virtual_environment_vm.this"]
+      },
       "playbooks": [
         "infra/ansible/playbooks/hermes.yml"
       ],

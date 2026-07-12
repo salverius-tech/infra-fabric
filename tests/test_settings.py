@@ -188,8 +188,12 @@ class SettingsTests(unittest.TestCase):
             path.unlink()
 
         self.assertEqual(
-            settings_script.tofu_replace_targets("hermes", loaded["services"]),
+            settings_script.tofu_replace_targets("hermes", loaded["services"], "lxc"),
             ["module.hermes[0].proxmox_virtual_environment_container.this"],
+        )
+        self.assertEqual(
+            settings_script.tofu_replace_targets("hermes", loaded["services"], "vm"),
+            ["module.hermes_vm[0].proxmox_virtual_environment_vm.this"],
         )
 
     def test_tofu_targets_require_enabled_service(self) -> None:
