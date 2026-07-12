@@ -1,9 +1,9 @@
 locals {
-  image_file_id = var.image.file_id != null ? var.image.file_id : proxmox_download_file.cloud_image[0].id
+  image_file_id = var.image.create ? proxmox_download_file.cloud_image[0].id : var.image.file_id
 }
 
 resource "proxmox_download_file" "cloud_image" {
-  count = var.image.file_id == null ? 1 : 0
+  count = var.image.create ? 1 : 0
 
   content_type        = "import"
   datastore_id        = var.image.datastore_id

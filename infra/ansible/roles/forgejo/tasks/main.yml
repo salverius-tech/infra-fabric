@@ -398,6 +398,45 @@
   no_log: true
   when: forgejo_bootstrap_enabled | default(false) | bool
 
+- name: Set Forgejo bootstrap repository filesystem paths
+  ansible.builtin.set_fact:
+    forgejo_bootstrap_repo_path: >-
+      /var/lib/forgejo/data/gitea-repositories/{{ forgejo_bootstrap_repo_owner }}/{{ forgejo_bootstrap_repo_name }}.git
+    forgejo_bootstrap_repo_preserved_path: >-
+      /var/lib/forgejo/data/gitea-repositories/{{ forgejo_bootstrap_repo_owner }}/{{ forgejo_bootstrap_repo_name }}.git.preserved-before-bootstrap
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+
+- name: Check existing Forgejo bootstrap repository files
+  ansible.builtin.stat:
+    path: "{{ forgejo_bootstrap_repo_path }}"
+  register: forgejo_bootstrap_repo_files
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+
+- name: Check preserved Forgejo bootstrap repository files
+  ansible.builtin.stat:
+    path: "{{ forgejo_bootstrap_repo_preserved_path }}"
+  register: forgejo_bootstrap_repo_preserved_files
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+
+- name: Preserve existing Forgejo bootstrap repository files before DB bootstrap
+  ansible.builtin.command:
+    argv:
+      - mv
+      - "{{ forgejo_bootstrap_repo_path }}"
+      - "{{ forgejo_bootstrap_repo_preserved_path }}"
+  changed_when: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+    - forgejo_bootstrap_repo_files.stat.exists | default(false)
+    - not forgejo_bootstrap_repo_preserved_files.stat.exists | default(false)
+
 - name: Create Forgejo bootstrap repository
   ansible.builtin.uri:
     url: "http://127.0.0.1:3000/api/v1/admin/users/{{ forgejo_bootstrap_repo_owner }}/repos"
@@ -415,6 +454,77 @@
   when:
     - forgejo_bootstrap_enabled | default(false) | bool
     - not forgejo_bootstrap_repo_exists
+
+- name: Re-check preserved Forgejo bootstrap repository files
+  ansible.builtin.stat:
+    path: "{{ forgejo_bootstrap_repo_preserved_path }}"
+  register: forgejo_bootstrap_repo_preserved_after_create
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+
+- name: Stop Forgejo before restoring preserved bootstrap repository files
+  ansible.builtin.systemd:
+    name: forgejo
+    state: stopped
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+    - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
+
+- name: Restore preserved Forgejo bootstrap repository files
+  ansible.builtin.shell: |
+    set -euo pipefail
+    rm -rf {{ forgejo_bootstrap_repo_path | quote }}
+    mv {{ forgejo_bootstrap_repo_preserved_path | quote }} {{ forgejo_bootstrap_repo_path | quote }}
+  args:
+    executable: /bin/bash
+  changed_when: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+    - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
+
+- name: Ensure restored Forgejo bootstrap repository file ownership
+  ansible.builtin.file:
+    path: "{{ forgejo_bootstrap_repo_path }}"
+    owner: git
+    group: git
+    recurse: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+    - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
+
+- name: Regenerate Forgejo repository hooks after restoring bootstrap repository files
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - git
+      - --
+      - /usr/local/bin/forgejo
+      - admin
+      - regenerate
+      - hooks
+      - --config
+      - /etc/forgejo/app.ini
+      - --work-path
+      - /var/lib/forgejo
+  changed_when: true
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+    - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
+
+- name: Start Forgejo after restoring preserved bootstrap repository files
+  ansible.builtin.systemd:
+    name: forgejo
+    state: started
+  when:
+    - forgejo_bootstrap_enabled | default(false) | bool
+    - not forgejo_bootstrap_repo_exists
+    - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
 - name: Verify Forgejo Caddy service is active
   ansible.builtin.command:
     argv:

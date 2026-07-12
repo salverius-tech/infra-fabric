@@ -151,6 +151,7 @@ module "forgejo_vm" {
     url          = var.forgejo_vm_image_url
     file_name    = var.forgejo_vm_image_file_name
     file_id      = local.onramp_host_enabled ? proxmox_download_file.debian_13_onramp_host_image[0].id : null
+    create       = !local.onramp_host_enabled
   }
 
   disk = {

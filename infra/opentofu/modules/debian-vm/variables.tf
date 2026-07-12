@@ -37,13 +37,19 @@ variable "start_on_boot" {
 }
 
 variable "image" {
-  description = "Cloud image import settings."
+  description = "Cloud image import settings. Set create=false with file_id when reusing an image managed outside this module."
   type = object({
     datastore_id = string
     url          = string
     file_name    = string
     file_id      = optional(string)
+    create       = optional(bool, true)
   })
+
+  validation {
+    condition     = var.image.create || var.image.file_id != null
+    error_message = "image.file_id is required when image.create is false."
+  }
 }
 
 variable "disk" {
