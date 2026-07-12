@@ -129,13 +129,19 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tfvars", type=Path, default=DEFAULT_TFVARS)
     parser.add_argument("--settings", type=Path, default=None)
+    parser.add_argument("--service", default="")
     parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
 
     try:
         loaded_settings = settings.load_settings(args.settings)
+        enabled_services = loaded_settings["services"]
+        if args.service:
+            if args.service not in enabled_services:
+                raise StorageVarsError(f"service is not enabled: {args.service}")
+            enabled_services = [args.service]
         tfvars = load_tfvars(args.tfvars)
-        mounts = build_storage_mounts(loaded_settings["services"], tfvars)
+        mounts = build_storage_mounts(enabled_services, tfvars)
         payload = {"storage_bind_mounts": mounts}
     except (settings.SettingsError, StorageVarsError, OSError) as error:
         print(f"storage vars failed: {error}", file=sys.stderr)

@@ -36,6 +36,7 @@ SERVICES = {
     name: {
         "playbooks": tuple(config["playbooks"]),
         "dependencies": tuple(config["dependencies"]),
+        "terraform_addresses": tuple(config.get("terraform_addresses", ())),
     }
     for name, config in SERVICE_REGISTRY_DATA["services"].items()
 }
@@ -95,6 +96,23 @@ def ansible_playbooks(services: list[str]) -> list[str]:
         for service in services
         for playbook in SERVICES[service]["playbooks"]
     ]
+
+
+def tofu_targets(service: str, enabled_services: list[str]) -> list[str]:
+    if service not in SERVICE_NAMES:
+        raise SettingsError(f"unknown service: {service}")
+    if service not in enabled_services:
+        raise SettingsError(f"service is not enabled: {service}")
+    targets: list[str] = []
+    for address in SERVICES[service]["terraform_addresses"]:
+        if not isinstance(address, str) or not address:
+            continue
+        target = address[:-1] if address.endswith("[") else address
+        if target not in targets:
+            targets.append(target)
+    if not targets:
+        raise SettingsError(f"service has no OpenTofu targets: {service}")
+    return targets
 
 
 def all_ansible_playbooks() -> list[str]:
@@ -163,6 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     ansible_playbooks_parser.add_argument("--settings", type=Path, default=None)
     subparsers.add_parser("summary")
     subparsers.add_parser("tofu-var")
+    tofu_target_parser = subparsers.add_parser("tofu-targets")
+    tofu_target_parser.add_argument("service")
     args = parser.parse_args(argv)
 
     try:
@@ -185,6 +205,9 @@ def main(argv: list[str] | None = None) -> int:
         print(settings_summary(settings))
     elif args.command == "tofu-var":
         print(json.dumps(settings["services"]))
+    elif args.command == "tofu-targets":
+        for target in tofu_targets(args.service, settings["services"]):
+            print(target)
     return 0
 
 

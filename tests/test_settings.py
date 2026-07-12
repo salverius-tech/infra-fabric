@@ -168,6 +168,28 @@ class SettingsTests(unittest.TestCase):
         self.assertIn("infra/ansible/playbooks/tailscale-client.yml", playbooks)
         self.assertEqual(len(playbooks), len(set(playbooks)))
 
+    def test_tofu_targets_are_derived_from_enabled_service_registry(self) -> None:
+        path = self.write_settings({"services": ["forgejo"]})
+        try:
+            loaded = settings_script.load_settings(path)
+        finally:
+            path.unlink()
+
+        self.assertEqual(
+            settings_script.tofu_targets("forgejo", loaded["services"]),
+            ["module.forgejo", "module.forgejo_vm", "terraform_data.forgejo_storage_validation"],
+        )
+
+    def test_tofu_targets_require_enabled_service(self) -> None:
+        path = self.write_settings({"services": ["technitium"]})
+        try:
+            loaded = settings_script.load_settings(path)
+        finally:
+            path.unlink()
+
+        with self.assertRaises(settings_script.SettingsError):
+            settings_script.tofu_targets("forgejo", loaded["services"])
+
     def test_summary_lists_services_and_playbooks(self) -> None:
         path = self.write_settings({"services": ["tailscale_client"]})
         try:

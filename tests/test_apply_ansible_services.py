@@ -82,6 +82,17 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             ],
         )
 
+    def test_enabled_services_can_filter_to_one_service(self) -> None:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+            handle.write('{"services":["technitium","forgejo"]}\n')
+            path = Path(handle.name)
+        try:
+            self.assertEqual(apply_ansible_services.enabled_services(path, "forgejo"), ["forgejo"])
+            with self.assertRaises(apply_ansible_services.settings.SettingsError):
+                apply_ansible_services.enabled_services(path, "hermes")
+        finally:
+            path.unlink()
+
     def test_sequential_stops_after_first_failure(self) -> None:
         commands: list[list[str]] = []
 

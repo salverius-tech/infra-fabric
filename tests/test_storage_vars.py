@@ -127,6 +127,38 @@ class StorageVarsTests(unittest.TestCase):
             self.assertEqual(payload["storage_bind_mounts"][0]["source"], "/srv/homelab/forgejo")
             self.assertEqual(payload["storage_bind_mounts"][0]["host_prepare"]["type"], "directory")
 
+    def test_main_filters_to_requested_service(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            settings_path = root / "settings.json"
+            tfvars_path = root / "terraform.tfvars"
+            settings_path.write_text('{"services":["forgejo","hermes"]}\n', encoding="utf-8")
+            tfvars_path.write_text(
+                "service_storage = {\n"
+                "  forgejo = { data = { type = \"bind\", source = \"/srv/forgejo\", target = \"/var/lib/forgejo\" } }\n"
+                "  hermes = { data = { type = \"bind\", source = \"/srv/hermes\", target = \"/var/lib/hermes\" } }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            import contextlib
+            import io
+
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                rc = storage_vars.main([
+                    "--settings",
+                    str(settings_path),
+                    "--tfvars",
+                    str(tfvars_path),
+                    "--service",
+                    "hermes",
+                ])
+
+            self.assertEqual(rc, 0)
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual([mount["name"] for mount in payload["storage_bind_mounts"]], ["hermes"])
+
     def test_main_outputs_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

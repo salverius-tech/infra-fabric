@@ -34,8 +34,13 @@ class ServiceResult:
     log_path: Path
 
 
-def enabled_services(settings_path: Path | None = None) -> list[str]:
-    return settings.load_settings(settings_path)["services"]
+def enabled_services(settings_path: Path | None = None, service: str = "") -> list[str]:
+    services = settings.load_settings(settings_path)["services"]
+    if not service:
+        return services
+    if service not in services:
+        raise settings.SettingsError(f"service is not enabled: {service}")
+    return [service]
 
 
 def dependency_waves(services: Iterable[str]) -> list[list[str]]:
@@ -187,11 +192,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--inventory", action="append", default=None)
     parser.add_argument("--env-file", type=Path, default=Path("values/.env"))
     parser.add_argument("--mode", choices=("parallel", "sequential"), default=os.environ.get("INFRA_APPLY_ANSIBLE_MODE", "parallel"))
+    parser.add_argument("--service", default="")
     parser.add_argument("--max-workers", type=int, default=int(os.environ.get("INFRA_APPLY_ANSIBLE_MAX_WORKERS", "4")))
     parser.add_argument("--log-dir", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    services = enabled_services(args.settings)
+    try:
+        services = enabled_services(args.settings, args.service)
+    except settings.SettingsError as error:
+        print(error, file=sys.stderr)
+        return 1
     inventories = tuple(args.inventory or DEFAULT_INVENTORY)
     timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     log_dir = args.log_dir or Path(".tmp") / f"apply-ansible-{timestamp.replace(':', '')}"
