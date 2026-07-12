@@ -41,10 +41,21 @@
         suffix: "{{ service_state_service }}-state"
       register: service_state_snapshot_dir
 
+    - name: Allow PostgreSQL to access its temporary dump directory
+      ansible.builtin.file:
+        path: "{{ service_state_snapshot_dir.path }}"
+        state: directory
+        mode: "0711"
+      when:
+        - service_state_service == "forgejo"
+        - forgejo_database.type | default("sqlite") == "postgres"
+
     - name: Ensure Forgejo database snapshot directory exists
       ansible.builtin.file:
         path: "{{ service_state_snapshot_dir.path }}/.service-state"
         state: directory
+        owner: postgres
+        group: postgres
         mode: "0700"
       when:
         - service_state_service == "forgejo"
@@ -85,13 +96,20 @@
         msg: "None of the configured state paths exist for {{ service_state_service }}."
       when: service_state_existing_paths | length == 0
 
+    - name: Create service-state snapshot parent directories
+      ansible.builtin.file:
+        path: "{{ service_state_snapshot_dir.path }}{{ item | dirname }}"
+        state: directory
+        mode: "0700"
+      loop: "{{ service_state_existing_paths }}"
+
     - name: Snapshot managed service-state paths
       ansible.builtin.command:
         argv:
-          - rsync
-          - -aR
+          - cp
+          - -a
           - "{{ item }}"
-          - "{{ service_state_snapshot_dir.path }}/"
+          - "{{ service_state_snapshot_dir.path }}{{ item }}"
       loop: "{{ service_state_existing_paths }}"
       changed_when: true
 

@@ -76,7 +76,9 @@
   changed_when: false
   delegate_to: localhost
   become: false
-  when: hermes_state_bootstrap_archive | length > 0
+  when:
+    - hermes_state_bootstrap_archive | length > 0
+    - hermes_state_bootstrap_safe | bool
 
 - name: Require customized soul state before automatic full restore
   ansible.builtin.assert:
