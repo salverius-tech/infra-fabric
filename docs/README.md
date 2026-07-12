@@ -12,7 +12,7 @@ Public-safe documentation for this homelab infrastructure runbook.
 - [Debian baseline split](debian-baseline.md) explains the current LXC/host Debian versions, rationale, and the reviewed migration path.
 - [Onramp SearXNG handoff](onramp-searxng-handoff.md) gives `onramp-vNext` the future SearXNG-on-Podman contract and records the current temporary `searxng_onramp` exception.
 - [App-host runbook](onramp-host-runbook.md) covers `onramp_host` and `searxng_onramp` enable/disable, rollback, and live deployment validation.
-- [Service update policy](service-update-policy.md) defines the managed update workflow and the target model for Technitium version/checksum management.
+- [Service update policy](service-update-policy.md) defines the managed update workflow, current service boundaries, and Technitium version/checksum management.
 
 ## Workflow reminder
 

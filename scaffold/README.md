@@ -8,7 +8,7 @@ This directory is a public-safe template for `values/`, the nested private Git r
 
 - `.env` — local credentials and bootstrap environment variables, including Hermes Agent dashboard auth secrets.
 - `terraform.tfvars` — site-specific Proxmox/LXC/OpenTofu variables, including optional per-container VLAN tags and the optional disabled-by-default Tailscale client LXC.
-- Optional private artifact cache — if a future workflow caches release archives such as Technitium portable tarballs, keep those files in ignored private storage outside tracked `scaffold/`.
+- Optional private artifact cache — controller-side Technitium archives may be kept in ignored private storage outside tracked `scaffold/` and referenced with `technitium_artifact_path`.
 - `dns-records.local.json` — site-specific Technitium DNS zones and records.
 - `ansible/inventory/local.yml` — site-specific Ansible inventory and role variables. The Technitium Caddy proxy uses `caddy_server_names` for DNS UI aliases such as `dns.example.internal` and `technitium.example.internal`.
 
@@ -206,7 +206,7 @@ Use `bind` when the Proxmox host exposes a path to an LXC. `host_prepare.type` m
 
 Hermes and the optional onramp host use `anvil` as their non-root runtime/deploy user by default. Add real public SSH keys to `lxc_ssh_public_keys`; the onramp cloud-init keys fall back to that list when `onramp_host_ssh_public_keys` is empty. Hermes managed runtime activation requires Debian 13 amd64 with Python 3.13 and uses hash-locked dashboard plus messaging dependencies, verified Node.js, and disabled runtime lazy installs. Set `hermes_allow_legacy_runtime: true` only for an explicitly accepted exception that uses the mutable legacy installer. Set `hermes_runtime_passwordless_sudo: true` only when Hermes setup requires unattended sudo; this makes the runtime user root-equivalent inside the Hermes guest.
 
-Technitium update management is intended to use private version/checksum pins and, if needed, cached release archives in ignored private storage. Keep live cached tarballs and checksums out of tracked source.
+Technitium updates are managed by Ansible using the private `technitium_discovery_version` and `technitium_portable_sha256` pins. Set `technitium_artifact_path` to use a controller-side cache containing `<version>/DnsServerPortable.tar.gz`; Ansible still verifies the SHA256 before activation. Keep cached tarballs and private checksums out of tracked source.
 
 After editing the copied files, run the normal validation entry point:
 

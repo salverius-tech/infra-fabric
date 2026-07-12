@@ -1,12 +1,14 @@
 # PRD: Hermes Operator Pilot for Homelab Infrastructure
 
+**Status:** Active design document; onramp-host and temporary SearXNG infrastructure are implemented. The remaining scope is Hermes operator integration and approval workflow.
+
 ## Summary
 
 This pilot defines Hermes as an operator cockpit for `homelab-infra` without making Hermes a second source of truth. The selected architecture is option 3: `homelab-infra remains the durable infrastructure substrate`, `onramp-vNext owns Docker app services`, and `Hermes operates across both` through their approved native workflows.
 
 For the first plugin-backend pilot, SearXNG should be treated as an Onramp app-platform service by default. The recommended onramp-host direction is a Debian 13 VM running Podman. Podman-in-LXC is experimental and should not be the default substrate for durable onramp hosting.
 
-No live mutation is in scope for this PRD. Provisioning a Debian 13 VM, Deploying SearXNG, and Wiring the Hermes web-searxng plugin are deferred until separate reviewed implementation plans exist.
+No direct live mutation is added by this PRD. The Debian 13 `onramp_host` VM and temporary `searxng_onramp` deployment are now implemented by the infrastructure runbook; Hermes integration must continue to use their reviewed native workflows. Wiring or validating the Hermes web-searxng plugin remains a separate concern.
 
 ## Problem
 
@@ -32,10 +34,9 @@ Hermes is now available as a managed LXC with a browser-facing dashboard. The ne
 - Do not store or display secrets in Hermes transcripts, logs, docs, or tracked files.
 - Do not turn this repo into an arbitrary app catalog by default.
 - Do not require Onramp to be complete before Hermes can provide useful repo operations.
-- No live mutation is in scope for this MVP.
-- Provisioning a Debian 13 VM is deferred.
-- Deploying SearXNG is deferred.
-- Wiring the Hermes web-searxng plugin is deferred.
+- No new live mutation path is introduced by this MVP.
+- Existing `onramp_host` provisioning and temporary `searxng_onramp` deployment are implemented outside this PRD.
+- Wiring and validating the Hermes web-searxng plugin remains deferred.
 
 ## Users and scenarios
 

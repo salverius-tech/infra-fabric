@@ -54,6 +54,7 @@ Current service-state targets are:
 - `hermes` — runtime user's `.hermes` directory, including memory/soul files,
   config, history, logs, and Hermes-managed backups.
 - `forgejo` — `/etc/forgejo` and `/var/lib/forgejo`.
+- `infisical` — legacy Infisical configuration, PostgreSQL, Redis, and attachment data.
 - `technitium` — `/etc/dns`.
 - `onramp_host` — `/etc/caddy` and the configured onramp deployment directory.
 - `infisical_onramp` — Infisical onramp deployment directory and Caddy snippet.

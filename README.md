@@ -103,7 +103,7 @@ just update
 
 `just update` checks known upstream releases and only updates pins for releases at least 48 hours old. It currently manages tool pins such as OpenTofu/TFLint and service pins such as Forgejo and Forgejo runner where the repo has a deterministic update target. Review the resulting diff before continuing with validation and planning.
 
-Technitium is planned to move into this managed update path. The intended model is to read Technitium release metadata from GitHub, pin the desired DNS Server version plus the SHA256 of the portable tarball in private values, optionally cache the tarball under ignored `values/artifacts/technitium/`, then let Ansible update the LXC only when the installed marker differs from the pin. Until that is implemented, do not treat rerunning the upstream `install.sh` as an acceptable routine update mechanism.
+Technitium is managed by Ansible using a versioned portable archive, a private SHA256 pin, an installed-version marker, activation health checks, and rollback handling. An optional controller-side cache can be configured with `technitium_artifact_path` under private values. Technitium is not yet automatically discovered or updated by `just update`; review and change its private version/checksum pins explicitly before running `just validate`, `just plan`, and approved `just apply`. Do not rerun the upstream installer as a routine update mechanism.
 
 Review infrastructure/DNS changes:
 

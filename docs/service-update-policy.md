@@ -17,18 +17,21 @@ A service belongs in `just update` when the repo can identify a specific upstrea
 
 For downloadable tools or archives, prefer a version plus checksum. If upstream artifacts are mutable or unversioned, cache the reviewed artifact in ignored private storage and install from that cache during `just apply`.
 
-## Technitium target model
+## Technitium
 
-Technitium DNS is critical infrastructure and should not be upgraded by rerunning the upstream installer as an ad hoc command. The desired model is:
+Technitium DNS is managed by Ansible and must not be upgraded by rerunning an upstream installer. The current implementation:
 
-- Read latest release metadata from `TechnitiumSoftware/DnsServer`.
-- Apply the same `just update` release-age hold used for other managed pins.
-- Pin the desired Technitium DNS Server version and portable tarball SHA256 in private values.
-- Optionally cache the reviewed tarball under `values/artifacts/technitium/`.
-- Let Ansible compare the installed marker with the desired pin, unpack the verified artifact, restart `dns.service`, and verify DNS/UI health.
+- Pins a version and portable tarball SHA256 in private values.
+- Downloads the versioned archive from the Technitium archive endpoint.
+- Optionally stages a controller-side archive cache configured with `technitium_artifact_path`.
+- Compares the installed-version marker with the requested pin.
+- Validates the archive layout and checksum before activation.
+- Performs health checks and retains rollback state during activation.
 
-The upstream portable tarball URL is currently unversioned, so checksum pinning and/or private artifact caching is required for reproducible updates.
+Technitium is not currently a target of `just update`. To change it, update the private version/checksum together, then run `just validate`, review `just plan`, and apply only after approval. Do not use the upstream installer as a routine update mechanism.
 
-## Unmanaged software
+## Other update boundaries
 
-If a component is not yet in `just update`, document that explicitly and avoid inventing one-off upgrade commands. Add managed update support before making routine version changes.
+`just update` currently manages OpenTofu, TFLint, Forgejo, Forgejo runner, Docker Compose, and just pins. Caddy build inputs are version-pinned but do not yet have an automated update target. Tailscale package updates and general guest OS upgrades are also outside the `just update` workflow.
+
+For components not managed by `just update`, document the reviewed pin or package policy explicitly and avoid ad hoc production upgrades.
