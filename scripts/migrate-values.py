@@ -435,6 +435,32 @@ def ensure_lxc_template_integrity_tfvars(tfvars_lines: list[str]) -> list[str]:
     return changes
 
 
+def ensure_onramp_image_integrity_tfvars(tfvars_lines: list[str]) -> list[str]:
+    if not any(
+        tfvars_key_exists(tfvars_lines, key)
+        for key in ("onramp_host_image_url", "onramp_host_image_file_name", "onramp_host_image_checksum")
+    ):
+        return []
+    changes: list[str] = []
+    if tfvars_scalar_value(tfvars_lines, "onramp_host_image_url") == LEGACY_GUEST_VM_IMAGE_URL:
+        if replace_tfvars_raw(tfvars_lines, "onramp_host_image_url", hcl_quote(PINNED_GUEST_VM_IMAGE_URL)):
+            changes.append("pinned onramp_host_image_url")
+    if tfvars_scalar_value(tfvars_lines, "onramp_host_image_file_name") == LEGACY_GUEST_VM_IMAGE_FILE_NAME:
+        if replace_tfvars_raw(tfvars_lines, "onramp_host_image_file_name", hcl_quote(PINNED_GUEST_VM_IMAGE_FILE_NAME)):
+            changes.append("pinned onramp_host_image_file_name")
+    defaults = {
+        "onramp_host_image_checksum_algorithm": '"sha512"',
+        "onramp_host_image_checksum": '"df2bd468b08566c0409a7982d6489d73499ad22f9a28646b538c2f21d08f15040a5e4737952ca209e9ad4488cd00793191791be9f135dee93082c86fcca3300c"',
+    }
+    for key, value in defaults.items():
+        if set_tfvars_raw(tfvars_lines, key, value):
+            changes.append(f"added {key}")
+        elif tfvars_raw_value(tfvars_lines, key) != value:
+            if replace_tfvars_raw(tfvars_lines, key, value):
+                changes.append(f"normalized {key}")
+    return changes
+
+
 def ensure_service_storage_tfvars(tfvars_lines: list[str]) -> list[str]:
     if tfvars_key_exists(tfvars_lines, "service_storage"):
         removed = remove_tfvars_keys_by_name(
@@ -816,6 +842,7 @@ def migrate(values_dir: Path) -> list[str]:
         if rename_tfvars_key(tfvars_lines, old_key, new_key):
             changes.append(f"renamed {old_key} to {new_key}")
     changes.extend(ensure_lxc_template_integrity_tfvars(tfvars_lines))
+    changes.extend(ensure_onramp_image_integrity_tfvars(tfvars_lines))
     changes.extend(ensure_service_storage_tfvars(tfvars_lines))
     services = enabled_services(values_dir)
     optional_services = {service for service in ("infisical", "hermes", "onramp_host", "searxng_onramp") if service in services}

@@ -8,13 +8,15 @@ This pilot defines Hermes as an operator cockpit for `homelab-infra` without mak
 
 For the first plugin-backend pilot, SearXNG should be treated as an Onramp app-platform service by default. The recommended onramp-host direction is a Debian 13 VM running Podman. Podman-in-LXC is experimental and should not be the default substrate for durable onramp hosting.
 
-No direct live mutation is added by this PRD. The Debian 13 `onramp_host` VM and temporary `searxng_onramp` deployment are now implemented by the infrastructure runbook; Hermes integration must continue to use their reviewed native workflows. Wiring or validating the Hermes web-searxng plugin remains a separate concern.
+No direct live mutation is added by this PRD. The Debian 13 `onramp_host` VM and temporary `searxng_onramp` deployment are now implemented by the infrastructure runbook; Hermes integration must continue to use their reviewed native workflows. The bundled Hermes web-searxng provider is configured when the private endpoint is set; end-to-end validation remains a separate concern.
 
 ## Problem
 
 The homelab infrastructure workflow is repo-driven and intentionally cautious: source changes are reviewed in the public runbook repo, private site values live in the ignored `values/` repo, infrastructure changes are reviewed with `just plan`, and live mutation happens only through `just apply` after approval.
 
 Hermes is now available as a managed LXC with a browser-facing dashboard. The next product question is how to use Hermes as an operator cockpit for this repository without bypassing the audited runbook workflow, leaking private values, or turning the infra repo into a general application catalog.
+
+The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized local action metadata under `.tmp/hermes-operator-audit.jsonl`; durable centralized audit persistence remains outstanding. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding.
 
 ## Goals
 
@@ -36,7 +38,7 @@ Hermes is now available as a managed LXC with a browser-facing dashboard. The ne
 - Do not require Onramp to be complete before Hermes can provide useful repo operations.
 - No new live mutation path is introduced by this MVP.
 - Existing `onramp_host` provisioning and temporary `searxng_onramp` deployment are implemented outside this PRD.
-- Wiring and validating the Hermes web-searxng plugin remains deferred.
+- Wiring the bundled Hermes web-searxng provider is implemented; live search validation remains deferred.
 
 ## Users and scenarios
 

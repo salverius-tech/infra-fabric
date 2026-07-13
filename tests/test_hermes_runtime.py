@@ -15,6 +15,8 @@ UNIT = ROLE / "templates" / "hermes-dashboard.service.j2"
 GATEWAY_UNIT = ROLE / "templates" / "hermes-gateway.service.j2"
 ENV = ROLE / "templates" / "hermes-dashboard.env.j2"
 PREFLIGHT = ROLE / "templates" / "hermes-dashboard-preflight.sh.j2"
+OPERATOR_PLUGIN = ROLE / "files" / "homelab-infra-operator" / "__init__.py"
+OPERATOR_MANIFEST = ROLE / "files" / "homelab-infra-operator" / "plugin.yaml"
 WHEEL_SHA256 = "bf75c02d59f7c464cd0d85026fb7ee2e6bb15f003beccab3442b572f1ae1fd37"
 
 
@@ -59,6 +61,8 @@ class HermesRuntimeContractTests(unittest.TestCase):
         cls.defaults = DEFAULTS.read_text(encoding="utf-8")
         cls.unit = UNIT.read_text(encoding="utf-8")
         cls.gateway_unit = GATEWAY_UNIT.read_text(encoding="utf-8")
+        cls.operator_plugin = OPERATOR_PLUGIN.read_text(encoding="utf-8")
+        cls.operator_manifest = OPERATOR_MANIFEST.read_text(encoding="utf-8")
 
     def test_runtime_user_can_run_containerized_tasks(self) -> None:
         self.assertIn("Grant Hermes runtime user access to Docker", self.main)
@@ -107,6 +111,20 @@ class HermesRuntimeContractTests(unittest.TestCase):
         self.assertIn("HERMES_SKIP_NODE_BOOTSTRAP=1", env)
         self.assertIn("HERMES_DISABLE_LAZY_INSTALLS=1", env)
         self.assertIn("PATH=/usr/local/lib/hermes-node/current/bin:", env)
+
+    def test_operator_plugin_is_installed_enabled_and_approval_gated(self) -> None:
+        self.assertIn("homelab-infra-operator/plugin.yaml", self.main)
+        self.assertIn("homelab-infra-operator/__init__.py", self.main)
+        self.assertIn("plugins", self.main)
+        self.assertIn("HERMES_OPERATOR_REPO_PATH", self.gateway_unit)
+        self.assertIn("HERMES_OPERATOR_REPO_PATH", ENV.read_text(encoding="utf-8"))
+        self.assertIn("name: homelab-infra-operator", self.operator_manifest)
+        self.assertIn('enum": list(_ACTIONS)', self.operator_plugin)
+        self.assertIn('name="infra-apply"', self.operator_plugin)
+        self.assertIn('"--approve"', self.operator_plugin)
+        self.assertIn("unsupported apply argument", self.operator_plugin)
+        self.assertIn("Configure Hermes SearXNG web-search backend", self.main)
+        self.assertIn("web.search_backend", self.main)
 
     def test_full_state_bootstrap_restore_is_guarded_and_validated(self) -> None:
         self.assertIn("Restore guarded private Hermes state during bootstrap", self.main)

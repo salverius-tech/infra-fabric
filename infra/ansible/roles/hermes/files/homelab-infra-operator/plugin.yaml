@@ -1,0 +1,7 @@
+name: homelab-infra-operator
+version: 1.0.0
+description: "Safe operator actions for the homelab-infra repository."
+author: homelab-infra
+kind: standalone
+provides_tools:
+  - homelab_infra_operator

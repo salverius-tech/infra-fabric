@@ -284,6 +284,19 @@ class MigrateValuesTests(unittest.TestCase):
             self.assertIn("added onramp_host_vmid", changes)
             self.assertEqual(second_changes, [])
 
+    def test_pins_existing_legacy_onramp_image_values(self) -> None:
+        lines = [
+            'onramp_host_image_url = "https://cloud.debian.org/images/cloud/trixie/latest/debian-13-genericcloud-amd64.qcow2"\n',
+            'onramp_host_image_file_name = "debian-13-genericcloud-amd64.qcow2"\n',
+        ]
+        changes = migrate_values.ensure_onramp_image_integrity_tfvars(lines)
+        text = "".join(lines)
+        self.assertIn(migrate_values.PINNED_GUEST_VM_IMAGE_URL, text)
+        self.assertIn(migrate_values.PINNED_GUEST_VM_IMAGE_FILE_NAME, text)
+        self.assertIn("onramp_host_image_checksum", text)
+        self.assertIn("pinned onramp_host_image_url", changes)
+        self.assertIn("pinned onramp_host_image_file_name", changes)
+
     def test_forgejo_bootstrap_defaults_to_dedicated_admin_and_remote_owner(self) -> None:
         temp, values = self.make_values()
         with temp:
