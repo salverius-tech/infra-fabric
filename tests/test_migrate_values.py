@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import tempfile
 import unittest
@@ -52,6 +53,29 @@ class MigrateValuesTests(unittest.TestCase):
         self.assertIn("added debian_template_checksum", changes)
         self.assertIn("guest_vm_image_checksum", "\n".join(lines))
         self.assertEqual(migrate_values.ensure_lxc_template_integrity_tfvars(lines), [])
+
+    def test_dns_migration_preserves_disabled_optional_service_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            records = Path(temp_dir) / "dns-records.local.json"
+            original = {"a_records": {"infisical.example.internal": "192.0.2.70"}}
+            records.write_text(json.dumps(original), encoding="utf-8")
+
+            changes = migrate_values.ensure_dns_records(records, "example.internal", "", "")
+
+            self.assertEqual(changes, [])
+            self.assertEqual(json.loads(records.read_text(encoding="utf-8")), original)
+
+    def test_dns_migration_adds_control_record_with_hermes_address(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            records = Path(temp_dir) / "dns-records.local.json"
+            records.write_text('{"a_records": {}}', encoding="utf-8")
+
+            changes = migrate_values.ensure_dns_records(records, "example.internal", "", "192.0.2.71")
+
+            self.assertIn("added optional service DNS record", changes)
+            output = json.loads(records.read_text(encoding="utf-8"))
+            self.assertEqual(output["a_records"]["control.hermes.example.internal"], "192.0.2.71")
+            self.assertEqual(migrate_values.ensure_dns_records(records, "example.internal", "", "192.0.2.71"), [])
 
     def test_ensure_technitium_pin_inventory_vars_adds_missing_pins(self) -> None:
         text, changes = migrate_values.ensure_technitium_pin_inventory_vars("all:\n  vars:\n")

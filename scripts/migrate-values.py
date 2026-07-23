@@ -29,6 +29,8 @@ GENERATED_SECRET_KEYS = {
     "INFISICAL_AUTH_SECRET": lambda: base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
     "INFISICAL_POSTGRES_PASSWORD": lambda: secrets.token_urlsafe(32),
     "HERMES_DASHBOARD_BASIC_AUTH_SECRET": lambda: secrets.token_urlsafe(48),
+    "HERMES_CONTROL_API_TOKEN": lambda: secrets.token_urlsafe(48),
+    "HERMES_CONTROL_BRIDGE_TOKEN": lambda: secrets.token_urlsafe(48),
     "SEARXNG_SECRET_KEY": lambda: secrets.token_urlsafe(48),
 }
 
@@ -55,6 +57,8 @@ SECRET_KEYS = {
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
     "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
+    "HERMES_CONTROL_API_TOKEN",
+    "HERMES_CONTROL_BRIDGE_TOKEN",
     "HERMES_WEB_SEARXNG_URL",
     "SEARXNG_SECRET_KEY",
 }
@@ -103,6 +107,10 @@ MIGRATION_ENV_KEYS = {
     "FORGEJO_REPO_OWNER_EMAIL",
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD",
     "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
+    "HERMES_CONTROL_API_TOKEN",
+    "HERMES_CONTROL_BRIDGE_TOKEN",
+    "HERMES_CONTROL_SOURCE_URL",
+    "HERMES_CONTROL_SOURCE_REF",
     "HERMES_WEB_SEARXNG_URL",
     *ENV_TO_INVENTORY,
     *HISTORICAL_ENV_KEYS,
@@ -667,6 +675,12 @@ def ensure_inventory_vars(path: Path, text: str, domain: str) -> tuple[str, list
         "hermes_dashboard_basic_auth_username": "    hermes_dashboard_basic_auth_username: admin",
         "hermes_dashboard_basic_auth_password_hash": "    hermes_dashboard_basic_auth_password_hash: \"{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH') }}\"",
         "hermes_dashboard_basic_auth_secret": "    hermes_dashboard_basic_auth_secret: \"{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_SECRET') }}\"",
+        "hermes_control_enabled": "    hermes_control_enabled: false",
+        "hermes_control_domain": f"    hermes_control_domain: control.hermes.{domain}",
+        "hermes_control_source_url": "    hermes_control_source_url: \"{{ lookup('env', 'HERMES_CONTROL_SOURCE_URL') }}\"",
+        "hermes_control_source_ref": "    hermes_control_source_ref: \"{{ lookup('env', 'HERMES_CONTROL_SOURCE_REF') }}\"",
+        "hermes_control_api_token": "    hermes_control_api_token: \"{{ lookup('env', 'HERMES_CONTROL_API_TOKEN') }}\"",
+        "hermes_control_bridge_token": "    hermes_control_bridge_token: \"{{ lookup('env', 'HERMES_CONTROL_BRIDGE_TOKEN') }}\"",
         "hermes_web_searxng_url": "    hermes_web_searxng_url: \"{{ lookup('env', 'HERMES_WEB_SEARXNG_URL') }}\"",
         "searxng_server_name": f"    searxng_server_name: searxng.apps.{domain}",
         "searxng_public_url": f"    searxng_public_url: https://searxng.apps.{domain}",
@@ -791,6 +805,8 @@ def ensure_dns_records(
         raise MigrationError(f"{path}: a_records must be an object")
     changes: list[str] = []
     desired = {f"infisical.{domain}": infisical_ip, f"hermes.{domain}": hermes_ip}
+    if hermes_ip:
+        desired[f"control.hermes.{domain}"] = hermes_ip
     if searxng_ip:
         desired[f"searxng.apps.{domain}"] = searxng_ip
     for name, address in desired.items():
@@ -857,8 +873,11 @@ def migrate(values_dir: Path) -> list[str]:
     tfvars_values = parse_tfvars(tfvars_lines, tfvars_path)
 
     inventory_changes: list[str] = []
+    hermes_control_enabled = bool(re.search(r"^\s*hermes_control_enabled:\s*true\s*$", inventory_text, re.MULTILINE))
     if optional_services or forgejo_bootstrap_services or "technitium" in services:
         for key, generator in GENERATED_SECRET_KEYS.items():
+            if key.startswith("HERMES_CONTROL_") and not hermes_control_enabled:
+                continue
             if key not in env_entries:
                 set_env(env_lines, env_entries, key, generator())
                 changes.append(f"generated {key}")

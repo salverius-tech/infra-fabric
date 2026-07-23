@@ -523,6 +523,53 @@
   retries: 6
   delay: 5
   until: hermes_caddy_active.rc == 0
+- name: Configure optional Hermes Control companion stack
+  ansible.builtin.include_role:
+    name: hermes_control
+  when: hermes_control_enabled | default(false) | bool
+- name: Verify Hermes Control HTTPS health through Caddy
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
+      - --max-time
+      - "10"
+      - --resolve
+      - "{{ hermes_control_domain }}:443:127.0.0.1"
+      - "https://{{ hermes_control_domain }}/health"
+  changed_when: false
+  when: hermes_control_enabled | default(false) | bool
+  register: hermes_control_https_health
+  retries: 12
+  delay: 5
+  until: hermes_control_https_health.rc == 0
+
+- name: Verify Hermes Control HTTPS diagnostics through Caddy
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
+      - --max-time
+      - "10"
+      - --resolve
+      - "{{ hermes_control_domain }}:443:127.0.0.1"
+      - -H
+      - "Authorization: Bearer {{ hermes_control_api_token }}"
+      - "https://{{ hermes_control_domain }}/diagnostics"
+  changed_when: false
+  no_log: true
+  when: hermes_control_enabled | default(false) | bool
+  register: hermes_control_https_diagnostics
+  retries: 12
+  delay: 5
+  until: hermes_control_https_diagnostics.rc == 0
+
 - name: Verify Hermes gateway service is active
   ansible.builtin.command:
     argv:

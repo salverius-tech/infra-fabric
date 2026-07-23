@@ -234,6 +234,7 @@ def update_dns_records(
         "git.example.internal",
         "infisical.example.internal",
         "hermes.example.internal",
+        "control.hermes.example.internal",
         "searxng.apps.example.net",
     ):
         records.pop(placeholder, None)
@@ -242,6 +243,7 @@ def update_dns_records(
     records[f"git.{domain}"] = forgejo_ip
     records[f"infisical.{domain}"] = infisical_ip
     records[f"hermes.{domain}"] = hermes_ip
+    records[f"control.hermes.{domain}"] = hermes_ip
     records[f"searxng.apps.{domain}"] = searxng_ip
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
@@ -349,7 +351,7 @@ def run(args: argparse.Namespace) -> int:
     print(f"  TECHNITIUM_API_URL=http://{technitium_ip}:5380/api")
     print(f"  LXC gateway: {gateway}")
     print(f"  Managed service IPs: git={forgejo_ip}, runner={forgejo_runner_ip}, tailscale={tailscale_ip}, infisical={infisical_ip}, hermes={hermes_ip}, searxng={searxng_ip}")
-    print(f"  DNS records: dns.{domain}, technitium.{domain}, git.{domain}, infisical.{domain}, hermes.{domain}, searxng.apps.{domain}")
+    print(f"  DNS records: dns.{domain}, technitium.{domain}, git.{domain}, infisical.{domain}, hermes.{domain}, control.hermes.{domain}, searxng.apps.{domain}")
     return 0
 
 

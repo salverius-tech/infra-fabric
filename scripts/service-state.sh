@@ -111,13 +111,21 @@ run_playbook() {
   local group
   group="$(service_group "${service}")"
 
+  local msys_env_conv_excl="${MSYS2_ENV_CONV_EXCL:-}"
+  if [[ -n "${msys_env_conv_excl}" ]]; then
+    msys_env_conv_excl+=";"
+  fi
+  msys_env_conv_excl+="SERVICE_STATE_BACKUP_ROOT;SERVICE_STATE_RESTORE_FILE"
+
   if [[ "${mode}" == "backup" ]]; then
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
+      MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       scripts/run-infra.sh bash -lc \
       "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i values/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml"
   else
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
+      MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       SERVICE_STATE_RESTORE_FILE="${restore_file}" \
       scripts/run-infra.sh bash -lc \

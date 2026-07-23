@@ -160,6 +160,10 @@ def build_inventory(tfvars: dict[str, Any], services: list[str]) -> dict[str, An
         "services": {"children": []},
     }
     hostvars = inventory["_meta"]["hostvars"]
+    # Keep registry-known groups resolvable even when their service is disabled.
+    # Selection remains governed by settings; no disabled host is added here.
+    for group in sorted({str(config["group"]) for config in SERVICE_HOSTS.values()}):
+        inventory[group] = {"hosts": []}
     for service in services:
         inventory["all"]["vars"].update(service_play_vars(service, tfvars))
         rendered = service_hostvars(service, tfvars)
