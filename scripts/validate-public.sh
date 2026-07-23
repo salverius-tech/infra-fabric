@@ -36,7 +36,10 @@ ansible-playbook -i scaffold/ansible/inventory/local.yml -i infra/ansible/invent
   "${playbooks[@]}"
 
 lint_root="$(mktemp -d)"
-trap 'rm -rf "${lint_root}"' EXIT
+cleanup_lint_root() {
+  rm -rf "$lint_root"
+}
+trap cleanup_lint_root EXIT
 cp -a .ansible-lint ansible.cfg settings.example.json infra scaffold scripts "${lint_root}/"
 (
   cd "${lint_root}"

@@ -27,6 +27,23 @@ class CapacityPreflightTests(unittest.TestCase):
             self.assertGreaterEqual(result[0]["required_bytes"], 150)
             self.assertTrue(result[0]["ok"])
 
+    def test_capacity_is_grouped_by_filesystem(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            first = root / "first"
+            second = root / "second"
+            first.mkdir()
+            second.mkdir()
+
+            def filesystem(path: Path) -> tuple[int, Path, int]:
+                return (1 if path == root else 2, path, 1000)
+
+            with patch.object(capacity, "filesystem_key", side_effect=filesystem):
+                with patch.object(capacity, "allocated_bytes", return_value=100):
+                    result = capacity.preflight(50, root, [first, second], reserve_bytes=10)
+            self.assertEqual({entry["filesystem"] for entry in result}, {str(root), str(first)})
+            self.assertTrue(all(entry["ok"] for entry in result))
+
     def test_insufficient_capacity_reports_deficit_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -47,7 +64,7 @@ class CapacityPreflightTests(unittest.TestCase):
         self.assertNotIn("ansible.builtin.fetch:", restore)
         self.assertNotIn("failed_when: false", restore[:restore.index("Create temporary pre-restore")])
         self.assertNotIn("tar -tzf", restore)
-        self.assertIn("    - block:\n", restore)
+        self.assertIn("- name: Restore service state with failure-safe service recovery\n      block:", restore)
         self.assertIn("      always:\n", restore)
         self.assertLess(restore.index("      always:"), restore.index("Report service-state restore result"))
         self.assertLess(

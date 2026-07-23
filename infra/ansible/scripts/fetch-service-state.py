@@ -69,9 +69,11 @@ def stream_archive(args: argparse.Namespace) -> dict[str, int | str]:
                 size += len(chunk)
             handle.flush()
             os.fsync(handle.fileno())
-        stderr = process.stderr.read() if process.stderr is not None else b""
-        if process.wait() != 0:
-            raise TransferError(f"direct archive stream failed ({process.returncode}): {stderr.decode(errors='replace').strip()[:200]}")
+        if process.stderr is not None:
+            process.stderr.read()
+        returncode = process.wait()
+        if returncode != 0:
+            raise TransferError(f"direct archive stream failed ({returncode})")
         os.replace(temp_path, output)
         os.chmod(output, stat.S_IRUSR | stat.S_IWUSR)
         return {"sha256": digest.hexdigest(), "bytes": size}

@@ -352,7 +352,7 @@ No infrastructure plan or apply was run, and no live Proxmox, service, DNS, rout
 |---|---|
 | Repository status at start | Clean, `main` at `524ac1f`, aligned with `origin/main`. |
 | `just validate` | Could not complete in this host environment: the local tooling image was absent and Docker Buildx 0.13.1 is below Compose's required 0.17. This is an environment/tool-bootstrap blocker. |
-| Python unit suite in isolated venv with `tools/requirements.txt` | PASS: 195 tests. |
+| Python unit suite in isolated venv with `tools/requirements.txt` | Passed: 195 tests. |
 | Public-safety scanner against current tracked tree | FAIL: findings in `tests/test_hermes_operator.py` (F-01). |
 | Python compile | PASS. |
 | Bash syntax | PASS. |
@@ -360,7 +360,7 @@ No infrastructure plan or apply was run, and no live Proxmox, service, DNS, rout
 | Docker Compose configuration | PASS. |
 | Ansible inventory with declared dependency PATH | PASS. |
 | Ansible syntax checks | PASS, with expected absent-host warnings for disabled scaffold services. |
-| ansible-lint | PASS: 0 failures and 0 warnings in 124 processed files. |
+| ansible-lint | Passed: 0 failures and 0 warnings in 124 processed files. |
 | OpenTofu artifact checksum | PASS for pinned 1.12.3 download. |
 | TFLint artifact checksum | PASS for pinned 0.63.1 download. |
 | `tofu init -backend=false` | PASS; reused locked `bpg/proxmox` 0.111.0. |

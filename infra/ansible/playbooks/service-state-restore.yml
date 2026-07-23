@@ -95,7 +95,8 @@
       changed_when: false
       register: service_state_capacity_preflight
 
-    - block:
+    - name: Restore service state with failure-safe service recovery
+      block:
         - name: Stop managed system services before restore
           ansible.builtin.systemd_service:
             name: "{{ item }}"

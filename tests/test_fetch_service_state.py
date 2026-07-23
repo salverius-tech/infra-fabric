@@ -20,7 +20,7 @@ spec.loader.exec_module(fetch_service_state)
 class FakeProcess:
     def __init__(self, payload: bytes, returncode: int = 0) -> None:
         self.stdout = io.BytesIO(payload)
-        self.stderr = io.BytesIO(b"stream failed")
+        self.stderr = io.BytesIO(b"remote-private-detail")
         self.returncode = returncode
 
     def wait(self) -> int:
@@ -58,10 +58,35 @@ class FetchServiceStateTests(unittest.TestCase):
             root = Path(temp)
             args = self.args(root)
             with patch.object(fetch_service_state.subprocess, "Popen", return_value=FakeProcess(b"partial", 1)):
-                with self.assertRaises(fetch_service_state.TransferError):
+                with self.assertRaises(fetch_service_state.TransferError) as error:
                     fetch_service_state.stream_archive(args)
+            self.assertNotIn("remote-private-detail", str(error.exception))
             self.assertFalse((root / "state.tar.gz").exists())
             self.assertFalse(list(root.glob(".state.tar.gz.*")))
+
+    def test_ssh_command_uses_become_without_interpolating_archive_data(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            args = self.args(Path(temp))
+            args.ssh_common_args = "-o BatchMode=yes -o StrictHostKeyChecking=no"
+            args.become = True
+            command = fetch_service_state.ssh_command(args)
+        self.assertEqual(
+            command,
+            [
+                "ssh",
+                "-p",
+                "22",
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "StrictHostKeyChecking=no",
+                "operator@192.0.2.71",
+                "sudo",
+                "-n",
+                "cat",
+                "/tmp/hermes-state.tar.gz",
+            ],
+        )
 
     def test_rejects_unsafe_paths_before_ssh(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -76,7 +101,7 @@ class FetchServiceStateTests(unittest.TestCase):
         backup = (SCRIPT.parents[1] / "playbooks" / "service-state-backup.yml").read_text(encoding="utf-8")
         self.assertIn("service_state_stream.stdout | from_json", backup)
         self.assertIn("service_state_checksum.sha256", backup)
-        self.assertIn("    - block:\n", backup)
+        self.assertIn("- name: Create and stream service-state backup transaction\n      block:", backup)
         self.assertIn("      always:\n", backup)
         self.assertLess(backup.index("      always:"), backup.index("Record streamed service-state archive checksum"))
         self.assertNotIn("sha256sum", backup)

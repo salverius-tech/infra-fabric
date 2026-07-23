@@ -19,6 +19,7 @@ Public-safe documentation for this homelab infrastructure runbook.
 
 - [Repository audit (2026-07-19)](repository-audit-2026-07-19.md) reviews the tracked projects, layout, documentation, validation, security boundaries, recovery workflows, and prioritized improvements at commit `524ac1f`.
 - [Upstream gap and suitability review (2026-07-22)](upstream-gap-review-2026-07-19.md) groups all 43 upstream-only commits into final capability series, maps corrective follow-ups, and records fork adoption decisions with commit-level evidence in an appendix.
+- [Upstream commit review](upstream-commit-review.md) tracks the 2026-07-14 upstream changes and their applicability to this fork.
 
 ## Workflow reminder
 

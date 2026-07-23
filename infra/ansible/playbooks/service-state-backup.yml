@@ -35,7 +35,8 @@
       delegate_to: localhost
       become: false
 
-    - block:
+    - name: Create and stream service-state backup transaction
+      block:
         - name: Create temporary service-state snapshot directory
           ansible.builtin.tempfile:
             state: directory

@@ -358,6 +358,19 @@
     - Restart hermes dashboard
     - Restart hermes gateway
 
+- name: Install homelab-infra operator dashboard plugin
+  ansible.builtin.copy:
+    src: homelab-infra-operator/dashboard/
+    dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator/dashboard/"
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0644'
+    directory_mode: '0750'
+  when: hermes_dashboard_enabled | default(true) | bool
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway
+
 - name: Enable homelab-infra operator plugin
   ansible.builtin.command:
     argv:
