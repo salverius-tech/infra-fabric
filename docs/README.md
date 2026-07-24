@@ -14,6 +14,7 @@ Public-safe documentation for this homelab infrastructure runbook.
 - [Onramp SearXNG handoff](onramp-searxng-handoff.md) gives `onramp-vNext` the future SearXNG-on-Podman contract and records the current temporary `searxng_onramp` exception.
 - [App-host runbook](onramp-host-runbook.md) covers `onramp_host` and `searxng_onramp` enable/disable, rollback, and live deployment validation.
 - [Service update policy](service-update-policy.md) defines the managed update workflow, current service boundaries, and Technitium version/checksum management.
+- [Development testing environment](development-environment.md) documents disposable integration testing and the agent workflow for adding services.
 
 ## Repository review
 
