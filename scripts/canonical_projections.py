@@ -113,6 +113,35 @@ def render_ansible_inventory(model: CanonicalSite, catalog: ServiceCatalog) -> d
     }
 
 
+def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[str, Any]:
+    """Render non-secret service variables from canonical ownership.
+
+    The result deliberately keeps service configuration namespaced by service.
+    Consumer-specific flattening belongs in the Ansible adapter, not in the
+    canonical model or operator-edited YAML.
+    """
+    services: dict[str, Any] = {}
+    for name, service in sorted(model.services.items()):
+        if not service.enabled:
+            continue
+        capability = catalog.get(name)
+        resource = _resource(model, service.resource or "")
+        services[name] = {
+            "resource": service.resource,
+            "resource_type": resource.type,
+            "runtime": resource.runtime.model_dump(mode="json", exclude_none=True),
+            "endpoints": service.endpoints.model_dump(mode="json", exclude_none=True),
+            "release": service.release.model_dump(mode="json", exclude_none=True),
+            "configuration": service.configuration,
+            "overrides": service.overrides,
+            "catalog": {
+                "inventory_host": capability.inventory.get("host"),
+                "inventory_group": capability.inventory.get("group"),
+            },
+        }
+    return {"canonical_site": model.site.name, "services": services}
+
+
 def render_dns_records(model: CanonicalSite) -> dict[str, Any]:
     """Render the existing DNS projection shape from endpoint intent."""
     records: dict[str, str] = {}
@@ -131,4 +160,10 @@ def render_dns_records(model: CanonicalSite) -> dict[str, Any]:
     return {"a_records": dict(sorted(records.items())), "cname_records": {}, "zones": {}, "settings": {}}
 
 
-__all__ = ["ProjectionError", "render_ansible_inventory", "render_dns_records", "render_opentofu_variables"]
+__all__ = [
+    "ProjectionError",
+    "render_ansible_inventory",
+    "render_ansible_vars",
+    "render_dns_records",
+    "render_opentofu_variables",
+]

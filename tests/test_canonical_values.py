@@ -10,7 +10,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from canonical_values import CanonicalValuesError, load_site, model_digest, normalized_model, redacted_summary
-from canonical_projections import render_ansible_inventory, render_dns_records, render_opentofu_variables
+from canonical_projections import (
+    render_ansible_inventory,
+    render_ansible_vars,
+    render_dns_records,
+    render_opentofu_variables,
+)
 from service_catalog import load_catalog
 
 
@@ -196,7 +201,13 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o700)
         self.assertEqual(
             sorted(path.name for path in output.iterdir()),
-            ["ansible-inventory.json", "dns-records.json", "manifest.json", "terraform.auto.tfvars.json"],
+            [
+                "ansible-inventory.json",
+                "ansible-vars.json",
+                "dns-records.json",
+                "manifest.json",
+                "terraform.auto.tfvars.json",
+            ],
         )
         self.assertNotIn("password", (output / "manifest.json").read_text(encoding="utf-8").lower())
 
@@ -225,10 +236,17 @@ class CanonicalValuesTests(unittest.TestCase):
         catalog = load_catalog(catalog_path)
         tofu = render_opentofu_variables(model)
         inventory = render_ansible_inventory(model, catalog)
+        ansible_vars = render_ansible_vars(model, catalog)
         dns = render_dns_records(model)
         self.assertEqual(tofu["forgejo_container_vmid"], 107)
         self.assertEqual(tofu["forgejo_server_name"], "git.example.internal")
         self.assertEqual(inventory["forgejo"]["hosts"], ["forgejo_lxc"])
+        self.assertEqual(ansible_vars["canonical_site"], "dev")
+        self.assertEqual(ansible_vars["services"]["forgejo"]["resource"], "forgejo")
+        self.assertEqual(
+            ansible_vars["services"]["forgejo"]["endpoints"]["public_names"],
+            ["git.example.internal"],
+        )
         self.assertEqual(dns["a_records"], {"git.example.internal": "192.0.2.62"})
 
 

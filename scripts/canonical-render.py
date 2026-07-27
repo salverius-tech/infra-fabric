@@ -9,7 +9,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-from canonical_projections import render_ansible_inventory, render_dns_records, render_opentofu_variables
+from canonical_projections import (
+    render_ansible_inventory,
+    render_ansible_vars,
+    render_dns_records,
+    render_opentofu_variables,
+)
 from canonical_values import CanonicalValuesError, load_site, model_digest
 from projection_manifest import ManifestError, build_manifest
 from service_catalog import ServiceCatalogError, load_catalog
@@ -18,6 +23,7 @@ from service_catalog import ServiceCatalogError, load_catalog
 PROJECTION_FILES = {
     "terraform.auto.tfvars.json": "terraform",
     "ansible-inventory.json": "ansible",
+    "ansible-vars.json": "ansible-vars",
     "dns-records.json": "dns",
 }
 
@@ -50,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         projections = {
             "terraform.auto.tfvars.json": render_opentofu_variables(model),
             "ansible-inventory.json": render_ansible_inventory(model, catalog),
+            "ansible-vars.json": render_ansible_vars(model, catalog),
             "dns-records.json": render_dns_records(model),
         }
         args.output_dir.mkdir(parents=True, exist_ok=True)
