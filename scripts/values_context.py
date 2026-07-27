@@ -30,6 +30,14 @@ class ValuesContext:
         return candidate
 
     @property
+    def canonical_site_path(self) -> Path | None:
+        """Return the canonical site.yaml path when the selected site has one."""
+        if self.site is None:
+            return None
+        candidate = self.values_dir / "site.yaml"
+        return candidate if candidate.is_file() else None
+
+    @property
     def metadata_path(self) -> Path | None:
         if self.site is None:
             return None
