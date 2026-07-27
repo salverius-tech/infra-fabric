@@ -1,0 +1,280 @@
+#!/usr/bin/env python3
+"""Provider-neutral access to encrypted canonical site secrets."""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import tempfile
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Iterator, Protocol
+
+from ruamel.yaml import YAML
+from ruamel.yaml.constructor import DuplicateKeyError
+from ruamel.yaml.parser import ParserError
+from ruamel.yaml.tokens import AliasToken, AnchorToken
+
+
+class SecretProviderError(ValueError):
+    """Raised for secret loading, schema, or logical-path failures."""
+
+
+class SecretProvider(Protocol):
+    def resolve(self, logical_path: str) -> str: ...
+
+    def describe(self, logical_path: str) -> dict[str, str]: ...
+
+    def secret_digest(self, logical_paths: set[str] | None = None) -> str: ...
+
+    def discover(self) -> tuple[str, ...]: ...
+
+    def validate_required(self, logical_paths: set[str]) -> None: ...
+
+
+@dataclass(frozen=True)
+class SecretBundle:
+    """Validated structural view of a decrypted logical secret bundle."""
+
+    data: dict[str, Any] = field(repr=False)
+    required_paths: frozenset[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        paths = frozenset(_leaf_paths(self.data))
+        if self.required_paths - paths:
+            raise SecretProviderError("required secret path is not present in the bundle")
+
+    def discover(self) -> tuple[str, ...]:
+        return tuple(sorted(_leaf_paths(self.data)))
+
+    def validate_required(self, logical_paths: set[str] | None = None) -> None:
+        required = self.required_paths if logical_paths is None else frozenset(logical_paths)
+        for path in sorted(required):
+            _resolve(self.data, path)
+
+
+@dataclass(frozen=True)
+class SecretIdentity:
+    ciphertext_hash: str
+    secret_digest: str
+
+
+class SopsAgeProvider:
+    """Decrypt one SOPS YAML bundle in memory and resolve dotted paths.
+
+    The subprocess receives only the source path and emits decrypted YAML on
+    stdout. The provider never prints command output or secret values.
+    """
+
+    def __init__(
+        self,
+        path: Path,
+        *,
+        executable: str = "sops",
+        environment: dict[str, str] | None = None,
+        key_file: Path | None = None,
+        required_paths: set[str] | None = None,
+    ) -> None:
+        self.path = path.resolve()
+        self.executable = executable
+        self.environment = environment or {}
+        configured_key = key_file or (Path(self.environment["SOPS_AGE_KEY_FILE"]) if "SOPS_AGE_KEY_FILE" in self.environment else None)
+        self.key_file = discover_age_key_file(configured_key, environment=self.environment) if configured_key else None
+        self._bundle = SecretBundle(self._decrypt(), frozenset(required_paths or ()))
+        self._data = self._bundle.data
+
+    def _decrypt(self) -> dict[str, Any]:
+        if not self.path.is_file():
+            raise SecretProviderError(f"secret bundle does not exist: {self.path}")
+        env = os.environ.copy()
+        env.update(self.environment)
+        env.pop("SOPS_AGE_KEY", None)
+        if self.key_file is not None:
+            env["SOPS_AGE_KEY_FILE"] = str(self.key_file)
+        try:
+            result = subprocess.run(
+                [self.executable, "--decrypt", "--input-type", "yaml", "--output-type", "yaml", str(self.path)],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+        except OSError as error:
+            raise SecretProviderError("SOPS executable is unavailable") from error
+        if result.returncode != 0:
+            raise SecretProviderError("SOPS could not decrypt the selected secret bundle")
+        try:
+            data = _strict_yaml(result.stdout)
+        except SecretProviderError as error:
+            raise SecretProviderError("decrypted secret bundle is invalid") from error
+        return data
+
+    def resolve(self, logical_path: str) -> str:
+        return _resolve(self._data, logical_path)
+
+    def discover(self) -> tuple[str, ...]:
+        return self._bundle.discover()
+
+    def validate_required(self, logical_paths: set[str]) -> None:
+        self._bundle.validate_required(logical_paths)
+
+    def describe(self, logical_path: str) -> dict[str, str]:
+        self.resolve(logical_path)
+        return {"path": logical_path, "provider": "sops-age", "classification": "logical"}
+
+    def secret_digest(self, logical_paths: set[str] | None = None) -> str:
+        paths = sorted(logical_paths or _leaf_paths(self._data))
+        values = {path: self.resolve(path) for path in paths}
+        payload = json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    def identity(self, logical_paths: set[str] | None = None) -> SecretIdentity:
+        return SecretIdentity(
+            ciphertext_hash=hashlib.sha256(self.path.read_bytes()).hexdigest(),
+            secret_digest=self.secret_digest(logical_paths),
+        )
+
+
+def _parts(logical_path: str) -> list[str]:
+    parts = logical_path.split(".")
+    if not parts or any(not part or part in {".", ".."} for part in parts):
+        raise SecretProviderError(f"invalid logical secret path: {logical_path}")
+    return parts
+
+
+def _resolve(data: dict[str, Any], logical_path: str) -> str:
+    value: Any = data
+    for part in _parts(logical_path):
+        if not isinstance(value, dict) or part not in value:
+            raise SecretProviderError("required secret is missing")
+        value = value[part]
+    if not isinstance(value, str) or not value:
+        raise SecretProviderError("secret value must be a non-empty string")
+    return value
+
+
+def discover_age_key_file(
+    explicit: Path | None = None,
+    *,
+    environment: dict[str, str] | None = None,
+    home: Path | None = None,
+) -> Path:
+    """Discover an external age key file without reading or logging its contents."""
+    env = environment or os.environ
+    candidate = explicit or (Path(env["SOPS_AGE_KEY_FILE"]) if env.get("SOPS_AGE_KEY_FILE") else None)
+    if candidate is None:
+        candidate = (home or Path.home()) / ".config" / "sops" / "age" / "keys.txt"
+    candidate = candidate.expanduser().resolve()
+    if not candidate.is_file():
+        raise SecretProviderError("SOPS age key file is unavailable")
+    if not os.access(candidate, os.R_OK):
+        raise SecretProviderError("SOPS age key file is not readable")
+    if candidate.stat().st_mode & 0o077:
+        raise SecretProviderError("SOPS age key file permissions are too broad")
+    return candidate
+
+
+def validate_sops_age_recipients(path: Path, expected_recipients: set[str]) -> None:
+    """Require the encrypted bundle's SOPS age recipients to match policy.
+
+    Only public SOPS metadata is inspected; encrypted payload values are never
+    resolved by this check. Errors intentionally do not identify keys or
+    recipients.
+    """
+    if not expected_recipients or any(
+        not isinstance(item, str) or not item for item in expected_recipients
+    ):
+        raise SecretProviderError("SOPS recipient policy is invalid")
+    try:
+        yaml = YAML(typ="safe")
+        yaml.allow_duplicate_keys = False
+        text = path.read_text(encoding="utf-8")
+        for token in yaml.scan(text):
+            if isinstance(token, (AliasToken, AnchorToken)):
+                raise SecretProviderError("SOPS recipient metadata is invalid")
+        document = yaml.load(text)
+    except SecretProviderError:
+        raise
+    except (OSError, DuplicateKeyError, ParserError, ValueError) as error:
+        raise SecretProviderError("SOPS recipient metadata is unavailable") from error
+    if not isinstance(document, dict) or not isinstance(document.get("sops"), dict):
+        raise SecretProviderError("SOPS recipient metadata is unavailable")
+    age_entries = document["sops"].get("age")
+    if not isinstance(age_entries, list):
+        raise SecretProviderError("SOPS age recipient metadata is invalid")
+    actual: set[str] = set()
+    for entry in age_entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("recipient"), str) or not entry["recipient"]:
+            raise SecretProviderError("SOPS age recipient metadata is invalid")
+        actual.add(entry["recipient"])
+    if actual != expected_recipients:
+        raise SecretProviderError("SOPS age recipient policy does not match")
+
+
+@contextmanager
+def secret_material_directory(parent: Path | None = None) -> Iterator[Path]:
+    """Create a private temporary directory and remove it on every exit path."""
+    directory = Path(tempfile.mkdtemp(prefix="canonical-secrets-", dir=parent))
+    directory.chmod(0o700)
+    try:
+        yield directory
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+
+def write_secret_material(directory: Path, name: str, content: str) -> Path:
+    """Write controlled secret material with mode 0600; reject path traversal."""
+    relative = Path(name)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise SecretProviderError("invalid secret material path")
+    target = directory / relative
+    target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
+    target.chmod(0o600)
+    return target
+
+
+def _strict_yaml(text: str) -> dict[str, Any]:
+    yaml = YAML(typ="safe")
+    yaml.allow_duplicate_keys = False
+    try:
+        for token in yaml.scan(text):
+            if isinstance(token, (AliasToken, AnchorToken)):
+                raise SecretProviderError("secret YAML anchors and aliases are not permitted")
+        data = yaml.load(text)
+    except (DuplicateKeyError, ParserError, ValueError) as error:
+        raise SecretProviderError("secret YAML is invalid") from error
+    if not isinstance(data, dict):
+        raise SecretProviderError("secret YAML must contain a mapping")
+    return data
+
+
+def _leaf_paths(data: dict[str, Any], prefix: str = "") -> list[str]:
+    paths: list[str] = []
+    for key, value in data.items():
+        if not isinstance(key, str):
+            raise SecretProviderError("secret YAML keys must be strings")
+        path = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            paths.extend(_leaf_paths(value, path))
+        elif isinstance(value, str) and value:
+            paths.append(path)
+        else:
+            raise SecretProviderError(f"secret leaf must be a non-empty string: {path}")
+    return paths
+
+
+__all__ = [
+    "SecretBundle",
+    "SecretIdentity",
+    "SecretProvider",
+    "SecretProviderError",
+    "SopsAgeProvider",
+    "discover_age_key_file",
+    "validate_sops_age_recipients",
+    "secret_material_directory",
+    "write_secret_material",
+]
