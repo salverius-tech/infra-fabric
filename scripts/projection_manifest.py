@@ -67,9 +67,19 @@ def verify_manifest(
         raise ManifestError("projection manifest has a stale model digest")
     if manifest.get("secret_digest") != secret_digest:
         raise ManifestError("projection manifest has a stale secret digest")
+    recorded_digest = manifest.get("projection_digest")
+    if not isinstance(recorded_digest, str):
+        raise ManifestError("projection manifest has no projection digest")
+    unsigned_manifest = {key: value for key, value in manifest.items() if key not in {"created_at", "projection_digest"}}
+    unsigned_manifest["projection_digest"] = recorded_digest
+    expected_digest = content_digest({key: value for key, value in unsigned_manifest.items() if key != "projection_digest"})
+    if expected_digest != recorded_digest:
+        raise ManifestError("projection manifest identity is altered")
     entries = manifest.get("projections")
     if not isinstance(entries, dict):
         raise ManifestError("projection manifest has no projection entries")
+    if set(entries) != set(projections):
+        raise ManifestError("projection manifest projection set does not match")
     for name, value in projections.items():
         entry = entries.get(name)
         if not isinstance(entry, dict) or entry.get("digest") != content_digest(value):

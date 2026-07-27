@@ -71,6 +71,30 @@ class ProjectionManifestTests(unittest.TestCase):
                 projections=altered,
             )
 
+    def test_manifest_identity_tampering_fails_closed(self) -> None:
+        manifest, projections = self.manifest()
+        altered = {**manifest, "source_commit": "different-source"}
+        with self.assertRaisesRegex(ManifestError, "identity is altered"):
+            verify_manifest(
+                altered,
+                site="dev",
+                model_digest="model-digest",
+                secret_digest="secret-digest",
+                projections=projections,
+            )
+
+    def test_projection_set_mismatch_fails_closed(self) -> None:
+        manifest, projections = self.manifest()
+        missing = {name: value for name, value in projections.items() if name != "dns-records.json"}
+        with self.assertRaisesRegex(ManifestError, "projection set does not match"):
+            verify_manifest(
+                manifest,
+                site="dev",
+                model_digest="model-digest",
+                secret_digest="secret-digest",
+                projections=missing,
+            )
+
     def test_secret_identity_change_fails_closed(self) -> None:
         manifest, projections = self.manifest()
         with self.assertRaisesRegex(ManifestError, "stale secret"):
