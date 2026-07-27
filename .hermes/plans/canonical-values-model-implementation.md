@@ -52,7 +52,7 @@ The implementation is complete when all of the following are true:
 | W1 | Canonical schema, strict YAML loader, normalization, digests | W0 | `[~]` |
 | W2 | Secret provider, SOPS/age policy, transport and cleanup | W0, W1 | `[~]` |
 | W3 | Service catalog and mapping matrix | W0, W1 | `[~]` |
-| W4 | Legacy importer and reversible migration | W1, W2, W3 | `[ ]` |
+| W4 | Legacy importer and reversible migration | W1, W2, W3 | `[~]` |
 | W5 | Consumer projections and compatibility adapters | W1, W2, W3 | `[~]` |
 | W6 | Plan/apply identity binding and equivalence oracle | W5 | `[~]` |
 | W7 | Operational cutover and compatibility window | W4, W5, W6 | `[ ]` |
@@ -132,6 +132,7 @@ The implementation is complete when all of the following are true:
 - [ ] Import legacy root layout: `.env`, `terraform.tfvars`, static inventory, DNS JSON, state, and settings metadata.
 - [ ] Import current site-aware layout: `site.json`, site `.env`, site `terraform.tfvars`, inventory, known hosts, DNS JSON, state, plans, backups, and artifacts.
 - [ ] Reuse existing values-context and migration contracts; do not create a competing path resolver.
+- [x] Add report-only legacy discovery for dotenv, tfvars, settings, DNS, and inventory inputs. Secret/unknown values are redacted, all reads are non-mutating, and candidate generation refuses incomplete mapping.
 - [ ] Generate candidate `site.yaml` and encrypted `secrets.sops.yaml` in dry-run mode by default.
 - [ ] Detect and report conflicts after semantic normalization; never choose silently.
 - [ ] Generate missing persistent secrets idempotently through an explicit policy, without logging values.
@@ -261,6 +262,7 @@ Update this table with real command output, fixture names, or review links. Do n
 | 2026-07-27 | Ansible variables projection slice | `docker compose run --rm -T infra python -m unittest -v tests/test_canonical_values.py tests/test_projection_manifest.py`; `docker compose run --rm -T infra python -m unittest discover -s tests -p 'test_*.py'`; `python3 -m py_compile scripts/canonical_projections.py scripts/canonical-render.py tests/test_canonical_values.py`; `git diff --check` | `[x]` | 20 focused tests and 290 full repository tests passed; `ansible-vars.json` renders non-secret service placement/configuration and is included in the projection manifest. |
 | 2026-07-27 | Projection manifest integrity slice | `docker compose run --rm -T infra python -m unittest -v tests/test_projection_manifest.py tests/test_canonical_values.py`; `docker compose run --rm -T infra python -m unittest discover -s tests -p 'test_*.py'`; `python3 -m py_compile scripts/projection_manifest.py tests/test_projection_manifest.py`; `git diff --check` | `[x]` | 22 focused tests and 292 full repository tests passed; manifest self-tampering and projection-set mismatch now fail closed in addition to stale/altered payload checks. |
 | 2026-07-27 | Canonical projection preflight slice | `docker compose run --rm -T infra python -m unittest -v tests/test_workspace_preflight.py tests/test_canonical_values.py tests/test_projection_manifest.py`; `docker compose run --rm -T infra python -m unittest discover -s tests -p 'test_*.py'`; `docker compose run --rm -T infra python -m py_compile scripts/workspace-preflight.py tests/test_workspace_preflight.py`; `git diff --check` | `[x]` | 29 focused tests and 294 full repository tests passed; selected canonical sites render and verify non-secret projections in a temporary restricted directory, invalid canonical input fails closed, and no generated directory is left behind. |
+| 2026-07-27 | Legacy discovery report-only slice | `docker compose run --rm -T infra python -m unittest -v tests/test_legacy_values_discovery.py tests/test_migrate_values.py tests/test_values_context.py`; `docker compose run --rm -T infra python -m unittest discover -s tests -p 'test_*.py'`; `docker compose run --rm -T infra python -m py_compile scripts/legacy_values_discovery.py tests/test_legacy_values_discovery.py`; `git diff --check` | `[x]` | 32 focused tests and 297 full repository tests passed; legacy reads are byte-for-byte non-mutating, secret and unknown values are redacted, inventory is reported as unsupported, and incomplete mapping refuses candidate generation. |
 | 2026-07-27 | Host-only unittest discovery | `.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` | `[!]` | Host run was not authoritative: missing declared dependencies and `/workspace` assumptions caused environment failures. |
 
 ## Risks and stop conditions
@@ -285,3 +287,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-27 — Added the initial validated secret bundle, required logical-path checks, external age-key-file discovery, redacted metadata, and private temporary secret-material cleanup helpers.
 - 2026-07-27 — Added catalog-driven required-secret path metadata/derivation and age-key-file permission enforcement; recipient checks, provider availability policy, and execution-boundary cleanup remain open.
 - 2026-07-27 — Added read-only canonical projection preflight to workspace validation, with temporary restricted output, manifest verification, legacy fallback, and cleanup tests.
+- 2026-07-27 — Added report-only legacy values discovery with source classification, redaction, non-mutation checks, and fail-closed candidate gating.

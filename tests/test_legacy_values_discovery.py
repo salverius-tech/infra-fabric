@@ -1,0 +1,73 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "legacy_values_discovery.py"
+spec = importlib.util.spec_from_file_location("legacy_values_discovery", SCRIPT)
+assert spec and spec.loader
+legacy_values_discovery = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = legacy_values_discovery
+spec.loader.exec_module(legacy_values_discovery)
+
+
+class LegacyValuesDiscoveryTests(unittest.TestCase):
+    def make_values(self) -> tuple[tempfile.TemporaryDirectory[str], Path]:
+        temp = tempfile.TemporaryDirectory()
+        values = Path(temp.name) / "values"
+        (values / "ansible" / "inventory").mkdir(parents=True)
+        (values / ".env").write_text(
+            "TECHNITIUM_API_URL=http://192.0.2.53:5380/api\n"
+            "TECHNITIUM_API_TOKEN=SECRET_SENTINEL_DO_NOT_PRINT\n",
+            encoding="utf-8",
+        )
+        (values / "terraform.tfvars").write_text(
+            'technitium_api_url = "http://192.0.2.53:5380/api"\n'
+            'unmapped_public_key = "review-me"\n',
+            encoding="utf-8",
+        )
+        (values / "settings.local.json").write_text('{"services": ["technitium"]}\n', encoding="utf-8")
+        (values / "dns-records.local.json").write_text('{"dns.example.internal": "192.0.2.53"}\n', encoding="utf-8")
+        (values / "ansible" / "inventory" / "local.yml").write_text("all:\n  hosts:\n    edge:\n", encoding="utf-8")
+        return temp, values
+
+    def test_discovery_is_byte_for_byte_non_mutating(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            before = {path: path.read_bytes() for path in values.rglob("*") if path.is_file()}
+            report = legacy_values_discovery.discover_legacy(values)
+            after = {path: path.read_bytes() for path in values.rglob("*") if path.is_file()}
+        self.assertEqual(before, after)
+        self.assertFalse((values / "site.yaml").exists())
+        self.assertIn(".env", report.files)
+
+    def test_report_redacts_secret_and_unknown_values(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            rendered = json.dumps(
+                legacy_values_discovery.render_migration_report(
+                    legacy_values_discovery.discover_legacy(values)
+                ),
+                sort_keys=True,
+            )
+        self.assertIn("TECHNITIUM_API_TOKEN", rendered)
+        self.assertIn("<redacted>", rendered)
+        self.assertIn("unmapped_public_key", rendered)
+        self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
+        self.assertNotIn("review-me", rendered)
+
+    def test_incomplete_mapping_refuses_candidate(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            report = legacy_values_discovery.discover_legacy(values)
+            self.assertFalse(report.candidate_ready)
+            with self.assertRaises(legacy_values_discovery.DiscoveryError):
+                legacy_values_discovery.build_candidate_site(report)
+
+
+if __name__ == "__main__":
+    unittest.main()
