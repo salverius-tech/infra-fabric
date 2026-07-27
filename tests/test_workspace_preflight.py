@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "workspace-preflight.py"
 spec = importlib.util.spec_from_file_location("workspace_preflight", SCRIPT)
@@ -59,6 +62,35 @@ class WorkspacePreflightTests(unittest.TestCase):
             (root / "values" / ".terraform.tfstate.lock.info").write_text("{}\n", encoding="utf-8")
             with self.assertRaises(workspace_preflight.PreflightError):
                 workspace_preflight.run(root, require_values=True)
+    def test_canonical_site_preflight_renders_and_cleans_temporary_projections(self) -> None:
+        temp, root = self.make_repo()
+        source_root = Path(__file__).resolve().parents[1]
+        site = root / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        (root / "infra" / "services.json").write_text(
+            (source_root / "infra" / "services.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        with temp, patch.dict(
+            os.environ,
+            {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"},
+            clear=True,
+        ):
+            self.assertIsNone(workspace_preflight.check_canonical_projection(root))
+            self.assertFalse((site / "generated").exists())
+
+    def test_invalid_canonical_site_fails_preflight(self) -> None:
+        temp, root = self.make_repo()
+        site = root / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        (site / "site.yaml").write_text("schema_version: 1\n", encoding="utf-8")
+        with temp, patch.dict(
+            os.environ,
+            {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"},
+            clear=True,
+        ), self.assertRaises(workspace_preflight.PreflightError):
+            workspace_preflight.run(root, require_values=True)
 
 
 if __name__ == "__main__":

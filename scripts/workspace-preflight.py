@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 import argparse
+import json
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 try:
+    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+    from canonical_values import load_site, model_digest
+    from projection_manifest import build_manifest, verify_manifest
+    from service_catalog import load_catalog
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+    from canonical_values import load_site, model_digest
+    from projection_manifest import build_manifest, verify_manifest
+    from service_catalog import load_catalog
     from values_context import from_environment
 
 
@@ -71,6 +82,55 @@ def check_no_state_lock(values: Path) -> None:
         )
 
 
+def _write_projection(path: Path, value: object) -> None:
+    temporary = path.with_name(f".{path.name}.preflight")
+    try:
+        temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary.chmod(0o600)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def check_canonical_projection(repo: Path) -> None:
+    """Validate canonical input and its non-secret projections without mutation."""
+    context = from_environment(repo)
+    site_file = context.canonical_site_path
+    if site_file is None:
+        return
+    catalog_path = repo / "infra" / "services.json"
+    model = load_site(site_file, expected_site=context.site, catalog_path=catalog_path)
+    catalog = load_catalog(catalog_path)
+    projections = {
+        "terraform.auto.tfvars.json": render_opentofu_variables(model),
+        "ansible-inventory.json": render_ansible_inventory(model, catalog),
+        "ansible-vars.json": render_ansible_vars(model, catalog),
+        "dns-records.json": render_dns_records(model),
+    }
+    with tempfile.TemporaryDirectory(prefix="canonical-preflight-") as temporary:
+        output = Path(temporary)
+        output.chmod(0o700)
+        for name, value in projections.items():
+            _write_projection(output / name, value)
+        manifest = build_manifest(
+            site=model.site.name,
+            schema_version=model.schema_version,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+            renderer_version="canonical-renderer/0.1",
+            source_commit="preflight",
+        )
+        _write_projection(output / "manifest.json", manifest)
+        verify_manifest(
+            manifest,
+            site=model.site.name,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+        )
+
+
 def run(root: Path, require_values: bool) -> None:
     repo = root.resolve()
     check_directory_writable(repo)
@@ -89,6 +149,10 @@ def run(root: Path, require_values: bool) -> None:
         check_glob_writable(values, "*.tfstate*")
         check_file_writable(values / ".terraform.tfstate.lock.info")
         check_no_state_lock(values)
+    try:
+        check_canonical_projection(repo)
+    except (OSError, ValueError) as error:
+        raise PreflightError(f"canonical projection preflight failed: {error}") from error
 
 
 def main(argv: list[str] | None = None) -> int:
