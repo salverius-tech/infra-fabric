@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "legacy_values_discovery.py"
@@ -13,6 +15,13 @@ assert spec and spec.loader
 legacy_values_discovery = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = legacy_values_discovery
 spec.loader.exec_module(legacy_values_discovery)
+
+CLI_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "legacy-values-discovery.py"
+cli_spec = importlib.util.spec_from_file_location("legacy_values_discovery_cli", CLI_SCRIPT)
+assert cli_spec and cli_spec.loader
+legacy_values_discovery_cli = importlib.util.module_from_spec(cli_spec)
+sys.modules[cli_spec.name] = legacy_values_discovery_cli
+cli_spec.loader.exec_module(legacy_values_discovery_cli)
 
 
 class LegacyValuesDiscoveryTests(unittest.TestCase):
@@ -67,6 +76,29 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             self.assertFalse(report.candidate_ready)
             with self.assertRaises(legacy_values_discovery.DiscoveryError):
                 legacy_values_discovery.build_candidate_site(report)
+    def test_cli_writes_redacted_report_with_restricted_mode(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            output = values.parent / "report.json"
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                result = legacy_values_discovery_cli.main(
+                    ["--values-dir", str(values), "--output", str(output)]
+                )
+            self.assertEqual(result, 0)
+            self.assertIn("wrote redacted legacy discovery report", stdout.getvalue())
+            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+            rendered = output.read_text(encoding="utf-8")
+            self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
+            self.assertIn("TECHNITIUM_API_TOKEN", rendered)
+
+    def test_cli_reports_invalid_values_directory_without_traceback(self) -> None:
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            result = legacy_values_discovery_cli.main(["--values-dir", "/not/a/real/values-dir"])
+        self.assertEqual(result, 1)
+        self.assertIn("legacy discovery failed:", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
 
 if __name__ == "__main__":
