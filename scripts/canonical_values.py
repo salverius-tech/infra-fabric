@@ -28,6 +28,7 @@ class CanonicalValuesError(ValueError):
 
 _IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 _HOSTNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?$")
+_PORT_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 _CIDR_RE = re.compile(r"^(?:dhcp|(?:[0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2})$")
 _CHECKSUM_RE = re.compile(r"^[0-9a-fA-F]{64}|[0-9a-fA-F]{128}$")
 
@@ -330,6 +331,8 @@ class ServiceEndpoints(StrictModel):
     @field_validator("ports")
     @classmethod
     def validate_ports(cls, value: dict[str, int]) -> dict[str, int]:
+        if any(not _PORT_NAME_RE.fullmatch(name) for name in value):
+            raise ValueError("service endpoint port names must be lowercase identifiers")
         if any(port < 1 or port > 65535 for port in value.values()):
             raise ValueError("service endpoint ports must be between 1 and 65535")
         return value

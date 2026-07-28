@@ -190,6 +190,26 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(CanonicalValuesError):
             load_site(self.write_site(duplicate))
 
+    def test_endpoint_port_names_are_lowercase_identifiers(self) -> None:
+        for port_name in ("", "HTTPS", "web.port", " web", "-ssh"):
+            with self.subTest(port_name=port_name):
+                content = VALID_SITE.replace(
+                    "      public_url: https://git.example.internal/",
+                    f"      public_url: https://git.example.internal/\n      ports:\n        {port_name or '':} 443",
+                )
+                with self.assertRaises(CanonicalValuesError):
+                    load_site(self.write_site(content))
+
+    def test_endpoint_port_values_remain_strict_integers(self) -> None:
+        for value in ('"443"', "443.0"):
+            with self.subTest(value=value):
+                content = VALID_SITE.replace(
+                    "      public_url: https://git.example.internal/",
+                    f"      public_url: https://git.example.internal/\n      ports:\n        https: {value}",
+                )
+                with self.assertRaises(CanonicalValuesError):
+                    load_site(self.write_site(content))
+
     def test_rejects_endpoint_ports_outside_tcp_range(self) -> None:
         content = VALID_SITE.replace(
             "      public_url: https://git.example.internal/",
