@@ -97,6 +97,13 @@ fi
   tofu -chdir=infra/opentofu apply -state=../../${INFRA_VALUES_DIR}/terraform.tfstate ../../${INFRA_VALUES_DIR}/tfplan
 )
 
+python scripts/tfplan-metadata.py verify \
+  --plan "${INFRA_VALUES_DIR}/tfplan" \
+  --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json" \
+  --target-service "${target_service}" \
+  --replace-service "${replace_service}" \
+  "${verify_args[@]}"
+
 ansible_service_args=()
 if [[ -n "${target_service}" ]]; then
   ansible_service_args+=(--service "${target_service}")

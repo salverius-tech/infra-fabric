@@ -20,6 +20,27 @@ fi
 INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh bash -euo pipefail -c '
 python scripts/workspace-preflight.py --require-values
 python scripts/settings.py summary
+
+if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
+  generated_dir="${INFRA_VALUES_DIR}/generated"
+  generated_tmp="$(mktemp -d "${INFRA_VALUES_DIR}/.canonical-generated.XXXXXX")"
+  cleanup_generated_tmp() {
+    if [[ -n "${generated_tmp}" && -d "${generated_tmp}" ]]; then
+      rm -rf "${generated_tmp}"
+    fi
+  }
+  trap cleanup_generated_tmp EXIT
+  source_commit="$(git rev-parse HEAD 2>/dev/null || printf 'unknown')"
+  python scripts/canonical-render.py \
+    --site-file "${INFRA_VALUES_DIR}/site.yaml" \
+    --output-dir "${generated_tmp}" \
+    --source-commit "${source_commit}"
+  rm -rf "${generated_dir}"
+  mv "${generated_tmp}" "${generated_dir}"
+  generated_tmp=""
+  printf 'Canonical non-secret projections refreshed for %s.\n' "${INFRA_VALUES_DIR}"
+fi
+
 storage_vars_args=()
 if [[ -n "${1:-}" ]]; then
   storage_vars_args+=(--service "${1}")
