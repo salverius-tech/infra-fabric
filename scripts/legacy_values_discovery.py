@@ -37,7 +37,7 @@ class DiscoveryReport:
     @property
     def candidate_ready(self) -> bool:
         return bool(self.observations) and not self.conflicts and not any(
-            item.classification in {"unknown", "unsupported"} for item in self.observations
+            item.classification in {"secret", "unknown", "unsupported"} for item in self.observations
         )
 
 

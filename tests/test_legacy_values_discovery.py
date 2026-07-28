@@ -175,6 +175,20 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaises(legacy_values_discovery.DiscoveryError):
                 legacy_values_discovery.build_candidate_site(report)
 
+    def test_secret_only_report_remains_fail_closed(self) -> None:
+        temp = tempfile.TemporaryDirectory()
+        values = Path(temp.name) / "values"
+        values.mkdir()
+        (values / ".env").write_text(
+            "TECHNITIUM_API_TOKEN=SECRET_SENTINEL_DO_NOT_PRINT\n",
+            encoding="utf-8",
+        )
+        with temp:
+            report = legacy_values_discovery.discover_legacy(values)
+            self.assertFalse(report.candidate_ready)
+            rendered = json.dumps(legacy_values_discovery.render_migration_report(report))
+        self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
+
     def test_cli_writes_redacted_report_with_restricted_mode(self) -> None:
         temp, values = self.make_values()
         with temp:

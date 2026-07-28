@@ -6,9 +6,12 @@ import tempfile
 import stat
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
+import atomic_output
+from atomic_output import atomic_output_directory
 from canonical_values import CanonicalValuesError, load_site, model_digest, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
@@ -250,6 +253,56 @@ class CanonicalValuesTests(unittest.TestCase):
             ],
         )
         self.assertNotIn("password", (output / "manifest.json").read_text(encoding="utf-8").lower())
+
+    def test_renderer_failure_does_not_leave_partial_output_or_secret(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: self._remove(root))
+        output = root / "generated"
+        output.mkdir()
+        (output / "previous.json").write_text("previous\n", encoding="utf-8")
+        script = Path(__file__).resolve().parents[1] / "scripts" / "canonical-render.py"
+        site = Path(__file__).resolve().parents[1] / "scaffold" / "sites" / "dev" / "site.yaml"
+        catalog = Path(__file__).resolve().parents[1] / "infra" / "services.json"
+        invalid_site = root / "invalid-site.yaml"
+        invalid_site.write_text(
+            site.read_text(encoding="utf-8").replace(
+                "      public_url: https://git.example.internal/",
+                "      public_url: https://git.example.internal/\n      dns:\n        enabled: true\n        innocuous_secret_carrier: SECRET_SENTINEL",
+            ),
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            [sys.executable, str(script), "--site-file", str(invalid_site), "--catalog", str(catalog), "--output-dir", str(output)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((output / "previous.json").read_text(encoding="utf-8"), "previous\n")
+        self.assertEqual(sorted(path.name for path in output.iterdir()), ["previous.json"])
+        self.assertNotIn("SECRET_SENTINEL", result.stderr)
+
+    def test_atomic_output_preserves_previous_directory_when_replacement_fails(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: self._remove(root))
+        output = root / "generated"
+        output.mkdir()
+        (output / "previous.json").write_text("previous\n", encoding="utf-8")
+        original_replace = atomic_output.os.replace
+
+        def fail_install(source: str | Path, destination: str | Path) -> None:
+            if Path(source).name.startswith(".generated.tmp-"):
+                raise OSError("simulated replacement failure")
+            original_replace(source, destination)
+
+        with mock.patch("atomic_output.os.replace", side_effect=fail_install):
+            with self.assertRaisesRegex(OSError, "simulated replacement failure"):
+                atomic_output_directory(
+                    output,
+                    lambda directory: (directory / "new.json").write_text("new\n", encoding="utf-8"),
+                )
+        self.assertEqual((output / "previous.json").read_text(encoding="utf-8"), "previous\n")
+        self.assertFalse((output / "new.json").exists())
 
     def test_cli_summary_is_redacted_and_catalog_validated(self) -> None:
         site_path = self.write_site(VALID_SITE)

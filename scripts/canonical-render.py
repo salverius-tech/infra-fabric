@@ -9,6 +9,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from atomic_output import atomic_output_directory
 from canonical_projections import (
     render_ansible_inventory,
     render_ansible_vars,
@@ -59,10 +60,6 @@ def main(argv: list[str] | None = None) -> int:
             "ansible-vars.json": render_ansible_vars(model, catalog),
             "dns-records.json": render_dns_records(model),
         }
-        args.output_dir.mkdir(parents=True, exist_ok=True)
-        args.output_dir.chmod(0o700)
-        for name, value in projections.items():
-            _write_json(args.output_dir / name, value)
         manifest = build_manifest(
             site=model.site.name,
             schema_version=model.schema_version,
@@ -72,7 +69,12 @@ def main(argv: list[str] | None = None) -> int:
             renderer_version=args.renderer_version,
             source_commit=args.source_commit,
         )
-        _write_json(args.output_dir / "manifest.json", manifest)
+        def populate(directory: Path) -> None:
+            for name, value in projections.items():
+                _write_json(directory / name, value)
+            _write_json(directory / "manifest.json", manifest)
+
+        atomic_output_directory(args.output_dir, populate)
         print(f"rendered {len(projections)} non-secret projections for {model.site.name} into {args.output_dir}")
     except (CanonicalValuesError, ServiceCatalogError, ManifestError, OSError, ValueError) as error:
         print(f"canonical projection error: {error}", file=sys.stderr)
