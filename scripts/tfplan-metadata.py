@@ -18,7 +18,15 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from values_context import ValuesContextError, from_environment
 
-SCHEMA_VERSION = 4
+try:
+    from canonical_values import load_site, model_digest
+    from projection_manifest import ManifestError, verify_manifest
+except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from canonical_values import load_site, model_digest
+    from projection_manifest import ManifestError, verify_manifest
+
+SCHEMA_VERSION = 5
 DEFAULT_MAX_AGE_HOURS = 24
 INPUT_GLOBS = (
     "infra/opentofu/**/*.tf",
@@ -256,6 +264,46 @@ def selected_site(repo: Path) -> str | None:
         raise MetadataError(str(error)) from error
 
 
+def canonical_identity(repo: Path) -> dict[str, Any] | None:
+    """Return the verified canonical/projection identity for the selected site."""
+    context = from_environment(repo)
+    site_file = context.canonical_site_path
+    if site_file is None:
+        return None
+    if context.site is None:
+        raise MetadataError("canonical site requires VALUES_SITE")
+    catalog_path = repo / "infra" / "services.json"
+    try:
+        model = load_site(site_file, expected_site=context.site, catalog_path=catalog_path)
+        manifest_path = context.projection_manifest_path
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        entries = manifest.get("projections")
+        if not isinstance(entries, dict) or not entries:
+            raise MetadataError("Saved tfplan canonical projection manifest is invalid. Run `just plan` again.")
+        projections: dict[str, Any] = {}
+        for name in entries:
+            projection_path = context.generated_path(name)
+            projections[name] = json.loads(projection_path.read_text(encoding="utf-8"))
+        verify_manifest(
+            manifest,
+            site=model.site.name,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+        )
+    except (OSError, KeyError, TypeError, json.JSONDecodeError, ManifestError, ValueError) as error:
+        raise MetadataError(
+            "Saved tfplan canonical projection manifest is missing or invalid. Run `just plan` again."
+        ) from error
+    return {
+        "site": model.site.name,
+        "model_digest": model_digest(model),
+        "projection_digest": manifest["projection_digest"],
+        "renderer_version": manifest["renderer_version"],
+        "source_commit": manifest["source_commit"],
+    }
+
+
 def create_metadata(
     plan: Path,
     metadata: Path,
@@ -275,6 +323,7 @@ def create_metadata(
         "expires_at": (now + timedelta(hours=max_age_hours)).isoformat(),
         "git_commit": git_commit(repo),
         "site": selected_site(repo),
+        "canonical": canonical_identity(repo),
         "plan": {
             "path": plan.as_posix(),
             "sha256": sha256_file(plan),
@@ -311,6 +360,17 @@ def validate_summary(summary: Any) -> dict[str, Any]:
     return summary
 
 
+def validate_canonical_identity(identity: Any) -> dict[str, str] | None:
+    if identity is None:
+        return None
+    if not isinstance(identity, dict) or not all(
+        isinstance(identity.get(key), str) and identity.get(key) for key in
+        ("site", "model_digest", "projection_digest", "renderer_version", "source_commit")
+    ):
+        raise MetadataError("Saved tfplan metadata has invalid canonical identity. Run `just plan` again.")
+    return {key: identity[key] for key in ("site", "model_digest", "projection_digest", "renderer_version", "source_commit")}
+
+
 def load_metadata(metadata: Path) -> dict[str, Any]:
     if not metadata.is_file():
         raise MetadataError("Saved tfplan metadata is missing. Run `just plan` again.")
@@ -326,6 +386,7 @@ def load_metadata(metadata: Path) -> dict[str, Any]:
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     if data.get("site") is not None and not isinstance(data.get("site"), str):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
+    data["canonical"] = validate_canonical_identity(data.get("canonical"))
     scope = data.get("scope")
     if not isinstance(scope, dict) or not all(isinstance(scope.get(key), str) for key in ("target_service", "replace_service")):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
@@ -356,6 +417,10 @@ def verify_metadata(
 
     if data.get("site") != selected_site(repo):
         raise MetadataError("Saved tfplan site differs from this apply. Run `just plan` again.")
+
+    expected_canonical = data["canonical"]
+    if expected_canonical != canonical_identity(repo):
+        raise MetadataError("Saved tfplan canonical identity differs from this apply. Run `just plan` again.")
 
     expected_plan_hash = data.get("plan", {}).get("sha256")
     if expected_plan_hash != sha256_file(plan):

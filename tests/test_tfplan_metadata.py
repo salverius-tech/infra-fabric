@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
+import shutil
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -13,6 +16,12 @@ spec = importlib.util.spec_from_file_location("tfplan_metadata", SCRIPT)
 assert spec and spec.loader
 tfplan_metadata = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tfplan_metadata)
+
+sys.path.insert(0, str(SCRIPT.parent))
+from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+from canonical_values import load_site, model_digest
+from projection_manifest import build_manifest
+from service_catalog import load_catalog
 
 
 class TfplanMetadataTests(unittest.TestCase):
@@ -50,6 +59,77 @@ class TfplanMetadataTests(unittest.TestCase):
         metadata = repo / "tfplan.meta.json"
         plan.write_text("plan-data\n")
         return temp_dir, repo, plan, metadata
+
+    def add_canonical_projection_set(self, repo: Path) -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        site = repo / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        (repo / "infra" / "services.json").write_text(
+            (source_root / "infra" / "services.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        model = load_site(site / "site.yaml", expected_site="dev", catalog_path=repo / "infra" / "services.json")
+        catalog = load_catalog(repo / "infra" / "services.json")
+        projections = {
+            "terraform.auto.tfvars.json": render_opentofu_variables(model),
+            "ansible-inventory.json": render_ansible_inventory(model, catalog),
+            "ansible-vars.json": render_ansible_vars(model, catalog),
+            "dns-records.json": render_dns_records(model),
+        }
+        generated = site / "generated"
+        generated.mkdir(mode=0o700)
+        for name, value in projections.items():
+            (generated / name).write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
+        manifest = build_manifest(
+            site="dev",
+            schema_version=model.schema_version,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+            renderer_version="test-renderer",
+            source_commit="test-source",
+        )
+        (generated / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+
+    def test_canonical_identity_is_recorded_and_verified(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ):
+            data = tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            self.assertEqual(data["canonical"]["site"], "dev")
+            self.assertTrue(data["canonical"]["model_digest"])
+            self.assertTrue(data["canonical"]["projection_digest"])
+            tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_changed_canonical_projection_fails(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ):
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            projection = repo / "values" / "sites" / "dev" / "generated" / "dns-records.json"
+            projection.write_text('{"altered": true}\n', encoding="utf-8")
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_missing_canonical_manifest_fails_creation(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        (repo / "values" / "sites" / "dev" / "generated" / "manifest.json").unlink()
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ), self.assertRaises(tfplan_metadata.MetadataError):
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
 
     def test_create_and_verify_metadata(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
