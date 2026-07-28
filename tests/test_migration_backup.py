@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+import shutil
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+
+from migration_backup import BackupManifestError, build_manifest, verify_manifest
+
+
+class MigrationBackupTests(unittest.TestCase):
+    def make_tree(self, root: Path) -> list[str]:
+        (root / "site").mkdir()
+        (root / "site" / "terraform.tfvars").write_text("address = 192.0.2.10\n", encoding="utf-8")
+        (root / "site" / "dns-records.json").write_text('{"zone":"example.internal"}\n', encoding="utf-8")
+        return ["site/dns-records.json", "site/terraform.tfvars"]
+
+    def test_manifest_is_deterministic_and_sorted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self.make_tree(root)
+            first = build_manifest(root, list(reversed(paths)))
+            second = build_manifest(root, paths)
+            self.assertEqual(first, second)
+            self.assertEqual([entry["path"] for entry in first["entries"]], sorted(paths))
+
+    def test_hash_verification_accepts_unchanged_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = build_manifest(root, self.make_tree(root))
+            verify_manifest(root, manifest)
+
+    def test_changed_missing_and_unexpected_files_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = build_manifest(root, self.make_tree(root))
+            (root / "site" / "terraform.tfvars").write_text("changed\n", encoding="utf-8")
+            with self.assertRaises(BackupManifestError):
+                verify_manifest(root, manifest)
+            (root / "site" / "terraform.tfvars").unlink()
+            with self.assertRaises(BackupManifestError):
+                verify_manifest(root, manifest)
+            (root / "site" / "terraform.tfvars").write_text("address = 192.0.2.10\n", encoding="utf-8")
+            (root / "extra.txt").write_text("unexpected\n", encoding="utf-8")
+            with self.assertRaises(BackupManifestError):
+                verify_manifest(root, manifest)
+
+    def test_traversal_absolute_duplicate_and_symlink_paths_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_tree(root)
+            for paths in (["../outside"], [str(root / "site" / "dns-records.json")], ["site/dns-records.json"] * 2):
+                with self.subTest(paths=paths), self.assertRaises(BackupManifestError):
+                    build_manifest(root, paths)
+            link = root / "link"
+            link.symlink_to(root / "site" / "dns-records.json")
+            with self.assertRaises(BackupManifestError):
+                build_manifest(root, ["link"])
+
+    def test_manifest_errors_do_not_contain_fixture_contents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self.make_tree(root)
+            manifest = build_manifest(root, paths)
+            (root / paths[0]).write_text("REPLACE_SECRET\n", encoding="utf-8")
+            with self.assertRaises(BackupManifestError) as context:
+                verify_manifest(root, manifest)
+            self.assertNotIn("REPLACE_SECRET", str(context.exception))
+
+    def test_disposable_restore_rehearsal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self.make_tree(root)
+            backup = root / "backup"
+            working = root / "working"
+            shutil.copytree(root / "site", backup)
+            shutil.copytree(root / "site", working)
+            manifest = build_manifest(backup, relative_paths=[path.removeprefix("site/") for path in paths])
+            shutil.rmtree(working)
+            shutil.copytree(backup, working)
+            verify_manifest(backup, manifest)
+            self.assertEqual(
+                sorted(path.relative_to(working).as_posix() for path in working.rglob("*")),
+                sorted(path.removeprefix("site/") for path in paths),
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()
