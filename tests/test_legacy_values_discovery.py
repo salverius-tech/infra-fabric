@@ -132,6 +132,17 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[0].proposed_path, "services.infisical.endpoints.public_names")
         self.assertEqual(observations[0].value, ["vault.example.internal"])
 
+    def test_infisical_domain_maps_to_normalized_public_name(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            with (values / "terraform.tfvars").open("a", encoding="utf-8") as stream:
+                stream.write('infisical_domain = "Domain.Example.Internal."\n')
+            report = legacy_values_discovery.discover_legacy(values)
+        observations = [item for item in report.observations if item.key == "infisical_domain"]
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0].proposed_path, "services.infisical.endpoints.public_names")
+        self.assertEqual(observations[0].value, ["domain.example.internal"])
+
     def test_infisical_server_name_conflict_remains_fail_closed(self) -> None:
         temp, values = self.make_values()
         with temp:

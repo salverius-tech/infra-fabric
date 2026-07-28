@@ -67,6 +67,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "server_name": "services.technitium.endpoints.public_names",
         "infisical_server_name": "services.infisical.endpoints.public_names",
         "INFISICAL_SERVER_NAME": "services.infisical.endpoints.public_names",
+        "infisical_domain": "services.infisical.endpoints.public_names",
         "FORGEJO_DOMAIN": "services.forgejo.endpoints.public_names",
         "forgejo_domain": "services.forgejo.endpoints.public_names",
         "FORGEJO_SERVER_NAME": "services.forgejo.endpoints.public_names",
