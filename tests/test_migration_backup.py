@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 import tempfile
@@ -8,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from migration_backup import BackupManifestError, build_manifest, verify_manifest
+from migration_backup import BackupManifestError, build_manifest, emit_manifest, verify_manifest
 
 
 class MigrationBackupTests(unittest.TestCase):
@@ -86,6 +87,37 @@ class MigrationBackupTests(unittest.TestCase):
                 sorted(path.relative_to(working).as_posix() for path in working.rglob("*")),
                 sorted(path.removeprefix("site/") for path in paths),
             )
+
+    def test_emit_stages_selected_files_and_creates_explicit_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "values"
+            root.mkdir()
+            paths = self.make_tree(root)
+            output = Path(directory) / "artifacts" / "backup.json"
+            output.parent.mkdir()
+            manifest = emit_manifest(root, [paths[0]], output)
+            self.assertEqual([entry["path"] for entry in manifest["entries"]], [paths[0]])
+            self.assertEqual(json.loads(output.read_text(encoding="utf-8")), manifest)
+            self.assertTrue((root / paths[1]).is_file())
+
+    def test_emit_rejects_directories_symlinked_parents_and_existing_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "values"
+            root.mkdir()
+            paths = self.make_tree(root)
+            output = Path(directory) / "backup.json"
+            with self.assertRaises(BackupManifestError):
+                emit_manifest(root, ["site"], output)
+            outside = Path(directory) / "outside"
+            outside.mkdir()
+            (outside / "secret.txt").write_text("sentinel", encoding="utf-8")
+            (root / "escape").symlink_to(outside, target_is_directory=True)
+            with self.assertRaises(BackupManifestError):
+                emit_manifest(root, ["escape/secret.txt"], output)
+            output.write_text("do not replace", encoding="utf-8")
+            with self.assertRaises(BackupManifestError):
+                emit_manifest(root, paths, output)
+            self.assertEqual(output.read_text(encoding="utf-8"), "do not replace")
 
 
 if __name__ == "__main__":
