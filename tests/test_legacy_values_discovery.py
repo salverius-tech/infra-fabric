@@ -69,6 +69,18 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
         self.assertNotIn("review-me", rendered)
 
+    def test_conflicting_sources_are_reported_and_block_candidate(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "terraform.tfvars").write_text(
+                'technitium_api_url = "http://192.0.2.54:5380/api"\n',
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+        self.assertFalse(report.candidate_ready)
+        self.assertEqual(report.conflicts[0]["canonical_path"], "services.technitium.endpoints.public_url")
+        self.assertEqual(report.conflicts[0]["disposition"], "manual review required")
+
     def test_incomplete_mapping_refuses_candidate(self) -> None:
         temp, values = self.make_values()
         with temp:
@@ -76,6 +88,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             self.assertFalse(report.candidate_ready)
             with self.assertRaises(legacy_values_discovery.DiscoveryError):
                 legacy_values_discovery.build_candidate_site(report)
+
     def test_cli_writes_redacted_report_with_restricted_mode(self) -> None:
         temp, values = self.make_values()
         with temp:

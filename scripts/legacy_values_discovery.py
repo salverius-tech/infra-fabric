@@ -62,6 +62,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "PROXMOX_VE_ENDPOINT": "platform.proxmox.endpoint",
         "PROXMOX_NODE_NAME": "platform.proxmox.node",
         "TECHNITIUM_API_URL": "services.technitium.endpoints.public_url",
+        "technitium_api_url": "services.technitium.endpoints.public_url",
         "FORGEJO_DOMAIN": "services.forgejo.endpoints.public_names",
         "FORGEJO_VERSION": "services.forgejo.release.version",
     }
