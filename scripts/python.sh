@@ -5,7 +5,14 @@ export INFRA_HOST_UID="${INFRA_HOST_UID:-$(scripts/host-id.sh uid)}"
 export INFRA_HOST_GID="${INFRA_HOST_GID:-$(scripts/host-id.sh gid)}"
 export INFRA_GIT_COMMIT="${INFRA_GIT_COMMIT:-$(git rev-parse HEAD 2>/dev/null || true)}"
 
+source scripts/container-secret-transport.sh
+transport_parse_args "$@"
+set -- "${transport_remaining_args[@]}"
+transport_prepare
+
 compose_args=(compose run --rm
+  "${transport_compose_mount_args[@]}"
+  "${transport_compose_env_args[@]}"
   --env "VALUES_DIR=${VALUES_DIR:-}"
   --env "VALUES_SITE=${VALUES_SITE:-}"
   --env "INFRA_VALUES_DIR=${INFRA_VALUES_DIR:-}"

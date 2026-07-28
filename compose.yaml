@@ -23,6 +23,7 @@ services:
       INFRA_HOST_GID: ${INFRA_HOST_GID:-1000}
       SERVICE_STATE_BACKUP_ROOT: ${SERVICE_STATE_BACKUP_ROOT:-}
       SERVICE_STATE_RESTORE_FILE: ${SERVICE_STATE_RESTORE_FILE:-}
+      SOPS_AGE_KEY_FILE: /run/secrets/sops-age-key
 
 volumes:
   tofu-plugin-cache:

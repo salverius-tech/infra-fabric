@@ -2,6 +2,10 @@
 set -euo pipefail
 
 source scripts/site-context.sh
+source scripts/container-secret-transport.sh
+transport_parse_args "$@"
+set -- "${transport_remaining_args[@]}"
+transport_prepare
 values_dir="$(site_values_dir)"
 env_file="${values_dir}/.env"
 if [[ ! -f "${env_file}" ]]; then
@@ -27,6 +31,8 @@ scripts/python.sh scripts/parse-env.py --env-file "${env_file}" >"${compose_env_
 chmod 0600 "${compose_env_file}"
 
 docker compose run --rm \
+  "${transport_compose_mount_args[@]}" \
+  "${transport_compose_env_args[@]}" \
   --env VALUES_DIR="${VALUES_DIR:-values}" \
   --env VALUES_SITE="${VALUES_SITE:-}" \
   --env INFRA_VALUES_DIR="${values_dir}" \
