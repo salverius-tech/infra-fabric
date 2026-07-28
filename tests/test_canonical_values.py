@@ -179,6 +179,25 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(CanonicalValuesError):
             load_site(self.write_site(content))
 
+    def test_normalizes_protocols_and_rejects_duplicate_protocols(self) -> None:
+        content = VALID_SITE.replace(
+            "      public_url: https://git.example.internal/",
+            "      public_url: https://git.example.internal/\n      protocols:\n        - HTTPS\n        - ssh",
+        )
+        model = load_site(self.write_site(content))
+        self.assertEqual(model.services["forgejo"].endpoints.protocols, ["https", "ssh"])
+        duplicate = content.replace("        - ssh", "        - HTTPS")
+        with self.assertRaises(CanonicalValuesError):
+            load_site(self.write_site(duplicate))
+
+    def test_rejects_endpoint_ports_outside_tcp_range(self) -> None:
+        content = VALID_SITE.replace(
+            "      public_url: https://git.example.internal/",
+            "      public_url: https://git.example.internal/\n      ports:\n        https: 65536",
+        )
+        with self.assertRaises(CanonicalValuesError):
+            load_site(self.write_site(content))
+
     def test_loads_public_scaffold_fixture(self) -> None:
         path = Path(__file__).resolve().parents[1] / "scaffold" / "sites" / "dev" / "site.yaml"
         model = load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")

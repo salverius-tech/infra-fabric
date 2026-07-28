@@ -314,6 +314,21 @@ class ServiceEndpoints(StrictModel):
             raise ValueError("service endpoint public_names must be unique")
         return normalized
 
+    @field_validator("protocols")
+    @classmethod
+    def validate_protocols(cls, value: list[str]) -> list[str]:
+        normalized = [protocol.lower() for protocol in value]
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("service endpoint protocols must be unique")
+        return normalized
+
+    @field_validator("ports")
+    @classmethod
+    def validate_ports(cls, value: dict[str, int]) -> dict[str, int]:
+        if any(port < 1 or port > 65535 for port in value.values()):
+            raise ValueError("service endpoint ports must be between 1 and 65535")
+        return value
+
 
 class ServiceRelease(StrictModel):
     version: StrictStr | None = None
