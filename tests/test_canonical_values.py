@@ -275,6 +275,16 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaisesRegex(ProjectionError, "sensitive field"):
             render_ansible_vars(model, catalog)
 
+    def test_non_secret_projection_rejects_opaque_runtime_template(self) -> None:
+        content = VALID_SITE.replace(
+            "        unprivileged: true",
+            "        unprivileged: true\n        template:\n          image: public-template",
+        )
+        model = load_site(self.write_site(content))
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        with self.assertRaisesRegex(ProjectionError, "runtime.template"):
+            render_ansible_vars(model, catalog)
+
     def test_dns_metadata_rejects_unknown_fields_without_exposing_values(self) -> None:
         content = VALID_SITE.replace(
             "      visibility: internal",

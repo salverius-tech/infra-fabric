@@ -30,7 +30,7 @@ def _assert_non_secret(value: Any, path: str = "projection") -> None:
 
 def _validate_non_secret_inputs(model: CanonicalSite) -> None:
     for name, resource in (*model.resources.guests.items(), *model.resources.shared_hosts.items()):
-        for field_name, value in (("runtime.cloud_init", resource.runtime.cloud_init), ("runtime.users", resource.runtime.users)):
+        for field_name, value in (("runtime.cloud_init", resource.runtime.cloud_init), ("runtime.template", resource.runtime.template), ("runtime.users", resource.runtime.users)):
             if value:
                 raise ProjectionError(f"non-secret projection rejects opaque field: resources.{name}.{field_name}")
     for name, service in model.services.items():
