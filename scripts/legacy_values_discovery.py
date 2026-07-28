@@ -65,6 +65,8 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "technitium_api_url": "services.technitium.endpoints.public_url",
         "SERVER_NAME": "services.technitium.endpoints.public_names",
         "server_name": "services.technitium.endpoints.public_names",
+        "infisical_server_name": "services.infisical.endpoints.public_names",
+        "INFISICAL_SERVER_NAME": "services.infisical.endpoints.public_names",
         "FORGEJO_DOMAIN": "services.forgejo.endpoints.public_names",
         "forgejo_domain": "services.forgejo.endpoints.public_names",
         "FORGEJO_SERVER_NAME": "services.forgejo.endpoints.public_names",
@@ -102,6 +104,7 @@ def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migrati
     public = _public_value(value)
     if proposed_path in {
         "services.technitium.endpoints.public_names",
+        "services.infisical.endpoints.public_names",
         "services.forgejo.endpoints.public_names",
     }:
         public = _normalize_public_name(public)

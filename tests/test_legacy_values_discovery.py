@@ -120,6 +120,30 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertFalse(report.candidate_ready)
         self.assertEqual(report.conflicts[0]["canonical_path"], "services.technitium.endpoints.public_names")
 
+    def test_infisical_server_name_maps_to_normalized_public_name(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            with (values / "terraform.tfvars").open("a", encoding="utf-8") as stream:
+                stream.write('infisical_server_name = "Vault.Example.Internal."\n')
+            report = legacy_values_discovery.discover_legacy(values)
+        observations = [item for item in report.observations if item.key == "infisical_server_name"]
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0].classification, "mapped")
+        self.assertEqual(observations[0].proposed_path, "services.infisical.endpoints.public_names")
+        self.assertEqual(observations[0].value, ["vault.example.internal"])
+
+    def test_infisical_server_name_conflict_remains_fail_closed(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            with (values / "terraform.tfvars").open("a", encoding="utf-8") as stream:
+                stream.write(
+                    'infisical_server_name = "one.example.internal"\n'
+                    'INFISICAL_SERVER_NAME = "two.example.internal"\n'
+                )
+            report = legacy_values_discovery.discover_legacy(values)
+        self.assertFalse(report.candidate_ready)
+        self.assertEqual(report.conflicts[0]["canonical_path"], "services.infisical.endpoints.public_names")
+
     def test_conflicting_sources_are_reported_and_block_candidate(self) -> None:
         temp, values = self.make_values()
         with temp:
