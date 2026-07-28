@@ -179,7 +179,7 @@ def render_dns_records(model: CanonicalSite) -> dict[str, Any]:
     """Render the existing DNS projection shape from endpoint intent."""
     records: dict[str, str] = {}
     for name, service in model.services.items():
-        if not service.enabled or not service.endpoints.dns.get("enabled", False):
+        if not service.enabled or not service.endpoints.dns.enabled:
             continue
         address = _address(_resource(model, service.resource or ""))
         if not address:

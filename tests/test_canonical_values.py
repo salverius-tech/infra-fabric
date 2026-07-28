@@ -255,6 +255,24 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaisesRegex(ProjectionError, "sensitive field"):
             render_ansible_vars(model, catalog)
 
+    def test_dns_metadata_rejects_unknown_fields_without_exposing_values(self) -> None:
+        content = VALID_SITE.replace(
+            "      visibility: internal",
+            "      visibility: internal\n      dns:\n        enabled: true\n        innocuous_secret_carrier: SECRET_SENTINEL",
+        )
+        with self.assertRaises(CanonicalValuesError) as context:
+            load_site(self.write_site(content))
+        self.assertNotIn("SECRET_SENTINEL", str(context.exception))
+
+    def test_dns_metadata_requires_strict_supported_values(self) -> None:
+        for replacement in (
+            "      visibility: internal\n      dns:\n        enabled: \"true\"",
+            "      visibility: internal\n      dns:\n        record_type: AAAA",
+        ):
+            with self.subTest(replacement=replacement):
+                with self.assertRaises(CanonicalValuesError):
+                    load_site(self.write_site(VALID_SITE.replace("      visibility: internal", replacement)))
+
     def test_non_secret_consumer_projections_use_canonical_ownership(self) -> None:
         content = VALID_SITE.replace(
             "      visibility: internal",

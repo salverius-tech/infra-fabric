@@ -296,13 +296,18 @@ class ServiceState(StrictModel):
     disable_policy: Literal["retain", "archive", "destroy"] | None = None
 
 
+class ServiceEndpointDNS(StrictModel):
+    enabled: StrictBool = False
+    record_type: Literal["A"] = "A"
+
+
 class ServiceEndpoints(StrictModel):
     public_names: list[StrictStr] = Field(default_factory=list)
     public_url: StrictStr | None = None
     protocols: list[StrictStr] = Field(default_factory=list)
     ports: dict[str, StrictInt] = Field(default_factory=dict)
     visibility: Literal["internal", "public", "none"] = "internal"
-    dns: dict[str, Any] = Field(default_factory=dict)
+    dns: ServiceEndpointDNS = Field(default_factory=ServiceEndpointDNS)
 
     @field_validator("public_names")
     @classmethod
