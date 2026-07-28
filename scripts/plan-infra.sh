@@ -24,9 +24,13 @@ python scripts/settings.py summary
 if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   generated_dir="${INFRA_VALUES_DIR}/generated"
   generated_tmp="$(mktemp -d "${INFRA_VALUES_DIR}/.canonical-generated.XXXXXX")"
+  generated_backup=""
   cleanup_generated_tmp() {
     if [[ -n "${generated_tmp}" && -d "${generated_tmp}" ]]; then
       rm -rf "${generated_tmp}"
+    fi
+    if [[ -n "${generated_backup}" && ! -e "${generated_dir}" && -e "${generated_backup}" ]]; then
+      mv "${generated_backup}" "${generated_dir}" || printf 'Unable to restore prior canonical projections.\n' >&2
     fi
   }
   trap cleanup_generated_tmp EXIT
@@ -35,9 +39,20 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
     --site-file "${INFRA_VALUES_DIR}/site.yaml" \
     --output-dir "${generated_tmp}" \
     --source-commit "${source_commit}"
-  rm -rf "${generated_dir}"
-  mv "${generated_tmp}" "${generated_dir}"
+  if [[ -e "${generated_dir}" ]]; then
+    generated_backup="$(mktemp -d "${INFRA_VALUES_DIR}/.canonical-generated-previous.XXXXXX")"
+    rmdir "${generated_backup}"
+    mv "${generated_dir}" "${generated_backup}"
+  fi
+  if ! mv "${generated_tmp}" "${generated_dir}"; then
+    printf 'Unable to install refreshed canonical projections.\n' >&2
+    exit 1
+  fi
   generated_tmp=""
+  if [[ -n "${generated_backup}" ]]; then
+    rm -rf "${generated_backup}"
+    generated_backup=""
+  fi
   printf 'Canonical non-secret projections refreshed for %s.\n' "${INFRA_VALUES_DIR}"
 fi
 
