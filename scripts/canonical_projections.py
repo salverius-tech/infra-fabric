@@ -28,6 +28,17 @@ def _assert_non_secret(value: Any, path: str = "projection") -> None:
             _assert_non_secret(child, f"{path}[{index}]")
 
 
+def _validate_non_secret_inputs(model: CanonicalSite) -> None:
+    for name, resource in (*model.resources.guests.items(), *model.resources.shared_hosts.items()):
+        for field_name, value in (("runtime.cloud_init", resource.runtime.cloud_init), ("runtime.users", resource.runtime.users)):
+            if value:
+                raise ProjectionError(f"non-secret projection rejects opaque field: resources.{name}.{field_name}")
+    for name, service in model.services.items():
+        for field_name, value in (("configuration", service.configuration), ("overrides", service.overrides)):
+            if value:
+                _assert_non_secret(value, f"services.{name}.{field_name}")
+
+
 def _address(resource: Any) -> str:
     value = resource.network.address
     if value == "dhcp":
@@ -70,6 +81,7 @@ def _resource_variables(name: str, resource: Any) -> dict[str, Any]:
 
 def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
     """Render existing OpenTofu variable names without secret material."""
+    _validate_non_secret_inputs(model)
     values: dict[str, Any] = {
         "enabled_services": sorted(name for name, service in model.services.items() if service.enabled),
         "proxmox_endpoint": model.platform.proxmox.endpoint,
@@ -138,6 +150,7 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
     Consumer-specific flattening belongs in the Ansible adapter, not in the
     canonical model or operator-edited YAML.
     """
+    _validate_non_secret_inputs(model)
     services: dict[str, Any] = {}
     for name, service in sorted(model.services.items()):
         if not service.enabled:
