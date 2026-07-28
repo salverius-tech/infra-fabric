@@ -15,6 +15,7 @@ try:
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
+    from secret_provider import SecretProviderError, check_sops_age_availability
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
@@ -22,6 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
+    from secret_provider import SecretProviderError, check_sops_age_availability
 
 
 class PreflightError(RuntimeError):
@@ -92,6 +94,23 @@ def _write_projection(path: Path, value: object) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def check_canonical_secret_availability(repo: Path) -> None:
+    """Check canonical encrypted-bundle prerequisites without decryption."""
+    context = from_environment(repo)
+    if context.canonical_site_path is None:
+        return
+    bundle = context.values_dir / "secrets.sops.yaml"
+    if not bundle.is_file():
+        return
+    try:
+        check_sops_age_availability(
+            bundle,
+            environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
+        )
+    except SecretProviderError as error:
+        raise PreflightError("canonical secret availability preflight failed") from error
+
+
 def check_canonical_projection(repo: Path) -> None:
     """Validate canonical input and its non-secret projections without mutation."""
     context = from_environment(repo)
@@ -150,6 +169,7 @@ def run(root: Path, require_values: bool) -> None:
         check_file_writable(values / ".terraform.tfstate.lock.info")
         check_no_state_lock(values)
     try:
+        check_canonical_secret_availability(repo)
         check_canonical_projection(repo)
     except (OSError, ValueError) as error:
         raise PreflightError(f"canonical projection preflight failed: {error}") from error

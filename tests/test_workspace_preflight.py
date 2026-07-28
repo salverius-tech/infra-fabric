@@ -91,6 +91,39 @@ class WorkspacePreflightTests(unittest.TestCase):
             clear=True,
         ), self.assertRaises(workspace_preflight.PreflightError):
             workspace_preflight.run(root, require_values=True)
+    def test_canonical_secret_check_uses_fixed_path_without_decryption(self) -> None:
+        temp, root = self.make_repo()
+        source_root = Path(__file__).resolve().parents[1]
+        site = root / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        (site / "secrets.sops.yaml").write_text("encrypted\n", encoding="utf-8")
+        with temp, patch.dict(os.environ, {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"}, clear=True), patch.object(
+            workspace_preflight,
+            "check_sops_age_availability",
+            return_value={"provider": "sops-age"},
+        ) as check:
+            workspace_preflight.check_canonical_secret_availability(root)
+        check.assert_called_once_with(
+            site / "secrets.sops.yaml",
+            environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
+        )
+
+    def test_canonical_secret_check_sanitizes_provider_failure(self) -> None:
+        temp, root = self.make_repo()
+        source_root = Path(__file__).resolve().parents[1]
+        site = root / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        (site / "secrets.sops.yaml").write_text("SECRET_SENTINEL\n", encoding="utf-8")
+        with temp, patch.dict(os.environ, {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"}, clear=True), patch.object(
+            workspace_preflight,
+            "check_sops_age_availability",
+            side_effect=workspace_preflight.SecretProviderError("SECRET_SENTINEL"),
+        ):
+            with self.assertRaisesRegex(workspace_preflight.PreflightError, "canonical secret availability") as context:
+                workspace_preflight.check_canonical_secret_availability(root)
+        self.assertNotIn("SECRET_SENTINEL", str(context.exception))
 
 
 if __name__ == "__main__":
