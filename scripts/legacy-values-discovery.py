@@ -14,6 +14,13 @@ except ModuleNotFoundError:  # pragma: no cover - direct import from another cwd
     from legacy_values_discovery import DiscoveryError, discover_legacy, render_migration_report
 
 
+def _reject_values_output(output: Path, values_dir: Path) -> None:
+    resolved_output = output.expanduser().resolve()
+    resolved_values = values_dir.expanduser().resolve()
+    if resolved_output == resolved_values or resolved_values in resolved_output.parents:
+        raise DiscoveryError("report output must be outside the legacy values directory")
+
+
 def _write_report(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
@@ -36,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.output is None:
             print(encoded, end="")
         else:
+            _reject_values_output(args.output, args.values_dir)
             _write_report(args.output, payload)
             print(f"wrote redacted legacy discovery report: {args.output}")
     except (DiscoveryError, OSError, ValueError) as error:

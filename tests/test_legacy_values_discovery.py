@@ -113,6 +113,33 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertIn("legacy discovery failed:", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
+    def test_cli_rejects_report_output_inside_values_directory(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            output = values / "report.json"
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                result = legacy_values_discovery_cli.main(
+                    ["--values-dir", str(values), "--output", str(output)]
+                )
+            self.assertEqual(result, 1)
+            self.assertIn("outside the legacy values directory", stderr.getvalue())
+            self.assertFalse(output.exists())
+
+    def test_cli_rejects_malformed_json_without_output_artifact(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "settings.local.json").write_text("{not-json}\n", encoding="utf-8")
+            output = values.parent / "report.json"
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                result = legacy_values_discovery_cli.main(
+                    ["--values-dir", str(values), "--output", str(output)]
+                )
+            self.assertEqual(result, 1)
+            self.assertIn("invalid JSON legacy input", stderr.getvalue())
+            self.assertFalse(output.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
