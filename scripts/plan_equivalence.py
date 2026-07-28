@@ -1,8 +1,10 @@
 """Report-only comparison of normalized public plan fixtures.
 
+The version-1 input shape is ``{"schema_version": 1, "resources": [...]}``;
+each resource has an exact address, ordered actions, and required values.
 This module deliberately does not parse provider-specific OpenTofu JSON or gate
-plan/apply. Its input is a small normalized shape that can be adopted by a
-future provider adapter after the equivalence policy is reviewed.
+plan/apply. Its input can be adopted by a future provider adapter after the
+equivalence policy is reviewed.
 """
 from __future__ import annotations
 
@@ -14,7 +16,15 @@ class PlanEquivalenceError(ValueError):
     """Raised when a normalized plan fixture is malformed."""
 
 
+_SCHEMA_VERSION = 1
+_ACTIONS = frozenset({"create", "read", "update", "delete", "no-op"})
+_REPLACEMENT_ACTIONS = ("delete", "create")
+
+
 def _resources(plan: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    schema_version = plan.get("schema_version")
+    if schema_version != _SCHEMA_VERSION:
+        raise PlanEquivalenceError("normalized plan schema_version must be 1")
     resources = plan.get("resources")
     if not isinstance(resources, list):
         raise PlanEquivalenceError("normalized plan resources must be a list")
@@ -28,11 +38,19 @@ def _resources(plan: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
             raise PlanEquivalenceError("normalized plan resource address is required")
         if address in result:
             raise PlanEquivalenceError("normalized plan resource addresses must be unique")
-        if not isinstance(actions, list) or not all(isinstance(action, str) for action in actions):
-            raise PlanEquivalenceError("normalized plan resource actions must be strings")
+        if (
+            not isinstance(actions, list)
+            or not actions
+            or not all(isinstance(action, str) and action in _ACTIONS for action in actions)
+        ):
+            raise PlanEquivalenceError("normalized plan resource actions are invalid")
+        if len(actions) > 1 and tuple(actions) != _REPLACEMENT_ACTIONS:
+            raise PlanEquivalenceError("normalized plan replacement actions must be delete, create")
+        if "values" not in resource:
+            raise PlanEquivalenceError("normalized plan resource values are required")
         result[address] = {
-            "actions": actions,
-            "values": resource.get("values"),
+            "actions": list(actions),
+            "values": resource["values"],
         }
     return result
 

@@ -1,0 +1,17 @@
+{
+  "path_metadata": {"source": "/public/fixture/b"},
+  "resources": [
+    {
+      "values": {
+        "endpoint": {"dns": "forgejo.example.internal"},
+        "storage": {"rootfs": {"size_gb": 32}},
+        "runtime": "lxc",
+        "vmid": 101
+      },
+      "actions": ["update"],
+      "address": "service.forgejo"
+    }
+  ],
+  "formatting": "compact",
+  "schema_version": 1
+}

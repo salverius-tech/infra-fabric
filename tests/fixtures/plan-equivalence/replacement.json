@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "resources": [
+    {
+      "address": "service.forgejo",
+      "actions": ["delete", "create"],
+      "values": {
+        "vmid": 101,
+        "runtime": "lxc",
+        "storage": {"rootfs": {"size_gb": 32}},
+        "endpoint": {"dns": "forgejo.example.internal"}
+      }
+    }
+  ]
+}

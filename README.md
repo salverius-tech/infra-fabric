@@ -37,6 +37,7 @@ Keep non-public material in `values/` or outside this checkout; do not add anoth
 - [Onramp SearXNG handoff](docs/onramp-searxng-handoff.md) documents the default future Onramp-owned SearXNG contract and the current temporary `homelab-infra` exception.
 - [App-host runbook](docs/onramp-host-runbook.md) covers `onramp_host` rollback and future deployment validation.
 - [Service update policy](docs/service-update-policy.md) defines managed version updates and the target Technitium update model.
+- [Canonical values migration boundary](docs/canonical-values-migration.md) documents the validation-only `site.yaml` and legacy-input review workflow; legacy consumers remain active until cutover.
 
 ## Fresh setup
 
