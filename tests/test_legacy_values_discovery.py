@@ -31,7 +31,8 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         (values / "ansible" / "inventory").mkdir(parents=True)
         (values / ".env").write_text(
             "TECHNITIUM_API_URL=http://192.0.2.53:5380/api\n"
-            "TECHNITIUM_API_TOKEN=SECRET_SENTINEL_DO_NOT_PRINT\n",
+            "TECHNITIUM_API_TOKEN=SECRET_SENTINEL_DO_NOT_PRINT\n"
+            "SERVER_NAME=DNS.Example.Internal.\n",
             encoding="utf-8",
         )
         (values / "terraform.tfvars").write_text(
@@ -97,6 +98,27 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             report = legacy_values_discovery.discover_legacy(values)
         self.assertFalse(report.candidate_ready)
         self.assertEqual(report.conflicts[0]["canonical_path"], "services.forgejo.endpoints.public_names")
+
+    def test_server_name_maps_to_normalized_technitium_public_name(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            report = legacy_values_discovery.discover_legacy(values)
+        observations = [item for item in report.observations if item.key == "SERVER_NAME"]
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0].classification, "mapped")
+        self.assertEqual(observations[0].proposed_path, "services.technitium.endpoints.public_names")
+        self.assertEqual(observations[0].value, ["dns.example.internal"])
+
+    def test_server_name_conflict_remains_fail_closed(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "terraform.tfvars").write_text(
+                'SERVER_NAME = "other.example.internal"\n',
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+        self.assertFalse(report.candidate_ready)
+        self.assertEqual(report.conflicts[0]["canonical_path"], "services.technitium.endpoints.public_names")
 
     def test_conflicting_sources_are_reported_and_block_candidate(self) -> None:
         temp, values = self.make_values()

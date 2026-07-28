@@ -63,6 +63,8 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "PROXMOX_NODE_NAME": "platform.proxmox.node",
         "TECHNITIUM_API_URL": "services.technitium.endpoints.public_url",
         "technitium_api_url": "services.technitium.endpoints.public_url",
+        "SERVER_NAME": "services.technitium.endpoints.public_names",
+        "server_name": "services.technitium.endpoints.public_names",
         "FORGEJO_DOMAIN": "services.forgejo.endpoints.public_names",
         "forgejo_domain": "services.forgejo.endpoints.public_names",
         "FORGEJO_SERVER_NAME": "services.forgejo.endpoints.public_names",
@@ -98,7 +100,10 @@ def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migrati
         report.observations.append(FieldObservation(source, key, classification, None, type(value).__name__, "<redacted>"))
         return
     public = _public_value(value)
-    if proposed_path == "services.forgejo.endpoints.public_names":
+    if proposed_path in {
+        "services.technitium.endpoints.public_names",
+        "services.forgejo.endpoints.public_names",
+    }:
         public = _normalize_public_name(public)
     value_type = type(value).__name__
     if classification == "unknown":
