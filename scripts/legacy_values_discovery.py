@@ -73,6 +73,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "FORGEJO_SERVER_NAME": "services.forgejo.endpoints.public_names",
         "forgejo_server_name": "services.forgejo.endpoints.public_names",
         "FORGEJO_VERSION": "services.forgejo.release.version",
+        "FORGEJO_SSH_PORT": "services.forgejo.endpoints.ports.ssh",
     }
     if key in paths:
         return "mapped", paths[key]
@@ -97,6 +98,12 @@ def _normalize_public_name(value: Any) -> Any:
     return value
 
 
+def _normalize_port(value: Any) -> Any:
+    if isinstance(value, str) and value.isdecimal():
+        return int(value)
+    return value
+
+
 def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migration: Any) -> None:
     classification, proposed_path = _classification(key, migration)
     if classification == "secret":
@@ -110,6 +117,8 @@ def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migrati
     }:
         public = _normalize_public_name(public)
     value_type = type(value).__name__
+    if proposed_path == "services.forgejo.endpoints.ports.ssh":
+        public = _normalize_port(public)
     if classification == "unknown":
         public = None
     observation = FieldObservation(source, key, classification, proposed_path, value_type, public)
