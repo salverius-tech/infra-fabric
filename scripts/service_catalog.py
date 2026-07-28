@@ -6,6 +6,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 
 class ServiceCatalogError(ValueError):
@@ -13,6 +14,8 @@ class ServiceCatalogError(ValueError):
 
 
 _LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
+SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "generated"]
+_SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,7 @@ class ServiceCapability:
     state_capable: bool
     dependencies: tuple[str, ...]
     required_secrets: tuple[str, ...]
+    secret_classifications: dict[str, SecretClassification]
     inventory: dict[str, object]
     raw: dict[str, object]
 
@@ -66,6 +70,20 @@ class ServiceCatalog:
         self.validate_model_services(services)
         enabled = {name for name, service in services.items() if getattr(service, "enabled", False)}
         return self.required_secret_paths(enabled)
+
+    def required_secret_report(self, enabled: set[str]) -> tuple[dict[str, object], ...]:
+        """Return a deterministic, value-free report of catalog requirements."""
+        self.validate_selection(enabled)
+        report: list[dict[str, object]] = []
+        for name in sorted(enabled):
+            capability = self.get(name)
+            for path in sorted(set(capability.required_secrets)):
+                entry: dict[str, object] = {"service": name, "path": path, "required": True}
+                classification = capability.secret_classifications.get(path)
+                if classification is not None:
+                    entry["classification"] = classification
+                report.append(entry)
+        return tuple(report)
 
     def validate_model_services(self, services: dict[str, object]) -> None:
         """Validate the complete canonical service map against catalog ownership."""
@@ -125,6 +143,17 @@ def load_catalog(path: Path) -> ServiceCatalog:
             for item in required_secrets
         ):
             raise ServiceCatalogError(f"service {name} required_secrets must be logical paths")
+        secret_classifications = raw.get("secret_classifications", {})
+        if not isinstance(secret_classifications, dict) or any(
+            not isinstance(secret_path, str)
+            or not isinstance(classification, str)
+            or secret_path not in required_secrets
+            or classification not in _SECRET_CLASSIFICATIONS
+            for secret_path, classification in secret_classifications.items()
+        ):
+            raise ServiceCatalogError(
+                f"service {name} secret_classifications must map required paths to supported classifications"
+            )
         inventory = raw.get("inventory", {})
         if not isinstance(inventory, dict):
             raise ServiceCatalogError(f"service {name} inventory metadata must be an object")
@@ -133,6 +162,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
             state_capable=raw.get("state_capable") is True,
             dependencies=tuple(dependencies),
             required_secrets=tuple(required_secrets),
+            secret_classifications=dict(secret_classifications),
             inventory=inventory,
             raw=raw,
         )
@@ -141,4 +171,4 @@ def load_catalog(path: Path) -> ServiceCatalog:
     return catalog
 
 
-__all__ = ["ServiceCapability", "ServiceCatalog", "ServiceCatalogError", "load_catalog"]
+__all__ = ["SecretClassification", "ServiceCapability", "ServiceCatalog", "ServiceCatalogError", "load_catalog"]

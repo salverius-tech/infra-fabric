@@ -48,6 +48,45 @@ class ServiceCatalogTests(unittest.TestCase):
         }
         self.assertEqual(catalog.required_secret_paths_for_model(services), {"services.app.token"})
 
+    def test_optional_secret_classification_is_typed_and_report_is_redacted(self) -> None:
+        catalog = load_catalog(
+            self.write_catalog(
+                {
+                    "services": {
+                        "app": {
+                            "dependencies": [],
+                            "required_secrets": ["services.app.token"],
+                            "secret_classifications": {"services.app.token": "runtime"},
+                        },
+                        "disabled": {"dependencies": [], "required_secrets": ["services.disabled.token"]},
+                    }
+                }
+            )
+        )
+        self.assertEqual(
+            catalog.required_secret_report({"app"}),
+            ({"service": "app", "path": "services.app.token", "classification": "runtime", "required": True},),
+        )
+
+    def test_invalid_secret_classification_fails_at_load(self) -> None:
+        for classifications in ({"services.app.token": "logical"}, {"services.other.token": "runtime"}):
+            with self.subTest(classifications=classifications), self.assertRaisesRegex(
+                ServiceCatalogError, "secret_classifications"
+            ):
+                load_catalog(
+                    self.write_catalog(
+                        {
+                            "services": {
+                                "app": {
+                                    "dependencies": [],
+                                    "required_secrets": ["services.app.token"],
+                                    "secret_classifications": classifications,
+                                }
+                            }
+                        }
+                    )
+                )
+
     def test_invalid_required_secret_path_fails_at_load(self) -> None:
         with self.assertRaisesRegex(ServiceCatalogError, "required_secrets must be logical paths"):
             load_catalog(
@@ -62,6 +101,40 @@ class ServiceCatalogTests(unittest.TestCase):
                 load_catalog(
                     self.write_catalog(
                         {"services": {"app": {"dependencies": [], "required_secrets": [path]}}}
+                    )
+                )
+
+    def test_secret_classifications_are_validated_and_reported_without_values(self) -> None:
+        catalog = load_catalog(
+            self.write_catalog(
+                {
+                    "services": {
+                        "app": {
+                            "dependencies": [],
+                            "required_secrets": ["services.app.token"],
+                            "secret_classifications": {"services.app.token": "runtime"},
+                        }
+                    }
+                }
+            )
+        )
+        self.assertEqual(
+            catalog.required_secret_report({"app"}),
+            ({"service": "app", "path": "services.app.token", "required": True, "classification": "runtime"},),
+        )
+        for classification in ("secret", "", "RUNTIME"):
+            with self.subTest(classification=classification), self.assertRaisesRegex(ServiceCatalogError, "secret_classifications"):
+                load_catalog(
+                    self.write_catalog(
+                        {
+                            "services": {
+                                "app": {
+                                    "dependencies": [],
+                                    "required_secrets": ["services.app.token"],
+                                    "secret_classifications": {"services.app.token": classification},
+                                }
+                            }
+                        }
                     )
                 )
 

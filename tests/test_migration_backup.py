@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from migration_backup import BackupManifestError, build_manifest, emit_manifest, verify_manifest
+from migration_backup import BackupManifestError, build_manifest, emit_manifest, expand_backup_paths, verify_manifest
 
 
 class MigrationBackupTests(unittest.TestCase):
@@ -104,24 +104,62 @@ class MigrationBackupTests(unittest.TestCase):
             self.assertEqual(json.loads(output.read_text(encoding="utf-8")), manifest)
             self.assertTrue((root / paths[1]).is_file())
 
-    def test_emit_rejects_directories_symlinked_parents_and_existing_output(self) -> None:
+    def test_recursive_expansion_is_sorted_posix_ignores_empty_dirs_and_deduplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "service-backups" / "z").mkdir(parents=True)
+            (root / "service-backups" / "a").mkdir()
+            (root / "service-backups" / "z" / "later.tar").write_text("z", encoding="utf-8")
+            (root / "service-backups" / "a" / "first.tar").write_text("a", encoding="utf-8")
+            self.assertEqual(
+                expand_backup_paths(root, ["service-backups", "service-backups/a/first.tar"]),
+                ["service-backups/a/first.tar", "service-backups/z/later.tar"],
+            )
+
+    def test_recursive_expansion_rejects_nested_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            selected = root / "service-backups"
+            selected.mkdir()
+            (selected / "real.tar").write_text("real", encoding="utf-8")
+            (selected / "link.tar").symlink_to(selected / "real.tar")
+            with self.assertRaises(BackupManifestError):
+                expand_backup_paths(root, ["service-backups"])
+
+    def test_emit_accepts_directories_but_rejects_symlinked_parents_and_existing_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "values"
             root.mkdir()
             paths = self.make_tree(root)
             output = Path(directory) / "backup.json"
-            with self.assertRaises(BackupManifestError):
-                emit_manifest(root, ["site"], output)
+            manifest = emit_manifest(root, ["site"], output)
+            self.assertEqual([entry["path"] for entry in manifest["entries"]], paths)
             outside = Path(directory) / "outside"
             outside.mkdir()
             (outside / "secret.txt").write_text("sentinel", encoding="utf-8")
             (root / "escape").symlink_to(outside, target_is_directory=True)
+            symlink_output = Path(directory) / "symlink-backup.json"
             with self.assertRaises(BackupManifestError):
-                emit_manifest(root, ["escape/secret.txt"], output)
+                emit_manifest(root, ["escape/secret.txt"], symlink_output)
             output.write_text("do not replace", encoding="utf-8")
             with self.assertRaises(BackupManifestError):
                 emit_manifest(root, paths, output)
             self.assertEqual(output.read_text(encoding="utf-8"), "do not replace")
+
+
+    def test_recursive_expansion_is_sorted_unique_and_rejects_symlinks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.make_tree(root)
+            (root / "site" / "nested").mkdir()
+            (root / "site" / "nested" / "extra.txt").write_text("public\n", encoding="utf-8")
+            self.assertEqual(
+                expand_backup_paths(root, ["site", "site/dns-records.json"]),
+                ["site/dns-records.json", "site/nested/extra.txt", "site/terraform.tfvars"],
+            )
+            (root / "site" / "escape").symlink_to(root / "site" / "nested", target_is_directory=True)
+            with self.assertRaises(BackupManifestError):
+                expand_backup_paths(root, ["site"])
 
 
 if __name__ == "__main__":

@@ -35,11 +35,42 @@ def _source_path(root: Path, relative: str) -> Path:
 
 
 def _file_entry(root: Path, relative: str) -> dict[str, Any]:
+    relative = _relative_path(relative).as_posix()
     path = _source_path(root, relative)
     if not path.is_file() or path.is_symlink():
         raise BackupManifestError("backup entries must be regular files")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     return {"path": relative, "type": "file", "size": path.stat().st_size, "sha256": digest}
+
+
+def expand_backup_paths(root: Path, relative_paths: list[str]) -> list[str]:
+    """Expand selected files/directories into unique, sorted POSIX file paths.
+
+    Empty directories contribute no entries. A symlink or non-regular file
+    anywhere below a selected directory is rejected rather than followed or
+    silently omitted. Overlapping selections are harmless: each canonical
+    relative path is returned once.
+    """
+    if not root.is_dir() or root.is_symlink():
+        raise BackupManifestError("backup root must be a directory")
+
+    selected: set[str] = set()
+
+    def visit(path: Path, relative: str) -> None:
+        if path.is_symlink():
+            raise BackupManifestError("backup entries must not be symlinks")
+        if path.is_dir():
+            for child in sorted(path.iterdir(), key=lambda item: item.name):
+                visit(child, f"{relative}/{child.name}" if relative else child.name)
+            return
+        if not path.is_file():
+            raise BackupManifestError("backup entries must be regular files")
+        selected.add(_relative_path(relative).as_posix())
+
+    for value in relative_paths:
+        relative = _relative_path(value).as_posix()
+        visit(_source_path(root, relative), relative)
+    return sorted(selected)
 
 
 def build_manifest(root: Path, relative_paths: list[str]) -> dict[str, Any]:
@@ -112,10 +143,11 @@ def _write_new_output(output: Path, manifest: dict[str, Any]) -> None:
 
 def emit_manifest(root: Path, relative_paths: list[str], output: Path) -> dict[str, Any]:
     """Dry-run only: stage selected files and emit their content-free manifest."""
+    expanded_paths = expand_backup_paths(root, relative_paths)
     with tempfile.TemporaryDirectory(prefix="migration-backup-") as directory:
         staging = Path(directory)
-        _stage_selected_files(root, relative_paths, staging)
-        manifest = build_manifest(staging, relative_paths)
+        _stage_selected_files(root, expanded_paths, staging)
+        manifest = build_manifest(staging, expanded_paths)
     _write_new_output(output, manifest)
     return manifest
 
@@ -124,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True, help="source values tree (never modified)")
     parser.add_argument("--output", type=Path, required=True, help="new manifest path (must not already exist)")
-    parser.add_argument("paths", nargs="+", help="selected files relative to --root")
+    parser.add_argument("paths", nargs="+", help="selected files or directories relative to --root")
     args = parser.parse_args(argv)
     try:
         emit_manifest(args.root, args.paths, args.output)
