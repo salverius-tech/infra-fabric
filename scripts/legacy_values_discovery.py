@@ -64,6 +64,9 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "TECHNITIUM_API_URL": "services.technitium.endpoints.public_url",
         "technitium_api_url": "services.technitium.endpoints.public_url",
         "FORGEJO_DOMAIN": "services.forgejo.endpoints.public_names",
+        "forgejo_domain": "services.forgejo.endpoints.public_names",
+        "FORGEJO_SERVER_NAME": "services.forgejo.endpoints.public_names",
+        "forgejo_server_name": "services.forgejo.endpoints.public_names",
         "FORGEJO_VERSION": "services.forgejo.release.version",
     }
     if key in paths:
@@ -81,12 +84,22 @@ def _public_value(value: Any) -> Any:
     return None
 
 
+def _normalize_public_name(value: Any) -> Any:
+    if isinstance(value, str):
+        return [value.lower().rstrip(".")]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return [item.lower().rstrip(".") for item in value]
+    return value
+
+
 def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migration: Any) -> None:
     classification, proposed_path = _classification(key, migration)
     if classification == "secret":
         report.observations.append(FieldObservation(source, key, classification, None, type(value).__name__, "<redacted>"))
         return
     public = _public_value(value)
+    if proposed_path == "services.forgejo.endpoints.public_names":
+        public = _normalize_public_name(public)
     value_type = type(value).__name__
     if classification == "unknown":
         public = None
@@ -120,7 +133,10 @@ def _read_tfvars(path: Path, report: DiscoveryReport, migration: Any) -> None:
     for line in lines:
         match = pattern.match(line)
         if match and match.group(1) not in known:
-            _observe(path.relative_to(path.parents[1]).as_posix(), match.group(1), None, report, migration)
+            key = match.group(1)
+            classification, _ = _classification(key, migration)
+            value = migration.tfvars_scalar_value(lines, key) if classification == "mapped" else None
+            _observe(path.relative_to(path.parents[1]).as_posix(), key, value, report, migration)
 
 
 def _read_json_keys(path: Path, report: DiscoveryReport, migration: Any) -> None:

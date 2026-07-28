@@ -36,6 +36,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         )
         (values / "terraform.tfvars").write_text(
             'technitium_api_url = "http://192.0.2.53:5380/api"\n'
+            'forgejo_server_name = "Git.Example.Internal."\n'
             'unmapped_public_key = "review-me"\n',
             encoding="utf-8",
         )
@@ -68,6 +69,34 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertIn("unmapped_public_key", rendered)
         self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
         self.assertNotIn("review-me", rendered)
+
+    def test_forgejo_server_name_maps_to_normalized_public_name(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            report = legacy_values_discovery.discover_legacy(values)
+        observations = [item for item in report.observations if item.key == "forgejo_server_name"]
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0].classification, "mapped")
+        self.assertEqual(observations[0].proposed_path, "services.forgejo.endpoints.public_names")
+        self.assertEqual(observations[0].value, ["git.example.internal"])
+
+    def test_equivalent_forgejo_names_do_not_conflict_after_normalization(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text(
+                "FORGEJO_DOMAIN=git.example.internal\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+        self.assertFalse([item for item in report.conflicts if item["canonical_path"] == "services.forgejo.endpoints.public_names"])
+
+    def test_different_forgejo_names_conflict_and_remain_fail_closed(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("FORGEJO_DOMAIN=other.example.internal\n", encoding="utf-8")
+            report = legacy_values_discovery.discover_legacy(values)
+        self.assertFalse(report.candidate_ready)
+        self.assertEqual(report.conflicts[0]["canonical_path"], "services.forgejo.endpoints.public_names")
 
     def test_conflicting_sources_are_reported_and_block_candidate(self) -> None:
         temp, values = self.make_values()
