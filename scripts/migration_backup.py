@@ -67,10 +67,13 @@ def verify_manifest(root: Path, manifest: dict[str, Any]) -> None:
         raise BackupManifestError("backup manifest entries are not sorted")
     if expected != entries:
         raise BackupManifestError("backup tree differs from manifest")
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise BackupManifestError("backup tree contains symlinks")
     actual_paths = sorted(
         path.relative_to(root).as_posix()
         for path in root.rglob("*")
-        if path.is_file() and not path.is_symlink()
+        if path.is_file()
     )
     if actual_paths != [entry["path"] for entry in entries]:
         raise BackupManifestError("backup tree contains unexpected files")

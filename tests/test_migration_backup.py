@@ -48,6 +48,10 @@ class MigrationBackupTests(unittest.TestCase):
             (root / "extra.txt").write_text("unexpected\n", encoding="utf-8")
             with self.assertRaises(BackupManifestError):
                 verify_manifest(root, manifest)
+            (root / "extra.txt").unlink()
+            (root / "unexpected-link").symlink_to(root / "site" / "terraform.tfvars")
+            with self.assertRaises(BackupManifestError):
+                verify_manifest(root, manifest)
 
     def test_traversal_absolute_duplicate_and_symlink_paths_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

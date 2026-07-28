@@ -71,7 +71,7 @@ class SecretProviderTests(unittest.TestCase):
 
     def test_invalid_logical_paths_fail_closed(self) -> None:
         provider = SopsAgeProvider(self.bundle, executable=str(self.sops))
-        for logical_path in ("", "..", "services..forgejo", "services.forgejo..admin_password"):
+        for logical_path in ("", "..", "services..forgejo", "services.forgejo..admin_password", "Services.forgejo.token", "services/forgejo/token", "services.forgejo.bad key"):
             with self.subTest(logical_path=logical_path), self.assertRaises(SecretProviderError):
                 provider.resolve(logical_path)
 

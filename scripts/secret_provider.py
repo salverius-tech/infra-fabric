@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -138,10 +139,13 @@ class SopsAgeProvider:
         )
 
 
+_LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
+
+
 def _parts(logical_path: str) -> list[str]:
     parts = logical_path.split(".")
-    if not parts or any(not part or part in {".", ".."} for part in parts):
-        raise SecretProviderError(f"invalid logical secret path: {logical_path}")
+    if not parts or any(not _LOGICAL_PART_RE.fullmatch(part) for part in parts):
+        raise SecretProviderError("invalid logical secret path")
     return parts
 
 

@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 
 class ServiceCatalogError(ValueError):
     """Raised when a service catalog or selected service set is invalid."""
+
+
+_LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 
 
 @dataclass(frozen=True)
@@ -117,7 +121,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
             raise ServiceCatalogError(f"service {name} dependencies must be a list of strings")
         required_secrets = raw.get("required_secrets", [])
         if not isinstance(required_secrets, list) or not all(
-            isinstance(item, str) and item and all(part not in {"", ".", ".."} for part in item.split("."))
+            isinstance(item, str) and item and all(_LOGICAL_PART_RE.fullmatch(part) for part in item.split("."))
             for item in required_secrets
         ):
             raise ServiceCatalogError(f"service {name} required_secrets must be logical paths")
