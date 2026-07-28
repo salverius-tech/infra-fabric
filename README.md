@@ -163,6 +163,19 @@ values/
   ansible/inventory/local.yml
 ```
 
+The canonical model is being introduced alongside these compatibility inputs. Site-scoped canonical files live under `values/sites/<site>/site.yaml` and may be validated/rendered into non-secret projections, but the legacy files remain active consumer inputs until the documented cutover is complete. Do not put secrets into canonical non-secret projections.
+
+For a public-safe, non-mutating migration rehearsal, the backup helper can emit a content-free manifest for explicitly selected regular files:
+
+```bash
+scripts/python.sh scripts/migration_backup.py \\
+  --root values \\
+  --output /tmp/values-backup-manifest.json \\
+  terraform.tfvars ansible/inventory/local.yml
+```
+
+The command refuses to overwrite an existing output, follows no symlink escapes, writes mode-0600 output, and does not move or modify source files. It is not a replacement for a verified private backup or restore process, and it is not wired into migration apply.
+
 Use normal Git commands against the nested repo when you need to inspect, commit, or push private values:
 
 ```bash
