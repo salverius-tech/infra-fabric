@@ -226,6 +226,17 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             self.assertIn("invalid JSON legacy input", stderr.getvalue())
             self.assertFalse(output.exists())
 
+    def test_forgejo_version_maps_to_release_version(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            with (values / "terraform.tfvars").open("a", encoding="utf-8") as stream:
+                stream.write('FORGEJO_VERSION = "1.2.3"\n')
+            report = legacy_values_discovery.discover_legacy(values)
+        observations = [item for item in report.observations if item.key == "FORGEJO_VERSION"]
+        self.assertEqual(len(observations), 1)
+        self.assertEqual(observations[0].proposed_path, "services.forgejo.release.version")
+        self.assertEqual(observations[0].value, "1.2.3")
+
     def test_forgejo_ssh_port_maps_to_canonical_port(self) -> None:
         temp, values = self.make_values()
         with temp:
