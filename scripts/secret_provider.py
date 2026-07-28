@@ -177,6 +177,38 @@ def discover_age_key_file(
     return candidate
 
 
+def check_sops_age_availability(
+    path: Path,
+    *,
+    executable: str = "sops",
+    environment: dict[str, str] | None = None,
+    key_file: Path | None = None,
+    expected_recipients: set[str] | None = None,
+) -> dict[str, str]:
+    """Check SOPS/age prerequisites without decrypting or exposing secret material."""
+    bundle = path.expanduser().resolve()
+    if not bundle.is_file():
+        raise SecretProviderError("SOPS secret bundle is unavailable")
+    executable_path = Path(executable).expanduser() if "/" in executable else None
+    resolved_executable = executable_path if executable_path is not None else Path(shutil.which(executable) or "")
+    if not resolved_executable.is_file() or not os.access(resolved_executable, os.X_OK):
+        raise SecretProviderError("SOPS executable is unavailable")
+    discovered_key = discover_age_key_file(key_file, environment=environment)
+    if expected_recipients is not None:
+        validate_sops_age_recipients(bundle, expected_recipients)
+        recipient_policy = "verified"
+    else:
+        recipient_policy = "not-configured"
+    return {
+        "provider": "sops-age",
+        "bundle_classification": "encrypted-yaml",
+        "ciphertext_hash": hashlib.sha256(bundle.read_bytes()).hexdigest(),
+        "key_file_classification": "external-private-key",
+        "key_file_mode": oct(discovered_key.stat().st_mode & 0o777),
+        "recipient_policy": recipient_policy,
+    }
+
+
 def validate_sops_age_recipients(path: Path, expected_recipients: set[str]) -> None:
     """Require the encrypted bundle's SOPS age recipients to match policy.
 

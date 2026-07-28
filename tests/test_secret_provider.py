@@ -13,6 +13,7 @@ from secret_provider import (
     SecretBundle,
     SecretProviderError,
     SopsAgeProvider,
+    check_sops_age_availability,
     discover_age_key_file,
     secret_material_directory,
     validate_sops_age_recipients,
@@ -121,7 +122,31 @@ class SecretProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(SecretProviderError, "key file is unavailable"):
             discover_age_key_file(environment={"SOPS_AGE_KEY_FILE": str(self.root / "missing")})
 
-    def test_secret_material_is_private_and_cleaned_up(self) -> None:
+    def test_metadata_only_sops_availability_does_not_decrypt_or_expose_values(self) -> None:
+        key_file = self.root / "age-keys.txt"
+        key_file.write_text("PRIVATE_KEY_SENTINEL", encoding="utf-8")
+        key_file.chmod(0o600)
+        result = check_sops_age_availability(
+            self.bundle,
+            executable=str(self.sops),
+            key_file=key_file,
+        )
+        self.assertEqual(result["provider"], "sops-age")
+        self.assertEqual(result["bundle_classification"], "encrypted-yaml")
+        self.assertNotIn("PRIVATE_KEY_SENTINEL", repr(result))
+        self.assertNotIn("placeholder-secret", repr(result))
+
+    def test_metadata_only_sops_availability_requires_executable(self) -> None:
+        key_file = self.root / "age-keys.txt"
+        key_file.write_text("PRIVATE_KEY_SENTINEL", encoding="utf-8")
+        key_file.chmod(0o600)
+        with self.assertRaisesRegex(SecretProviderError, "SOPS executable is unavailable"):
+            check_sops_age_availability(
+                self.bundle,
+                executable=str(self.root / "missing-sops"),
+                key_file=key_file,
+            )
+
         with secret_material_directory(self.root) as directory:
             self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
             material = write_secret_material(directory, "runtime.env", "SECRET=placeholder-secret\n")
