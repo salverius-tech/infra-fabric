@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from canonical_values import CanonicalValuesError, load_site, model_digest, normalized_model, redacted_summary
 from canonical_projections import (
+    ProjectionError,
     render_ansible_inventory,
     render_ansible_vars,
     render_dns_records,
@@ -224,6 +225,16 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('"enabled_services": [\n    "forgejo"', result.stdout)
         self.assertNotIn("password", result.stdout.lower())
+
+    def test_non_secret_projection_rejects_sensitive_configuration_fields(self) -> None:
+        content = VALID_SITE.replace(
+            "      version: 12.0.4",
+            "      version: 12.0.4\n    configuration:\n      api_token: SECRET_SENTINEL_DO_NOT_PROJECT",
+        )
+        model = load_site(self.write_site(content))
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        with self.assertRaisesRegex(ProjectionError, "sensitive field"):
+            render_ansible_vars(model, catalog)
 
     def test_non_secret_consumer_projections_use_canonical_ownership(self) -> None:
         content = VALID_SITE.replace(

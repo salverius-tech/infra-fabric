@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 from typing import Any
 
 from canonical_values import CanonicalSite
@@ -11,6 +12,20 @@ from service_catalog import ServiceCatalog
 
 class ProjectionError(ValueError):
     """Raised when a canonical model cannot produce a safe projection."""
+
+
+_SENSITIVE_KEY = re.compile(r"(?:password|passphrase|secret|token|private[_-]?key|api[_-]?key|credential)", re.IGNORECASE)
+
+
+def _assert_non_secret(value: Any, path: str = "projection") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if isinstance(key, str) and _SENSITIVE_KEY.search(key):
+                raise ProjectionError(f"non-secret projection contains sensitive field: {path}.{key}")
+            _assert_non_secret(child, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, child in enumerate(value):
+            _assert_non_secret(child, f"{path}[{index}]")
 
 
 def _address(resource: Any) -> str:
@@ -81,6 +96,7 @@ def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
             values[f"{name}_server_name"] = endpoint_names[0]
         if service.endpoints.public_url:
             values[f"{name}_public_url"] = service.endpoints.public_url
+    _assert_non_secret(values, "opentofu")
     return values
 
 
@@ -106,11 +122,13 @@ def render_ansible_inventory(model: CanonicalSite, catalog: ServiceCatalog) -> d
         groups.setdefault(group, {"hosts": []})["hosts"].append(host)
     for group in groups.values():
         group["hosts"] = sorted(set(group["hosts"]))
-    return {
+    result = {
         "_meta": {"hostvars": hosts},
         "all": {"children": sorted(groups), "vars": {"canonical_site": model.site.name}},
         **groups,
     }
+    _assert_non_secret(result, "inventory")
+    return result
 
 
 def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[str, Any]:
@@ -139,7 +157,9 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                 "inventory_group": capability.inventory.get("group"),
             },
         }
-    return {"canonical_site": model.site.name, "services": services}
+    result = {"canonical_site": model.site.name, "services": services}
+    _assert_non_secret(result, "ansible")
+    return result
 
 
 def render_dns_records(model: CanonicalSite) -> dict[str, Any]:
