@@ -168,7 +168,12 @@ class SecretProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(SecretProviderError, "policy does not match"):
             validate_sops_age_recipients(encrypted, {"age1other"})
 
-    def test_sops_age_recipient_policy_rejects_missing_or_malformed_metadata(self) -> None:
+    def test_sops_age_recipient_policy_rejects_placeholder_policy(self) -> None:
+        encrypted = self.root / "encrypted.yaml"
+        encrypted.write_text("sops:\n  age:\n    - recipient: age1REPLACE_WITH_SITE_RECIPIENT\n", encoding="utf-8")
+        with self.assertRaises(SecretProviderError):
+            validate_sops_age_recipients(encrypted, {"age1REPLACE_WITH_SITE_RECIPIENT"})
+
         missing = self.root / "missing-metadata.sops.yaml"
         missing.write_text("secret: ENC[ age-encrypted ]\n", encoding="utf-8")
         with self.assertRaisesRegex(SecretProviderError, "metadata is unavailable"):

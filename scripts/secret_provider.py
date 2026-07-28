@@ -217,7 +217,8 @@ def validate_sops_age_recipients(path: Path, expected_recipients: set[str]) -> N
     recipients.
     """
     if not expected_recipients or any(
-        not isinstance(item, str) or not item for item in expected_recipients
+        not isinstance(item, str) or not item or "REPLACE_WITH" in item
+        for item in expected_recipients
     ):
         raise SecretProviderError("SOPS recipient policy is invalid")
     try:
