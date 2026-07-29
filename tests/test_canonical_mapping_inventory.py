@@ -46,6 +46,19 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(report["matrix_coverage"]["unmatched_count"], 163)
         self.assertEqual(report["matrix_coverage"]["status"], "review-required")
         self.assertTrue(report["matrix_coverage"]["unmatched"])
+        deferred = report["deferred_classification"]
+        self.assertEqual(deferred["item_count"], 163)
+        self.assertEqual(deferred["unclassified_count"], 0)
+        self.assertEqual(
+            set(deferred["counts"]),
+            {
+                "ambiguous-or-destructive",
+                "behavior-without-typed-owner",
+                "migration-only-or-unsupported",
+                "secret-or-protected",
+            },
+        )
+        self.assertEqual(sum(deferred["counts"].values()), 163)
         self.assertIn(
             {"source": "scripts/migrate-values.py", "key": "FORGEJO_VERSION", "canonical_path": "services.forgejo.release.version"},
             report["matrix_coverage"]["matched"],
@@ -321,6 +334,14 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertNotIn("ssh-ed25519 AAAA", encoded)
         self.assertEqual(report["schema"], 1)
         self.assertEqual(report["opentofu"]["variable_count"], 182)
+        blockers = (ROOT / "docs" / "canonical-values-model-blockers.md").read_text(encoding="utf-8")
+        for heading in (
+            "## Secret or protected inputs",
+            "## Behavior or configuration without a typed owner",
+            "## Ambiguous or destructive inputs",
+            "## Migration-only or unsupported inputs",
+        ):
+            self.assertIn(heading, blockers)
     def test_hermes_non_secret_inputs_have_canonical_matrix_rows(self) -> None:
         report = MODULE.build_report(ROOT)
         matched = report["matrix_coverage"]["matched"]

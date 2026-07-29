@@ -449,3 +449,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-28 — Added fail-closed identity-bound runtime conflict handling: equal canonical/legacy runtime aliases reconcile; divergent values are rejected before Ansible inventory generation.
 - 2026-07-28 — Formalized shared provider-secret aliases as value-free, provider-scoped review metadata; no secret path, projection, delivery, or mapping coverage was promoted.
 - 2026-07-28 — Added metadata-only discovery for site-aware known-hosts, Terraform state, and service-backup artifacts with containment/symlink rejection; migration semantics remain deferred.
+- 2026-07-28 — Added machine-readable classification for all 163 unmatched identities and the durable decision register at `docs/canonical-values-model-blockers.md`; no candidate generation or consumer cutover is authorized while these four review categories remain.

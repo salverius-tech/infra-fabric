@@ -392,6 +392,44 @@ def load_source_inventory(repo: Path, variables: list[dict[str, str]], catalog: 
     }
 
 
+def classify_deferred_input(item: dict[str, str]) -> tuple[str, str]:
+    """Assign every unmatched source identity to an explicit safe disposition."""
+    source = item["source"]
+    key = item["key"]
+    if source.endswith("scripts/migrate-site-values.py"):
+        return "migration-only-or-unsupported", "site-layout artifact requires an explicit migration/state policy"
+    if source.endswith("scaffold/dns-records.local.json"):
+        return "ambiguous-or-destructive", "DNS document shape has no general canonical resolver/zone/record owner"
+    if source.endswith("scripts/migrate-values.py") and key.startswith("container_"):
+        return "ambiguous-or-destructive", "generic migration alias does not identify one resource"
+    if key in {"debian_template_url", "debian_template_file_name", "debian_template_checksum_algorithm", "debian_template_checksum"}:
+        return "ambiguous-or-destructive", "public scaffold transport conflicts with the canonical HTTPS image contract"
+    if re.search(r"(?:password|secret|token|private[_-]?key|api[_-]?key|ssh_public_keys|auth_key|root_password)", key, re.IGNORECASE):
+        return "secret-or-protected", "protected material or delivery metadata requires an approved secret consumer contract"
+    if key in {"PROXMOX_VE_ENDPOINT", "PROXMOX_VE_USERNAME", "PVE_HOST", "EDGEROUTER_ADDR", "EDGEROUTER_USER", "CF_API_EMAIL"}:
+        return "secret-or-protected", "provider or external-system input has no canonical delivery boundary"
+    return "behavior-without-typed-owner", "legacy behavior/configuration lacks an exact typed canonical owner and projection"
+
+
+def deferred_classification(matrix_coverage: dict[str, Any]) -> dict[str, Any]:
+    """Classify unmatched identities without reading or retaining their values."""
+    items: list[dict[str, str]] = []
+    for unmatched in matrix_coverage["unmatched"]:
+        classification, reason = classify_deferred_input(unmatched)
+        items.append({**unmatched, "classification": classification, "reason": reason})
+    counts = {
+        classification: sum(item["classification"] == classification for item in items)
+        for classification in sorted({item["classification"] for item in items})
+    }
+    return {
+        "item_count": len(items),
+        "unclassified_count": sum("classification" not in item for item in items),
+        "counts": counts,
+        "items": items,
+        "status": "complete" if not sum("classification" not in item for item in items) else "review-required",
+    }
+
+
 def candidate_generation_readiness(matrix_coverage: dict[str, Any], alias_classification: dict[str, Any] | None = None) -> dict[str, Any]:
     reasons: list[str] = []
     if matrix_coverage["unmatched_count"]:
@@ -416,6 +454,7 @@ def build_report(repo: Path) -> dict[str, Any]:
     source_inputs = load_source_input_inventory(repo)
     matrix = load_mapping_matrix(repo / "docs/canonical-values-mapping-v1.md")
     matrix_coverage = reconcile_matrix_inputs(source_inputs, matrix)
+    deferred = deferred_classification(matrix_coverage)
     alias_classification = classify_ambiguous_legacy_aliases(source_inputs)
     candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
     catalog_contract = _catalog_contract(repo / "infra/services.json")
@@ -433,6 +472,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "service_contracts": catalog_contract,
         "mapping_matrix": matrix,
         "matrix_coverage": matrix_coverage,
+        "deferred_classification": deferred,
         "legacy_alias_classification": alias_classification,
         "candidate_generation": candidate_readiness,
         "consumer_contract": consumer_contract,
