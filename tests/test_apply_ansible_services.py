@@ -34,6 +34,28 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             apply_ansible_services.refresh_root_password_from_tfvars(tfvars, env)
             self.assertEqual(env["TF_VAR_lxc_root_password"], "desired-password-value")
 
+    def test_canonical_dns_environment_keeps_legacy_context_unchanged(self) -> None:
+        class LegacyContext:
+            canonical_site_path = None
+
+        self.assertEqual(apply_ansible_services.canonical_dns_environment(LegacyContext()), {})
+
+    def test_canonical_dns_environment_fails_closed_when_generated_projection_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+
+            class CanonicalContext:
+                canonical_site_path = apply_ansible_services.REPO / "scaffold/sites/dev/site.yaml"
+                site = "dev"
+                projection_manifest_path = root / "manifest.json"
+
+                @staticmethod
+                def generated_path(name: str) -> Path:
+                    return root / name
+
+            with self.assertRaisesRegex(RuntimeError, "generated projection"):
+                apply_ansible_services.canonical_dns_environment(CanonicalContext())
+
     def test_run_service_keeps_service_playbooks_sequential(self) -> None:
         commands: list[list[str]] = []
 

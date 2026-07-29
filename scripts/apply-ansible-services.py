@@ -6,6 +6,7 @@ import argparse
 import concurrent.futures
 import datetime as dt
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -20,9 +21,17 @@ if SETTINGS_SPEC is None or SETTINGS_SPEC.loader is None:
 settings = importlib.util.module_from_spec(SETTINGS_SPEC)
 SETTINGS_SPEC.loader.exec_module(settings)
 try:
+    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+    from canonical_values import load_site, model_digest
+    from projection_manifest import verify_manifest
+    from service_catalog import load_catalog
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(REPO / "scripts"))
+    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+    from canonical_values import load_site, model_digest
+    from projection_manifest import verify_manifest
+    from service_catalog import load_catalog
     from values_context import from_environment
 DEFAULT_INVENTORY = ("infra/ansible/inventory/tfvars.py",)
 RunCommand = Callable[[list[str], Path, dict[str, str]], int]
@@ -97,6 +106,48 @@ def refresh_root_password_from_tfvars(tfvars_file: Path, env: dict[str, str]) ->
     password = values.get("lxc_root_password")
     if isinstance(password, str) and password:
         env["TF_VAR_lxc_root_password"] = password
+
+
+def canonical_dns_environment(context: object) -> dict[str, str]:
+    """Return a verified canonical DNS projection transport when available."""
+    site_file = getattr(context, "canonical_site_path", None)
+    if site_file is None:
+        return {}
+    catalog_path = REPO / "infra" / "services.json"
+    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=catalog_path)
+    catalog = load_catalog(catalog_path)
+    expected_projections = {
+        "terraform.auto.tfvars.json": render_opentofu_variables(model),
+        "ansible-inventory.json": render_ansible_inventory(model, catalog),
+        "ansible-vars.json": render_ansible_vars(model, catalog),
+        "dns-records.json": render_dns_records(model),
+    }
+    generated_path = getattr(context, "generated_path")
+    projections: dict[str, object] = {}
+    try:
+        for name in expected_projections:
+            path = generated_path(name)
+            projections[name] = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError("canonical generated projection is unavailable or invalid") from error
+    if projections != expected_projections:
+        raise RuntimeError("canonical generated projection does not match the selected model")
+    manifest_path = getattr(context, "projection_manifest_path")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError("canonical projection manifest is unavailable") from error
+    verify_manifest(
+        manifest,
+        site=model.site.name,
+        model_digest=model_digest(model),
+        secret_digest=None,
+        projections=projections,
+    )
+    dns_path = generated_path("dns-records.json")
+    if not dns_path.is_file():
+        raise RuntimeError("canonical DNS projection is unavailable")
+    return {"DNS_RECORDS_FILE": str(dns_path)}
 
 
 def bootstrap_technitium_token(env_file: Path, log_path: Path, env: dict[str, str], runner: RunCommand) -> int:
@@ -240,6 +291,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Ansible service apply mode: {args.mode}; started {timestamp}; logs: {log_dir}", flush=True)
     base_env = dict(os.environ)
     refresh_root_password_from_tfvars(context.path("terraform.tfvars"), base_env)
+    try:
+        base_env.update(canonical_dns_environment(context))
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"canonical Ansible projection verification failed: {error}", file=sys.stderr)
+        return 1
 
     if args.mode == "sequential":
         results = run_sequential(services, inventories, log_dir, env_file, base_env)
