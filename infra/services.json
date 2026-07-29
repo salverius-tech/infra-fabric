@@ -98,6 +98,12 @@
         "vmid_var": "tailscale_client_vmid",
         "tf_vmid": "tailscale_client_vmid",
         "tf_host": "tailscale_client_ipv4_address",
+        "canonical_play_vars": {
+          "tailscale_client_restore_backup": "configuration.restore_backup",
+          "tailscale_client_backup_archive": "configuration.backup_archive",
+          "tailscale_client_enable_ip_forwarding": "configuration.enable_ip_forwarding",
+          "tailscale_client_up_args": "configuration.up_args"
+        },
         "extra_play_vars": {
           "tailscale_client_enabled": "tailscale_client_enabled"
         }

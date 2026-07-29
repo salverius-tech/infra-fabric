@@ -458,3 +458,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-28 — Added the typed Forgejo database configuration/default projection; coverage is now 233 matched and 154 review-required inputs.
 - 2026-07-28 — Added typed Forgejo Caddy, SSH, bootstrap, and Actions configuration with non-secret Ansible compatibility projections; coverage is now 250 matched and 137 review-required inputs.
 - 2026-07-28 — Added typed Infisical data-directory and PostgreSQL identity configuration with non-secret Ansible compatibility projections; coverage is now 253 matched and 134 review-required inputs.
+- 2026-07-28 — Added typed Tailscale recovery and networking configuration with non-secret Ansible compatibility projections; coverage is now 257 matched and 130 review-required inputs.

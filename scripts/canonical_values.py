@@ -420,6 +420,15 @@ class ForgejoDatabaseConfiguration(StrictModel):
         return self
 
 
+class TailscaleConfiguration(StrictModel):
+    """Typed non-secret Tailscale restore and networking behavior."""
+
+    restore_backup: StrictBool | None = None
+    backup_archive: StrictStr | None = None
+    enable_ip_forwarding: StrictBool | None = None
+    up_args: list[StrictStr] | None = None
+
+
 class InfisicalConfiguration(StrictModel):
     """Typed non-secret Infisical storage and database identity settings."""
 
@@ -721,6 +730,14 @@ class CanonicalSite(StrictModel):
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
                 raise ValueError(f"services.hermes.configuration: {details}") from error
+        tailscale = self.services.get("tailscale_client")
+        if tailscale is not None:
+            try:
+                configuration = TailscaleConfiguration.model_validate(tailscale.configuration)
+                tailscale.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.tailscale_client.configuration: {details}") from error
         infisical = self.services.get("infisical")
         if infisical is not None:
             try:
