@@ -46,19 +46,13 @@ CANONICAL_PROJECTION_FILES = (
 )
 
 
-def load_verified_canonical_inventory(
+def _load_verified_projections(
     generated_dir: Path,
     *,
     site: str,
     model_digest: str,
     secret_digest: str | None = None,
 ) -> dict[str, Any]:
-    """Load the canonical inventory only after verifying its projection manifest.
-
-    This is an opt-in compatibility boundary. The legacy tfvars parser remains
-    the default until plan/apply cutover is authorized; callers must supply the
-    identities they already verified at the selected-site boundary.
-    """
     generated_dir = generated_dir.expanduser().resolve()
     try:
         manifest = json.loads((generated_dir / "manifest.json").read_text(encoding="utf-8"))
@@ -74,7 +68,29 @@ def load_verified_canonical_inventory(
             projections=projections,
         )
     except (OSError, json.JSONDecodeError, TypeError, ManifestError) as error:
-        raise InventoryError("canonical inventory projection is missing, stale, or altered") from error
+        raise InventoryError("canonical Ansible projections are missing, stale, or altered") from error
+    return projections
+
+
+def load_verified_canonical_inventory(
+    generated_dir: Path,
+    *,
+    site: str,
+    model_digest: str,
+    secret_digest: str | None = None,
+) -> dict[str, Any]:
+    """Load the canonical inventory only after verifying its projection manifest.
+
+    This is an opt-in compatibility boundary. The legacy tfvars parser remains
+    the default until plan/apply cutover is authorized; callers must supply the
+    identities they already verified at the selected-site boundary.
+    """
+    projections = _load_verified_projections(
+        generated_dir,
+        site=site,
+        model_digest=model_digest,
+        secret_digest=secret_digest,
+    )
     inventory = projections["ansible-inventory.json"]
     if not isinstance(inventory, dict) or not isinstance(inventory.get("_meta"), dict):
         raise InventoryError("canonical inventory projection has an invalid shape")
@@ -94,22 +110,12 @@ def load_verified_canonical_vars(
     projection set as the canonical inventory loader and rejects duplicate
     top-level compatibility keys with different values.
     """
-    generated_dir = generated_dir.expanduser().resolve()
-    try:
-        manifest = json.loads((generated_dir / "manifest.json").read_text(encoding="utf-8"))
-        projections = {
-            name: json.loads((generated_dir / name).read_text(encoding="utf-8"))
-            for name in CANONICAL_PROJECTION_FILES
-        }
-        verify_manifest(
-            manifest,
-            site=site,
-            model_digest=model_digest,
-            secret_digest=secret_digest,
-            projections=projections,
-        )
-    except (OSError, json.JSONDecodeError, TypeError, ManifestError) as error:
-        raise InventoryError("canonical Ansible vars projection is missing, stale, or altered") from error
+    projections = _load_verified_projections(
+        generated_dir,
+        site=site,
+        model_digest=model_digest,
+        secret_digest=secret_digest,
+    )
     projection = projections["ansible-vars.json"]
     services = projection.get("services") if isinstance(projection, dict) else None
     if not isinstance(services, dict):
@@ -128,6 +134,40 @@ def load_verified_canonical_vars(
                 raise InventoryError(f"conflicting canonical Ansible compatibility var: {key}")
             flattened[key] = value
     return flattened
+
+
+def load_verified_canonical_bundle(
+    generated_dir: Path,
+    *,
+    site: str,
+    model_digest: str,
+    secret_digest: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return inventory and compatibility vars verified from one projection set."""
+    projections = _load_verified_projections(
+        generated_dir,
+        site=site,
+        model_digest=model_digest,
+        secret_digest=secret_digest,
+    )
+    inventory = projections["ansible-inventory.json"]
+    if not isinstance(inventory, dict) or not isinstance(inventory.get("_meta"), dict):
+        raise InventoryError("canonical inventory projection has an invalid shape")
+    projection = projections["ansible-vars.json"]
+    services = projection.get("services") if isinstance(projection, dict) else None
+    if not isinstance(services, dict):
+        raise InventoryError("canonical Ansible vars projection has an invalid shape")
+    flattened: dict[str, Any] = {}
+    for service, values in sorted(services.items()):
+        if not isinstance(values, dict) or not isinstance(values.get("legacy_vars", {}), dict):
+            raise InventoryError(f"canonical Ansible compatibility vars are invalid: {service}")
+        for key, value in values["legacy_vars"].items():
+            if not isinstance(key, str):
+                raise InventoryError(f"canonical Ansible compatibility key is invalid: {service}")
+            if key in flattened and flattened[key] != value:
+                raise InventoryError(f"conflicting canonical Ansible compatibility var: {key}")
+            flattened[key] = value
+    return inventory, flattened
 
 
 def load_tfvars(path: Path) -> dict[str, Any]:

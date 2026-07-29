@@ -314,6 +314,9 @@ class TfvarsInventoryTests(unittest.TestCase):
         loaded = tfvars_inventory.load_verified_canonical_vars(generated, site="dev", model_digest="model-digest")
         self.assertEqual(loaded["forgejo_version"], "1.2.3")
         self.assertEqual(loaded["technitium_api_url"], "http://192.0.2.53:5380/api")
+        inventory, bundled = tfvars_inventory.load_verified_canonical_bundle(generated, site="dev", model_digest="model-digest")
+        self.assertEqual(inventory, projections["ansible-inventory.json"])
+        self.assertEqual(bundled, loaded)
 
     def test_canonical_vars_reject_conflicting_compatibility_keys(self) -> None:
         generated = Path(tempfile.mkdtemp())
