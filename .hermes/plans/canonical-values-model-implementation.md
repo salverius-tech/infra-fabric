@@ -450,3 +450,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-28 — Formalized shared provider-secret aliases as value-free, provider-scoped review metadata; no secret path, projection, delivery, or mapping coverage was promoted.
 - 2026-07-28 — Added metadata-only discovery for site-aware known-hosts, Terraform state, and service-backup artifacts with containment/symlink rejection; migration semantics remain deferred.
 - 2026-07-28 — Added machine-readable classification for all 163 unmatched identities and the durable decision register at `docs/canonical-values-model-blockers.md`; no candidate generation or consumer cutover is authorized while these four review categories remain.
+- 2026-07-28 — Corrected deferred classification for password, encryption-key, and pass aliases so protected inputs cannot be misreported as ordinary behavior/configuration.

@@ -59,6 +59,12 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             },
         )
         self.assertEqual(sum(deferred["counts"].values()), 163)
+        deferred_by_key = {(item["source"], item["key"]): item["classification"] for item in deferred["items"]}
+        for identity in (
+            ("scaffold/ansible/inventory/local.yml", "infisical_encryption_key"),
+            ("scripts/parse-env.py", "TECHNITIUM_ADMIN_PASS"),
+        ):
+            self.assertEqual(deferred_by_key[identity], "secret-or-protected")
         self.assertIn(
             {"source": "scripts/migrate-values.py", "key": "FORGEJO_VERSION", "canonical_path": "services.forgejo.release.version"},
             report["matrix_coverage"]["matched"],

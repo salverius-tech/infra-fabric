@@ -404,7 +404,11 @@ def classify_deferred_input(item: dict[str, str]) -> tuple[str, str]:
         return "ambiguous-or-destructive", "generic migration alias does not identify one resource"
     if key in {"debian_template_url", "debian_template_file_name", "debian_template_checksum_algorithm", "debian_template_checksum"}:
         return "ambiguous-or-destructive", "public scaffold transport conflicts with the canonical HTTPS image contract"
-    if re.search(r"(?:password|secret|token|private[_-]?key|api[_-]?key|ssh_public_keys|auth_key|root_password)", key, re.IGNORECASE):
+    if re.search(
+        r"(?:^|_)(?:password|pass|secret|token|private[_-]?key|api[_-]?key|ssh_public_keys|auth_key|encryption_key)(?:_|$)",
+        key,
+        re.IGNORECASE,
+    ):
         return "secret-or-protected", "protected material or delivery metadata requires an approved secret consumer contract"
     if key in {"PROXMOX_VE_ENDPOINT", "PROXMOX_VE_USERNAME", "PVE_HOST", "EDGEROUTER_ADDR", "EDGEROUTER_USER", "CF_API_EMAIL"}:
         return "secret-or-protected", "provider or external-system input has no canonical delivery boundary"
