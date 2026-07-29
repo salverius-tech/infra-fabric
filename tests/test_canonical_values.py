@@ -175,6 +175,18 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertNotIn("secret", summary)
         self.assertEqual(len(model.resources.guests), 1)
 
+    def test_forgejo_database_is_typed_and_projected(self) -> None:
+        content = VALID_SITE.replace(
+            "    release:\n",
+            "    configuration:\n      database:\n        type: postgres\n        name: forgejo_db\n        user: forgejo_user\n    release:\n",
+        )
+        model = load_site(self.write_site(content))
+        values = render_opentofu_variables(model)
+        self.assertEqual(values["forgejo_database"]["type"], "postgres")
+        self.assertEqual(values["forgejo_database"]["name"], "forgejo_db")
+        with self.assertRaises(CanonicalValuesError):
+            load_site(self.write_site(content.replace("forgejo_db", "bad-name")))
+
     def test_typed_cloud_init_and_template_timeout_projection(self) -> None:
         content = VALID_SITE.replace(
             "  storage:\n    rootfs_datastore: local-lvm",

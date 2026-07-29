@@ -38,17 +38,17 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             {"ansible-only", "deprecated", "unsupported"},
         )
         self.assertEqual(report["source_inputs"]["status"], "classification-complete-with-review-dispositions")
-        self.assertEqual(report["mapping_matrix"]["row_count"], 218)
+        self.assertEqual(report["mapping_matrix"]["row_count"], 219)
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-incomplete")
         self.assertEqual(report["matrix_coverage"]["input_count"], 387)
         self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 387)
-        self.assertEqual(report["matrix_coverage"]["matched_count"], 232)
-        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 155)
+        self.assertEqual(report["matrix_coverage"]["matched_count"], 233)
+        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 154)
         self.assertEqual(report["matrix_coverage"]["status"], "review-required")
         self.assertTrue(report["matrix_coverage"]["unmatched"])
         deferred = report["deferred_classification"]
-        self.assertEqual(deferred["item_count"], 155)
-        self.assertEqual(deferred["classified_count"], 155)
+        self.assertEqual(deferred["item_count"], 154)
+        self.assertEqual(deferred["classified_count"], 154)
         self.assertEqual(deferred["unclassified_count"], 0)
         self.assertEqual(
             set(deferred["counts"]),
@@ -59,7 +59,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 "secret-or-protected",
             },
         )
-        self.assertEqual(sum(deferred["counts"].values()), 155)
+        self.assertEqual(sum(deferred["counts"].values()), 154)
         deferred_by_key = {(item["source"], item["key"]): item["classification"] for item in deferred["items"]}
         for identity in (
             ("scaffold/ansible/inventory/local.yml", "infisical_encryption_key"),
@@ -84,6 +84,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             ("scaffold/terraform.tfvars", "onramp_host_cloud_init_user", "resources.shared_hosts.onramp_host.runtime.cloud_init_user"),
             ("scaffold/terraform.tfvars", "service_runtime", "resources.<id>.runtime"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_runtime", "resources.guests.forgejo.runtime"),
+            ("scaffold/terraform.tfvars", "forgejo_database", "services.forgejo.configuration.database"),
         ):
             with self.subTest(source=source, key=key):
                 self.assertIn(

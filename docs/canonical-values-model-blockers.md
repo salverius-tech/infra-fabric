@@ -11,7 +11,7 @@ Regenerate the value-free inventory with:
 python3 scripts/canonical-mapping-inventory.py
 ```
 
-Current baseline: 218 mapping rows, 232 matched inputs, 155 unmatched inputs, and 0 ambiguous matrix matches. The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the decision blockers that prevent promotion.
+Current baseline: 219 mapping rows, 233 matched inputs, 154 unmatched inputs, and 0 ambiguous matrix matches. The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the decision blockers that prevent promotion.
 
 ## Secret or protected inputs
 
@@ -31,7 +31,7 @@ Current baseline: 218 mapping rows, 232 matched inputs, 155 unmatched inputs, an
 
 ## Behavior or configuration without a typed owner
 
-**Source identities:** service selection/runtime aliases not covered by the typed runtime projection (`tailscale_client_enabled`); Forgejo behavior and bootstrap/Caddy/database/runner fields; Infisical and SearXNG runtime fields; Caddy settings; Hermes fields not covered by the existing typed Control/dashboard slice; SearXNG `searxng_container_port`, `searxng_bind_address`, `searxng_instance_name`, and public-URL enablement.
+**Source identities:** service selection/runtime aliases not covered by the typed runtime projection (`tailscale_client_enabled`); Forgejo behavior and bootstrap/Caddy/runner fields; Infisical and SearXNG runtime fields; Caddy settings; Hermes fields not covered by the existing typed Control/dashboard slice; SearXNG `searxng_container_port`, `searxng_bind_address`, `searxng_instance_name`, and public-URL enablement.
 
 **Candidate owners:** service-specific configuration models, resource runtime/security models, or an explicit consumer adapter.
 

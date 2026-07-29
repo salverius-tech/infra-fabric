@@ -111,11 +111,31 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         self.assertNotIn("basic_auth_secret", repr(projected))
 
         mapping = self.catalog.get("forgejo").inventory["canonical_play_vars"]
-        self.assertEqual(mapping, {"forgejo_version": "release.version"})
+        self.assertEqual(
+            mapping,
+            {
+                "forgejo_version": "release.version",
+                "forgejo_database": "configuration.database",
+            },
+        )
         model = self.model.model_copy(deep=True)
         model.services["forgejo"].release = model.services["forgejo"].release.model_copy(update={"version": "10.0.0"})
         projected = render_ansible_vars(model, self.catalog)
-        self.assertEqual(projected["services"]["forgejo"]["legacy_vars"], {"forgejo_version": "10.0.0"})
+        self.assertEqual(
+            projected["services"]["forgejo"]["legacy_vars"],
+            {
+                "forgejo_version": "10.0.0",
+                "forgejo_database": {
+                    "type": "sqlite",
+                    "managed": True,
+                    "host": "127.0.0.1",
+                    "port": 5432,
+                    "name": "forgejo",
+                    "user": "forgejo",
+                    "ssl_mode": "disable",
+                },
+            },
+        )
 
         mapping = self.catalog.get("hermes").inventory["canonical_play_vars"]
         self.assertEqual(mapping["hermes_runtime_user"], "configuration.runtime_user")

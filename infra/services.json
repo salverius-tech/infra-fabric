@@ -64,7 +64,8 @@
           "forgejo_database": "forgejo_database"
         },
         "canonical_play_vars": {
-          "forgejo_version": "release.version"
+          "forgejo_version": "release.version",
+          "forgejo_database": "configuration.database"
         }
       }
     },

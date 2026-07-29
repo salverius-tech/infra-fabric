@@ -152,6 +152,8 @@ def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
     for name, service in model.services.items():
         if not service.enabled:
             continue
+        if name == "forgejo" and isinstance(service.configuration.get("database"), dict):
+            values["forgejo_database"] = dict(service.configuration["database"])
         endpoint_names = service.endpoints.public_names
         if endpoint_names:
             values[f"{name}_server_name"] = endpoint_names[0]

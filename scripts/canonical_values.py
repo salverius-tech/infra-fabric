@@ -393,6 +393,33 @@ class Resources(StrictModel):
         return self
 
 
+class ForgejoDatabaseConfiguration(StrictModel):
+    """Non-secret Forgejo database selection and connection metadata."""
+
+    type: Literal["sqlite", "postgres"] = "sqlite"
+    managed: StrictBool = True
+    host: StrictStr = "127.0.0.1"
+    port: StrictInt = 5432
+    name: StrictStr = "forgejo"
+    user: StrictStr = "forgejo"
+    ssl_mode: StrictStr = "disable"
+
+    @field_validator("port")
+    @classmethod
+    def validate_port(cls, value: int) -> int:
+        if not 1 <= value <= 65535:
+            raise ValueError("Forgejo database port must be between 1 and 65535")
+        return value
+
+    @model_validator(mode="after")
+    def validate_postgres_identifiers(self) -> "ForgejoDatabaseConfiguration":
+        if self.type == "postgres":
+            identifier = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+            if not identifier.fullmatch(self.name) or not identifier.fullmatch(self.user):
+                raise ValueError("PostgreSQL Forgejo database name and user must be SQL identifiers")
+        return self
+
+
 class ServiceState(StrictModel):
     capable: StrictBool = False
     backup: dict[str, Any] = Field(default_factory=dict)
@@ -662,6 +689,14 @@ class CanonicalSite(StrictModel):
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
                 raise ValueError(f"services.hermes.configuration: {details}") from error
+        forgejo = self.services.get("forgejo")
+        if forgejo is not None:
+            try:
+                database = ForgejoDatabaseConfiguration.model_validate(forgejo.configuration.get("database", {}))
+                forgejo.configuration["database"] = database.model_dump(mode="json")
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.forgejo.configuration.database: {details}") from error
         for _, resource in (*self.resources.guests.items(), *self.resources.shared_hosts.items()):
             network = resource.network
             if network.bridge is None:

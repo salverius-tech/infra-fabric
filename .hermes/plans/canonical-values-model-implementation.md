@@ -455,3 +455,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-28 — Added the exact `FORGEJO_SERVER_NAME` migration alias to the existing Forgejo endpoint owner; coverage is now 226 matched and 161 review-required inputs.
 - 2026-07-28 — Added the exact `PROXMOX_VE_ENDPOINT` provider endpoint alias to `platform.proxmox.endpoint`; coverage is now 227 matched and 160 review-required inputs.
 - 2026-07-28 — Added typed VM cloud-init users, LXC template upload timeout, and resource runtime compatibility mappings for `service_runtime`/`forgejo_runtime`; coverage is now 232 matched and 155 review-required inputs.
+- 2026-07-28 — Added the typed Forgejo database configuration/default projection; coverage is now 233 matched and 154 review-required inputs.
