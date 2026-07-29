@@ -42,12 +42,12 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-incomplete")
         self.assertEqual(report["matrix_coverage"]["input_count"], 387)
         self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 387)
-        self.assertEqual(report["matrix_coverage"]["matched_count"], 226)
-        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 161)
+        self.assertEqual(report["matrix_coverage"]["matched_count"], 227)
+        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 160)
         self.assertEqual(report["matrix_coverage"]["status"], "review-required")
         self.assertTrue(report["matrix_coverage"]["unmatched"])
         deferred = report["deferred_classification"]
-        self.assertEqual(deferred["item_count"], 161)
+        self.assertEqual(deferred["item_count"], 160)
         self.assertEqual(deferred["unclassified_count"], 0)
         self.assertEqual(
             set(deferred["counts"]),
@@ -58,7 +58,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 "secret-or-protected",
             },
         )
-        self.assertEqual(sum(deferred["counts"].values()), 161)
+        self.assertEqual(sum(deferred["counts"].values()), 160)
         deferred_by_key = {(item["source"], item["key"]): item["classification"] for item in deferred["items"]}
         for identity in (
             ("scaffold/ansible/inventory/local.yml", "infisical_encryption_key"),
@@ -71,6 +71,10 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         )
         self.assertIn(
             {"source": "scaffold/terraform.tfvars", "key": "onramp_host_datastore_id", "canonical_path": "resources.shared_hosts.onramp_host.storage.root.storage_id"},
+            report["matrix_coverage"]["matched"],
+        )
+        self.assertIn(
+            {"source": "scripts/parse-env.py", "key": "PROXMOX_VE_ENDPOINT", "canonical_path": "platform.proxmox.endpoint"},
             report["matrix_coverage"]["matched"],
         )
         self.assertIn(

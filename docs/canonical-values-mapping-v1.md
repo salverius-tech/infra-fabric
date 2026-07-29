@@ -37,7 +37,7 @@ A logical service references exactly one resource. VMID, hostname, address, comp
 | `site.lifecycle` | `disposable`, `persistent`, `protected` | `site.json.lifecycle` | policy checks | canonical | none | production/disposable and protected mutation policies fail | public | lifecycle |
 | `site.allow_apply` | boolean | `site.json.allow_apply` | apply gate | canonical | required | missing/type mismatch fails | public | mutation gate |
 | `site.allow_destroy` | boolean | `site.json.allow_destroy` | destructive apply gate | canonical | required; production must be false | unsafe policy fails | public | destructive |
-| `platform.proxmox.endpoint` | URL | `proxmox_endpoint` | `proxmox_endpoint` | OpenTofu-only | preserve URL form | normalized URL conflicts fail | provider | provider/state exposure review |
+| `platform.proxmox.endpoint` | URL | `proxmox_endpoint`; `PROXMOX_VE_ENDPOINT` | `proxmox_endpoint` | OpenTofu-only | preserve URL form | normalized URL conflicts fail | provider | provider/state exposure review |
 | `platform.proxmox.node` | identifier | `proxmox_node_name` | `proxmox_node_name` | OpenTofu-only | none | conflict fails | public | resource placement |
 | `platform.proxmox.insecure` | boolean | `proxmox_insecure` | `proxmox_insecure` | OpenTofu-only | strict boolean | conflict fails | public | connectivity |
 | `platform.network.default_bridge` | string | `*_container_bridge`, inventory defaults | resource bridge vars/inventory | canonical/derived | resource override wins | normalized values must agree | public | network |
