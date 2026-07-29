@@ -154,6 +154,13 @@ def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
             continue
         if name == "forgejo" and isinstance(service.configuration.get("database"), dict):
             values["forgejo_database"] = dict(service.configuration["database"])
+        if service.resource:
+            resource = _resource(model, service.resource)
+            if resource.storage.volumes:
+                values.setdefault("service_storage", {})[name] = {
+                    volume_name: volume.model_dump(mode="python")
+                    for volume_name, volume in resource.storage.volumes.items()
+                }
         endpoint_names = service.endpoints.public_names
         if endpoint_names:
             values[f"{name}_server_name"] = endpoint_names[0]
@@ -167,6 +174,15 @@ def render_ansible_inventory(model: CanonicalSite, catalog: ServiceCatalog) -> d
     """Render a minimal dynamic-inventory contract from resources and services."""
     hosts: dict[str, dict[str, Any]] = {}
     groups: dict[str, dict[str, Any]] = {}
+    management = model.platform.proxmox.management
+    if management is not None:
+        hosts["pve"] = {
+            "canonical_site": model.site.name,
+            "canonical_platform": "proxmox",
+            "ansible_host": management.host,
+            "ansible_user": management.user,
+        }
+        groups["proxmox"] = {"hosts": ["pve"]}
     for name, service in model.services.items():
         if not service.enabled:
             continue
@@ -222,6 +238,7 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                 "inventory_group": capability.inventory.get("group"),
             },
         }
+        legacy_vars: dict[str, Any] = {}
         compatibility = capability.inventory.get("canonical_play_vars")
         if isinstance(compatibility, Mapping):
             legacy_vars: dict[str, Any] = {}
@@ -231,8 +248,21 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                 value = _compatibility_value(service, resource, canonical_path)
                 if value is not None:
                     legacy_vars[legacy_name] = value
-            if legacy_vars:
-                service_vars["legacy_vars"] = legacy_vars
+        if name == "technitium":
+            caddy = service.configuration.get("caddy")
+            if isinstance(caddy, Mapping) and caddy.get("enabled", True):
+                upstream = caddy["upstream"]
+                legacy_vars.update(
+                    {
+                        "caddy_email": model.platform.ingress.acme.email,
+                        "caddy_server_name": caddy["server_names"][0],
+                        "caddy_server_names": list(caddy["server_names"]),
+                        "caddy_upstream": f"{upstream['host']}:{upstream['port']}",
+                        "caddy_extra_vhosts": list(caddy.get("extra_vhosts", [])),
+                    }
+                )
+        if legacy_vars:
+            service_vars["legacy_vars"] = legacy_vars
         services[name] = service_vars
     result = {"canonical_site": model.site.name, "services": services}
     _assert_non_secret(result, "ansible")
@@ -240,8 +270,10 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
 
 
 def render_dns_records(model: CanonicalSite) -> dict[str, Any]:
-    """Render the existing DNS projection shape from endpoint intent."""
-    records: dict[str, str] = {}
+    """Render canonical DNS ownership plus derived service endpoint records."""
+    dns = model.platform.dns
+    records = dict(dns.a_records)
+    cname_records = dict(dns.cname_records)
     for name, service in model.services.items():
         if not service.enabled or not service.endpoints.dns.enabled:
             continue
@@ -249,12 +281,30 @@ def render_dns_records(model: CanonicalSite) -> dict[str, Any]:
         if not address:
             raise ProjectionError(f"DNS-enabled service {name} has no verified resource address")
         try:
-            ipaddress.ip_address(address)
+            address = str(ipaddress.IPv4Address(address))
         except ValueError as error:
             raise ProjectionError(f"DNS-enabled service {name} has invalid resource address") from error
         for public_name in service.endpoints.public_names:
+            if public_name in cname_records:
+                raise ProjectionError(f"DNS record conflicts with canonical CNAME: {public_name}")
+            if public_name in records and records[public_name] != address:
+                raise ProjectionError(f"DNS record target conflicts for {public_name}")
             records[public_name] = address
-    return {"a_records": dict(sorted(records.items())), "cname_records": {}, "zones": {}, "settings": {}}
+    settings: dict[str, Any] = {}
+    if dns.settings is not None:
+        settings = {
+            "forwarders": list(dns.settings.forwarders),
+            "forwarderProtocol": dns.settings.forwarder_protocol,
+            "concurrentForwarding": dns.settings.concurrent_forwarding,
+            "dnssecValidation": dns.settings.dnssec_validation,
+            "preferIPv6": dns.settings.prefer_ipv6,
+        }
+    return {
+        "a_records": dict(sorted(records.items())),
+        "cname_records": dict(sorted(cname_records.items())),
+        "zones": {zone: list(forwarders) for zone, forwarders in sorted(dns.zones.items())},
+        "settings": settings,
+    }
 
 
 __all__ = [

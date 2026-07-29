@@ -26,6 +26,49 @@ MIGRATED_FILES = (
     Path("ansible/known_hosts"),
 )
 
+GENERATED_PROJECTIONS = {Path(".env"), Path("terraform.tfvars"), Path("dns-records.local.json"), Path("ansible/inventory/local.yml")}
+
+
+def artifact_disposition(relative: Path) -> tuple[str, str]:
+    if relative in GENERATED_PROJECTIONS:
+        return "generated-projection", "canonical site values"
+    return "operational-artifact", "private migration/recovery workflow"
+
+
+def migration_manifest(site: str, items: list[tuple[Path, Path]], values_root: Path) -> dict[str, Any]:
+    operations: list[dict[str, str]] = []
+    for source, destination in items:
+        relative = source.relative_to(values_root)
+        disposition, owner = artifact_disposition(relative)
+        operations.append(
+            {
+                "source": relative.as_posix(),
+                "destination": destination.relative_to(values_root).as_posix(),
+                "disposition": disposition,
+                "owner": owner,
+                "action": "move-for-compatibility",
+                "rollback": "restore-from-private-backup",
+            }
+        )
+    if (values_root.parent / "settings.local.json").is_file():
+        operations.append(
+            {
+                "source": "settings.local.json",
+                "destination": "settings.local.json",
+                "disposition": "operational-artifact",
+                "owner": "private operator/workspace configuration",
+                "action": "remove-services-after-migration",
+                "rollback": "restore-from-private-backup",
+            }
+        )
+    return {
+        "schema_version": 1,
+        "source": "legacy-values",
+        "canonical_destination": f"sites/{site}",
+        "operations": operations,
+        "secret_values_included": False,
+    }
+
 
 def site_metadata(repo: Path, site: str, site_class: str, lifecycle: str, allow_apply: bool, allow_destroy: bool) -> dict[str, Any]:
     settings_path = repo / "settings.local.json"
@@ -132,7 +175,7 @@ def migrate(
     target, items = validate_request(values_root, site, metadata)
     settings_path = repo / "settings.local.json"
     original_settings = settings_path.read_bytes() if settings_path.is_file() else None
-    actions = [f"create {target}/site.json"]
+    actions = [f"create {target}/site.json", f"create {target}/migration-manifest.json"]
     actions.extend(f"move {source} -> {destination}" for source, destination in items)
     if (repo / "settings.local.json").is_file():
         actions.append("remove services from settings.local.json")
@@ -143,6 +186,10 @@ def migrate(
     moved: list[tuple[Path, Path]] = []
     try:
         (target / "site.json").write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (target / "migration-manifest.json").write_text(
+            json.dumps(migration_manifest(site, items, values_root), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         for source, destination in items:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(source), str(destination))

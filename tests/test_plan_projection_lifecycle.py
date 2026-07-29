@@ -27,6 +27,11 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertIn('trap cleanup_generated_tmp EXIT', content)
         self.assertIn('-var-file=../../${INFRA_VALUES_DIR}/terraform.tfvars', content)
         self.assertIn('ansible/inventory/local.yml', content)
+        self.assertIn('INFRA_EQUIVALENCE_BEFORE_JSON', content)
+        self.assertIn('tofu -chdir=infra/opentofu show -json', content)
+        self.assertIn('scripts/report-plan-equivalence.py', content)
+        self.assertIn('Plan equivalence review failed', content)
+        self.assertIn('rm -f "${equivalence_after_json}"', content)
         self.assertNotIn('rm -rf "${generated_dir}"', content)
 
 

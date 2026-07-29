@@ -1,11 +1,10 @@
 # Normalized OpenTofu plan-equivalence contract
 
-**Status:** report-only, provider adapter deferred
+**Status:** report-only provider adapter implemented; plan/apply wiring and consumer cutover deferred
 
-`scripts/plan_equivalence.py` compares a deliberately small, provider-neutral
-shape. It is not an OpenTofu JSON parser and is not called by plan or apply.
-Provider adapters may be added later, but must map provider output into this
-contract before comparison.
+The report-only boundary is `scripts/report-plan-equivalence.py`. It accepts two saved `tofu show -json` documents, emits only `address`/difference-kind metadata, returns 0 for equivalence, 1 for a semantic difference, and 2 for invalid input. It never invokes OpenTofu, writes plans, or applies infrastructure.
+
+When an operator has a saved prior plan, setting `INFRA_EQUIVALENCE_BEFORE_JSON` while running the existing plan workflow enables the optional gate. The current plan is exported to a disposable private-values file, compared, and removed by the existing EXIT cleanup path. A difference stops the workflow with a redacted report; without the variable, plan behavior is unchanged.
 
 ## Version 1 shape
 
@@ -51,14 +50,7 @@ fields.
 
 ## Provider-neutral versus provider-specific boundary
 
-A future provider adapter owns extraction from `resource_changes`, including
-provider addresses, nested `change.before`/`change.after` values, unknown and
-sensitive markers, and provider refresh noise. The adapter must output the
-version-1 shape above. Provider-specific normalization is not permitted to
-silently drop VM identity, runtime type, storage identity/size, placement,
-endpoint/DNS targets, release pins, or secret-dependent fields. If a value
-cannot be represented safely, the adapter should reject the input rather than
-omit it.
+The provider adapter at `scripts/tofu_plan_equivalence.py` owns extraction from `resource_changes`, including provider addresses, nested `change.before`/`change.after` values, unknown and sensitive markers, and provider refresh noise. It outputs the version-1 shape above. Provider-specific normalization is not permitted to silently drop VM identity, runtime type, storage identity/size, placement, endpoint/DNS targets, release pins, or secret-dependent fields. If a value cannot be represented safely, the adapter rejects the input rather than omitting it.
 
 Only a narrowly reviewed allowlist may remove path-only or refresh-only
 metadata. There is no generic recursive "ignore provider fields" rule. Exact
@@ -72,9 +64,9 @@ Fixtures under `tests/fixtures/plan-equivalence/` must use placeholders and RFC
 unknown values, changed VMID/runtime/storage/address/DNS/ownership, release or
 secret-dependent changes, and update versus replacement actions. No real
 `tofu show -json` output is required for this slice, and no provider output is
-invented. A later adapter slice needs provider-backed fixtures and tests for
-unknown/sensitive encoding, refresh-only differences, and the exact
-`resource_changes` mapping.
+invented. A later integration slice needs provider-backed fixtures and tests for
+refresh-only differences, exact `resource_changes` mapping, and an approved
+report/plan invocation boundary.
 
 This contract is intentionally not wired into `verify_metadata()`,
 `plan-infra.sh`, or apply. Passing these tests proves normalization semantics

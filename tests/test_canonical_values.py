@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import atomic_output
 from atomic_output import atomic_output_directory
-from canonical_values import CanonicalValuesError, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformImages, ResourceNetwork, SearxngConfiguration, ServiceRelease, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
+from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, SearxngConfiguration, ServiceRelease, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
     render_ansible_inventory,
@@ -63,6 +63,12 @@ resources:
           storage_id: local-lvm
           size_gb: 8
           target: /
+        volumes:
+          data:
+            type: directory
+            target: /var/lib/forgejo
+            backup: true
+            read_only: true
       runtime:
         started: true
         start_on_boot: true
@@ -181,6 +187,23 @@ class CanonicalValuesTests(unittest.TestCase):
         )
         self.assertEqual(configuration.admin_user, "admin")
 
+    def test_technitium_caddy_configuration_is_typed_and_normalized(self) -> None:
+        configuration = CaddyConfiguration.model_validate(
+            {
+                "server_names": ["DNS.Example.Internal."],
+                "upstream": {"host": "127.0.0.1", "port": 5380},
+                "tls": {"dns_provider": "cloudflare"},
+                "extra_vhosts": [],
+            }
+        )
+        self.assertEqual(configuration.server_names, ["dns.example.internal"])
+        self.assertEqual(configuration.upstream.port, 5380)
+        with self.assertRaises(ValueError):
+            CaddyConfiguration.model_validate(
+                {"server_names": ["dns.example.internal", "DNS.example.internal"], "upstream": {"host": "127.0.0.1", "port": 5380}, "tls": {"dns_provider": "cloudflare"}}
+            )
+
+
     def test_searxng_non_secret_configuration_is_typed(self) -> None:
         configuration = SearxngConfiguration.model_validate(
             {"container_port": 8080, "bind_address": "127.0.0.1", "instance_name": "Search", "enable_public_url": True}
@@ -256,6 +279,21 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(projected["hermes_start_on_boot"], True)
         self.assertNotIn("hermes_container_started", projected)
         self.assertNotIn("hermes_started", values)
+
+    def test_service_storage_projection_preserves_typed_volume_fields(self) -> None:
+        model = load_site(self.write_site(VALID_SITE))
+        values = render_opentofu_variables(model)
+        self.assertEqual(
+            values["service_storage"]["forgejo"]["data"],
+            {
+                "type": "directory",
+                "storage_id": None,
+                "size_gb": None,
+                "target": "/var/lib/forgejo",
+                "backup": True,
+                "read_only": True,
+            },
+        )
 
     def test_digest_is_stable_across_formatting_and_key_order(self) -> None:
         first = load_site(self.write_site(VALID_SITE))
@@ -527,6 +565,86 @@ class CanonicalValuesTests(unittest.TestCase):
         )
         self.assertEqual(dns["a_records"], {"git.example.internal": "192.0.2.62"})
 
+
+    def test_general_dns_contract_projects_owned_records_and_settings(self) -> None:
+        model = load_site(
+            self.write_site(VALID_SITE.replace(
+                "      visibility: internal",
+                "      visibility: internal\n      dns:\n        enabled: true\n        record_type: A",
+            )),
+            catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json",
+        )
+        model.platform.dns = PlatformDNS(
+            enabled=True,
+            settings=DNSSettings(
+                forwarders=["resolver.example.internal (192.0.2.1:53)"],
+                forwarder_protocol="Tls",
+                concurrent_forwarding=False,
+                dnssec_validation=True,
+                prefer_ipv6=False,
+            ),
+            zones={"Example.Internal.": ["192.0.2.10:54"]},
+            a_records={"static.Example.Internal.": "192.0.2.80"},
+            cname_records={"www.Example.Internal.": "proxy.example.internal."},
+        )
+        dns = render_dns_records(model)
+        self.assertEqual(dns["zones"], {"example.internal": ["192.0.2.10:54"]})
+        self.assertEqual(dns["a_records"]["static.example.internal"], "192.0.2.80")
+        self.assertEqual(dns["a_records"]["git.example.internal"], "192.0.2.62")
+        self.assertEqual(dns["cname_records"], {"www.example.internal": "proxy.example.internal"})
+        self.assertEqual(dns["settings"]["forwarderProtocol"], "Tls")
+
+    def test_general_dns_contract_rejects_overlap_and_out_of_zone_records(self) -> None:
+        with self.assertRaises(ValueError):
+            PlatformDNS(
+                enabled=True,
+                settings=DNSSettings(
+                    forwarders=["192.0.2.1:53"],
+                    forwarder_protocol="Udp",
+                    concurrent_forwarding=False,
+                    dnssec_validation=True,
+                    prefer_ipv6=False,
+                ),
+                zones={"example.internal": ["192.0.2.10:54"]},
+                a_records={"same.example.internal": "192.0.2.80"},
+                cname_records={"same.example.internal": "target.example.internal"},
+            )
+        with self.assertRaises(ValueError):
+            PlatformDNS(
+                enabled=True,
+                settings=DNSSettings(
+                    forwarders=["192.0.2.1:53"],
+                    forwarder_protocol="Udp",
+                    concurrent_forwarding=False,
+                    dnssec_validation=True,
+                    prefer_ipv6=False,
+                ),
+                zones={"example.internal": ["192.0.2.10:54"]},
+                a_records={"outside.other.internal": "192.0.2.80"},
+            )
+
+    def test_general_dns_projection_rejects_derived_target_conflict(self) -> None:
+        model = load_site(
+            self.write_site(VALID_SITE.replace(
+                "      visibility: internal",
+                "      visibility: internal\n      dns:\n        enabled: true\n        record_type: A",
+            )),
+            catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json",
+        )
+        model.platform.dns = PlatformDNS(
+            enabled=True,
+            settings=DNSSettings(
+                forwarders=["192.0.2.1:53"],
+                forwarder_protocol="Udp",
+                concurrent_forwarding=False,
+                dnssec_validation=True,
+                prefer_ipv6=False,
+            ),
+            zones={"example.internal": ["192.0.2.10:54"]},
+            a_records={"git.example.internal": "192.0.2.63"},
+        )
+        with self.assertRaises(ProjectionError):
+            render_dns_records(model)
 
     def test_distinct_vm_image_families_project_independently_without_file_id(self) -> None:
         model = load_site(self.write_site(VALID_SITE), catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")

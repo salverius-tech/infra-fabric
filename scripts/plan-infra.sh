@@ -18,23 +18,29 @@ fi
 
 # shellcheck disable=SC2016
 INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh bash -euo pipefail -c '
+equivalence_after_json=""
 python scripts/workspace-preflight.py --require-values
 python scripts/settings.py summary
+
+generated_tmp=""
+generated_backup=""
+cleanup_generated_tmp() {
+  if [[ -n "${generated_tmp}" && -d "${generated_tmp}" ]]; then
+    rm -rf "${generated_tmp}"
+  fi
+  if [[ -n "${generated_backup}" && ! -e "${generated_dir}" && -e "${generated_backup}" ]]; then
+    mv "${generated_backup}" "${generated_dir}" || printf "Unable to restore prior canonical projections.\\n" >&2
+  fi
+  if [[ -n "${equivalence_after_json}" ]]; then
+    rm -f "${equivalence_after_json}"
+  fi
+}
+trap cleanup_generated_tmp EXIT
 
 if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   generated_dir="${INFRA_VALUES_DIR}/generated"
   generated_tmp="$(mktemp -d "${INFRA_VALUES_DIR}/.canonical-generated.XXXXXX")"
-  generated_backup=""
-  cleanup_generated_tmp() {
-    if [[ -n "${generated_tmp}" && -d "${generated_tmp}" ]]; then
-      rm -rf "${generated_tmp}"
-    fi
-    if [[ -n "${generated_backup}" && ! -e "${generated_dir}" && -e "${generated_backup}" ]]; then
-      mv "${generated_backup}" "${generated_dir}" || printf 'Unable to restore prior canonical projections.\n' >&2
-    fi
-  }
-  trap cleanup_generated_tmp EXIT
-  source_commit="$(git rev-parse HEAD 2>/dev/null || printf 'unknown')"
+  source_commit="$(git rev-parse HEAD 2>/dev/null || printf "unknown")"
   python scripts/canonical-render.py \
     --site-file "${INFRA_VALUES_DIR}/site.yaml" \
     --output-dir "${generated_tmp}" \
@@ -45,7 +51,7 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
     mv "${generated_dir}" "${generated_backup}"
   fi
   if ! mv "${generated_tmp}" "${generated_dir}"; then
-    printf 'Unable to install refreshed canonical projections.\n' >&2
+    printf "Unable to install refreshed canonical projections.\\n" >&2
     exit 1
   fi
   generated_tmp=""
@@ -53,7 +59,7 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
     rm -rf "${generated_backup}"
     generated_backup=""
   fi
-  printf 'Canonical non-secret projections refreshed for %s.\n' "${INFRA_VALUES_DIR}"
+  printf "Canonical non-secret projections refreshed for %s.\\n" "${INFRA_VALUES_DIR}"
 fi
 
 storage_vars_args=()
@@ -98,6 +104,20 @@ tofu -chdir=infra/opentofu plan \
   -out=../../${INFRA_VALUES_DIR}/tfplan
 
 tofu -chdir=infra/opentofu show ../../${INFRA_VALUES_DIR}/tfplan
+
+if [[ -n "${INFRA_EQUIVALENCE_BEFORE_JSON:-}" ]]; then
+  equivalence_after_json="$(mktemp "${INFRA_VALUES_DIR}/.tfplan-equivalence.XXXXXX.json")"
+  cleanup_equivalence_json() {
+    rm -f "${equivalence_after_json}"
+  }
+  trap cleanup_equivalence_json EXIT
+  tofu -chdir=infra/opentofu show -json ../../${INFRA_VALUES_DIR}/tfplan > "${equivalence_after_json}"
+  if ! python scripts/report-plan-equivalence.py "${INFRA_EQUIVALENCE_BEFORE_JSON}" "${equivalence_after_json}"; then
+    printf 'Plan equivalence review failed; inspect the redacted report before proceeding.\\n' >&2
+    exit 1
+  fi
+fi
+
 python scripts/tfplan-metadata.py create \
   --plan "${INFRA_VALUES_DIR}/tfplan" \
   --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json" \

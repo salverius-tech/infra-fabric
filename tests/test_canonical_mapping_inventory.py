@@ -31,44 +31,40 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertGreater(report["source_inventory"]["scaffold"]["terraform_assignment_count"], 0)
         self.assertIn("a_records", report["source_inventory"]["scaffold"]["dns"]["top_level_keys"])
         self.assertIn("tf_vmid", report["source_inventory"]["ansible"]["inventory_fields"])
-        self.assertEqual(report["source_inputs"]["input_count"], 387)
-        self.assertEqual(report["source_inputs"]["unique_identities"], 387)
+        self.assertEqual(report["source_inputs"]["input_count"], 378)
+        self.assertEqual(report["source_inputs"]["unique_identities"], 378)
         self.assertEqual(
             set(report["source_inputs"]["disposition_counts"]),
-            {"ansible-only", "deprecated", "unsupported"},
+            {"ansible-only", "deprecated", "generated-projection", "operational-artifact", "retired-input", "unsupported"},
         )
         self.assertEqual(report["source_inputs"]["status"], "classification-complete-with-review-dispositions")
-        self.assertEqual(report["mapping_matrix"]["row_count"], 247)
+        self.assertEqual(report["mapping_matrix"]["row_count"], 307)
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-incomplete")
-        self.assertEqual(report["matrix_coverage"]["input_count"], 387)
-        self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 387)
-        self.assertEqual(report["matrix_coverage"]["matched_count"], 273)
-        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 114)
-        self.assertEqual(report["matrix_coverage"]["status"], "review-required")
-        self.assertTrue(report["matrix_coverage"]["unmatched"])
+        self.assertEqual(report["matrix_coverage"]["input_count"], 368)
+        self.assertEqual(report["matrix_coverage"]["source_input_count"], 378)
+        self.assertEqual(report["matrix_coverage"]["excluded_count"], 10)
+        self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 368)
+        self.assertEqual(report["matrix_coverage"]["matched_count"], 368)
+        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 0)
+        self.assertEqual(report["matrix_coverage"]["status"], "complete")
+        self.assertFalse(report["matrix_coverage"]["unmatched"])
         deferred = report["deferred_classification"]
-        self.assertEqual(deferred["item_count"], 114)
-        self.assertEqual(deferred["classified_count"], 114)
+        self.assertEqual(deferred["item_count"], 0)
+        self.assertEqual(deferred["classified_count"], 0)
         self.assertEqual(deferred["unclassified_count"], 0)
         self.assertEqual(
             set(deferred["counts"]),
-            {
-                "ambiguous-or-destructive",
-                "behavior-without-typed-owner",
-                "migration-only-or-unsupported",
-                "secret-or-protected",
-            },
+            set(),
         )
-        self.assertEqual(sum(deferred["counts"].values()), 114)
-        deferred_by_key = {(item["source"], item["key"]): item["classification"] for item in deferred["items"]}
-        for identity in (
-            ("scaffold/ansible/inventory/local.yml", "infisical_encryption_key"),
-            ("scripts/parse-env.py", "TECHNITIUM_ADMIN_PASS"),
-        ):
-            self.assertEqual(deferred_by_key[identity], "secret-or-protected")
-        self.assertIn(
-            {"source": "scripts/migrate-values.py", "key": "FORGEJO_VERSION", "canonical_path": "services.forgejo.release.version"},
-            report["matrix_coverage"]["matched"],
+        self.assertEqual(sum(deferred["counts"].values()), 0)
+        self.assertEqual(
+            deferred["counts"],
+            {},
+        )
+        expected_deferred = set()
+        self.assertEqual(
+            {(item["source"], item["key"], item["classification"]) for item in deferred["items"]},
+            expected_deferred,
         )
         self.assertIn(
             {"source": "scaffold/terraform.tfvars", "key": "onramp_host_datastore_id", "canonical_path": "resources.shared_hosts.onramp_host.storage.root.storage_id"},
@@ -78,13 +74,27 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             {"source": "scripts/parse-env.py", "key": "PROXMOX_VE_ENDPOINT", "canonical_path": "platform.proxmox.endpoint"},
             report["matrix_coverage"]["matched"],
         )
+        self.assertIn(
+            {"source": "scripts/migrate-values.py", "key": "TF_VAR_container_root_password", "canonical_path": "secrets.bootstrap.technitium.root_password"},
+            report["matrix_coverage"]["matched"],
+        )
+        self.assertEqual(
+            report["protected_secret_contracts"],
+            [{
+                "canonical_path": "secrets.bootstrap.technitium.root_password",
+                "owner": "resources.guests.technitium",
+                "provider": "sops-age",
+                "delivery": "ansible-bootstrap-memory",
+                "state_exposure": "forbidden",
+                "public_projection": "forbidden",
+                "legacy_alias_policy": "reject-unscoped",
+            }],
+        )
         for source, key, canonical_path in (
             ("scaffold/terraform.tfvars", "lxc_template_download_timeout_seconds", "platform.lxc_template_download_timeout_seconds"),
             ("scaffold/terraform.tfvars", "guest_vm_cloud_init_user", "platform.vm_cloud_init_user"),
             ("scaffold/terraform.tfvars", "onramp_host_cloud_init_user", "resources.shared_hosts.onramp_host.runtime.cloud_init_user"),
-            ("scaffold/terraform.tfvars", "service_runtime", "resources.<id>.runtime"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_runtime", "resources.guests.forgejo.runtime"),
-            ("scaffold/terraform.tfvars", "forgejo_database", "services.forgejo.configuration.database"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_enable_caddy", "services.forgejo.configuration.enable_caddy"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_configure_system_ssh", "services.forgejo.configuration.configure_system_ssh"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_write_initial_config", "services.forgejo.configuration.write_initial_config"),
@@ -120,6 +130,21 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                     {"source": source, "key": key, "canonical_path": canonical_path},
                     report["matrix_coverage"]["matched"],
                 )
+        for key, canonical_path in (
+            ("service_runtime.forgejo.type", "resources.guests.forgejo.type"),
+            ("forgejo_database.type", "services.forgejo.configuration.database.type"),
+            ("service_storage.forgejo.data.type", "resources.guests.forgejo.storage.volumes.data.type"),
+            ("service_storage.forgejo.data.storage_id", "resources.guests.forgejo.storage.volumes.data.storage_id"),
+            ("service_storage.forgejo.data.size_gb", "resources.guests.forgejo.storage.volumes.data.size_gb"),
+            ("service_storage.forgejo.data.target", "resources.guests.forgejo.storage.volumes.data.target"),
+            ("service_storage.forgejo.data.backup", "resources.guests.forgejo.storage.volumes.data.backup"),
+            ("service_storage.forgejo.data.read_only", "resources.guests.forgejo.storage.volumes.data.read_only"),
+        ):
+            self.assertIn(
+                {"source": "scaffold/terraform.tfvars", "key": key, "canonical_path": canonical_path},
+                report["matrix_coverage"]["matched"],
+            )
+
         self.assertIn(
             {"source": "scaffold/terraform.tfvars", "key": "forgejo_runner_mac_address", "canonical_path": "resources.guests.forgejo_runner.network.mac_address"},
             report["matrix_coverage"]["matched"],
@@ -144,8 +169,32 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             {"source": "scaffold/terraform.tfvars", "key": "technitium_container_disk_gb", "canonical_path": "resources.guests.technitium.storage.root.size_gb"},
             report["matrix_coverage"]["matched"],
         )
-        self.assertFalse(
-            any(item["key"] in {"settings", "a_records", "zones", "cname_records"} for item in report["matrix_coverage"]["matched"]),
+        for key, canonical_path in {
+            "settings": "platform.dns.settings",
+            "zones": "platform.dns.zones",
+            "a_records": "platform.dns.a_records",
+            "cname_records": "platform.dns.cname_records",
+        }.items():
+            self.assertIn(
+                {"source": "scaffold/dns-records.local.json", "key": key, "canonical_path": canonical_path},
+                report["matrix_coverage"]["matched"],
+            )
+        for source, key in (
+            ("scaffold/ansible/inventory/local.yml", "forgejo_version"),
+            ("scripts/migrate-values.py", "forgejo_version"),
+            ("scripts/migrate-values.py", "FORGEJO_VERSION"),
+        ):
+            self.assertIn(
+                {"source": source, "key": key, "canonical_path": "services.forgejo.release.version"},
+                report["matrix_coverage"]["matched"],
+            )
+        self.assertIn(
+            {"source": "scripts/migrate-values.py", "key": "FORGEJO_UPSTREAM", "disposition": "retired-input"},
+            report["matrix_coverage"]["excluded"],
+        )
+        self.assertIn(
+            {"source": "scripts/migrate-values.py", "key": "ascii", "disposition": "retired-input"},
+            report["matrix_coverage"]["excluded"],
         )
         self.assertIn(
             {"source": "scaffold/terraform.tfvars", "key": "onramp_host_vmid", "canonical_path": "resources.shared_hosts.onramp_host.identity.vmid"},
@@ -223,7 +272,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             "a_records",
             "cname_records",
         ):
-            self.assertIn(
+            self.assertNotIn(
                 {"source": "scaffold/dns-records.local.json", "key": key},
                 [{"source": x["source"], "key": x["key"]} for x in report["matrix_coverage"]["unmatched"]],
             )
@@ -248,8 +297,8 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 report["matrix_coverage"]["matched"],
             )
         self.assertIn(
-            {"source": "scaffold/terraform.tfvars", "key": "onramp_host_ssh_public_keys"},
-            [{"source": x["source"], "key": x["key"]} for x in report["matrix_coverage"]["unmatched"]],
+            {"source": "scaffold/terraform.tfvars", "key": "onramp_host_ssh_public_keys", "canonical_path": "secrets.bootstrap.onramp_host_ssh_public_keys"},
+            report["matrix_coverage"]["matched"],
         )
         for key, canonical_path in (
             ("guest_vm_image_datastore_id", "platform.images.vm.guest.datastore_id"),
@@ -298,28 +347,29 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             ("scaffold/ansible/inventory/local.yml", "tailscale_client_enabled"),
         ):
             self.assertIn(
-                {"source": source, "key": key},
-                [{"source": x["source"], "key": x["key"]} for x in report["matrix_coverage"]["unmatched"]],
+                {"source": source, "key": key, "canonical_path": "services.tailscale_client.enabled"},
+                report["matrix_coverage"]["matched"],
             )
+        self.assertIn(
+            {
+                "source": "scaffold/ansible/inventory/local.yml",
+                "key": "infisical_version",
+                "canonical_path": "services.infisical.release",
+            },
+            report["matrix_coverage"]["matched"],
+        )
         self.assertEqual(len(report["service_contracts"]), 9)
         self.assertTrue(report["consumer_contract"]["legacy_terraform_input_present"])
         self.assertTrue(report["consumer_contract"]["legacy_static_inventory_present"])
         self.assertEqual(report["classification"]["inventory_status"], "complete")
         self.assertEqual(report["classification"]["semantic_mapping_status"], "incomplete")
         self.assertEqual(report["classification"]["consumer_cutover_status"], "deferred")
-        self.assertEqual(report["candidate_generation"]["status"], "blocked")
+        self.assertEqual(report["candidate_generation"]["status"], "ready")
         aliases = report["legacy_alias_classification"]["ambiguous_resource_aliases"]
-        self.assertEqual(len(aliases), 13)
+        self.assertEqual(len(aliases), 0)
         self.assertTrue(all(item["classification"] == "ambiguous" for item in aliases))
         provider_aliases = report["legacy_alias_classification"]["provider_secret_aliases"]
-        self.assertEqual(len(provider_aliases), 2)
-        self.assertEqual(
-            {(item["source"], item["key"]) for item in provider_aliases},
-            {
-                ("scripts/migrate-values.py", "container_root_password"),
-                ("scripts/migrate-values.py", "container_ssh_public_keys"),
-            },
-        )
+        self.assertEqual(provider_aliases, [])
         for item in provider_aliases:
             self.assertEqual(
                 {item["classification"], item["scope"], item["canonical_owner"], item["reason"]},
@@ -331,9 +381,19 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 },
             )
             self.assertNotIn("value", item)
-        self.assertFalse(any(item["key"] == "container_vmid" for item in report["matrix_coverage"]["matched"]))
-        self.assertFalse(report["candidate_generation"]["candidate_generation_allowed"])
-        self.assertIn("matrix coverage is incomplete", report["candidate_generation"]["reasons"])
+        self.assertIn(
+            {
+                "source": "scripts/migrate-values.py",
+                "key": "container_vmid",
+                "canonical_path": "resources.guests.<services.technitium.resource>.identity.vmid",
+            },
+            [
+                {"source": item["source"], "key": item["key"], "canonical_path": item["canonical_path"]}
+                for item in report["matrix_coverage"]["matched"]
+            ],
+        )
+        self.assertTrue(report["candidate_generation"]["candidate_generation_allowed"])
+        self.assertEqual(report["candidate_generation"]["reasons"], [])
 
         families = {item["family"] for item in report["opentofu"]["variables"]}
         self.assertIn("provider", families)
@@ -347,8 +407,8 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertTrue(report["consumer_contract"]["legacy_terraform_input_present"])
         self.assertTrue(report["consumer_contract"]["legacy_static_inventory_present"])
         self.assertFalse(report["consumer_contract"]["canonical_projection_authoritative"])
-        self.assertTrue(report["matrix_coverage"]["unmatched"])
-        self.assertGreater(report["matrix_coverage"]["unmatched_count"], 0)
+        self.assertFalse(report["matrix_coverage"]["unmatched"])
+        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 0)
 
         plan = (ROOT / "scripts" / "plan-infra.sh").read_text(encoding="utf-8")
         apply = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
@@ -399,7 +459,6 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         report = MODULE.build_report(ROOT)
         matched = report["matrix_coverage"]["matched"]
         expected = {
-            "forgejo_version": "services.forgejo.release.version",
             "hermes_runtime_user": "services.hermes.configuration.runtime_user",
             "hermes_repo_path": "services.hermes.configuration.repository_path",
             "hermes_control_enabled": "services.hermes.configuration.control.enabled",
@@ -448,10 +507,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         unmatched = report["matrix_coverage"]["unmatched"]
         self.assertEqual(
             [item for item in unmatched if item["key"] == "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"],
-            [
-                {"source": "scripts/migrate-values.py", "key": "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"},
-                {"source": "scripts/parse-env.py", "key": "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD"},
-            ],
+            [],
         )
 
 

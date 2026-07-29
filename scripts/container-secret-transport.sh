@@ -3,8 +3,12 @@
 set -euo pipefail
 
 SOPS_AGE_CONTAINER_KEY_FILE=/run/secrets/sops-age-key
+# These arrays are populated here and consumed by scripts that source this file.
+# shellcheck disable=SC2034
 transport_compose_mount_args=()
+# shellcheck disable=SC2034
 transport_compose_env_args=()
+# shellcheck disable=SC2034
 transport_remaining_args=()
 
 transport_parse_args() {
@@ -23,6 +27,7 @@ transport_parse_args() {
   elif (($# > 0)) && [[ "$1" == -- ]]; then
     shift
   fi
+  # shellcheck disable=SC2034
   transport_remaining_args=("$@")
   if [[ -n "$key_from_arg" ]]; then
     SOPS_AGE_KEY_FILE=$key_from_arg
@@ -49,6 +54,8 @@ transport_prepare() {
     printf 'SOPS age key-file transport is unavailable\n' >&2
     return 1
   fi
+  # shellcheck disable=SC2034
   transport_compose_mount_args=(--mount "type=bind,src=${resolved},dst=${SOPS_AGE_CONTAINER_KEY_FILE},readonly")
+  # shellcheck disable=SC2034
   transport_compose_env_args=(--env "SOPS_AGE_KEY_FILE=${SOPS_AGE_CONTAINER_KEY_FILE}")
 }

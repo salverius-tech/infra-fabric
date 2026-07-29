@@ -112,15 +112,15 @@ class MigrateValuesTests(unittest.TestCase):
         with temp:
             (values / ".env").write_text(
                 "export TF_VAR_technitium_api_token='REPLACE_SECRET'\n"
-                "export TF_VAR_container_root_password='REPLACE_PASSWORD'\n"
+                "export TF_VAR_lxc_root_password='REPLACE_PASSWORD'\n"
                 "export SERVER_NAME='dns.example.internal'\n"
                 "export FORGEJO_SERVER_NAME='git.example.internal'\n"
                 "export FORGEJO_UPSTREAM='192.0.2.10:3000'\n",
                 encoding="utf-8",
             )
             (values / "terraform.tfvars").write_text(
-                'container_root_password = "REPLACE_PASSWORD"\n'
-                'container_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA_REPLACE_ME user@host"]\n'
+                'lxc_root_password = "REPLACE_PASSWORD"\n'
+                'lxc_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA_REPLACE_ME user@host"]\n'
                 'container_vmid = 106\n'
                 'container_hostname = "technitium-dns"\n'
                 'container_ipv4_address = "192.0.2.53/24"\n'
@@ -136,7 +136,7 @@ class MigrateValuesTests(unittest.TestCase):
             env_text = (values / ".env").read_text(encoding="utf-8")
             tfvars_text = (values / "terraform.tfvars").read_text(encoding="utf-8")
             self.assertIn("TECHNITIUM_API_TOKEN=REPLACE_SECRET", env_text)
-            self.assertIn("TF_VAR_lxc_root_password=REPLACE_PASSWORD", env_text)
+            self.assertIn("export TF_VAR_lxc_root_password='REPLACE_PASSWORD'", env_text)
             self.assertIn("TECHNITIUM_API_URL=http://192.0.2.53:5380/api", env_text)
             self.assertIn("DNS_RECORDS_FILE=values/dns-records.local.json", env_text)
             self.assertNotIn("TF_VAR_technitium_api_token", env_text)
@@ -158,6 +158,16 @@ class MigrateValuesTests(unittest.TestCase):
             self.assertNotIn("technitium_api_url", tfvars_text)
             self.assertNotIn("dns_records_file", tfvars_text)
             self.assertTrue(changes)
+
+    def test_rejects_unscoped_secret_aliases(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text(
+                "export TF_VAR_container_root_password='REPLACE_PASSWORD'\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(migrate_values.MigrationError, "unscoped container secret aliases"):
+                migrate_values.migrate(values)
 
     def test_conflicting_token_names_fail(self) -> None:
         temp, values = self.make_values()

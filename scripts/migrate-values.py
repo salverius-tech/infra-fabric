@@ -76,14 +76,13 @@ ENV_TO_INVENTORY = {
     "FORGEJO_ENABLE_CADDY": "forgejo_enable_caddy",
 }
 HISTORICAL_ENV_KEYS = ("FORGEJO_SERVER_NAME", "FORGEJO_UPSTREAM")
-TF_VAR_RENAMES = {
-    "TF_VAR_container_root_password": "TF_VAR_lxc_root_password",
-    "TF_VAR_container_ssh_public_keys": "TF_VAR_lxc_ssh_public_keys",
-}
+UNSCOPED_SECRET_ENV_KEYS = (
+    "TF_VAR_container_root_password",
+    "TF_VAR_container_ssh_public_keys",
+)
 
 TECHNITIUM_TFVARS_RENAMES = {
-    "container_root_password": "lxc_root_password",
-    "container_ssh_public_keys": "lxc_ssh_public_keys",
+
     "container_vmid": "technitium_container_vmid",
     "container_hostname": "technitium_container_hostname",
     "container_description": "technitium_container_description",
@@ -101,8 +100,7 @@ TECHNITIUM_TFVARS_RENAMES = {
 
 MIGRATION_ENV_KEYS = {
     "TF_VAR_technitium_api_token",
-    *TF_VAR_RENAMES,
-    *TF_VAR_RENAMES.values(),
+    *UNSCOPED_SECRET_ENV_KEYS,
     "TECHNITIUM_API_TOKEN",
     "TECHNITIUM_API_URL",
     "DNS_RECORDS_FILE",
@@ -848,6 +846,20 @@ def enabled_optional_services(values_dir: Path) -> set[str]:
     return {service for service in ("infisical", "hermes", "onramp_host", "searxng_onramp") if service in services}
 
 
+def reject_unscoped_secret_aliases(env_entries: dict[str, EnvEntry], tfvars_lines: list[str]) -> None:
+    present = [key for key in UNSCOPED_SECRET_ENV_KEYS if key in env_entries]
+    for key in ("container_root_password", "container_ssh_public_keys"):
+        for line in tfvars_lines:
+            match = TFVARS_LINE_RE.match(line)
+            if match and match.group("key") == key:
+                present.append(key)
+                break
+    if present:
+        raise MigrationError(
+            "unscoped container secret aliases are not migrated; provide resource-scoped canonical secret paths"
+        )
+
+
 def migrate(values_dir: Path) -> list[str]:
     env_path = values_dir / ".env"
     tfvars_path = values_dir / "terraform.tfvars"
@@ -859,10 +871,7 @@ def migrate(values_dir: Path) -> list[str]:
     inventory_text = inventory_path.read_text(encoding="utf-8") if inventory_path.exists() else ""
 
     env_entries = parse_env_lines(env_lines, env_path)
-
-    for old_key, new_key in TF_VAR_RENAMES.items():
-        if rename_env_key(env_lines, env_entries, old_key, new_key):
-            changes.append(f"renamed {old_key} to {new_key}")
+    reject_unscoped_secret_aliases(env_entries, tfvars_lines)
 
     for old_key, new_key in TECHNITIUM_TFVARS_RENAMES.items():
         if rename_tfvars_key(tfvars_lines, old_key, new_key):

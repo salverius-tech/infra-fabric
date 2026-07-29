@@ -12,6 +12,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts"))
 import settings
 from values_context import ValuesContextError, from_environment
+from projection_manifest import ManifestError, verify_manifest
 
 try:
     import hcl2
@@ -35,6 +36,49 @@ SERVICE_HOSTS = {
 
 class InventoryError(ValueError):
     pass
+
+
+CANONICAL_PROJECTION_FILES = (
+    "terraform.auto.tfvars.json",
+    "ansible-inventory.json",
+    "ansible-vars.json",
+    "dns-records.json",
+)
+
+
+def load_verified_canonical_inventory(
+    generated_dir: Path,
+    *,
+    site: str,
+    model_digest: str,
+    secret_digest: str | None = None,
+) -> dict[str, Any]:
+    """Load the canonical inventory only after verifying its projection manifest.
+
+    This is an opt-in compatibility boundary. The legacy tfvars parser remains
+    the default until plan/apply cutover is authorized; callers must supply the
+    identities they already verified at the selected-site boundary.
+    """
+    generated_dir = generated_dir.expanduser().resolve()
+    try:
+        manifest = json.loads((generated_dir / "manifest.json").read_text(encoding="utf-8"))
+        projections = {
+            name: json.loads((generated_dir / name).read_text(encoding="utf-8"))
+            for name in CANONICAL_PROJECTION_FILES
+        }
+        verify_manifest(
+            manifest,
+            site=site,
+            model_digest=model_digest,
+            secret_digest=secret_digest,
+            projections=projections,
+        )
+    except (OSError, json.JSONDecodeError, TypeError, ManifestError) as error:
+        raise InventoryError("canonical inventory projection is missing, stale, or altered") from error
+    inventory = projections["ansible-inventory.json"]
+    if not isinstance(inventory, dict) or not isinstance(inventory.get("_meta"), dict):
+        raise InventoryError("canonical inventory projection has an invalid shape")
+    return inventory
 
 
 def load_tfvars(path: Path) -> dict[str, Any]:
@@ -194,11 +238,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default=None)
     parser.add_argument("--tfvars", type=Path, default=Path(os.environ.get("ANSIBLE_TFVARS_FILE", DEFAULT_TFVARS)))
     parser.add_argument("--settings", type=Path, default=None)
+    parser.add_argument("--canonical-generated-dir", type=Path, default=None)
+    parser.add_argument("--canonical-site", default=None)
+    parser.add_argument("--canonical-model-digest", default=None)
+    parser.add_argument("--canonical-secret-digest", default=None)
     args = parser.parse_args(argv)
 
-    settings_path = args.settings or (Path(os.environ["INFRA_SETTINGS_FILE"]) if "INFRA_SETTINGS_FILE" in os.environ else None)
     try:
-        inventory = build_inventory(load_tfvars(args.tfvars), enabled_services(settings_path))
+        if args.canonical_generated_dir is not None:
+            if not args.canonical_site or not args.canonical_model_digest:
+                raise InventoryError("canonical site and model digest are required with --canonical-generated-dir")
+            inventory = load_verified_canonical_inventory(
+                args.canonical_generated_dir,
+                site=args.canonical_site,
+                model_digest=args.canonical_model_digest,
+                secret_digest=args.canonical_secret_digest,
+            )
+        else:
+            settings_path = args.settings or (Path(os.environ["INFRA_SETTINGS_FILE"]) if "INFRA_SETTINGS_FILE" in os.environ else None)
+            inventory = build_inventory(load_tfvars(args.tfvars), enabled_services(settings_path))
     except (InventoryError, settings.SettingsError) as error:
         print(error, file=sys.stderr)
         return 1

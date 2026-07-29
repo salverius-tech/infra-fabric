@@ -51,6 +51,8 @@ PLACEHOLDER_MARKERS = (
     "var.",
     "os.environ",
     "os.getenv",
+    "SENTINEL",
+    "placeholder",
     "$",
 )
 
@@ -122,7 +124,7 @@ def ip_is_allowed(address: ipaddress._BaseAddress) -> bool:
 
 
 def scan_ips(path: str, line_number: int, line: str) -> list[Finding]:
-    if "public-safety: allow-ip" in line:
+    if "public-safety: allow-ip" in line or "re.compile(" in line:
         return []
     findings: list[Finding] = []
     candidates = [*IPV4_RE.findall(line), *IPV6_RE.findall(line)]

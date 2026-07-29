@@ -19,7 +19,30 @@ from typing import Any
 
 VARIABLE_RE = re.compile(r'^variable\s+"([^"]+)"', re.MULTILINE)
 HCL_ASSIGNMENT_RE = re.compile(r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=')
-VALID_DISPOSITIONS = {"canonical", "derived", "ansible-only", "opentofu-only", "deprecated", "unsupported"}
+VALID_DISPOSITIONS = {
+    "canonical",
+    "derived",
+    "ansible-only",
+    "opentofu-only",
+    "deprecated",
+    "unsupported",
+    "generated-projection",
+    "operational-artifact",
+    "retired-input",
+    "unsupported-review",
+}
+NON_CANONICAL_MAPPING_DISPOSITIONS = {"generated-projection", "operational-artifact", "retired-input"}
+PROTECTED_SECRET_CONTRACTS = [
+    {
+        "canonical_path": "secrets.bootstrap.technitium.root_password",
+        "owner": "resources.guests.technitium",
+        "provider": "sops-age",
+        "delivery": "ansible-bootstrap-memory",
+        "state_exposure": "forbidden",
+        "public_projection": "forbidden",
+        "legacy_alias_policy": "reject-unscoped",
+    }
+]
 MATRIX_HEADERS = (
     "Canonical path",
     "Type/condition",
@@ -104,17 +127,26 @@ def reconcile_matrix_inputs(source_inputs: dict[str, Any], matrix: dict[str, Any
     matched: list[dict[str, str]] = []
     unmatched: list[dict[str, str]] = []
     ambiguous: list[dict[str, Any]] = []
+    excluded: list[dict[str, str]] = []
+    eligible_inputs = []
     for item in source_inputs["inputs"]:
+        if item.get("disposition") in NON_CANONICAL_MAPPING_DISPOSITIONS:
+            excluded.append({"source": item["source"], "key": item["key"], "disposition": item["disposition"]})
+        else:
+            eligible_inputs.append(item)
+    for item in eligible_inputs:
         source_name = Path(item["source"]).name
         key = item["key"]
-        if item["source"].endswith("dns-records.local.json") and key in {"settings", "zones", "a_records", "cname_records"}:
-            unmatched.append({"source": item["source"], "key": key})
-            continue
-        candidates = [
+        key_candidates = [candidate for candidate in rows if _matrix_token_matches(candidate["Legacy source(s)"], key)]
+        source_key_candidates = [
+            candidate
+            for candidate in key_candidates
+            if _matrix_token_matches(candidate["Legacy source(s)"], item["source"])
+        ]
+        candidates = source_key_candidates or key_candidates or [
             candidate
             for candidate in rows
-            if _matrix_token_matches(candidate["Legacy source(s)"], key)
-            or _matrix_token_matches(candidate["Legacy source(s)"], item["source"])
+            if _matrix_token_matches(candidate["Legacy source(s)"], item["source"])
             or _matrix_token_matches(candidate["Legacy source(s)"], source_name)
         ]
         record = {"source": item["source"], "key": key}
@@ -126,7 +158,10 @@ def reconcile_matrix_inputs(source_inputs: dict[str, Any], matrix: dict[str, Any
         else:
             matched.append({**record, "canonical_path": candidates[0]["Canonical path"]})
     return {
-        "input_count": len(source_inputs["inputs"]),
+        "input_count": len(eligible_inputs),
+        "source_input_count": len(source_inputs["inputs"]),
+        "excluded_count": len(excluded),
+        "excluded": excluded,
         "matched_count": len(matched),
         "unmatched_count": len(unmatched),
         "ambiguous_count": len(ambiguous),
@@ -137,12 +172,13 @@ def reconcile_matrix_inputs(source_inputs: dict[str, Any], matrix: dict[str, Any
     }
 
 
-def classify_ambiguous_legacy_aliases(source_inputs: dict[str, Any]) -> dict[str, Any]:
+def classify_ambiguous_legacy_aliases(source_inputs: dict[str, Any], matrix_coverage: dict[str, Any] | None = None) -> dict[str, Any]:
+    matched_keys = {(item["source"], item["key"]) for item in (matrix_coverage or {}).get("matched", [])}
     secret_keys = {"container_root_password", "container_ssh_public_keys"}
     aliases = [
         {"source": item["source"], "key": item["key"], "classification": "ambiguous", "scope": "resource-scoped", "canonical_owner": "review-required", "reason": "generic migration alias lacks explicit resource scope"}
         for item in source_inputs["inputs"]
-        if item["source"].endswith("scripts/migrate-values.py") and item["key"].startswith("container_") and item["key"] not in secret_keys
+        if item["source"].endswith("scripts/migrate-values.py") and item["key"].startswith("container_") and item["key"] not in secret_keys and (item["source"], item["key"]) not in matched_keys
     ]
     provider_secrets = [
         {"source": item["source"], "key": item["key"], "classification": "secret-provider-input", "scope": "provider-scoped", "canonical_owner": "review-required", "reason": "provider secret alias requires explicit delivery contract"}
@@ -224,11 +260,35 @@ def _source_path(repo: Path, relative: str) -> Path:
 
 
 def _assignment_keys(path: Path) -> list[str]:
+    """Return contextual HCL assignment paths from a scaffold tfvars file.
+
+    Nested map members are source identities in their containing resource, not
+    independent bare keys. For example, ``service_storage.forgejo.data.type``
+    must not be reported as the unrelated key ``type``.
+    """
     keys: list[str] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    stack: list[str] = []
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.split("#", 1)[0].rstrip()
+        stripped = line.lstrip()
+        while stripped.startswith("}") and stack:
+            stack.pop()
+            stripped = stripped[1:].lstrip()
         match = HCL_ASSIGNMENT_RE.match(line)
-        if match and match.group(1) not in keys:
-            keys.append(match.group(1))
+        if match:
+            key = match.group(1)
+            value = line[match.end():].strip()
+            if value.startswith("{"):
+                stack.append(key)
+            else:
+                qualified = ".".join((*stack, key))
+                if qualified not in keys:
+                    keys.append(qualified)
+        opens = line.count("{")
+        closes = line.count("}")
+        for _ in range(max(0, closes - opens)):
+            if stack:
+                stack.pop()
     return keys
 
 
@@ -312,14 +372,35 @@ def load_source_input_inventory(repo: Path) -> dict[str, Any]:
         {"PROXMOX_KEYS", "CADDY_KEYS", "TERRAFORM_KEYS", "TECHNITIUM_DNS_KEYS", "TECHNITIUM_BOOTSTRAP_KEYS", "FORGEJO_KEYS", "TAILSCALE_KEYS", "INFISICAL_KEYS", "HERMES_KEYS", "SEARXNG_KEYS", "EDGEROUTER_KEYS", "ALLOWED_KEYS"},
     )
     layout_keys = _python_string_constants(migration_site, {"MIGRATED_FILES"}) + ["terraform.tfstate*", "service-backups", "settings.local.json"]
+    layout_dispositions = {
+        ".env": "generated-projection",
+        "terraform.tfvars": "generated-projection",
+        "dns-records.local.json": "generated-projection",
+        "ansible/inventory/local.yml": "generated-projection",
+        "ansible/known_hosts": "operational-artifact",
+        "terraform.tfstate*": "operational-artifact",
+        "service-backups": "operational-artifact",
+        "settings.local.json": "operational-artifact",
+    }
     records = [
         *_input_records("scaffold/terraform.tfvars", tfvars_keys, "unsupported", "scaffold legacy input awaits canonical row"),
         *_input_records("scaffold/dns-records.local.json", dns_keys, "unsupported", "DNS ownership and record semantics await matrix row"),
         *_input_records("scaffold/ansible/inventory/local.yml", ansible_keys, "ansible-only", "static inventory remains a compatibility consumer"),
         *_input_records("scripts/migrate-values.py", migration_keys, "deprecated", "legacy migration alias or key awaits matrix reconciliation"),
         *_input_records("scripts/parse-env.py", dotenv_keys, "deprecated", "dotenv compatibility key awaits matrix reconciliation"),
-        *_input_records("scripts/migrate-site-values.py", layout_keys, "unsupported", "site-layout artifact requires explicit migration/state policy"),
+        *[
+            {
+                **record,
+                "disposition": layout_dispositions[record["key"]],
+                "review_reason": "generated compatibility projection" if layout_dispositions[record["key"]] == "generated-projection" else "private operational artifact",
+            }
+            for record in _input_records("scripts/migrate-site-values.py", layout_keys, "unsupported-review", "site-layout artifact requires explicit migration/state policy")
+        ],
     ]
+    for record in records:
+        if record["source"] == "scripts/migrate-values.py" and record["key"] in {"FORGEJO_UPSTREAM", "ascii"}:
+            record["disposition"] = "retired-input"
+            record["review_reason"] = "retired compatibility input retained only for cleanup" if record["key"] == "FORGEJO_UPSTREAM" else "migration implementation metadata is not a site value"
     return {
         "input_count": len(records),
         "inputs": records,
@@ -398,8 +479,8 @@ def classify_deferred_input(item: dict[str, str]) -> tuple[str, str]:
     key = item["key"]
     if source.endswith("scripts/migrate-site-values.py"):
         return "migration-only-or-unsupported", "site-layout artifact requires an explicit migration/state policy"
-    if source.endswith("scaffold/dns-records.local.json"):
-        return "ambiguous-or-destructive", "DNS document shape has no general canonical resolver/zone/record owner"
+    if source.endswith("scaffold/dns-records.local.json") and key == "settings":
+        return "ambiguous-or-destructive", "DNS resolver settings require an explicit platform policy"
     if source.endswith("scripts/migrate-values.py") and key.startswith("container_"):
         return "ambiguous-or-destructive", "generic migration alias does not identify one resource"
     if key in {"debian_template_url", "debian_template_file_name", "debian_template_checksum_algorithm", "debian_template_checksum"}:
@@ -461,7 +542,7 @@ def build_report(repo: Path) -> dict[str, Any]:
     matrix = load_mapping_matrix(repo / "docs/canonical-values-mapping-v1.md")
     matrix_coverage = reconcile_matrix_inputs(source_inputs, matrix)
     deferred = deferred_classification(matrix_coverage)
-    alias_classification = classify_ambiguous_legacy_aliases(source_inputs)
+    alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
     candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
     catalog_contract = _catalog_contract(repo / "infra/services.json")
     consumer_contract = load_consumer_contract(repo)
@@ -481,6 +562,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "deferred_classification": deferred,
         "legacy_alias_classification": alias_classification,
         "candidate_generation": candidate_readiness,
+        "protected_secret_contracts": PROTECTED_SECRET_CONTRACTS,
         "consumer_contract": consumer_contract,
         "source_inventory": source_inventory,
         "source_inputs": source_inputs,

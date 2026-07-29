@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -36,9 +40,10 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(inventory["all"]["vars"]["forgejo_vmid"], 107)
         self.assertEqual(inventory["all"]["vars"]["forgejo_domain"], "git.example.internal")
         self.assertEqual(inventory["services"]["children"], ["technitium", "forgejo"])
+        expected_known_hosts = tfvars_inventory.from_environment(tfvars_inventory.REPO).path("ansible/known_hosts")
         self.assertEqual(
             inventory["all"]["vars"]["ansible_ssh_common_args"],
-            "-o UserKnownHostsFile=/workspace/values/ansible/known_hosts -o StrictHostKeyChecking=yes",
+            f"-o UserKnownHostsFile={expected_known_hosts} -o StrictHostKeyChecking=yes",
         )
 
     def test_dhcp_address_is_not_used_as_ansible_host(self) -> None:
@@ -245,6 +250,90 @@ class TfvarsInventoryTests(unittest.TestCase):
 
         self.assertEqual(values["technitium_container_vmid"], 106)
         hcl_load.assert_called_once()
+
+
+    def test_load_verified_canonical_inventory_requires_matching_manifest(self) -> None:
+        generated = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(generated, ignore_errors=True))
+        projections = {
+            name: {"_meta": {"hostvars": {}}} if name == "ansible-inventory.json" else {}
+            for name in tfvars_inventory.CANONICAL_PROJECTION_FILES
+        }
+        from projection_manifest import build_manifest
+
+        manifest = build_manifest(
+            site="dev",
+            schema_version=1,
+            model_digest="model-digest",
+            secret_digest=None,
+            projections=projections,
+            renderer_version="test",
+            source_commit="source",
+        )
+        for name, value in projections.items():
+            (generated / name).write_text(json.dumps(value), encoding="utf-8")
+        (generated / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+        loaded = tfvars_inventory.load_verified_canonical_inventory(
+            generated,
+            site="dev",
+            model_digest="model-digest",
+        )
+        self.assertEqual(loaded, projections["ansible-inventory.json"])
+
+        (generated / "ansible-inventory.json").write_text(
+            json.dumps({"_meta": {"hostvars": {"tampered": {}}}}),
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(tfvars_inventory.InventoryError, "missing, stale, or altered"):
+            tfvars_inventory.load_verified_canonical_inventory(
+                generated,
+                site="dev",
+                model_digest="model-digest",
+            )
+
+
+    def test_canonical_cli_mode_emits_verified_inventory(self) -> None:
+        generated = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(generated, ignore_errors=True))
+        projections = {
+            name: {"_meta": {"hostvars": {"canonical": {}}}} if name == "ansible-inventory.json" else {}
+            for name in tfvars_inventory.CANONICAL_PROJECTION_FILES
+        }
+        from projection_manifest import build_manifest
+
+        for name, value in projections.items():
+            (generated / name).write_text(json.dumps(value), encoding="utf-8")
+        (generated / "manifest.json").write_text(
+            json.dumps(
+                build_manifest(
+                    site="dev",
+                    schema_version=1,
+                    model_digest="model-digest",
+                    secret_digest=None,
+                    projections=projections,
+                    renderer_version="test",
+                    source_commit="source",
+                )
+            ),
+            encoding="utf-8",
+        )
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(
+                tfvars_inventory.main(
+                    [
+                        "--canonical-generated-dir",
+                        str(generated),
+                        "--canonical-site",
+                        "dev",
+                        "--canonical-model-digest",
+                        "model-digest",
+                    ]
+                ),
+                0,
+            )
+        self.assertEqual(json.loads(output.getvalue())["_meta"]["hostvars"], {"canonical": {}})
 
 
 if __name__ == "__main__":

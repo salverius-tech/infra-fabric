@@ -84,10 +84,111 @@ class SiteMetadata(StrictModel):
         return self
 
 
+class DNSSettings(StrictModel):
+    forwarders: list[StrictStr]
+    forwarder_protocol: Literal["Udp", "Tcp", "Tls", "Https"]
+    concurrent_forwarding: StrictBool
+    dnssec_validation: StrictBool
+    prefer_ipv6: StrictBool
+
+    @field_validator("forwarders")
+    @classmethod
+    def validate_forwarders(cls, value: list[str]) -> list[str]:
+        if not value or any(not item.strip() or any(ord(char) < 32 for char in item) for item in value):
+            raise ValueError("platform.dns.settings.forwarders must be non-empty printable strings")
+        return value
+
+
+class PlatformDNS(StrictModel):
+    enabled: StrictBool = False
+    provider: Literal["technitium"] = "technitium"
+    default_ttl: StrictInt = 300
+    settings: DNSSettings | None = None
+    zones: dict[StrictStr, list[StrictStr]] = Field(default_factory=dict)
+    a_records: dict[StrictStr, StrictStr] = Field(default_factory=dict)
+    cname_records: dict[StrictStr, StrictStr] = Field(default_factory=dict)
+
+    @field_validator("default_ttl")
+    @classmethod
+    def validate_ttl(cls, value: int) -> int:
+        if not 0 <= value <= 86400:
+            raise ValueError("platform.dns.default_ttl must be between 0 and 86400")
+        return value
+
+    @model_validator(mode="after")
+    def validate_records(self) -> "PlatformDNS":
+        def hostname(value: str, field: str) -> str:
+            normalized = value.lower().rstrip(".")
+            if not _HOSTNAME_RE.fullmatch(normalized):
+                raise ValueError(f"{field} must be a valid hostname")
+            return normalized
+
+        def normalize_map(values: dict[str, Any], field: str) -> dict[str, Any]:
+            normalized: dict[str, Any] = {}
+            for key, value in values.items():
+                name = hostname(key, f"{field} key")
+                if name in normalized:
+                    raise ValueError(f"{field} contains duplicate normalized name: {name}")
+                normalized[name] = value
+            return normalized
+
+        zones = normalize_map(self.zones, "platform.dns.zones")
+        if any(not forwarders for forwarders in zones.values()):
+            raise ValueError("platform.dns.zones entries must contain at least one forwarder")
+        a_records = normalize_map(self.a_records, "platform.dns.a_records")
+        cname_records = normalize_map(self.cname_records, "platform.dns.cname_records")
+        if set(a_records) & set(cname_records):
+            raise ValueError("platform.dns.a_records and cname_records must not overlap")
+        for domain, address in a_records.items():
+            try:
+                a_records[domain] = str(ipaddress.IPv4Address(address))
+            except ipaddress.AddressValueError as error:
+                raise ValueError(f"platform.dns.a_records.{domain} must be an IPv4 address") from error
+        for domain, target in cname_records.items():
+            cname_records[domain] = hostname(target, f"platform.dns.cname_records.{domain}")
+        for domain in (*a_records, *cname_records):
+            if zones and not any(domain == zone or domain.endswith(f".{zone}") for zone in zones):
+                raise ValueError(f"platform.dns record has no configured zone: {domain}")
+        if self.enabled and (not zones or self.settings is None):
+            raise ValueError("enabled platform.dns requires settings and at least one zone")
+        if not self.enabled and (zones or a_records or cname_records or self.settings is not None):
+            raise ValueError("platform.dns records/settings require enabled: true")
+        self.zones = zones
+        self.a_records = a_records
+        self.cname_records = cname_records
+        return self
+
+
+class PlatformIngress(StrictModel):
+    class Acme(StrictModel):
+        email: StrictStr | None = None
+
+    class Cloudflare(StrictModel):
+        account_email: StrictStr | None = None
+        secret_ref: StrictStr = "secrets.providers.cloudflare.api_token"
+
+    acme: Acme = Field(default_factory=Acme)
+    dns_providers: dict[Literal["cloudflare"], Cloudflare] = Field(default_factory=dict)
+
+
+class ProxmoxManagement(StrictModel):
+    host: StrictStr
+    user: StrictStr = "root"
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str) -> str:
+        normalized = value.lower().rstrip(".")
+        if not _HOSTNAME_RE.fullmatch(normalized):
+            raise ValueError("platform.proxmox.management.host must be a valid hostname")
+        return normalized
+
+
 class ProxmoxPlatform(StrictModel):
     endpoint: StrictStr
     node: StrictStr
     insecure: StrictBool = False
+    management: ProxmoxManagement | None = None
 
 
 class NetworkDefaults(StrictModel):
@@ -176,6 +277,8 @@ class Platform(StrictModel):
     proxmox: ProxmoxPlatform
     network: NetworkDefaults
     storage: StorageDefaults
+    dns: PlatformDNS = Field(default_factory=PlatformDNS)
+    ingress: PlatformIngress = Field(default_factory=PlatformIngress)
     vm_cloud_init_user: StrictStr | None = None
     lxc_template_download_timeout_seconds: StrictInt | None = None
     images: PlatformImages = Field(default_factory=PlatformImages)
@@ -293,6 +396,7 @@ class ResourceVolume(StrictModel):
     size_gb: StrictInt | None = None
     target: StrictStr
     backup: StrictBool = True
+    read_only: StrictBool = False
 
     @field_validator("size_gb")
     @classmethod
@@ -420,11 +524,74 @@ class ForgejoDatabaseConfiguration(StrictModel):
         return self
 
 
+class CaddyUpstream(StrictModel):
+    host: StrictStr
+    port: StrictInt
+
+    @field_validator("port")
+    @classmethod
+    def validate_port(cls, value: int) -> int:
+        if not 1 <= value <= 65535:
+            raise ValueError("Caddy upstream port must be between 1 and 65535")
+        return value
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str) -> str:
+        try:
+            ipaddress.ip_address(value)
+            return value
+        except ValueError:
+            normalized = value.lower().rstrip(".")
+            if not _HOSTNAME_RE.fullmatch(normalized):
+                raise ValueError("Caddy upstream host must be an IP address or hostname")
+            return normalized
+
+
+class CaddyVHost(StrictModel):
+    server_names: list[StrictStr]
+    upstream: CaddyUpstream
+
+    @field_validator("server_names")
+    @classmethod
+    def validate_server_names(cls, value: list[str]) -> list[str]:
+        normalized = [name.lower().rstrip(".") for name in value]
+        if not normalized or any(not _HOSTNAME_RE.fullmatch(name) for name in normalized):
+            raise ValueError("Caddy vhost server_names must contain valid hostnames")
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("Caddy vhost server_names must be unique")
+        return normalized
+
+
+class CaddyTLS(StrictModel):
+    dns_provider: Literal["cloudflare"]
+    resolvers: list[StrictStr] = Field(default_factory=lambda: ["1.1.1.1"])
+
+
+class CaddyConfiguration(StrictModel):
+    enabled: StrictBool = True
+    server_names: list[StrictStr]
+    upstream: CaddyUpstream
+    extra_vhosts: list[CaddyVHost] = Field(default_factory=list)
+    tls: CaddyTLS
+
+    @field_validator("server_names")
+    @classmethod
+    def validate_server_names(cls, value: list[str]) -> list[str]:
+        normalized = [name.lower().rstrip(".") for name in value]
+        if not normalized or any(not _HOSTNAME_RE.fullmatch(name) for name in normalized):
+            raise ValueError("Caddy server_names must contain valid hostnames")
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("Caddy server_names must be unique")
+        return normalized
+
+
 class TechnitiumConfiguration(StrictModel):
-    """Typed non-secret Technitium direct API configuration."""
+    """Typed non-secret Technitium API and Caddy configuration."""
 
     api_url: StrictStr | None = None
     admin_user: StrictStr | None = None
+    caddy: CaddyConfiguration | None = None
 
     @field_validator("api_url")
     @classmethod
@@ -803,6 +970,12 @@ class CanonicalSite(StrictModel):
         if technitium is not None:
             try:
                 configuration = TechnitiumConfiguration.model_validate(technitium.configuration)
+                if configuration.caddy and configuration.caddy.enabled:
+                    if not self.platform.ingress.acme.email:
+                        raise ValueError("platform.ingress.acme.email is required when Technitium Caddy is enabled")
+                    provider = self.platform.ingress.dns_providers.get(configuration.caddy.tls.dns_provider)
+                    if provider is None:
+                        raise ValueError(f"platform.ingress.dns_providers.{configuration.caddy.tls.dns_provider} is required")
                 technitium.configuration = configuration.model_dump(mode="json", exclude_none=False)
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())

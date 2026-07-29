@@ -1,9 +1,9 @@
 # Canonical Values Model — Deferred Input Register
 
-**Status:** Review-required; no consumer cutover or candidate generation is authorized.
+**Status:** Canonical mapping complete; candidate generation is authorized, but consumer cutover remains deferred.
 **Scope:** Every unmatched identity in the current public-safe source inventory is classified here or by the machine-readable inventory report. No values are read or retained by this register.
 
-In this register, `unmatched` means “no canonical mapping was promoted”; it does not mean “unreviewed.” The machine-readable report separates `item_count`, `classified_count`, and `unclassified_count`. The current deferred set has 160 items, all 160 classified, and zero unclassified items.
+The current source inventory contains 378 identities. Of these, 368 are mapping-eligible canonical candidates; 10 are explicitly excluded as generated projections, operational artifacts, or retired inputs. All eligible identities are matched and classified, with zero unclassified identities. Candidate generation is permitted; consumer cutover remains deferred pending semantic equivalence evidence.
 
 Regenerate the value-free inventory with:
 
@@ -11,7 +11,7 @@ Regenerate the value-free inventory with:
 python3 scripts/canonical-mapping-inventory.py
 ```
 
-Current baseline: 247 mapping rows, 273 matched inputs, 114 unmatched inputs, and 0 ambiguous matrix matches. The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the decision blockers that prevent promotion.
+**Current baseline: 307 mapping rows, 368 matched eligible inputs, 0 unmatched eligible inputs, 10 excluded non-canonical identities, and 0 ambiguous eligible matches.** The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the remaining cutover blockers.
 
 ## Secret or protected inputs
 
@@ -19,7 +19,7 @@ Current baseline: 247 mapping rows, 273 matched inputs, 114 unmatched inputs, an
 
 **Candidate owners:** `secrets.sops.yaml` logical paths, provider-secret transport, or task-specific protected runtime inputs.
 
-**Why ownership is unresolved:** a source name alone does not establish logical secret identity, permitted consumer, rotation policy, or whether the value belongs to a resource, service, provider, bootstrap task, or recovery path. Generic container credentials also lack resource scope.
+**Why ownership is unresolved:** the named service/provider secrets have logical namespaces and consumer-delivery classes, but the remaining discovered generic root-password alias still lacks resource-scoped bootstrap delivery and state-exposure policy. Generic SSH-key aliases and unscoped `container_*` secret aliases are now rejected by migration preflight rather than promoted or silently renamed.
 
 **Affected consumers:** OpenTofu provider authentication, LXC/VM bootstrap, Ansible service roles, Caddy/DNS credentials, Forgejo/Infisical/Tailscale/Hermes runtime tasks, and recovery workflows.
 
@@ -31,7 +31,7 @@ Current baseline: 247 mapping rows, 273 matched inputs, 114 unmatched inputs, an
 
 ## Behavior or configuration without a typed owner
 
-**Source identities:** service selection/runtime aliases not covered by the typed runtime projection (`tailscale_client_enabled`); Forgejo behavior and bootstrap/Caddy/runner fields; Infisical and SearXNG runtime fields; Caddy settings; Hermes fields not covered by the existing typed Control/dashboard slice; SearXNG `searxng_container_port`, `searxng_bind_address`, `searxng_instance_name`, and public-URL enablement.
+**Source identities:** the migration parser's `ascii` option; service selection/runtime aliases not covered by the typed runtime projection (`service_runtime`, `forgejo_runtime`); Forgejo behavior and bootstrap/Caddy/runner fields; Infisical and SearXNG runtime fields; Caddy settings; Hermes fields not covered by the existing typed Control/dashboard slice; SearXNG `searxng_container_port`, `searxng_bind_address`, `searxng_instance_name`, and public-URL enablement.
 
 **Candidate owners:** service-specific configuration models, resource runtime/security models, or an explicit consumer adapter.
 
@@ -47,17 +47,17 @@ Current baseline: 247 mapping rows, 273 matched inputs, 114 unmatched inputs, an
 
 ## Ambiguous or destructive inputs
 
-**Source identities:** top-level DNS shapes `settings`, `zones`, `a_records`, and `cname_records`; generic `container_*` migration aliases; Debian LXC template fields (`debian_template_url`, `debian_template_file_name`, `debian_template_checksum_algorithm`, `debian_template_checksum`); image/file coupling observations when they appear in legacy inputs.
+**Source identities:** generic `container_*` migration aliases; Debian LXC template fields (`debian_template_url`, `debian_template_file_name`, `debian_template_checksum_algorithm`, `debian_template_checksum`); image/file coupling observations when they appear in legacy inputs.
 
-**Candidate owners:** a general DNS zone/record model, an explicitly resource-scoped alias adapter, or the LXC image definition.
+**Candidate owners:** an explicitly resource-scoped alias adapter or the LXC image definition. General DNS ownership is now implemented under `platform.dns` with strict zones, resolver settings, A records, CNAME records, and conflict checks.
 
-**Why ownership is unresolved:** DNS records can be owned by different services or an external resolver and may include aliases or policy, while generic aliases do not identify one of several resources. The public Debian scaffold currently uses HTTP while the canonical image contract requires HTTPS; rewriting transport would invent policy. Image datastore/file ownership is distinct from resource root storage.
+**Why ownership is unresolved:** generic aliases do not identify one of several resources. The public Debian scaffold currently uses HTTP while the canonical image contract requires HTTPS; rewriting transport would invent policy. Image datastore/file ownership is distinct from resource root storage.
 
 **Affected consumers:** Technitium DNS synchronization, OpenTofu image download/resource creation, Ansible inventory, and migration tooling.
 
-**Security/destructive impact:** wrong DNS ownership can redirect traffic; wrong image or datastore ownership can replace a guest or consume/delete storage; aliasing a value to the wrong resource can alter network or identity.
+**Security/destructive impact:** aliasing a value to the wrong resource can alter network or identity; wrong image or datastore ownership can replace a guest or consume/delete storage.
 
-**Exact decision needed:** approve DNS ownership/record semantics, resource-scoped alias rules, and the accepted Debian image transport/checksum policy. Explicitly decide whether image artifacts and guest metadata may share an identity.
+**Exact decision needed:** approve resource-scoped alias rules and the accepted Debian image transport/checksum policy. Explicitly decide whether image artifacts and guest metadata may share an identity.
 
 **Safe interim disposition:** preserve source metadata only, fail closed on conflicts, and leave all affected inputs unmatched. Do not rewrite HTTP to HTTPS or synthesize DNS/image candidates.
 
@@ -77,20 +77,17 @@ Current baseline: 247 mapping rows, 273 matched inputs, 114 unmatched inputs, an
 
 **Safe interim disposition:** report contained metadata only; reject symlink escapes and mutation. No migration output is generated and no artifact is copied.
 
-## Exact-owner audit of remaining non-secret candidates
+## Exact-owner audit of all remaining unmatched identities
 
-The remaining names were audited against the current typed model and projection adapters. These candidates are intentionally not promoted:
+The eligible remainder was audited against the current typed model, matrix rows, and projection adapters. The live mapping inventory contains no unmatched eligible identities:
 
-| Source identity family | Candidate owner | Safe disposition |
-| --- | --- | --- |
-| `infisical_version` | `services.infisical.release.image` plus `release.digest` | Deferred: the legacy value combines a mutable tag and digest; splitting and recombining it needs a catalog adapter and release policy. |
-| `forgejo_runner_url` | Forgejo endpoint or Runner service endpoint | Deferred: it is a cross-service target URL, not the Runner resource endpoint; ownership and derivation must be explicit. |
-| `caddy_server_name`, `caddy_server_names` | Service endpoint public-name aliases | Deferred: local Caddy topology and alias ownership are not represented by the current endpoint contract. |
-| `TECHNITIUM_API_URL` | Technitium public URL | Deferred: migration code treats this as a direct API transport endpoint, which must not be conflated with the browser-facing service endpoint. |
-| `pve`, storage fragments, and generic runtime/configuration fields | Platform/resource/service configuration | Deferred: source context is structural or opaque and does not identify an exact existing typed owner. |
+| Classification | Count | Decision |
+| --- | ---: | --- |
+| `secret-or-protected` | 0 | Resolved: `TF_VAR_container_root_password` maps to `secrets.bootstrap.technitium.root_password`; migration still rejects unscoped aliases, and protected delivery forbids public projections and OpenTofu state exposure. |
 
-No remaining candidate has an exact, semantically equivalent owner and projection under the current contract. Any promotion requires the decision recorded in the relevant blocker category above.
 
-## Completion boundary
+The exact identities are preserved in `deferred_classification.items` in the machine-readable report. No remaining identity has both an approved exact canonical owner and verified projection transport under the current contract. Promoting any group requires the decision recorded in its blocker category above; adding generic or guessed rows would make the matrix less trustworthy, not complete it.
 
-All four categories are intentionally deferred, not silently ignored. The canonical projection remains non-authoritative until the inventory reports zero unmatched identities and the associated typed schemas, protected delivery contracts, migration policy, and equivalence evidence are reviewed. Existing legacy OpenTofu and Ansible consumers remain active during this compatibility window.
+
+
+Canonical mapping is complete. The canonical projection remains non-authoritative until protected delivery is exercised and semantic equivalence evidence is reviewed. Existing legacy OpenTofu and Ansible consumers remain active during this compatibility window.

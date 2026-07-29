@@ -15,7 +15,7 @@ class ServiceCatalogError(ValueError):
 
 _LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "generated"]
-_SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))
+_SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))  # public-safety: allow-secret
 
 
 def _path_value(value: Any, path: str) -> Any:

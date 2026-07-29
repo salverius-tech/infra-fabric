@@ -47,6 +47,16 @@ class SiteMigrationTests(unittest.TestCase):
             migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, True)
             site = values / "sites" / "dev"
             self.assertEqual(json.loads((site / "site.json").read_text())["services"], ["hermes"])
+            manifest = json.loads((site / "migration-manifest.json").read_text())
+            self.assertFalse(manifest["secret_values_included"])
+            self.assertEqual(manifest["canonical_destination"], "sites/dev")
+            self.assertEqual(
+                {item["disposition"] for item in manifest["operations"]},
+                {
+                    "generated-projection",
+                    "operational-artifact",
+                },
+            )
             self.assertTrue((site / "terraform.tfvars").is_file())
             self.assertFalse((values / "terraform.tfvars").exists())
             self.assertNotIn("services", json.loads((values.parent / "settings.local.json").read_text()))

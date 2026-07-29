@@ -181,7 +181,7 @@ def check_canonical_required_secrets(repo: Path, *, require_secrets: bool) -> tu
     return report
 
 
-def run(root: Path, require_values: bool, require_secrets: bool) -> None:
+def run(root: Path, require_values: bool, require_secrets: bool = False) -> None:
     repo = root.resolve()
     check_directory_writable(repo)
     check_directory_writable(repo / "infra" / "opentofu")
