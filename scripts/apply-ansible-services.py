@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
@@ -43,6 +44,14 @@ class ServiceResult:
     playbooks: tuple[str, ...]
     returncode: int
     log_path: Path
+
+
+@dataclass(frozen=True)
+class CanonicalAnsibleTransport:
+    inventory: str
+    extra_args: tuple[str, ...]
+    vars_path: Path
+    environment: dict[str, str]
 
 
 def enabled_services(settings_path: Path | None = None, service: str = "") -> list[str]:
@@ -150,6 +159,56 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     return {"DNS_RECORDS_FILE": str(dns_path)}
 
 
+def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsibleTransport | None:
+    """Build an opt-in paired inventory/vars transport from verified projections."""
+    if getattr(context, "canonical_site_path", None) is None:
+        return None
+    environment = canonical_dns_environment(context)
+    generated_path = getattr(context, "generated_path")
+    inventory_path = generated_path("ansible-inventory.json")
+    vars_projection_path = generated_path("ansible-vars.json")
+    try:
+        projection = json.loads(vars_projection_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError("canonical Ansible vars projection is unavailable") from error
+    services = projection.get("services") if isinstance(projection, dict) else None
+    if not isinstance(services, dict):
+        raise RuntimeError("canonical Ansible vars projection has an invalid shape")
+    flattened: dict[str, object] = {}
+    for service, values in sorted(services.items()):
+        legacy_vars = values.get("legacy_vars", {}) if isinstance(values, dict) else None
+        if not isinstance(legacy_vars, dict):
+            raise RuntimeError(f"canonical Ansible compatibility vars are invalid: {service}")
+        for key, value in legacy_vars.items():
+            if not isinstance(key, str):
+                raise RuntimeError(f"canonical Ansible compatibility key is invalid: {service}")
+            if key in flattened and flattened[key] != value:
+                raise RuntimeError(f"conflicting canonical Ansible compatibility var: {key}")
+            flattened[key] = value
+    file_descriptor, vars_name = tempfile.mkstemp(
+        prefix=".canonical-ansible-vars-",
+        suffix=".json",
+        dir=log_dir,
+        text=True,
+    )
+    vars_path = Path(vars_name)
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as handle:
+            json.dump(flattened, handle, sort_keys=True)
+            handle.write("\n")
+        os.chmod(vars_path, 0o600)
+    except BaseException:
+        os.close(file_descriptor)
+        vars_path.unlink(missing_ok=True)
+        raise
+    return CanonicalAnsibleTransport(
+        inventory=str(inventory_path),
+        extra_args=("-e", f"@{vars_path}"),
+        vars_path=vars_path,
+        environment=environment,
+    )
+
+
 def bootstrap_technitium_token(env_file: Path, log_path: Path, env: dict[str, str], runner: RunCommand) -> int:
     rc = runner(
         ["python", "scripts/bootstrap-technitium-api-token.py", "--env-file", str(env_file)],
@@ -177,6 +236,7 @@ def run_service(
     env_file: Path,
     base_env: dict[str, str],
     runner: RunCommand = default_runner,
+    extra_args: tuple[str, ...] = (),
 ) -> ServiceResult:
     playbooks = tuple(settings.SERVICES[service]["playbooks"])
     log_path = log_dir / f"{service}.log"
@@ -186,7 +246,7 @@ def run_service(
             rc = bootstrap_technitium_token(env_file, log_path, env, runner)
             if rc != 0:
                 return ServiceResult(service, playbooks, rc, log_path)
-        command = ["ansible-playbook", *inventory_args(inventories), playbook]
+        command = ["ansible-playbook", *inventory_args(inventories), *extra_args, playbook]
         rc = runner(command, log_path, env)
         if rc != 0:
             return ServiceResult(service, playbooks, rc, log_path)
@@ -200,11 +260,12 @@ def run_sequential(
     env_file: Path,
     base_env: dict[str, str],
     runner: RunCommand = default_runner,
+    extra_args: tuple[str, ...] = (),
 ) -> list[ServiceResult]:
     results: list[ServiceResult] = []
     for service in services:
         print(f"==> ansible service {service}", flush=True)
-        result = run_service(service, inventories, log_dir, env_file, base_env, runner)
+        result = run_service(service, inventories, log_dir, env_file, base_env, runner, extra_args)
         results.append(result)
         if result.returncode != 0:
             break
@@ -220,13 +281,14 @@ def run_parallel(
     base_env: dict[str, str],
     max_workers: int,
     runner: RunCommand = default_runner,
+    extra_args: tuple[str, ...] = (),
 ) -> list[ServiceResult]:
     results: list[ServiceResult] = []
     for index, wave in enumerate(dependency_waves(services), 1):
         print(f"==> ansible wave {index}: {', '.join(wave)}", flush=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(wave))) as executor:
             future_map = {
-                executor.submit(run_service, service, inventories, log_dir, env_file, base_env, runner): service
+                executor.submit(run_service, service, inventories, log_dir, env_file, base_env, runner, extra_args): service
                 for service in wave
             }
             wave_results: list[ServiceResult] = []
@@ -275,6 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--service", default="")
     parser.add_argument("--max-workers", type=int, default=int(os.environ.get("INFRA_APPLY_ANSIBLE_MAX_WORKERS", "4")))
     parser.add_argument("--log-dir", type=Path, default=None)
+    parser.add_argument("--canonical-ansible", action="store_true", help="use the verified canonical inventory and vars pair")
     args = parser.parse_args(argv)
 
     try:
@@ -283,6 +346,9 @@ def main(argv: list[str] | None = None) -> int:
         print(error, file=sys.stderr)
         return 1
     context = from_environment(REPO)
+    if args.canonical_ansible and args.inventory:
+        print("--canonical-ansible cannot be combined with --inventory", file=sys.stderr)
+        return 1
     inventories = tuple(args.inventory or (str(context.path("ansible/inventory/local.yml")), *DEFAULT_INVENTORY))
     env_file = args.env_file or context.path(".env")
     timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -291,16 +357,28 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Ansible service apply mode: {args.mode}; started {timestamp}; logs: {log_dir}", flush=True)
     base_env = dict(os.environ)
     refresh_root_password_from_tfvars(context.path("terraform.tfvars"), base_env)
+    transport: CanonicalAnsibleTransport | None = None
     try:
-        base_env.update(canonical_dns_environment(context))
+        if args.canonical_ansible:
+            transport = canonical_ansible_transport(context, log_dir)
+            if transport is None:
+                raise RuntimeError("--canonical-ansible requires a selected canonical site")
+            base_env.update(transport.environment)
+            inventories = (transport.inventory,)
+            extra_args = transport.extra_args
+        else:
+            base_env.update(canonical_dns_environment(context))
+            extra_args = ()
+        if args.mode == "sequential":
+            results = run_sequential(services, inventories, log_dir, env_file, base_env, extra_args=extra_args)
+        else:
+            results = run_parallel(services, inventories, log_dir, env_file, base_env, max(1, args.max_workers), extra_args=extra_args)
     except (OSError, ValueError, RuntimeError) as error:
         print(f"canonical Ansible projection verification failed: {error}", file=sys.stderr)
         return 1
-
-    if args.mode == "sequential":
-        results = run_sequential(services, inventories, log_dir, env_file, base_env)
-    else:
-        results = run_parallel(services, inventories, log_dir, env_file, base_env, max(1, args.max_workers))
+    finally:
+        if transport is not None:
+            transport.vars_path.unlink(missing_ok=True)
     summarize_results(services, results)
     return summarize_failures(results)
 

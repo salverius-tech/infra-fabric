@@ -79,6 +79,27 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             [["ansible-playbook", "-i", "inventory.yml", "-i", "tfvars.py", "infra/ansible/playbooks/forgejo-runner.yml"]],
         )
 
+    def test_run_service_adds_paired_canonical_extra_args(self) -> None:
+        commands: list[list[str]] = []
+
+        def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
+            commands.append(command)
+            return 0
+
+        with tempfile.TemporaryDirectory() as temp:
+            result = apply_ansible_services.run_service(
+                "forgejo_runner",
+                ("canonical-inventory.json",),
+                Path(temp),
+                Path(temp) / ".env",
+                dict(os.environ),
+                runner,
+                ("-e", "@canonical-vars.json"),
+            )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(commands[0][0:6], ["ansible-playbook", "-i", "canonical-inventory.json", "-e", "@canonical-vars.json", "infra/ansible/playbooks/forgejo-runner.yml"])
+
     def test_technitium_dns_bootstraps_token_before_dns_sync(self) -> None:
         commands: list[list[str]] = []
 
