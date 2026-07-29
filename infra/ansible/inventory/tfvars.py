@@ -81,6 +81,55 @@ def load_verified_canonical_inventory(
     return inventory
 
 
+def load_verified_canonical_vars(
+    generated_dir: Path,
+    *,
+    site: str,
+    model_digest: str,
+    secret_digest: str | None = None,
+) -> dict[str, Any]:
+    """Flatten verified canonical service compatibility vars for Ansible.
+
+    This is an opt-in adapter only. It consumes the same manifest-verified
+    projection set as the canonical inventory loader and rejects duplicate
+    top-level compatibility keys with different values.
+    """
+    generated_dir = generated_dir.expanduser().resolve()
+    try:
+        manifest = json.loads((generated_dir / "manifest.json").read_text(encoding="utf-8"))
+        projections = {
+            name: json.loads((generated_dir / name).read_text(encoding="utf-8"))
+            for name in CANONICAL_PROJECTION_FILES
+        }
+        verify_manifest(
+            manifest,
+            site=site,
+            model_digest=model_digest,
+            secret_digest=secret_digest,
+            projections=projections,
+        )
+    except (OSError, json.JSONDecodeError, TypeError, ManifestError) as error:
+        raise InventoryError("canonical Ansible vars projection is missing, stale, or altered") from error
+    projection = projections["ansible-vars.json"]
+    services = projection.get("services") if isinstance(projection, dict) else None
+    if not isinstance(services, dict):
+        raise InventoryError("canonical Ansible vars projection has an invalid shape")
+    flattened: dict[str, Any] = {}
+    for service, values in sorted(services.items()):
+        if not isinstance(values, dict):
+            raise InventoryError(f"canonical Ansible vars entry is invalid: {service}")
+        legacy_vars = values.get("legacy_vars", {})
+        if not isinstance(legacy_vars, dict):
+            raise InventoryError(f"canonical Ansible compatibility vars are invalid: {service}")
+        for key, value in legacy_vars.items():
+            if not isinstance(key, str):
+                raise InventoryError(f"canonical Ansible compatibility key is invalid: {service}")
+            if key in flattened and flattened[key] != value:
+                raise InventoryError(f"conflicting canonical Ansible compatibility var: {key}")
+            flattened[key] = value
+    return flattened
+
+
 def load_tfvars(path: Path) -> dict[str, Any]:
     try:
         with path.open("r", encoding="utf-8") as file:

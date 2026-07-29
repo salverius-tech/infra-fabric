@@ -293,6 +293,43 @@ class TfvarsInventoryTests(unittest.TestCase):
             )
 
 
+    def test_load_verified_canonical_vars_flattens_compatibility_values(self) -> None:
+        generated = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(generated, ignore_errors=True))
+        projections = {
+            name: {"_meta": {"hostvars": {}}} if name == "ansible-inventory.json" else {}
+            for name in tfvars_inventory.CANONICAL_PROJECTION_FILES
+        }
+        projections["ansible-vars.json"] = {
+            "canonical_site": "dev",
+            "services": {
+                "forgejo": {"legacy_vars": {"forgejo_version": "1.2.3", "forgejo_domain": "git.example.internal"}},
+                "technitium": {"legacy_vars": {"technitium_api_url": "http://192.0.2.53:5380/api"}},
+            },
+        }
+        from projection_manifest import build_manifest
+        for name, value in projections.items():
+            (generated / name).write_text(json.dumps(value), encoding="utf-8")
+        (generated / "manifest.json").write_text(json.dumps(build_manifest(site="dev", schema_version=1, model_digest="model-digest", secret_digest=None, projections=projections, renderer_version="test", source_commit="source")), encoding="utf-8")
+        loaded = tfvars_inventory.load_verified_canonical_vars(generated, site="dev", model_digest="model-digest")
+        self.assertEqual(loaded["forgejo_version"], "1.2.3")
+        self.assertEqual(loaded["technitium_api_url"], "http://192.0.2.53:5380/api")
+
+    def test_canonical_vars_reject_conflicting_compatibility_keys(self) -> None:
+        generated = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(generated, ignore_errors=True))
+        projections = {
+            name: {"_meta": {"hostvars": {}}} if name == "ansible-inventory.json" else {}
+            for name in tfvars_inventory.CANONICAL_PROJECTION_FILES
+        }
+        projections["ansible-vars.json"] = {"services": {"a": {"legacy_vars": {"shared": "one"}}, "b": {"legacy_vars": {"shared": "two"}}}}
+        from projection_manifest import build_manifest
+        for name, value in projections.items():
+            (generated / name).write_text(json.dumps(value), encoding="utf-8")
+        (generated / "manifest.json").write_text(json.dumps(build_manifest(site="dev", schema_version=1, model_digest="model-digest", secret_digest=None, projections=projections, renderer_version="test", source_commit="source")), encoding="utf-8")
+        with self.assertRaisesRegex(tfvars_inventory.InventoryError, "conflicting canonical Ansible compatibility var"):
+            tfvars_inventory.load_verified_canonical_vars(generated, site="dev", model_digest="model-digest")
+
     def test_canonical_cli_mode_emits_verified_inventory(self) -> None:
         generated = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: __import__("shutil").rmtree(generated, ignore_errors=True))
