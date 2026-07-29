@@ -11,7 +11,7 @@ Regenerate the value-free inventory with:
 python3 scripts/canonical-mapping-inventory.py
 ```
 
-Current baseline: 213 mapping rows, 227 matched inputs, 160 unmatched inputs, and 0 ambiguous matrix matches. The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the decision blockers that prevent promotion.
+Current baseline: 218 mapping rows, 232 matched inputs, 155 unmatched inputs, and 0 ambiguous matrix matches. The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the decision blockers that prevent promotion.
 
 ## Secret or protected inputs
 
@@ -31,7 +31,7 @@ Current baseline: 213 mapping rows, 227 matched inputs, 160 unmatched inputs, an
 
 ## Behavior or configuration without a typed owner
 
-**Source identities:** service selection/runtime aliases (`service_runtime`, `forgejo_runtime`, `tailscale_client_enabled`); Forgejo behavior and bootstrap/Caddy/database/runner fields; Infisical and SearXNG runtime fields; Caddy settings; Hermes fields not covered by the existing typed Control/dashboard slice; VM cloud-init/user inputs; SearXNG `searxng_container_port`, `searxng_bind_address`, `searxng_instance_name`, and public-URL enablement.
+**Source identities:** service selection/runtime aliases not covered by the typed runtime projection (`tailscale_client_enabled`); Forgejo behavior and bootstrap/Caddy/database/runner fields; Infisical and SearXNG runtime fields; Caddy settings; Hermes fields not covered by the existing typed Control/dashboard slice; SearXNG `searxng_container_port`, `searxng_bind_address`, `searxng_instance_name`, and public-URL enablement.
 
 **Candidate owners:** service-specific configuration models, resource runtime/security models, or an explicit consumer adapter.
 
@@ -87,7 +87,7 @@ The remaining names were audited against the current typed model and projection 
 | `forgejo_runner_url` | Forgejo endpoint or Runner service endpoint | Deferred: it is a cross-service target URL, not the Runner resource endpoint; ownership and derivation must be explicit. |
 | `caddy_server_name`, `caddy_server_names` | Service endpoint public-name aliases | Deferred: local Caddy topology and alias ownership are not represented by the current endpoint contract. |
 | `TECHNITIUM_API_URL` | Technitium public URL | Deferred: migration code treats this as a direct API transport endpoint, which must not be conflated with the browser-facing service endpoint. |
-| `pve`, cloud-init users, storage fragments, and generic runtime/configuration fields | Platform/resource/service configuration | Deferred: source context is structural or opaque and does not identify an exact existing typed owner. |
+| `pve`, storage fragments, and generic runtime/configuration fields | Platform/resource/service configuration | Deferred: source context is structural or opaque and does not identify an exact existing typed owner. |
 
 No remaining candidate has an exact, semantically equivalent owner and projection under the current contract. Any promotion requires the decision recorded in the relevant blocker category above.
 

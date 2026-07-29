@@ -175,6 +175,22 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertNotIn("secret", summary)
         self.assertEqual(len(model.resources.guests), 1)
 
+    def test_typed_cloud_init_and_template_timeout_projection(self) -> None:
+        content = VALID_SITE.replace(
+            "  storage:\n    rootfs_datastore: local-lvm",
+            "  vm_cloud_init_user: vmadmin\n  lxc_template_download_timeout_seconds: 1800\n  storage:\n    rootfs_datastore: local-lvm",
+        ).replace(
+            "        unprivileged: true",
+            "        unprivileged: true\n        cloud_init_user: forgejo-admin",
+        )
+        model = load_site(self.write_site(content))
+        values = render_opentofu_variables(model)
+        self.assertEqual(values["guest_vm_cloud_init_user"], "vmadmin")
+        self.assertEqual(values["lxc_template_download_timeout_seconds"], 1800)
+        self.assertEqual(values["service_runtime"]["forgejo"]["cloud_init_user"], "forgejo-admin")
+        with self.assertRaises(CanonicalValuesError):
+            load_site(self.write_site(content.replace("vmadmin", "bad user")))
+
     def test_resource_lifecycle_projection_preserves_existing_variable_names(self) -> None:
         model = load_site(self.write_site(VALID_SITE))
         values = render_opentofu_variables(model)

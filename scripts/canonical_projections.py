@@ -87,6 +87,8 @@ def _resource_variables(name: str, resource: Any) -> dict[str, Any]:
     }
     if name == "onramp_host":
         values["onramp_host_datastore_id"] = resource.storage.root.storage_id
+        if resource.runtime.cloud_init_user is not None:
+            values["onramp_host_cloud_init_user"] = resource.runtime.cloud_init_user
     if name in {"forgejo_runner", "infisical", "hermes", "tailscale_client", "onramp_host"}:
         values[f"{name}_started"] = resource.runtime.started
         values[f"{name}_start_on_boot"] = resource.runtime.start_on_boot
@@ -116,6 +118,10 @@ def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
         "rootfs_datastore_id": model.platform.storage.rootfs_datastore,
         "template_datastore_id": model.platform.storage.template_datastore,
     }
+    if model.platform.vm_cloud_init_user is not None:
+        values["guest_vm_cloud_init_user"] = model.platform.vm_cloud_init_user
+    if model.platform.lxc_template_download_timeout_seconds is not None:
+        values["lxc_template_download_timeout_seconds"] = model.platform.lxc_template_download_timeout_seconds
     for name, resource in (*model.resources.guests.items(), *model.resources.shared_hosts.items()):
         values.update(_resource_variables(name, resource))
     runtimes: dict[str, dict[str, Any]] = {}
@@ -123,6 +129,8 @@ def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
         if service.enabled:
             resource = _resource(model, service.resource or "")
             runtimes[name] = {"type": resource.type}
+            if resource.runtime.cloud_init_user is not None:
+                runtimes[name]["cloud_init_user"] = resource.runtime.cloud_init_user
             if resource.type == "vm" and resource.runtime.cloud_init:
                 runtimes[name].update(resource.runtime.cloud_init)
     values["service_runtime"] = runtimes

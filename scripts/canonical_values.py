@@ -176,7 +176,23 @@ class Platform(StrictModel):
     proxmox: ProxmoxPlatform
     network: NetworkDefaults
     storage: StorageDefaults
+    vm_cloud_init_user: StrictStr | None = None
+    lxc_template_download_timeout_seconds: StrictInt | None = None
     images: PlatformImages = Field(default_factory=PlatformImages)
+
+    @field_validator("vm_cloud_init_user")
+    @classmethod
+    def validate_vm_cloud_init_user(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("platform.vm_cloud_init_user must be a valid Linux user identifier")
+        return value
+
+    @field_validator("lxc_template_download_timeout_seconds")
+    @classmethod
+    def validate_lxc_template_download_timeout(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("platform.lxc_template_download_timeout_seconds must be positive")
+        return value
 
 
 class ResourceIdentity(StrictModel):
@@ -294,6 +310,14 @@ class ResourceStorage(StrictModel):
 class ResourceRuntime(StrictModel):
     started: StrictBool = True
     start_on_boot: StrictBool = True
+    cloud_init_user: StrictStr | None = None
+
+    @field_validator("cloud_init_user")
+    @classmethod
+    def validate_cloud_init_user(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("resource runtime.cloud_init_user must be a valid Linux user identifier")
+        return value
     unprivileged: StrictBool | None = None
     nesting: StrictBool | None = None
     features: dict[str, StrictBool] = Field(default_factory=dict)
