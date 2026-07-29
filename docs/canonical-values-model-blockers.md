@@ -3,6 +3,8 @@
 **Status:** Review-required; no consumer cutover or candidate generation is authorized.
 **Scope:** Every unmatched identity in the current public-safe source inventory is classified here or by the machine-readable inventory report. No values are read or retained by this register.
 
+In this register, `unmatched` means “no canonical mapping was promoted”; it does not mean “unreviewed.” The machine-readable report separates `item_count`, `classified_count`, and `unclassified_count`. The current deferred set has 160 items, all 160 classified, and zero unclassified items.
+
 Regenerate the value-free inventory with:
 
 ```text

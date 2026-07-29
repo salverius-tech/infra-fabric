@@ -425,9 +425,11 @@ def deferred_classification(matrix_coverage: dict[str, Any]) -> dict[str, Any]:
         classification: sum(item["classification"] == classification for item in items)
         for classification in sorted({item["classification"] for item in items})
     }
+    unclassified_count = sum("classification" not in item for item in items)
     return {
         "item_count": len(items),
-        "unclassified_count": sum("classification" not in item for item in items),
+        "classified_count": len(items) - unclassified_count,
+        "unclassified_count": unclassified_count,
         "counts": counts,
         "items": items,
         "status": "complete" if not sum("classification" not in item for item in items) else "review-required",

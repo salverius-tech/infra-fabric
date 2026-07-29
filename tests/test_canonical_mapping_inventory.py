@@ -48,6 +48,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertTrue(report["matrix_coverage"]["unmatched"])
         deferred = report["deferred_classification"]
         self.assertEqual(deferred["item_count"], 160)
+        self.assertEqual(deferred["classified_count"], 160)
         self.assertEqual(deferred["unclassified_count"], 0)
         self.assertEqual(
             set(deferred["counts"]),
