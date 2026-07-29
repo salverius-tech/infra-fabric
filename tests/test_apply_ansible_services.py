@@ -56,6 +56,14 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "generated projection"):
                 apply_ansible_services.canonical_dns_environment(CanonicalContext())
 
+    def test_canonical_mode_rejects_explicit_legacy_inventory(self) -> None:
+        self.assertEqual(
+            apply_ansible_services.main(
+                ["--canonical-ansible", "--inventory", "legacy-inventory.yml", "--service", "forgejo"]
+            ),
+            1,
+        )
+
     def test_run_service_keeps_service_playbooks_sequential(self) -> None:
         commands: list[list[str]] = []
 
