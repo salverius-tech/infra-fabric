@@ -340,6 +340,7 @@ class TfvarsInventoryTests(unittest.TestCase):
             name: {"_meta": {"hostvars": {"canonical": {}}}} if name == "ansible-inventory.json" else {}
             for name in tfvars_inventory.CANONICAL_PROJECTION_FILES
         }
+        projections["ansible-vars.json"] = {"services": {}}
         from projection_manifest import build_manifest
 
         for name, value in projections.items():
@@ -374,6 +375,24 @@ class TfvarsInventoryTests(unittest.TestCase):
                 0,
             )
         self.assertEqual(json.loads(output.getvalue())["_meta"]["hostvars"], {"canonical": {}})
+
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(
+                tfvars_inventory.main(
+                    [
+                        "--canonical-generated-dir",
+                        str(generated),
+                        "--canonical-site",
+                        "dev",
+                        "--canonical-model-digest",
+                        "model-digest",
+                        "--canonical-vars",
+                    ]
+                ),
+                0,
+            )
+        self.assertEqual(json.loads(output.getvalue()), {})
 
 
 if __name__ == "__main__":

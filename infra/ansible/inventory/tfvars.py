@@ -331,12 +331,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--canonical-site", default=None)
     parser.add_argument("--canonical-model-digest", default=None)
     parser.add_argument("--canonical-secret-digest", default=None)
+    parser.add_argument("--canonical-vars", action="store_true", help="emit verified canonical compatibility vars as JSON")
     args = parser.parse_args(argv)
 
     try:
         if args.canonical_generated_dir is not None:
             if not args.canonical_site or not args.canonical_model_digest:
                 raise InventoryError("canonical site and model digest are required with --canonical-generated-dir")
+            if args.canonical_vars:
+                _, vars_for_play = load_verified_canonical_bundle(
+                    args.canonical_generated_dir,
+                    site=args.canonical_site,
+                    model_digest=args.canonical_model_digest,
+                    secret_digest=args.canonical_secret_digest,
+                )
+                print(json.dumps(vars_for_play))
+                return 0
             inventory = load_verified_canonical_inventory(
                 args.canonical_generated_dir,
                 site=args.canonical_site,
