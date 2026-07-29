@@ -420,6 +420,30 @@ class ForgejoDatabaseConfiguration(StrictModel):
         return self
 
 
+class ForgejoConfiguration(StrictModel):
+    """Typed non-secret Forgejo role configuration."""
+
+    database: ForgejoDatabaseConfiguration = Field(default_factory=ForgejoDatabaseConfiguration)
+    enable_caddy: StrictBool | None = None
+    configure_system_ssh: StrictBool | None = None
+    write_initial_config: StrictBool | None = None
+    bootstrap_enabled: StrictBool | None = None
+    bootstrap_admin_username: StrictStr | None = None
+    bootstrap_admin_email: StrictStr | None = None
+    bootstrap_owner_email: StrictStr | None = None
+    actions_enabled: StrictBool | None = None
+    actions_default_url: StrictStr | None = None
+
+    @field_validator("actions_default_url")
+    @classmethod
+    def validate_actions_url(cls, value: str | None) -> str | None:
+        if value is not None:
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise ValueError("Forgejo Actions default URL must be an HTTPS URL without credentials")
+        return value
+
+
 class ServiceState(StrictModel):
     capable: StrictBool = False
     backup: dict[str, Any] = Field(default_factory=dict)
@@ -692,11 +716,11 @@ class CanonicalSite(StrictModel):
         forgejo = self.services.get("forgejo")
         if forgejo is not None:
             try:
-                database = ForgejoDatabaseConfiguration.model_validate(forgejo.configuration.get("database", {}))
-                forgejo.configuration["database"] = database.model_dump(mode="json")
+                configuration = ForgejoConfiguration.model_validate(forgejo.configuration)
+                forgejo.configuration = configuration.model_dump(mode="json", exclude_none=False)
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
-                raise ValueError(f"services.forgejo.configuration.database: {details}") from error
+                raise ValueError(f"services.forgejo.configuration: {details}") from error
         for _, resource in (*self.resources.guests.items(), *self.resources.shared_hosts.items()):
             network = resource.network
             if network.bridge is None:

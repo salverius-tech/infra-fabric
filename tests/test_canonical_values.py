@@ -430,10 +430,8 @@ class CanonicalValuesTests(unittest.TestCase):
             "      version: 12.0.4",
             "      version: 12.0.4\n    configuration:\n      api_token: SECRET_SENTINEL_DO_NOT_PROJECT",
         )
-        model = load_site(self.write_site(content))
-        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
-        with self.assertRaisesRegex(ProjectionError, "sensitive field"):
-            render_ansible_vars(model, catalog)
+        with self.assertRaisesRegex(CanonicalValuesError, "services.forgejo.configuration"):
+            load_site(self.write_site(content))
 
     def test_non_secret_projection_rejects_opaque_runtime_template(self) -> None:
         content = VALID_SITE.replace(

@@ -65,7 +65,16 @@
         },
         "canonical_play_vars": {
           "forgejo_version": "release.version",
-          "forgejo_database": "configuration.database"
+          "forgejo_database": "configuration.database",
+          "forgejo_enable_caddy": "configuration.enable_caddy",
+          "forgejo_configure_system_ssh": "configuration.configure_system_ssh",
+          "forgejo_write_initial_config": "configuration.write_initial_config",
+          "forgejo_bootstrap_enabled": "configuration.bootstrap_enabled",
+          "forgejo_bootstrap_admin_username": "configuration.bootstrap_admin_username",
+          "forgejo_bootstrap_admin_email": "configuration.bootstrap_admin_email",
+          "forgejo_bootstrap_owner_email": "configuration.bootstrap_owner_email",
+          "forgejo_actions_enabled": "configuration.actions_enabled",
+          "forgejo_actions_default_url": "configuration.actions_default_url"
         }
       }
     },
