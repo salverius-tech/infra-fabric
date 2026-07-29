@@ -420,6 +420,22 @@ class ForgejoDatabaseConfiguration(StrictModel):
         return self
 
 
+class TechnitiumConfiguration(StrictModel):
+    """Typed non-secret Technitium direct API configuration."""
+
+    api_url: StrictStr | None = None
+    admin_user: StrictStr | None = None
+
+    @field_validator("api_url")
+    @classmethod
+    def validate_api_url(cls, value: str | None) -> str | None:
+        if value is not None:
+            parsed = urlsplit(value)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+                raise ValueError("Technitium API URL must be an HTTP(S) URL without credentials")
+        return value
+
+
 class SearxngConfiguration(StrictModel):
     """Typed non-secret SearXNG host publication and instance settings."""
 
@@ -783,6 +799,14 @@ class CanonicalSite(StrictModel):
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
                 raise ValueError(f"services.hermes.configuration: {details}") from error
+        technitium = self.services.get("technitium")
+        if technitium is not None:
+            try:
+                configuration = TechnitiumConfiguration.model_validate(technitium.configuration)
+                technitium.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.technitium.configuration: {details}") from error
         searxng = self.services.get("searxng_onramp")
         if searxng is not None:
             try:

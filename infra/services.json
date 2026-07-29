@@ -28,6 +28,8 @@
         "tf_vmid": "technitium_container_vmid",
         "tf_host": "technitium_container_ipv4_address",
         "canonical_play_vars": {
+          "technitium_api_url": "configuration.api_url",
+          "technitium_admin_user": "configuration.admin_user",
           "technitium_discovery_version": "release.version",
           "technitium_portable_sha256": "release.checksum"
         }

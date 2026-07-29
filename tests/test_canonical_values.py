@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import atomic_output
 from atomic_output import atomic_output_directory
-from canonical_values import CanonicalValuesError, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformImages, ResourceNetwork, SearxngConfiguration, ServiceRelease, TailscaleConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
+from canonical_values import CanonicalValuesError, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformImages, ResourceNetwork, SearxngConfiguration, ServiceRelease, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
     render_ansible_inventory,
@@ -174,6 +174,12 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(summary["enabled_services"], ["forgejo"])
         self.assertNotIn("secret", summary)
         self.assertEqual(len(model.resources.guests), 1)
+
+    def test_technitium_non_secret_configuration_is_typed(self) -> None:
+        configuration = TechnitiumConfiguration.model_validate(
+            {"api_url": "http://192.0.2.53:5380/", "admin_user": "admin"}
+        )
+        self.assertEqual(configuration.admin_user, "admin")
 
     def test_searxng_non_secret_configuration_is_typed(self) -> None:
         configuration = SearxngConfiguration.model_validate(
