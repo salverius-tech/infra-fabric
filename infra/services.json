@@ -132,7 +132,13 @@
         "tf_vmid": "forgejo_runner_vmid",
         "tf_host": "forgejo_runner_ipv4_address",
         "canonical_play_vars": {
-          "forgejo_runner_version": "release.version"
+          "forgejo_runner_version": "release.version",
+          "forgejo_runner_url": "configuration.url",
+          "forgejo_runner_name": "configuration.name",
+          "forgejo_runner_scope": "configuration.scope",
+          "forgejo_runner_label": "configuration.label",
+          "forgejo_runner_labels": "configuration.labels",
+          "forgejo_runner_hosts": "configuration.hosts"
         }
       }
     },

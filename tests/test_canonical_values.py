@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import atomic_output
 from atomic_output import atomic_output_directory
-from canonical_values import CanonicalValuesError, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformImages, ResourceNetwork, ServiceRelease, TailscaleConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
+from canonical_values import CanonicalValuesError, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformImages, ResourceNetwork, ServiceRelease, TailscaleConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
     render_ansible_inventory,
@@ -174,6 +174,20 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(summary["enabled_services"], ["forgejo"])
         self.assertNotIn("secret", summary)
         self.assertEqual(len(model.resources.guests), 1)
+
+    def test_forgejo_runner_non_secret_configuration_is_typed(self) -> None:
+        configuration = ForgejoRunnerConfiguration.model_validate(
+            {
+                "url": "https://git.example.internal/",
+                "name": "homelab-deploy",
+                "scope": "owner/repository",
+                "label": "homelab-deploy",
+                "labels": ["homelab-deploy:host"],
+                "hosts": [{"name": "git", "address": "192.0.2.62"}],
+            }
+        )
+        self.assertEqual(configuration.scope, "owner/repository")
+        self.assertEqual(configuration.hosts[0].address, "192.0.2.62")
 
     def test_tailscale_non_secret_configuration_is_typed(self) -> None:
         configuration = TailscaleConfiguration.model_validate(

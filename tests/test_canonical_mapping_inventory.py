@@ -38,17 +38,17 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             {"ansible-only", "deprecated", "unsupported"},
         )
         self.assertEqual(report["source_inputs"]["status"], "classification-complete-with-review-dispositions")
-        self.assertEqual(report["mapping_matrix"]["row_count"], 235)
+        self.assertEqual(report["mapping_matrix"]["row_count"], 241)
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-incomplete")
         self.assertEqual(report["matrix_coverage"]["input_count"], 387)
         self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 387)
-        self.assertEqual(report["matrix_coverage"]["matched_count"], 257)
-        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 130)
+        self.assertEqual(report["matrix_coverage"]["matched_count"], 263)
+        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 124)
         self.assertEqual(report["matrix_coverage"]["status"], "review-required")
         self.assertTrue(report["matrix_coverage"]["unmatched"])
         deferred = report["deferred_classification"]
-        self.assertEqual(deferred["item_count"], 130)
-        self.assertEqual(deferred["classified_count"], 130)
+        self.assertEqual(deferred["item_count"], 124)
+        self.assertEqual(deferred["classified_count"], 124)
         self.assertEqual(deferred["unclassified_count"], 0)
         self.assertEqual(
             set(deferred["counts"]),
@@ -59,7 +59,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 "secret-or-protected",
             },
         )
-        self.assertEqual(sum(deferred["counts"].values()), 130)
+        self.assertEqual(sum(deferred["counts"].values()), 124)
         deferred_by_key = {(item["source"], item["key"]): item["classification"] for item in deferred["items"]}
         for identity in (
             ("scaffold/ansible/inventory/local.yml", "infisical_encryption_key"),
@@ -101,6 +101,12 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             ("scaffold/ansible/inventory/local.yml", "tailscale_client_backup_archive", "services.tailscale_client.configuration.backup_archive"),
             ("scaffold/ansible/inventory/local.yml", "tailscale_client_enable_ip_forwarding", "services.tailscale_client.configuration.enable_ip_forwarding"),
             ("scaffold/ansible/inventory/local.yml", "tailscale_client_up_args", "services.tailscale_client.configuration.up_args"),
+            ("scaffold/ansible/inventory/local.yml", "forgejo_runner_url", "services.forgejo_runner.configuration.url"),
+            ("scaffold/ansible/inventory/local.yml", "forgejo_runner_name", "services.forgejo_runner.configuration.name"),
+            ("scaffold/ansible/inventory/local.yml", "forgejo_runner_scope", "services.forgejo_runner.configuration.scope"),
+            ("scaffold/ansible/inventory/local.yml", "forgejo_runner_label", "services.forgejo_runner.configuration.label"),
+            ("scaffold/ansible/inventory/local.yml", "forgejo_runner_labels", "services.forgejo_runner.configuration.labels"),
+            ("scaffold/ansible/inventory/local.yml", "forgejo_runner_hosts", "services.forgejo_runner.configuration.hosts"),
         ):
             with self.subTest(source=source, key=key):
                 self.assertIn(

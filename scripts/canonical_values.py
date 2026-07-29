@@ -420,6 +420,31 @@ class ForgejoDatabaseConfiguration(StrictModel):
         return self
 
 
+class ForgejoRunnerHost(StrictModel):
+    name: StrictStr
+    address: StrictStr
+
+
+class ForgejoRunnerConfiguration(StrictModel):
+    """Typed non-secret Forgejo Runner registration metadata."""
+
+    url: StrictStr | None = None
+    name: StrictStr | None = None
+    scope: StrictStr | None = None
+    label: StrictStr | None = None
+    labels: list[StrictStr] | None = None
+    hosts: list[ForgejoRunnerHost] | None = None
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str | None) -> str | None:
+        if value is not None:
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise ValueError("Forgejo Runner URL must be HTTPS without credentials")
+        return value
+
+
 class TailscaleConfiguration(StrictModel):
     """Typed non-secret Tailscale restore and networking behavior."""
 
@@ -730,6 +755,14 @@ class CanonicalSite(StrictModel):
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
                 raise ValueError(f"services.hermes.configuration: {details}") from error
+        runner = self.services.get("forgejo_runner")
+        if runner is not None:
+            try:
+                configuration = ForgejoRunnerConfiguration.model_validate(runner.configuration)
+                runner.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.forgejo_runner.configuration: {details}") from error
         tailscale = self.services.get("tailscale_client")
         if tailscale is not None:
             try:
