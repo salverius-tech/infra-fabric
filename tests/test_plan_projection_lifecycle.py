@@ -32,6 +32,8 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertIn('scripts/report-plan-equivalence.py', content)
         self.assertIn('Plan equivalence review failed', content)
         self.assertIn('rm -f "${equivalence_after_json}"', content)
+        self.assertNotIn('cleanup_equivalence_json', content)
+        self.assertEqual(content.count('trap cleanup_generated_tmp EXIT'), 1)
         self.assertNotIn('rm -rf "${generated_dir}"', content)
 
 

@@ -1,6 +1,6 @@
 # Normalized OpenTofu plan-equivalence contract
 
-**Status:** report-only provider adapter implemented; plan/apply wiring and consumer cutover deferred
+**Status:** report-only provider adapter implemented; optional report-only plan gate wired, consumer cutover deferred
 
 The report-only boundary is `scripts/report-plan-equivalence.py`. It accepts two saved `tofu show -json` documents, emits only `address`/difference-kind metadata, returns 0 for equivalence, 1 for a semantic difference, and 2 for invalid input. It never invokes OpenTofu, writes plans, or applies infrastructure.
 
@@ -68,7 +68,4 @@ invented. A later integration slice needs provider-backed fixtures and tests for
 refresh-only differences, exact `resource_changes` mapping, and an approved
 report/plan invocation boundary.
 
-This contract is intentionally not wired into `verify_metadata()`,
-`plan-infra.sh`, or apply. Passing these tests proves normalization semantics
-only; it does not prove plan/apply integration, consumer cutover, or resource
-behavior equivalence.
+This contract is optionally wired into `plan-infra.sh` through `INFRA_EQUIVALENCE_BEFORE_JSON`. The gate exports the current plan to a disposable private-values file, compares it, and removes it through the shared projection cleanup trap. It is not wired into `verify_metadata()` or apply, and it does not prove consumer cutover or resource behavior equivalence.
