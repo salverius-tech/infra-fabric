@@ -38,16 +38,16 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             {"ansible-only", "deprecated", "unsupported"},
         )
         self.assertEqual(report["source_inputs"]["status"], "classification-complete-with-review-dispositions")
-        self.assertEqual(report["mapping_matrix"]["row_count"], 212)
+        self.assertEqual(report["mapping_matrix"]["row_count"], 213)
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-incomplete")
         self.assertEqual(report["matrix_coverage"]["input_count"], 387)
         self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 387)
-        self.assertEqual(report["matrix_coverage"]["matched_count"], 224)
-        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 163)
+        self.assertEqual(report["matrix_coverage"]["matched_count"], 226)
+        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 161)
         self.assertEqual(report["matrix_coverage"]["status"], "review-required")
         self.assertTrue(report["matrix_coverage"]["unmatched"])
         deferred = report["deferred_classification"]
-        self.assertEqual(deferred["item_count"], 163)
+        self.assertEqual(deferred["item_count"], 161)
         self.assertEqual(deferred["unclassified_count"], 0)
         self.assertEqual(
             set(deferred["counts"]),
@@ -58,7 +58,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 "secret-or-protected",
             },
         )
-        self.assertEqual(sum(deferred["counts"].values()), 163)
+        self.assertEqual(sum(deferred["counts"].values()), 161)
         deferred_by_key = {(item["source"], item["key"]): item["classification"] for item in deferred["items"]}
         for identity in (
             ("scaffold/ansible/inventory/local.yml", "infisical_encryption_key"),
@@ -144,6 +144,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         for source, key, canonical_path in (
             ("scaffold/ansible/inventory/local.yml", "forgejo_domain", "services.forgejo.endpoints.public_names"),
             ("scripts/migrate-values.py", "FORGEJO_DOMAIN", "services.forgejo.endpoints.public_names"),
+            ("scripts/migrate-values.py", "FORGEJO_SERVER_NAME", "services.forgejo.endpoints.public_names"),
             ("scripts/migrate-values.py", "forgejo_domain", "services.forgejo.endpoints.public_names"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_ssh_port", "services.forgejo.endpoints.ports.ssh"),
             ("scripts/migrate-values.py", "FORGEJO_SSH_PORT", "services.forgejo.endpoints.ports.ssh"),
@@ -241,6 +242,14 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 "source": "scaffold/terraform.tfvars",
                 "key": "tailscale_client_mac_address",
                 "canonical_path": "resources.guests.tailscale_client.network.mac_address",
+            },
+            report["matrix_coverage"]["matched"],
+        )
+        self.assertIn(
+            {
+                "source": "scaffold/ansible/inventory/local.yml",
+                "key": "forgejo_runner_version",
+                "canonical_path": "services.forgejo_runner.release.version",
             },
             report["matrix_coverage"]["matched"],
         )

@@ -114,7 +114,10 @@
         "group": "forgejo_runner",
         "vmid_var": "forgejo_runner_vmid",
         "tf_vmid": "forgejo_runner_vmid",
-        "tf_host": "forgejo_runner_ipv4_address"
+        "tf_host": "forgejo_runner_ipv4_address",
+        "canonical_play_vars": {
+          "forgejo_runner_version": "release.version"
+        }
       }
     },
     "infisical": {
