@@ -23,6 +23,24 @@ for normal use, change OpenTofu or Ansible arguments, or apply infrastructure.
 Replace `dev` with the selected site directory; do not validate one site's file
 as another site.
 
+The generated projections can also be exercised through the opt-in paired
+Ansible compatibility boundary after canonical rendering has produced and
+verified `values/generated/`:
+
+```bash
+scripts/python.sh scripts/apply-ansible-services.py \
+  --canonical-ansible \
+  --mode sequential
+```
+
+This mode requires a selected canonical site, reads the identity-verified
+`ansible-inventory.json`, writes flattened non-secret compatibility variables to
+a temporary mode-0600 file, and passes both inputs to every playbook. The
+temporary file is removed on exit. Do not combine `--canonical-ansible` with
+`--inventory`; mixed canonical/legacy authority is rejected. The default
+`apply-ansible-services.py` invocation remains legacy and the opt-in mode is
+not evidence of full plan/apply parity.
+
 Review legacy inputs separately with the read-only discovery command:
 
 ```bash
