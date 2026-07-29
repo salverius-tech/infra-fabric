@@ -26,7 +26,11 @@
         "group": "technitium",
         "vmid_var": "technitium_vmid",
         "tf_vmid": "technitium_container_vmid",
-        "tf_host": "technitium_container_ipv4_address"
+        "tf_host": "technitium_container_ipv4_address",
+        "canonical_play_vars": {
+          "technitium_discovery_version": "release.version",
+          "technitium_portable_sha256": "release.checksum"
+        }
       }
     },
     "forgejo": {
@@ -58,6 +62,9 @@
         "tf_user_runtime": "vm",
         "extra_play_vars": {
           "forgejo_database": "forgejo_database"
+        },
+        "canonical_play_vars": {
+          "forgejo_version": "release.version"
         }
       }
     },
@@ -179,6 +186,28 @@
         "infra/ansible/playbooks/hermes.yml"
       ],
       "dependencies": [],
+      "required_secrets": [
+        "services.hermes.secrets.control_api_token",
+        "services.hermes.secrets.control_bridge_token",
+        "services.hermes.secrets.dashboard_basic_auth_password_hash",
+        "services.hermes.secrets.dashboard_basic_auth_secret"
+      ],
+      "secret_classifications": {
+        "services.hermes.secrets.control_api_token": "runtime",
+        "services.hermes.secrets.control_bridge_token": "runtime",
+        "services.hermes.secrets.dashboard_basic_auth_password_hash": "runtime",
+        "services.hermes.secrets.dashboard_basic_auth_secret": "runtime"
+      },
+      "conditional_required_secrets": {
+        "configuration.control.enabled": [
+          "services.hermes.secrets.control_api_token",
+          "services.hermes.secrets.control_bridge_token"
+        ],
+        "configuration.dashboard.enabled": [
+          "services.hermes.secrets.dashboard_basic_auth_password_hash",
+          "services.hermes.secrets.dashboard_basic_auth_secret"
+        ]
+      },
       "inventory": {
         "host": "hermes_lxc",
         "group": "hermes",
@@ -191,6 +220,35 @@
         "extra_play_vars": {
           "hermes_runtime_user": "hermes_runtime_user",
           "hermes_ssh_public_keys": "lxc_ssh_public_keys"
+        },
+        "canonical_play_vars": {
+          "hermes_runtime_user": "configuration.runtime_user",
+          "hermes_repo_path": "configuration.repository_path",
+          "hermes_control_enabled": "configuration.control.enabled",
+          "hermes_control_domain": "configuration.control.domain",
+          "hermes_control_source_url": "configuration.control.source_url",
+          "hermes_control_source_ref": "configuration.control.source_ref",
+          "hermes_control_api_host": "configuration.control.api_host",
+          "hermes_control_api_port": "configuration.control.api_port",
+          "hermes_control_require_task_approval": "configuration.control.require_task_approval",
+          "hermes_control_plugin_socket": "configuration.control.plugin_socket",
+          "hermes_runtime_passwordless_sudo": "resource.security.allow_passwordless_sudo",
+          "hermes_allow_legacy_runtime": "configuration.allow_legacy_runtime",
+          "hermes_compression_threshold": "configuration.tuning.compression_threshold",
+          "hermes_max_concurrent_children": "configuration.tuning.max_concurrent_children",
+          "hermes_max_spawn_depth": "configuration.tuning.max_spawn_depth",
+          "hermes_discovery_version": "release.version",
+          "hermes_discovery_tag": "release.tag",
+          "hermes_discovery_commit": "release.commit",
+          "hermes_discovery_wheel_sha256": "release.checksum",
+          "hermes_node_version": "configuration.node.version",
+          "hermes_node_sha256_amd64": "configuration.node.checksums.amd64",
+          "hermes_node_sha256_arm64": "configuration.node.checksums.arm64",
+          "hermes_dashboard_enabled": "configuration.dashboard.enabled",
+          "hermes_dashboard_port": "endpoints.ports.dashboard",
+          "hermes_dashboard_host": "configuration.dashboard.host",
+          "hermes_dashboard_basic_auth_username": "configuration.dashboard.auth_username",
+          "hermes_web_searxng_url": "configuration.web.searxng_url"
         }
       }
     },
@@ -212,6 +270,14 @@
         "tf_host": "onramp_host_ipv4_address",
         "domain_var": "onramp_host_hostname",
         "tf_domain": "onramp_host_hostname",
+        "canonical_play_vars": {
+          "onramp_host_password_authentication": "security.password_authentication",
+          "onramp_host_permit_root_login": "security.permit_root_login",
+          "onramp_host_deploy_user": "security.deploy_user",
+          "onramp_host_deploy_dir": "security.deploy_dir",
+          "onramp_host_allow_passwordless_sudo": "security.allow_passwordless_sudo",
+          "onramp_host_allowed_ssh_cidrs": "security.allowed_ssh_cidrs"
+        },
         "user_var": "onramp_host_deploy_user",
         "tf_user": "onramp_host_deploy_user",
         "extra_play_vars": {
@@ -237,6 +303,12 @@
       "dependencies": [
         "onramp_host"
       ],
+      "release": {
+        "source": "container",
+        "legacy_image_var": "searxng_container_image",
+        "canonical_fields": ["release.image", "release.digest"],
+        "immutable_reference": true
+      },
       "inventory": {
         "host": "onramp_host_vm",
         "group": "onramp_host",

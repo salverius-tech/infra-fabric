@@ -87,11 +87,15 @@ def enabled_services(settings_path: Path | None) -> list[str]:
 
 def service_runtime(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
     runtimes = tfvars.get("service_runtime", {})
-    if isinstance(runtimes, dict) and isinstance(runtimes.get(service), dict):
-        return runtimes[service]
-    legacy_runtime = tfvars.get(f"{service}_runtime", {})
-    if isinstance(legacy_runtime, dict):
-        return legacy_runtime
+    canonical = runtimes.get(service) if isinstance(runtimes, dict) and isinstance(runtimes.get(service), dict) else None
+    legacy = tfvars.get(f"{service}_runtime")
+    legacy = legacy if isinstance(legacy, dict) else None
+    if canonical is not None and legacy is not None and canonical != legacy:
+        raise InventoryError(f"conflicting canonical and legacy runtime for service {service}")
+    if canonical is not None:
+        return canonical
+    if legacy is not None:
+        return legacy
     return {}
 
 

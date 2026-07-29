@@ -15,11 +15,11 @@ from secret_provider import (
     SopsAgeProvider,
     check_sops_age_availability,
     discover_age_key_file,
+    inspect_sops_policy,
     secret_material_directory,
     validate_sops_age_recipients,
     write_secret_material,
 )
-
 
 class SecretProviderTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -28,8 +28,9 @@ class SecretProviderTests(unittest.TestCase):
         self.bundle = self.root / "secrets.sops.yaml"
         self.bundle.write_text("services:\n  forgejo:\n    admin_password: placeholder-secret\n    secret_key: another-placeholder\n", encoding="utf-8")
         self.sops = self.root / "sops-fixture"
+        self.sops_marker = self.root / "sops-invoked"
         self.sops.write_text(
-            "#!/bin/sh\n" "shift 5\n" "cat \"$1\"\n",
+            "#!/bin/sh\n" f"touch '{self.sops_marker}'\n" "shift 5\n" "cat \"$1\"\n",
             encoding="utf-8",
         )
         self.sops.chmod(self.sops.stat().st_mode | stat.S_IXUSR)
@@ -135,6 +136,7 @@ class SecretProviderTests(unittest.TestCase):
         self.assertEqual(result["bundle_classification"], "encrypted-yaml")
         self.assertNotIn("PRIVATE_KEY_SENTINEL", repr(result))
         self.assertNotIn("placeholder-secret", repr(result))
+        self.assertFalse(self.sops_marker.exists())
 
     def test_metadata_only_sops_availability_requires_executable(self) -> None:
         key_file = self.root / "age-keys.txt"
@@ -183,6 +185,31 @@ class SecretProviderTests(unittest.TestCase):
         malformed.write_text("sops:\n  age: [{}]\n", encoding="utf-8")
         with self.assertRaisesRegex(SecretProviderError, "metadata is invalid"):
             validate_sops_age_recipients(malformed, {"age1example"})
+    def test_sops_policy_inspection_reports_public_placeholder_without_values(self) -> None:
+        policy = self.root / ".sops.yaml"
+        policy.write_text(
+            "creation_rules:\n  - path_regex: '^values/sites/[^/]+/secrets\\.sops\\.yaml$'\n    age: age1REPLACE_WITH_SITE_RECIPIENT\n",
+            encoding="utf-8",
+        )
+        result = inspect_sops_policy(policy, site="dev")
+        self.assertEqual(result["policy_scope"], "values/sites/dev/secrets.sops.yaml")
+        self.assertEqual(result["recipient_policy"], "not-configured")
+        self.assertNotIn("PRIVATE", repr(result))
+
+    def test_sops_policy_inspection_rejects_wrong_scope_and_recipient_mismatch(self) -> None:
+        policy = self.root / ".sops.yaml"
+        policy.write_text(
+            "creation_rules:\n  - path_regex: '^values/sites/[^/]+/other\\.yaml$'\n    age: age1example\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(SecretProviderError, "scope"):
+            inspect_sops_policy(policy, site="dev")
+        policy.write_text(
+            "creation_rules:\n  - path_regex: '^values/sites/[^/]+/secrets\\.sops\\.yaml$'\n    age: age1example\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(SecretProviderError, "does not match"):
+            inspect_sops_policy(policy, site="dev", expected_recipients={"age1other"})
 
 
 if __name__ == "__main__":

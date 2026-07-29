@@ -26,6 +26,10 @@ class ServiceCatalogTests(unittest.TestCase):
         catalog = load_catalog(path)
         self.assertIn("forgejo", catalog.names)
         catalog.validate_selection({"forgejo", "forgejo_runner"})
+        searxng = catalog.get("searxng_onramp")
+        self.assertEqual(searxng.raw["release"]["source"], "container")
+        self.assertEqual(searxng.raw["release"]["legacy_image_var"], "searxng_container_image")
+        self.assertEqual(searxng.raw["release"]["canonical_fields"], ["release.image", "release.digest"])
 
     def test_required_secret_paths_follow_enabled_services(self) -> None:
         catalog = load_catalog(
@@ -138,6 +142,27 @@ class ServiceCatalogTests(unittest.TestCase):
                     )
                 )
 
+    def test_enabled_service_resource_type_must_match_catalog_replacements(self) -> None:
+        catalog = load_catalog(
+            self.write_catalog(
+                {
+                    "services": {
+                        "app": {
+                            "dependencies": [],
+                            "terraform_replace_addresses": {"lxc": ["module.app"]},
+                        }
+                    }
+                }
+            )
+        )
+        service = SimpleNamespace(enabled=True, resource="guest", dependencies=[], state=SimpleNamespace(capable=False))
+        resources = SimpleNamespace(
+            guests={"guest": SimpleNamespace(type="vm")},
+            shared_hosts={},
+        )
+        with self.assertRaisesRegex(ServiceCatalogError, "resource type"):
+            catalog.validate_model_services({"app": service}, resources)
+
     def test_missing_dependency_fails_closed(self) -> None:
         catalog = load_catalog(
             self.write_catalog(
@@ -183,6 +208,61 @@ class ServiceCatalogTests(unittest.TestCase):
     def test_unknown_dependency_fails_at_load(self) -> None:
         with self.assertRaisesRegex(ServiceCatalogError, "unknown service"):
             load_catalog(self.write_catalog({"services": {"app": {"dependencies": ["missing"]}}}))
+    def test_real_hermes_catalog_conditional_secret_matrix(self) -> None:
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        def service(control: bool, dashboard: bool) -> SimpleNamespace:
+            return SimpleNamespace(
+                enabled=True,
+                dependencies=[],
+                state=SimpleNamespace(capable=False),
+                configuration={"control": {"enabled": control}, "dashboard": {"enabled": dashboard}},
+            )
+        api = {"services.hermes.secrets.control_api_token", "services.hermes.secrets.control_bridge_token"}
+        dashboard = {"services.hermes.secrets.dashboard_basic_auth_password_hash", "services.hermes.secrets.dashboard_basic_auth_secret"}
+        self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(False, False)}), frozenset())
+        self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(True, False)}), api)
+        self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(False, True)}), dashboard)
+        self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(True, True)}), api | dashboard)
+        report = catalog.required_secret_report_for_model({"hermes": service(True, True)})
+        self.assertEqual({entry["path"] for entry in report}, api | dashboard)
+        self.assertNotIn("value", repr(report))
+        with self.assertRaisesRegex(ServiceCatalogError, "required_secret_report_for_model"):
+            catalog.required_secret_report({"hermes"})
+
+        catalog = load_catalog(
+            self.write_catalog(
+                {
+                    "services": {
+                        "hermes": {
+                            "dependencies": [],
+                            "required_secrets": [
+                                "services.hermes.secrets.control_api_token",
+                                "services.hermes.secrets.dashboard_secret",
+                            ],
+                            "secret_classifications": {
+                                "services.hermes.secrets.control_api_token": "runtime",
+                                "services.hermes.secrets.dashboard_secret": "runtime",
+                            },
+                            "conditional_required_secrets": {
+                                "configuration.control.enabled": ["services.hermes.secrets.control_api_token"],
+                                "configuration.dashboard.enabled": ["services.hermes.secrets.dashboard_secret"],
+                            },
+                        }
+                    }
+                }
+            )
+        )
+        base = {"enabled": True, "dependencies": [], "state": SimpleNamespace(capable=False)}
+        disabled = SimpleNamespace(**base, configuration={"control": {"enabled": False}, "dashboard": {"enabled": False}})
+        self.assertEqual(catalog.required_secret_paths_for_model({"hermes": disabled}), frozenset())
+        enabled = SimpleNamespace(**base, configuration={"control": {"enabled": True}, "dashboard": {"enabled": True}})
+        self.assertEqual(
+            catalog.required_secret_paths_for_model({"hermes": enabled}),
+            {"services.hermes.secrets.control_api_token", "services.hermes.secrets.dashboard_secret"},
+        )
+        report = catalog.required_secret_report_for_model({"hermes": enabled})
+        self.assertEqual({entry["path"] for entry in report}, {"services.hermes.secrets.control_api_token", "services.hermes.secrets.dashboard_secret"})
+        self.assertNotIn("value", repr(report))
 
 
 if __name__ == "__main__":

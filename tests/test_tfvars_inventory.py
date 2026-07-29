@@ -169,6 +169,18 @@ class TfvarsInventoryTests(unittest.TestCase):
             keys,
         )
 
+    def test_conflicting_canonical_and_legacy_runtime_fails_closed(self) -> None:
+        with self.assertRaisesRegex(tfvars_inventory.InventoryError, "conflicting canonical and legacy runtime"):
+            tfvars_inventory.build_inventory(
+                {
+                    "forgejo_container_vmid": 107,
+                    "forgejo_lan_ip": "192.0.2.62",
+                    "service_runtime": {"forgejo": {"type": "vm"}},
+                    "forgejo_runtime": {"type": "lxc"},
+                },
+                ["forgejo"],
+            )
+
     def test_service_runtime_is_promoted_to_service_play_vars(self) -> None:
         runtime = {"type": "vm"}
         inventory = tfvars_inventory.build_inventory(

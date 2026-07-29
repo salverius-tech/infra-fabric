@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import atomic_output
 from atomic_output import atomic_output_directory
-from canonical_values import CanonicalValuesError, load_site, model_digest, normalized_model, redacted_summary
+from canonical_values import CanonicalValuesError, HermesConfiguration, ImageChecksum, ImageDefinition, PlatformImages, ResourceNetwork, ServiceRelease, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
     render_ansible_inventory,
@@ -100,6 +100,73 @@ class CanonicalValuesTests(unittest.TestCase):
 
         shutil.rmtree(path, ignore_errors=True)
 
+    def test_hermes_non_secret_configuration_is_strictly_typed(self) -> None:
+        configuration = HermesConfiguration.model_validate(
+            {
+                "runtime_user": "anvil",
+                "repository_path": "/srv/homelab-infra",
+                "allow_legacy_runtime": False,
+                "tuning": {
+                    "compression_threshold": 0.75,
+                    "max_concurrent_children": 5,
+                    "max_spawn_depth": 2,
+                },
+                "node": {
+                    "version": "22.23.1",
+                    "checksums": {"amd64": "a" * 64, "arm64": "b" * 64},
+                },
+                "dashboard": {"enabled": True, "host": "127.0.0.1", "auth_username": "admin"},
+                "web": {"searxng_url": "https://searxng.example.internal"},
+                "control": {
+                    "enabled": True,
+                    "domain": "Control.Hermes.Example.Internal.",
+                    "source_url": "https://github.com/example/hermes-control.git",
+                    "source_ref": "c" * 40,
+                },
+            }
+        )
+        self.assertEqual(configuration.runtime_user, "anvil")
+        self.assertEqual(configuration.repository_path, "/srv/homelab-infra")
+        self.assertEqual(configuration.node.checksums["arm64"], "b" * 64)
+        self.assertTrue(configuration.control.enabled)
+        self.assertEqual(configuration.control.domain, "control.hermes.example.internal")
+        self.assertEqual(configuration.control.api_host, "127.0.0.1")
+        self.assertEqual(configuration.control.api_port, 8787)
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"runtime_user": "root"})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"repository_path": "relative/repo"})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"repository_path": "/srv/../repo"})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"dashboard": {"host": "0.0.0.0"}})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"tuning": {"max_spawn_depth": 4}})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"control": {"enabled": True}})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"control": {"api_host": "0.0.0.0"}})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"control": {"require_task_approval": False}})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"control": {"source_url": "http://example.internal/control"}})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"control": {"plugin_socket": "/run/../tmp.sock"}})
+
+    def test_hermes_release_metadata_validates_managed_pins(self) -> None:
+        release = ServiceRelease(
+            source="binary",
+            version="0.18.0",
+            tag="v2026.7.1",
+            commit="a" * 40,
+            checksum="b" * 64,
+        )
+        self.assertEqual(release.tag, "v2026.7.1")
+        with self.assertRaises(ValueError):
+            ServiceRelease(source="binary", version="0.18.0", tag="main")
+        with self.assertRaises(ValueError):
+            ServiceRelease(source="binary", version="0.18.0", commit="A" * 40)
+
     def test_loads_valid_site_and_returns_redacted_summary(self) -> None:
         model = load_site(self.write_site(VALID_SITE), expected_site="dev")
         summary = redacted_summary(model)
@@ -107,6 +174,18 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(summary["enabled_services"], ["forgejo"])
         self.assertNotIn("secret", summary)
         self.assertEqual(len(model.resources.guests), 1)
+
+    def test_resource_lifecycle_projection_preserves_existing_variable_names(self) -> None:
+        model = load_site(self.write_site(VALID_SITE))
+        values = render_opentofu_variables(model)
+        resource = model.resources.guests["forgejo"]
+        from canonical_projections import _resource_variables
+
+        projected = _resource_variables("hermes", resource)
+        self.assertEqual(projected["hermes_started"], True)
+        self.assertEqual(projected["hermes_start_on_boot"], True)
+        self.assertNotIn("hermes_container_started", projected)
+        self.assertNotIn("hermes_started", values)
 
     def test_digest_is_stable_across_formatting_and_key_order(self) -> None:
         first = load_site(self.write_site(VALID_SITE))
@@ -379,6 +458,87 @@ class CanonicalValuesTests(unittest.TestCase):
             ["git.example.internal"],
         )
         self.assertEqual(dns["a_records"], {"git.example.internal": "192.0.2.62"})
+
+
+    def test_distinct_vm_image_families_project_independently_without_file_id(self) -> None:
+        model = load_site(self.write_site(VALID_SITE), catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        model.platform.images.vm["guest"] = ImageDefinition(
+            type="vm_image",
+            datastore_id="guest-store",
+            url="https://images.example.internal/guest.qcow2",
+            file_name="guest.qcow2",
+            checksum=ImageChecksum(algorithm="sha256", value="a" * 64),
+        )
+        model.platform.images.vm["onramp_host"] = ImageDefinition(
+            type="vm_image",
+            datastore_id="onramp-store",
+            url="https://images.example.internal/onramp.qcow2",
+            file_name="onramp.qcow2",
+            checksum=ImageChecksum(algorithm="sha256", value="b" * 64),
+        )
+        tofu = render_opentofu_variables(model)
+        self.assertEqual(tofu["guest_vm_image_datastore_id"], "guest-store")
+        self.assertEqual(tofu["onramp_host_image_datastore_id"], "onramp-store")
+        self.assertEqual(tofu["guest_vm_image_checksum"], "a" * 64)
+        self.assertEqual(tofu["onramp_host_image_checksum"], "b" * 64)
+        self.assertNotIn("guest_vm_image_file_id", tofu)
+        self.assertNotIn("onramp_host_image_file_id", tofu)
+
+    def test_searxng_immutable_image_reference_splits_and_rejects_mutable_forms(self) -> None:
+        digest = "sha256:" + "a" * 64
+        self.assertEqual(
+            normalize_container_image_reference("docker.io/searxng/searxng@" + digest),
+            ("docker.io/searxng/searxng", digest),
+        )
+        for reference in (
+            "docker.io/searxng/searxng:latest",
+            "docker.io/searxng/searxng@sha256:" + "A" * 64,
+            "Docker.io/searxng/searxng@" + digest,
+        ):
+            with self.subTest(reference=reference), self.assertRaises(CanonicalValuesError):
+                normalize_container_image_reference(reference)
+
+    def test_container_release_requires_separate_lowercase_sha256_digest(self) -> None:
+        valid = ServiceRelease(source="container", image="ghcr.io/example/app:1.0", digest="sha256:" + "a" * 64)
+        self.assertEqual(valid.digest, "sha256:" + "a" * 64)
+        for digest in ("not-a-digest", "SHA256:" + "a" * 64, "sha512:" + "a" * 128):
+            with self.assertRaises(ValueError):
+                ServiceRelease(source="container", image="ghcr.io/example/app:1.0", digest=digest)
+        with self.assertRaises(ValueError):
+            ServiceRelease(source="container", image="ghcr.io/example/app@sha256:" + "a" * 64, digest="sha256:" + "a" * 64)
+
+        network = ResourceNetwork(address="dhcp", mac_address="AA:bb:00:11:22:33")
+        self.assertEqual(network.mac_address, "aa:bb:00:11:22:33")
+        with self.assertRaises(ValueError):
+            ResourceNetwork(address="dhcp", mac_address="not-a-mac")
+
+    def test_image_definitions_require_safe_transport_metadata(self) -> None:
+        checksum = ImageChecksum(algorithm="sha256", value="a" * 64)
+        image = ImageDefinition(
+            type="lxc_template",
+            url="https://images.example.internal/debian.tar.zst",
+            file_name="debian.tar.zst",
+            checksum=checksum,
+        )
+        self.assertEqual(image.file_name, "debian.tar.zst")
+        with self.assertRaises(ValueError):
+            ImageDefinition(type="lxc_template", url="http://images.example.internal/image", file_name="image", checksum=checksum)
+        with self.assertRaises(ValueError):
+            ImageDefinition(type="lxc_template", url="https://images.example.internal/image", file_name="../image", checksum=checksum)
+
+    def test_image_family_and_identifier_must_match(self) -> None:
+        checksum = ImageChecksum(algorithm="sha256", value="b" * 64)
+        valid = ImageDefinition(
+            type="vm_image",
+            datastore_id="local-vm",
+            url="https://images.example.internal/debian.img",
+            file_name="debian.img",
+            checksum=checksum,
+        )
+        with self.assertRaises(ValueError):
+            PlatformImages(lxc={"debian": valid})
+        with self.assertRaises(ValueError):
+            PlatformImages(vm={"Debian": valid})
 
 
 if __name__ == "__main__":

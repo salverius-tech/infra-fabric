@@ -11,7 +11,9 @@ import ipaddress
 import json
 import re
 from pathlib import Path
-from typing import Any, Literal
+from pathlib import PurePosixPath
+from typing import Any, Literal, Mapping
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, ValidationError, field_validator, model_validator
 from ruamel.yaml import YAML
@@ -30,7 +32,25 @@ _IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 _HOSTNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?$")
 _PORT_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 _CIDR_RE = re.compile(r"^(?:dhcp|(?:[0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2})$")
+_MAC_RE = re.compile(r"^[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}$")
+_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _CHECKSUM_RE = re.compile(r"^[0-9a-fA-F]{64}|[0-9a-fA-F]{128}$")
+_HERMES_TAG_RE = re.compile(r"^v[0-9]{4}\.[0-9]+\.[0-9]+(?:\.[0-9]+)?$")
+_HERMES_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_HERMES_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+_HERMES_USER_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
+
+
+def normalize_container_image_reference(reference: str) -> tuple[str, str]:
+    """Split an immutable lowercase container reference into image and digest."""
+    if not isinstance(reference, str) or reference != reference.strip() or reference.count("@") != 1:
+        raise CanonicalValuesError("container image must use repository@sha256:digest")
+    image, digest = reference.split("@", 1)
+    if not image or image != image.lower() or any(char.isspace() for char in image):
+        raise CanonicalValuesError("container image repository must be lowercase and non-empty")
+    if not _DIGEST_RE.fullmatch(digest):
+        raise CanonicalValuesError("container image digest must be lowercase sha256")
+    return image, digest
 
 
 class StrictModel(BaseModel):
@@ -105,14 +125,51 @@ class ImageChecksum(StrictModel):
 
 class ImageDefinition(StrictModel):
     type: Literal["lxc_template", "vm_image"]
+    datastore_id: StrictStr | None = None
     url: StrictStr
     file_name: StrictStr
     checksum: ImageChecksum
+
+    @model_validator(mode="after")
+    def validate_datastore_ownership(self) -> "ImageDefinition":
+        if self.type == "vm_image" and not self.datastore_id:
+            raise ValueError("vm images require datastore_id ownership")
+        if self.type == "lxc_template" and self.datastore_id is not None:
+            raise ValueError("lxc templates use platform storage template_datastore")
+        return self
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("image url must be an HTTPS URL without credentials or fragments")
+        return value
+
+    @field_validator("file_name")
+    @classmethod
+    def validate_file_name(cls, value: str) -> str:
+        if value in {".", ".."} or "/" in value or "\\\\" in value or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,254}", value):
+            raise ValueError("image file_name must be a safe pathless filename")
+        return value
 
 
 class PlatformImages(StrictModel):
     lxc: dict[str, ImageDefinition] = Field(default_factory=dict)
     vm: dict[str, ImageDefinition] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_image_keys(self) -> "PlatformImages":
+        for family, definitions, expected_type in (
+            ("lxc", self.lxc, "lxc_template"),
+            ("vm", self.vm, "vm_image"),
+        ):
+            for name, definition in definitions.items():
+                if not _IDENTIFIER_RE.fullmatch(name):
+                    raise ValueError(f"platform.images.{family} keys must be lowercase identifiers")
+                if definition.type != expected_type:
+                    raise ValueError(f"platform.images.{family}.{name} type does not match its image family")
+        return self
 
 
 class Platform(StrictModel):
@@ -147,6 +204,7 @@ class ResourceNetwork(StrictModel):
     address: StrictStr
     expected_address: StrictStr | None = None
     gateway: StrictStr | None = None
+    mac_address: StrictStr | None = None
     bridge: StrictStr | None = None
     vlan_id: StrictInt | None = None
     dns_servers: list[StrictStr] = Field(default_factory=list)
@@ -181,6 +239,15 @@ class ResourceNetwork(StrictModel):
                 raise ValueError("network.gateway must be an IPv4 address") from error
             if address.version != 4:
                 raise ValueError("network.gateway must be an IPv4 address")
+        return value
+
+    @field_validator("mac_address")
+    @classmethod
+    def validate_mac_address(cls, value: str | None) -> str | None:
+        if value is not None:
+            if not _MAC_RE.fullmatch(value):
+                raise ValueError("network.mac_address must be six colon-separated hexadecimal octets")
+            return value.lower()
         return value
 
     @model_validator(mode="after")
@@ -238,6 +305,16 @@ class ResourceRuntime(StrictModel):
     users: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
+class ResourceSecurity(StrictModel):
+    password_authentication: StrictBool | None = None
+    permit_root_login: StrictBool | None = None
+    deploy_user: StrictStr | None = None
+    deploy_dir: StrictStr | None = None
+    allow_passwordless_sudo: StrictBool | None = None
+    allowed_ssh_cidrs: list[StrictStr] = Field(default_factory=list)
+    ssh_public_keys: list[StrictStr] = Field(default_factory=list)
+
+
 class Resource(StrictModel):
     type: Literal["lxc", "vm"]
     identity: ResourceIdentity
@@ -245,6 +322,7 @@ class Resource(StrictModel):
     compute: ResourceCompute
     storage: ResourceStorage
     runtime: ResourceRuntime
+    security: ResourceSecurity = Field(default_factory=ResourceSecurity)
 
     @model_validator(mode="after")
     def validate_runtime_fields(self) -> "Resource":
@@ -340,6 +418,8 @@ class ServiceEndpoints(StrictModel):
 
 class ServiceRelease(StrictModel):
     version: StrictStr | None = None
+    tag: StrictStr | None = None
+    commit: StrictStr | None = None
     image: StrictStr | None = None
     digest: StrictStr | None = None
     checksum: StrictStr | None = None
@@ -347,13 +427,187 @@ class ServiceRelease(StrictModel):
 
     @model_validator(mode="after")
     def validate_release(self) -> "ServiceRelease":
-        if self.source == "container" and (not self.image or not self.digest):
-            raise ValueError("container releases require image and immutable digest")
+        if self.tag is not None and not _HERMES_TAG_RE.fullmatch(self.tag):
+            raise ValueError("release tag must use the managed Hermes release-tag form")
+        if self.commit is not None and not _HERMES_COMMIT_RE.fullmatch(self.commit):
+            raise ValueError("release commit must be a lowercase 40-character commit")
+        if self.source == "container":
+            if not self.image or not self.digest:
+                raise ValueError("container releases require image and immutable digest")
+            if "@" in self.image or not _DIGEST_RE.fullmatch(self.digest):
+                raise ValueError("container releases require a separate lowercase sha256 digest")
         if self.source in {"package", "binary"} and not self.version:
             raise ValueError(f"{self.source} releases require version")
         if self.source == "package" and self.digest:
             raise ValueError("package releases cannot declare digest")
         return self
+
+
+class HermesRuntimeNode(StrictModel):
+    version: StrictStr | None = None
+    checksums: dict[Literal["amd64", "arm64"], StrictStr] = Field(default_factory=dict)
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_VERSION_RE.fullmatch(value):
+            raise ValueError("Hermes Node version must be a strict semantic version")
+        return value
+
+    @field_validator("checksums")
+    @classmethod
+    def validate_checksums(cls, value: dict[str, str]) -> dict[str, str]:
+        for architecture, checksum in value.items():
+            if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+                raise ValueError(f"Hermes Node {architecture} checksum must be lowercase SHA-256")
+        return value
+
+
+class HermesTuning(StrictModel):
+    compression_threshold: float | None = None
+    max_concurrent_children: StrictInt | None = None
+    max_spawn_depth: StrictInt | None = None
+
+    @field_validator("compression_threshold")
+    @classmethod
+    def validate_threshold(cls, value: float | None) -> float | None:
+        if value is not None and not 0.5 <= value <= 0.95:
+            raise ValueError("Hermes compression threshold must be between 0.5 and 0.95")
+        return value
+
+    @field_validator("max_concurrent_children")
+    @classmethod
+    def validate_concurrency(cls, value: int | None) -> int | None:
+        if value is not None and not 1 <= value <= 10:
+            raise ValueError("Hermes max_concurrent_children must be between 1 and 10")
+        return value
+
+    @field_validator("max_spawn_depth")
+    @classmethod
+    def validate_spawn_depth(cls, value: int | None) -> int | None:
+        if value is not None and not 1 <= value <= 3:
+            raise ValueError("Hermes max_spawn_depth must be between 1 and 3")
+        return value
+
+
+class HermesDashboard(StrictModel):
+    enabled: StrictBool | None = None
+    host: StrictStr | None = None
+    auth_username: StrictStr | None = None
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str | None) -> str | None:
+        if value is not None and value not in {"127.0.0.1", "::1", "localhost"}:
+            raise ValueError("Hermes dashboard host must be loopback-only")
+        return value
+
+
+class HermesWebConfiguration(StrictModel):
+    searxng_url: StrictStr | None = None
+
+
+class HermesControlConfiguration(StrictModel):
+    enabled: StrictBool = False
+    domain: StrictStr | None = None
+    source_url: StrictStr | None = None
+    source_ref: StrictStr | None = None
+    api_host: StrictStr = "127.0.0.1"
+    api_port: StrictInt = 8787
+    require_task_approval: StrictBool = True
+    plugin_socket: StrictStr = "/run/hermes/control-extension.sock"
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.lower().rstrip(".")
+        if not _HOSTNAME_RE.fullmatch(normalized):
+            raise ValueError("Hermes Control domain must be a hostname")
+        return normalized
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("Hermes Control source_url must be HTTPS without credentials or fragments")
+        return value
+
+    @field_validator("source_ref")
+    @classmethod
+    def validate_source_ref(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_COMMIT_RE.fullmatch(value):
+            raise ValueError("Hermes Control source_ref must be a lowercase 40-character commit")
+        return value
+
+    @field_validator("api_host")
+    @classmethod
+    def validate_api_host(cls, value: str) -> str:
+        if value != "127.0.0.1":
+            raise ValueError("Hermes Control api_host must be 127.0.0.1")
+        return value
+
+    @field_validator("api_port")
+    @classmethod
+    def validate_api_port(cls, value: int) -> int:
+        if not 1 <= value <= 65535:
+            raise ValueError("Hermes Control api_port must be between 1 and 65535")
+        return value
+
+    @field_validator("require_task_approval")
+    @classmethod
+    def validate_task_approval(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Hermes Control requires task approval")
+        return value
+
+    @field_validator("plugin_socket")
+    @classmethod
+    def validate_plugin_socket(cls, value: str) -> str:
+        path = PurePosixPath(value)
+        if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("Hermes Control plugin_socket must be a normalized absolute POSIX path")
+        return value
+
+    @model_validator(mode="after")
+    def validate_enabled_requirements(self) -> "HermesControlConfiguration":
+        if self.enabled:
+            missing = [name for name, value in (("domain", self.domain), ("source_url", self.source_url), ("source_ref", self.source_ref)) if not value]
+            if missing:
+                raise ValueError(f"enabled Hermes Control requires: {', '.join(missing)}")
+        return self
+
+
+class HermesConfiguration(StrictModel):
+    runtime_user: StrictStr | None = None
+    repository_path: StrictStr | None = None
+    allow_legacy_runtime: StrictBool | None = None
+    tuning: HermesTuning = Field(default_factory=HermesTuning)
+    node: HermesRuntimeNode = Field(default_factory=HermesRuntimeNode)
+    dashboard: HermesDashboard = Field(default_factory=HermesDashboard)
+    web: HermesWebConfiguration = Field(default_factory=HermesWebConfiguration)
+    control: HermesControlConfiguration = Field(default_factory=HermesControlConfiguration)
+
+    @field_validator("runtime_user")
+    @classmethod
+    def validate_runtime_user(cls, value: str | None) -> str | None:
+        if value is not None and (value == "root" or not _HERMES_USER_RE.fullmatch(value)):
+            raise ValueError("Hermes runtime_user must be a non-root Linux user identifier")
+        return value
+
+    @field_validator("repository_path")
+    @classmethod
+    def validate_repository_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        path = PurePosixPath(value)
+        if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("Hermes repository_path must be a normalized absolute POSIX path")
+        return value
 
 
 class Service(StrictModel):
@@ -376,6 +630,14 @@ class CanonicalSite(StrictModel):
 
     @model_validator(mode="after")
     def validate_service_ownership(self) -> "CanonicalSite":
+        hermes = self.services.get("hermes")
+        if hermes is not None:
+            try:
+                validated_hermes = HermesConfiguration.model_validate(hermes.configuration)
+                hermes.configuration = validated_hermes.model_dump(mode="json", exclude_none=True)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.hermes.configuration: {details}") from error
         for _, resource in (*self.resources.guests.items(), *self.resources.shared_hosts.items()):
             network = resource.network
             if network.bridge is None:
@@ -438,7 +700,7 @@ def load_site(
     if catalog_path is not None:
         try:
             catalog = load_catalog(catalog_path)
-            catalog.validate_model_services(model.services)
+            catalog.validate_model_services(model.services, model.resources)
             catalog.validate_selection({name for name, service in model.services.items() if service.enabled})
         except ServiceCatalogError as error:
             raise CanonicalValuesError(str(error)) from error

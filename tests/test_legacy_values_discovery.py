@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -46,6 +47,112 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         (values / "ansible" / "inventory" / "local.yml").write_text("all:\n  hosts:\n    edge:\n", encoding="utf-8")
         return temp, values
 
+    def test_root_and_site_aware_layouts_have_equivalent_report_only_discovery(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            site_values = values / "sites" / "dev"
+            site_values.mkdir(parents=True)
+            for source in (".env", "terraform.tfvars", "settings.local.json", "dns-records.local.json"):
+                (site_values / source).write_bytes((values / source).read_bytes())
+            inventory = site_values / "ansible" / "inventory"
+            inventory.mkdir(parents=True)
+            (inventory / "local.yml").write_bytes((values / "ansible" / "inventory" / "local.yml").read_bytes())
+            before = {path: path.read_bytes() for path in values.rglob("*") if path.is_file()}
+            root_report = legacy_values_discovery.discover_legacy(values)
+            site_report = legacy_values_discovery.discover_legacy(site_values)
+            after = {path: path.read_bytes() for path in values.rglob("*") if path.is_file()}
+        self.assertEqual(before, after)
+        normalize = lambda report: sorted(
+            (item.key, item.classification, item.proposed_path, repr(item.value)) for item in report.observations
+        )
+        self.assertEqual(normalize(root_report), normalize(site_report))
+        self.assertEqual(root_report.conflicts, site_report.conflicts)
+        self.assertEqual(root_report.candidate_ready, site_report.candidate_ready)
+        rendered = json.dumps(legacy_values_discovery.render_migration_report(site_report))
+        self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
+        self.assertFalse((values / "site.yaml").exists())
+        self.assertFalse((site_values / "site.yaml").exists())
+
+    def test_ancillary_artifacts_are_reported_without_reading_contents(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "ansible" / "known_hosts").write_text(
+                "SECRET_KNOWN_HOST_SENTINEL\n", encoding="utf-8"
+            )
+            (values / "terraform.tfstate").write_text(
+                '{"secret":"SECRET_STATE_SENTINEL"}\n', encoding="utf-8"
+            )
+            (values / "service-backups").mkdir()
+            (values / "service-backups" / "forgejo.json").write_text(
+                "SECRET_BACKUP_SENTINEL\n", encoding="utf-8"
+            )
+            (values / "tfplan.bin").write_bytes(b"SECRET_PLAN_SENTINEL")
+            (values / "artifacts" / "nested").mkdir(parents=True)
+            (values / "artifacts" / "nested" / "report.txt").write_text(
+                "SECRET_ARTIFACT_SENTINEL\n", encoding="utf-8"
+            )
+            (values / "backups").mkdir()
+            (values / "backups" / "restore.tar").write_bytes(b"SECRET_RECOVERY_SENTINEL")
+            report = legacy_values_discovery.discover_legacy(values)
+            rendered = json.dumps(legacy_values_discovery.render_migration_report(report))
+        artifacts = {item["path"]: item for item in report.ancillary_artifacts}
+        self.assertEqual(artifacts["ansible/known_hosts"]["class"], "known-hosts")
+        self.assertEqual(artifacts["terraform.tfstate"]["class"], "terraform-state")
+        self.assertEqual(artifacts["service-backups"]["class"], "service-backups")
+        self.assertEqual(artifacts["service-backups"]["file_count"], 1)
+        self.assertEqual(artifacts["tfplan.bin"]["class"], "terraform-plan")
+        self.assertEqual(artifacts["artifacts"]["class"], "general-artifacts")
+        self.assertEqual(artifacts["backups"]["class"], "recovery-backups")
+        self.assertEqual(artifacts["artifacts"]["file_count"], 1)
+        self.assertEqual(artifacts["backups"]["file_count"], 1)
+        self.assertNotIn("SECRET_KNOWN_HOST_SENTINEL", rendered)
+        self.assertNotIn("SECRET_PLAN_SENTINEL", rendered)
+        self.assertNotIn("SECRET_ARTIFACT_SENTINEL", rendered)
+        self.assertNotIn("SECRET_RECOVERY_SENTINEL", rendered)
+
+        self.assertNotIn("SECRET_STATE_SENTINEL", rendered)
+        self.assertNotIn("SECRET_BACKUP_SENTINEL", rendered)
+
+    def test_ancillary_artifacts_have_root_site_layout_parity(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "ansible" / "known_hosts").write_text("host key\n", encoding="utf-8")
+            (values / "terraform.tfstate.backup").write_text("state\n", encoding="utf-8")
+            (values / "service-backups").mkdir()
+            (values / "service-backups" / "restore.tar").write_bytes(b"backup")
+            site_values = values / "sites" / "dev"
+            for source in ("ansible/known_hosts", "terraform.tfstate.backup", "service-backups/restore.tar"):
+                destination = site_values / source
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes((values / source).read_bytes())
+            root_report = legacy_values_discovery.discover_legacy(values)
+            site_report = legacy_values_discovery.discover_legacy(site_values)
+        normalize = lambda report: sorted(
+            (item["path"], item["class"], item.get("file_count"), item["size_bytes"])
+            for item in report.ancillary_artifacts
+        )
+        self.assertEqual(normalize(root_report), normalize(site_report))
+        self.assertFalse((values / "site.yaml").exists())
+        self.assertFalse((site_values / "site.yaml").exists())
+
+    def test_ancillary_artifact_symlink_is_rejected(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            target = values.parent / "outside-known-hosts"
+            target.write_text("host key\n", encoding="utf-8")
+            (values / "ansible" / "known_hosts").symlink_to(target)
+            with self.assertRaises(legacy_values_discovery.DiscoveryError):
+                legacy_values_discovery.discover_legacy(values)
+
+    def test_ancillary_artifact_special_file_is_rejected(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "artifacts").mkdir()
+            os.mkfifo(values / "artifacts" / "artifacts.fifo")
+            with self.assertRaises(legacy_values_discovery.DiscoveryError):
+                legacy_values_discovery.discover_legacy(values)
+
+
     def test_discovery_is_byte_for_byte_non_mutating(self) -> None:
         temp, values = self.make_values()
         with temp:
@@ -56,7 +163,18 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertFalse((values / "site.yaml").exists())
         self.assertIn(".env", report.files)
 
-    def test_report_redacts_secret_and_unknown_values(self) -> None:
+    def test_hermes_control_source_aliases_are_mapped_and_redacted_secrets_stay_secret(self) -> None:
+        migration = legacy_values_discovery._load_migration_module()
+        self.assertEqual(
+            legacy_values_discovery._classification("HERMES_CONTROL_SOURCE_URL", migration),
+            ("mapped", "services.hermes.configuration.control.source_url"),
+        )
+        self.assertEqual(
+            legacy_values_discovery._classification("HERMES_CONTROL_SOURCE_REF", migration),
+            ("mapped", "services.hermes.configuration.control.source_ref"),
+        )
+        self.assertEqual(legacy_values_discovery._classification("HERMES_CONTROL_API_TOKEN", migration)[0], "secret")
+
         temp, values = self.make_values()
         with temp:
             rendered = json.dumps(

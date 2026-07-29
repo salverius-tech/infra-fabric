@@ -6,7 +6,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, Mapping
 
 
 class ServiceCatalogError(ValueError):
@@ -18,6 +18,15 @@ SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "
 _SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))
 
 
+def _path_value(value: Any, path: str) -> Any:
+    for part in path.split(".") if path else ():
+        if isinstance(value, Mapping):
+            value = value.get(part)
+        else:
+            value = getattr(value, part, None)
+    return value
+
+
 @dataclass(frozen=True)
 class ServiceCapability:
     name: str
@@ -25,6 +34,7 @@ class ServiceCapability:
     dependencies: tuple[str, ...]
     required_secrets: tuple[str, ...]
     secret_classifications: dict[str, SecretClassification]
+    conditional_required_secrets: dict[str, tuple[str, ...]]
     inventory: dict[str, object]
     raw: dict[str, object]
 
@@ -59,21 +69,64 @@ class ServiceCatalog:
     def required_secret_paths(self, enabled: set[str]) -> frozenset[str]:
         """Return catalog-declared logical secrets for an enabled service set."""
         self.validate_selection(enabled)
+        conditional = {
+            path
+            for name in enabled
+            for paths in self.get(name).conditional_required_secrets.values()
+            for path in paths
+        }
         return frozenset(
             path
             for name in sorted(enabled)
             for path in self.get(name).required_secrets
+            if path not in conditional
         )
 
     def required_secret_paths_for_model(self, services: dict[str, object]) -> frozenset[str]:
         """Derive required logical secrets from canonical service enablement."""
         self.validate_model_services(services)
         enabled = {name for name, service in services.items() if getattr(service, "enabled", False)}
-        return self.required_secret_paths(enabled)
+        paths = set(self.required_secret_paths(enabled))
+        for name in sorted(enabled):
+            service = services[name]
+            configuration = getattr(service, "configuration", {})
+            for condition, conditional_paths in self.get(name).conditional_required_secrets.items():
+                if _path_value(configuration, condition.removeprefix("configuration.")) is True:
+                    paths.update(conditional_paths)
+        return frozenset(paths)
+
+    def required_secret_report_for_model(self, services: Mapping[str, object]) -> tuple[dict[str, object], ...]:
+        """Return value-free secret metadata including configuration conditions."""
+        paths = self.required_secret_paths_for_model(dict(services))
+        report: list[dict[str, object]] = []
+        for path in sorted(paths):
+            owner = next(
+                (
+                    capability
+                    for capability in self._capabilities.values()
+                    if path in capability.required_secrets
+                    or any(path in values for values in capability.conditional_required_secrets.values())
+                ),
+                None,
+            )
+            entry: dict[str, object] = {"path": path, "required": True}
+            if owner is not None:
+                entry["service"] = owner.name
+                classification = owner.secret_classifications.get(path)
+                if classification is not None:
+                    entry["classification"] = classification
+            report.append(entry)
+        return tuple(report)
 
     def required_secret_report(self, enabled: set[str]) -> tuple[dict[str, object], ...]:
         """Return a deterministic, value-free report of catalog requirements."""
         self.validate_selection(enabled)
+        conditional_services = sorted(name for name in enabled if self.get(name).conditional_required_secrets)
+        if conditional_services:
+            raise ServiceCatalogError(
+                "required_secret_report(enabled) cannot evaluate conditional secrets; use required_secret_report_for_model(): "
+                + ", ".join(conditional_services)
+            )
         report: list[dict[str, object]] = []
         for name in sorted(enabled):
             capability = self.get(name)
@@ -85,8 +138,8 @@ class ServiceCatalog:
                 report.append(entry)
         return tuple(report)
 
-    def validate_model_services(self, services: dict[str, object]) -> None:
-        """Validate the complete canonical service map against catalog ownership."""
+    def validate_model_services(self, services: Mapping[str, object], resources: Any | None = None) -> None:
+        """Validate canonical service ownership and catalog-derived resource compatibility."""
         unknown = sorted(set(services) - self.names)
         if unknown:
             raise ServiceCatalogError(f"canonical services are not in catalog: {', '.join(unknown)}")
@@ -100,6 +153,19 @@ class ServiceCatalog:
             state = getattr(service, "state", None)
             if state is not None and getattr(state, "capable", False) and not self.get(name).state_capable:
                 raise ServiceCatalogError(f"service {name} declares state capability not present in catalog")
+            if resources is not None and getattr(service, "enabled", False):
+                resource_name = getattr(service, "resource", None)
+                resource_map = {
+                    **getattr(resources, "guests", {}),
+                    **getattr(resources, "shared_hosts", {}),
+                }
+                resource = resource_map.get(resource_name)
+                if resource is not None:
+                    supported = set(self.get(name).raw.get("terraform_replace_addresses", {}))
+                    if supported and getattr(resource, "type", None) not in supported:
+                        raise ServiceCatalogError(
+                            f"service {name} resource type {getattr(resource, 'type', None)!r} is not supported by catalog"
+                        )
 
     def _validate_acyclic(self) -> None:
         visiting: set[str] = set()
@@ -154,6 +220,28 @@ def load_catalog(path: Path) -> ServiceCatalog:
             raise ServiceCatalogError(
                 f"service {name} secret_classifications must map required paths to supported classifications"
             )
+        conditional_required_secrets = raw.get("conditional_required_secrets", {})
+        if not isinstance(conditional_required_secrets, dict) or any(
+            not isinstance(condition, str)
+            or not condition
+            or not all(_LOGICAL_PART_RE.fullmatch(part) for part in condition.split("."))
+            or not isinstance(paths, list)
+            or not all(
+                isinstance(secret_path, str)
+                and secret_path
+                and all(_LOGICAL_PART_RE.fullmatch(part) for part in secret_path.split("."))
+                for secret_path in paths
+            )
+            for condition, paths in conditional_required_secrets.items()
+        ):
+            raise ServiceCatalogError(f"service {name} conditional_required_secrets must map paths to logical secret lists")
+        conditional_paths = {condition: tuple(paths) for condition, paths in conditional_required_secrets.items()}
+        conditional_secret_paths = {secret_path for paths in conditional_paths.values() for secret_path in paths}
+        undeclared = sorted(conditional_secret_paths - set(required_secrets) - set(secret_classifications))
+        if undeclared:
+            raise ServiceCatalogError(
+                f"service {name} conditional secret paths must be declared: {', '.join(undeclared)}"
+            )
         inventory = raw.get("inventory", {})
         if not isinstance(inventory, dict):
             raise ServiceCatalogError(f"service {name} inventory metadata must be an object")
@@ -163,6 +251,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
             dependencies=tuple(dependencies),
             required_secrets=tuple(required_secrets),
             secret_classifications=dict(secret_classifications),
+            conditional_required_secrets=conditional_paths,
             inventory=inventory,
             raw=raw,
         )

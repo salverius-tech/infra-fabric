@@ -15,7 +15,7 @@ try:
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
-    from secret_provider import SecretProviderError, check_sops_age_availability
+    from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
@@ -23,7 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
-    from secret_provider import SecretProviderError, check_sops_age_availability
+    from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy
 
 
 class PreflightError(RuntimeError):
@@ -94,19 +94,24 @@ def _write_projection(path: Path, value: object) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def check_canonical_secret_availability(repo: Path) -> None:
+def check_canonical_secret_availability(repo: Path) -> dict[str, str] | None:
     """Check canonical encrypted-bundle prerequisites without decryption."""
     context = from_environment(repo)
     if context.canonical_site_path is None:
-        return
+        return None
+    if context.site is None:
+        raise PreflightError("canonical secret availability preflight failed")
     bundle = context.values_dir / "secrets.sops.yaml"
     if not bundle.is_file():
         return
     try:
-        check_sops_age_availability(
+        policy = repo / ".sops.yaml"
+        policy_metadata = inspect_sops_policy(policy, site=context.site) if policy.is_file() else {"recipient_policy": "unavailable"}
+        availability = check_sops_age_availability(
             bundle,
             environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
         )
+        return {**policy_metadata, **availability}
     except SecretProviderError as error:
         raise PreflightError("canonical secret availability preflight failed") from error
 
@@ -150,7 +155,33 @@ def check_canonical_projection(repo: Path) -> None:
         )
 
 
-def run(root: Path, require_values: bool) -> None:
+def check_canonical_required_secrets(repo: Path, *, require_secrets: bool) -> tuple[dict[str, object], ...] | None:
+    """Derive value-free required secret metadata and optionally validate the provider bundle."""
+    context = from_environment(repo)
+    site_file = context.canonical_site_path
+    if site_file is None:
+        return None
+    model = load_site(site_file, expected_site=context.site, catalog_path=repo / "infra" / "services.json")
+    catalog = load_catalog(repo / "infra" / "services.json")
+    report = catalog.required_secret_report_for_model(model.services)
+    if not require_secrets:
+        return report
+    paths: set[str] = {str(entry["path"]) for entry in report}
+    if not paths:
+        return report
+    bundle = context.values_dir / "secrets.sops.yaml"
+    if not bundle.is_file():
+        raise PreflightError("required canonical secrets bundle is missing")
+    provider = SopsAgeProvider(
+        bundle,
+        environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
+        required_paths=paths,
+    )
+    provider.validate_required(paths)
+    return report
+
+
+def run(root: Path, require_values: bool, require_secrets: bool) -> None:
     repo = root.resolve()
     check_directory_writable(repo)
     check_directory_writable(repo / "infra" / "opentofu")
@@ -170,6 +201,7 @@ def run(root: Path, require_values: bool) -> None:
         check_no_state_lock(values)
     try:
         check_canonical_secret_availability(repo)
+        check_canonical_required_secrets(repo, require_secrets=require_secrets)
         check_canonical_projection(repo)
     except (OSError, ValueError) as error:
         raise PreflightError(f"canonical projection preflight failed: {error}") from error
@@ -179,10 +211,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--require-values", action="store_true")
+    parser.add_argument("--require-secrets", action="store_true", help="validate conditional logical secrets against the SOPS bundle")
     args = parser.parse_args(argv)
 
     try:
-        run(args.root, args.require_values)
+        run(args.root, args.require_values, args.require_secrets)
     except PreflightError as error:
         print(f"workspace preflight failed: {error}", file=sys.stderr)
         print(

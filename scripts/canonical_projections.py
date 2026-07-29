@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
-from typing import Any
+from typing import Any, Mapping
 
 from canonical_values import CanonicalSite
 from service_catalog import ServiceCatalog
@@ -53,6 +53,25 @@ def _resource(model: CanonicalSite, name: str) -> Any:
     return resource
 
 
+def _path_value(value: Any, path: str) -> Any:
+    for part in path.split("."):
+        if isinstance(value, Mapping):
+            if part not in value:
+                raise ProjectionError(f"canonical projection path does not exist: {path}")
+            value = value[part]
+        else:
+            if not hasattr(value, part):
+                raise ProjectionError(f"canonical projection path does not exist: {path}")
+            value = getattr(value, part)
+    return value
+
+
+def _compatibility_value(service: Any, resource: Any, path: str) -> Any:
+    if path.startswith("resource."):
+        return _path_value(resource, path.removeprefix("resource."))
+    return _path_value(service, path)
+
+
 def _resource_variables(name: str, resource: Any) -> dict[str, Any]:
     prefix = name if resource.type == "vm" else f"{name}_container"
     network = resource.network
@@ -66,12 +85,19 @@ def _resource_variables(name: str, resource: Any) -> dict[str, Any]:
         f"{prefix}_swap_mb": resource.compute.swap_mb,
         f"{prefix}_disk_gb": resource.storage.root.size_gb,
     }
+    if name == "onramp_host":
+        values["onramp_host_datastore_id"] = resource.storage.root.storage_id
+    if name in {"forgejo_runner", "infisical", "hermes", "tailscale_client", "onramp_host"}:
+        values[f"{name}_started"] = resource.runtime.started
+        values[f"{name}_start_on_boot"] = resource.runtime.start_on_boot
     if network.gateway is not None:
         values[f"{prefix}_ipv4_gateway"] = network.gateway
     if network.dns_servers:
         values[f"{prefix}_dns_servers"] = list(network.dns_servers)
     if network.search_domain is not None:
         values[f"{prefix}_search_domain"] = network.search_domain
+    if network.mac_address is not None:
+        values[f"{prefix}_mac_address"] = network.mac_address
     if network.bridge is not None:
         values[f"{prefix}_bridge"] = network.bridge
     if network.vlan_id is not None:
@@ -100,6 +126,21 @@ def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
             if resource.type == "vm" and resource.runtime.cloud_init:
                 runtimes[name].update(resource.runtime.cloud_init)
     values["service_runtime"] = runtimes
+    image_names = (
+        ("lxc", "debian", "debian_template"),
+        ("vm", "guest", "guest_vm_image"),
+        ("vm", "onramp_host", "onramp_host_image"),
+    )
+    for family, name, prefix in image_names:
+        image = model.platform.images.model_dump(mode="python").get(family, {}).get(name)
+        if not image:
+            continue
+        if family == "vm":
+            values[f"{prefix}_datastore_id"] = image["datastore_id"]
+        values[f"{prefix}_url"] = image["url"]
+        values[f"{prefix}_file_name"] = image["file_name"]
+        values[f"{prefix}_checksum_algorithm"] = image["checksum"]["algorithm"]
+        values[f"{prefix}_checksum"] = image["checksum"]["value"]
     for name, service in model.services.items():
         if not service.enabled:
             continue
@@ -157,10 +198,11 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
             continue
         capability = catalog.get(name)
         resource = _resource(model, service.resource or "")
-        services[name] = {
+        service_vars = {
             "resource": service.resource,
             "resource_type": resource.type,
             "runtime": resource.runtime.model_dump(mode="json", exclude_none=True),
+            "security": resource.security.model_dump(mode="json", exclude={"ssh_public_keys"}, exclude_none=True),
             "endpoints": service.endpoints.model_dump(mode="json", exclude_none=True),
             "release": service.release.model_dump(mode="json", exclude_none=True),
             "configuration": service.configuration,
@@ -170,6 +212,18 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                 "inventory_group": capability.inventory.get("group"),
             },
         }
+        compatibility = capability.inventory.get("canonical_play_vars")
+        if isinstance(compatibility, Mapping):
+            legacy_vars: dict[str, Any] = {}
+            for legacy_name, canonical_path in compatibility.items():
+                if not isinstance(legacy_name, str) or not isinstance(canonical_path, str):
+                    raise ProjectionError(f"invalid canonical compatibility mapping for service {name}")
+                value = _compatibility_value(service, resource, canonical_path)
+                if value is not None:
+                    legacy_vars[legacy_name] = value
+            if legacy_vars:
+                service_vars["legacy_vars"] = legacy_vars
+        services[name] = service_vars
     result = {"canonical_site": model.site.name, "services": services}
     _assert_non_secret(result, "ansible")
     return result

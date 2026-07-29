@@ -33,6 +33,7 @@ class DiscoveryReport:
     observations: list[FieldObservation] = field(default_factory=list)
     conflicts: list[dict[str, Any]] = field(default_factory=list)
     files: list[str] = field(default_factory=list)
+    ancillary_artifacts: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def candidate_ready(self) -> bool:
@@ -74,6 +75,8 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_server_name": "services.forgejo.endpoints.public_names",
         "FORGEJO_VERSION": "services.forgejo.release.version",
         "FORGEJO_SSH_PORT": "services.forgejo.endpoints.ports.ssh",
+        "HERMES_CONTROL_SOURCE_URL": "services.hermes.configuration.control.source_url",
+        "HERMES_CONTROL_SOURCE_REF": "services.hermes.configuration.control.source_ref",
     }
     if key in paths:
         return "mapped", paths[key]
@@ -169,6 +172,81 @@ def _read_json_keys(path: Path, report: DiscoveryReport, migration: Any) -> None
         _observe(source, str(key), item, report, migration)
 
 
+def _artifact_relative(values: Path, path: Path) -> str:
+    """Return a contained, non-symlinked artifact path for metadata reporting."""
+    try:
+        relative = path.relative_to(values)
+    except ValueError as error:
+        raise DiscoveryError("legacy artifact path escapes the values directory") from error
+    current = values
+    for component in relative.parts:
+        current /= component
+        if current.is_symlink():
+            raise DiscoveryError("legacy artifact symlinks are not supported")
+    return relative.as_posix()
+
+
+def _record_artifact(report: DiscoveryReport, values: Path, path: Path, artifact_class: str) -> None:
+    relative = _artifact_relative(values, path)
+    if not path.is_file():
+        raise DiscoveryError("legacy artifact must be a regular file")
+    report.ancillary_artifacts.append(
+        {
+            "path": relative,
+            "class": artifact_class,
+            "present": True,
+            "size_bytes": path.stat().st_size,
+        }
+    )
+
+
+def _record_artifact_tree(report: DiscoveryReport, values: Path, root: Path, artifact_class: str) -> None:
+    _artifact_relative(values, root)
+    if root.is_symlink():
+        raise DiscoveryError("legacy artifact symlinks are not supported")
+    if not root.is_dir():
+        raise DiscoveryError("legacy artifact tree must be a directory")
+    regular_files: list[Path] = []
+    for path in sorted(root.rglob("*")):
+        _artifact_relative(values, path)
+        if path.is_symlink():
+            raise DiscoveryError("legacy artifact symlinks are not supported")
+        if path.is_file():
+            regular_files.append(path)
+        elif not path.is_dir():
+            raise DiscoveryError("legacy artifact tree contains a non-regular entry")
+    report.ancillary_artifacts.append(
+        {
+            "path": _artifact_relative(values, root),
+            "class": artifact_class,
+            "present": True,
+            "file_count": len(regular_files),
+            "size_bytes": sum(path.stat().st_size for path in regular_files),
+        }
+    )
+
+
+def _discover_ancillary_artifacts(values: Path, report: DiscoveryReport) -> None:
+    known_hosts = values / "ansible" / "known_hosts"
+    if known_hosts.exists() or known_hosts.is_symlink():
+        _record_artifact(report, values, known_hosts, "known-hosts")
+    for state in sorted(values.glob("terraform.tfstate*")):
+        if state.exists() or state.is_symlink():
+            _record_artifact(report, values, state, "terraform-state")
+    backups = values / "service-backups"
+    if backups.exists() or backups.is_symlink():
+        _record_artifact_tree(report, values, backups, "service-backups")
+    for plan in sorted(values.glob("tfplan*")):
+        if plan.exists() or plan.is_symlink():
+            _record_artifact(report, values, plan, "terraform-plan")
+    artifacts = values / "artifacts"
+    if artifacts.exists() or artifacts.is_symlink():
+        _record_artifact_tree(report, values, artifacts, "general-artifacts")
+    backups = values / "backups"
+    if backups.exists() or backups.is_symlink():
+        _record_artifact_tree(report, values, backups, "recovery-backups")
+
+
 def discover_legacy(values_dir: Path, repo: Path | None = None) -> DiscoveryReport:
     """Read legacy inputs and return a redacted migration review report."""
     values = values_dir.resolve()
@@ -193,6 +271,7 @@ def discover_legacy(values_dir: Path, repo: Path | None = None) -> DiscoveryRepo
             )
         else:
             reader(path, report, migration)
+    _discover_ancillary_artifacts(values, report)
     return report
 
 
@@ -214,6 +293,7 @@ def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
             for item in report.observations
         ],
         "conflicts": report.conflicts,
+        "ancillary_artifacts": sorted(report.ancillary_artifacts, key=lambda item: item["path"]),
     }
 
 
