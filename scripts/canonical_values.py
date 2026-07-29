@@ -420,6 +420,14 @@ class ForgejoDatabaseConfiguration(StrictModel):
         return self
 
 
+class InfisicalConfiguration(StrictModel):
+    """Typed non-secret Infisical storage and database identity settings."""
+
+    data_dir: StrictStr | None = None
+    postgres_user: StrictStr | None = None
+    postgres_db: StrictStr | None = None
+
+
 class ForgejoConfiguration(StrictModel):
     """Typed non-secret Forgejo role configuration."""
 
@@ -713,6 +721,14 @@ class CanonicalSite(StrictModel):
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
                 raise ValueError(f"services.hermes.configuration: {details}") from error
+        infisical = self.services.get("infisical")
+        if infisical is not None:
+            try:
+                configuration = InfisicalConfiguration.model_validate(infisical.configuration)
+                infisical.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.infisical.configuration: {details}") from error
         forgejo = self.services.get("forgejo")
         if forgejo is not None:
             try:
