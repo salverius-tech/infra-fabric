@@ -38,17 +38,17 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             {"ansible-only", "deprecated", "unsupported"},
         )
         self.assertEqual(report["source_inputs"]["status"], "classification-complete-with-review-dispositions")
-        self.assertEqual(report["mapping_matrix"]["row_count"], 241)
+        self.assertEqual(report["mapping_matrix"]["row_count"], 245)
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-incomplete")
         self.assertEqual(report["matrix_coverage"]["input_count"], 387)
         self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 387)
-        self.assertEqual(report["matrix_coverage"]["matched_count"], 263)
-        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 124)
+        self.assertEqual(report["matrix_coverage"]["matched_count"], 270)
+        self.assertEqual(report["matrix_coverage"]["unmatched_count"], 117)
         self.assertEqual(report["matrix_coverage"]["status"], "review-required")
         self.assertTrue(report["matrix_coverage"]["unmatched"])
         deferred = report["deferred_classification"]
-        self.assertEqual(deferred["item_count"], 124)
-        self.assertEqual(deferred["classified_count"], 124)
+        self.assertEqual(deferred["item_count"], 117)
+        self.assertEqual(deferred["classified_count"], 117)
         self.assertEqual(deferred["unclassified_count"], 0)
         self.assertEqual(
             set(deferred["counts"]),
@@ -59,7 +59,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 "secret-or-protected",
             },
         )
-        self.assertEqual(sum(deferred["counts"].values()), 124)
+        self.assertEqual(sum(deferred["counts"].values()), 117)
         deferred_by_key = {(item["source"], item["key"]): item["classification"] for item in deferred["items"]}
         for identity in (
             ("scaffold/ansible/inventory/local.yml", "infisical_encryption_key"),
@@ -107,6 +107,10 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             ("scaffold/ansible/inventory/local.yml", "forgejo_runner_label", "services.forgejo_runner.configuration.label"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_runner_labels", "services.forgejo_runner.configuration.labels"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_runner_hosts", "services.forgejo_runner.configuration.hosts"),
+            ("scaffold/terraform.tfvars", "searxng_container_port", "services.searxng_onramp.configuration.container_port"),
+            ("scaffold/terraform.tfvars", "searxng_bind_address", "services.searxng_onramp.configuration.bind_address"),
+            ("scaffold/terraform.tfvars", "searxng_instance_name", "services.searxng_onramp.configuration.instance_name"),
+            ("scaffold/terraform.tfvars", "searxng_enable_public_url", "services.searxng_onramp.configuration.enable_public_url"),
         ):
             with self.subTest(source=source, key=key):
                 self.assertIn(
@@ -242,14 +246,6 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             )
         self.assertIn(
             {"source": "scaffold/terraform.tfvars", "key": "onramp_host_ssh_public_keys"},
-            [{"source": x["source"], "key": x["key"]} for x in report["matrix_coverage"]["unmatched"]],
-        )
-        self.assertIn(
-            {"source": "scaffold/terraform.tfvars", "key": "searxng_container_port"},
-            [{"source": x["source"], "key": x["key"]} for x in report["matrix_coverage"]["unmatched"]],
-        )
-        self.assertIn(
-            {"source": "scaffold/terraform.tfvars", "key": "searxng_bind_address"},
             [{"source": x["source"], "key": x["key"]} for x in report["matrix_coverage"]["unmatched"]],
         )
         for key, canonical_path in (

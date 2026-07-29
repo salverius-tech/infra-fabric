@@ -460,3 +460,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-28 — Added typed Infisical data-directory and PostgreSQL identity configuration with non-secret Ansible compatibility projections; coverage is now 253 matched and 134 review-required inputs.
 - 2026-07-28 — Added typed Tailscale recovery and networking configuration with non-secret Ansible compatibility projections; coverage is now 257 matched and 130 review-required inputs.
 - 2026-07-28 — Added typed Forgejo Runner registration metadata and non-secret compatibility projections; coverage is now 263 matched and 124 review-required inputs.
+- 2026-07-28 — Added typed SearXNG publication and instance configuration with non-secret compatibility projections; coverage is now 270 matched and 117 review-required inputs.

@@ -349,6 +349,12 @@
         "tf_domain": "onramp_host_hostname",
         "user_var": "onramp_host_deploy_user",
         "tf_user": "onramp_host_deploy_user",
+        "canonical_play_vars": {
+          "searxng_container_port": "configuration.container_port",
+          "searxng_bind_address": "configuration.bind_address",
+          "searxng_instance_name": "configuration.instance_name",
+          "searxng_enable_public_url": "configuration.enable_public_url"
+        },
         "extra_play_vars": {
           "onramp_host_deploy_dir": "onramp_host_deploy_dir",
           "searxng_server_name": "searxng_server_name",

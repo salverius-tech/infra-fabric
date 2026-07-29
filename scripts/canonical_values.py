@@ -420,6 +420,34 @@ class ForgejoDatabaseConfiguration(StrictModel):
         return self
 
 
+class SearxngConfiguration(StrictModel):
+    """Typed non-secret SearXNG host publication and instance settings."""
+
+    container_port: StrictInt | None = None
+    bind_address: StrictStr | None = None
+    instance_name: StrictStr | None = None
+    enable_public_url: StrictBool | None = None
+
+    @field_validator("container_port")
+    @classmethod
+    def validate_container_port(cls, value: int | None) -> int | None:
+        if value is not None and not 1 <= value <= 65535:
+            raise ValueError("SearXNG container port must be between 1 and 65535")
+        return value
+
+    @field_validator("bind_address")
+    @classmethod
+    def validate_bind_address(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError as error:
+                raise ValueError("SearXNG bind address must be an IP address") from error
+            if address.is_unspecified or not address.is_loopback:
+                raise ValueError("SearXNG bind address must be loopback-only")
+        return value
+
+
 class ForgejoRunnerHost(StrictModel):
     name: StrictStr
     address: StrictStr
@@ -755,6 +783,14 @@ class CanonicalSite(StrictModel):
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
                 raise ValueError(f"services.hermes.configuration: {details}") from error
+        searxng = self.services.get("searxng_onramp")
+        if searxng is not None:
+            try:
+                configuration = SearxngConfiguration.model_validate(searxng.configuration)
+                searxng.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.searxng_onramp.configuration: {details}") from error
         runner = self.services.get("forgejo_runner")
         if runner is not None:
             try:

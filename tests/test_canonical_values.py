@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import atomic_output
 from atomic_output import atomic_output_directory
-from canonical_values import CanonicalValuesError, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformImages, ResourceNetwork, ServiceRelease, TailscaleConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
+from canonical_values import CanonicalValuesError, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformImages, ResourceNetwork, SearxngConfiguration, ServiceRelease, TailscaleConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
     render_ansible_inventory,
@@ -174,6 +174,14 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(summary["enabled_services"], ["forgejo"])
         self.assertNotIn("secret", summary)
         self.assertEqual(len(model.resources.guests), 1)
+
+    def test_searxng_non_secret_configuration_is_typed(self) -> None:
+        configuration = SearxngConfiguration.model_validate(
+            {"container_port": 8080, "bind_address": "127.0.0.1", "instance_name": "Search", "enable_public_url": True}
+        )
+        self.assertEqual(configuration.container_port, 8080)
+        with self.assertRaises(ValueError):
+            SearxngConfiguration.model_validate({"bind_address": "0.0.0.0"})
 
     def test_forgejo_runner_non_secret_configuration_is_typed(self) -> None:
         configuration = ForgejoRunnerConfiguration.model_validate(
