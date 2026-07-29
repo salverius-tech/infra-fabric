@@ -9,7 +9,7 @@ Regenerate the value-free inventory with:
 python3 scripts/canonical-mapping-inventory.py
 ```
 
-Current baseline: 214 mapping rows, 227 matched inputs, 160 unmatched inputs, and 0 ambiguous matrix matches. The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the decision blockers that prevent promotion.
+Current baseline: 213 mapping rows, 227 matched inputs, 160 unmatched inputs, and 0 ambiguous matrix matches. The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the decision blockers that prevent promotion.
 
 ## Secret or protected inputs
 
@@ -74,6 +74,20 @@ Current baseline: 214 mapping rows, 227 matched inputs, 160 unmatched inputs, an
 **Exact decision needed:** define site-local artifact ownership, encrypted backup/copy rules, rollback semantics, and the point at which each legacy file becomes compatibility-only.
 
 **Safe interim disposition:** report contained metadata only; reject symlink escapes and mutation. No migration output is generated and no artifact is copied.
+
+## Exact-owner audit of remaining non-secret candidates
+
+The remaining names were audited against the current typed model and projection adapters. These candidates are intentionally not promoted:
+
+| Source identity family | Candidate owner | Safe disposition |
+| --- | --- | --- |
+| `infisical_version` | `services.infisical.release.image` plus `release.digest` | Deferred: the legacy value combines a mutable tag and digest; splitting and recombining it needs a catalog adapter and release policy. |
+| `forgejo_runner_url` | Forgejo endpoint or Runner service endpoint | Deferred: it is a cross-service target URL, not the Runner resource endpoint; ownership and derivation must be explicit. |
+| `caddy_server_name`, `caddy_server_names` | Service endpoint public-name aliases | Deferred: local Caddy topology and alias ownership are not represented by the current endpoint contract. |
+| `TECHNITIUM_API_URL` | Technitium public URL | Deferred: migration code treats this as a direct API transport endpoint, which must not be conflated with the browser-facing service endpoint. |
+| `pve`, cloud-init users, storage fragments, and generic runtime/configuration fields | Platform/resource/service configuration | Deferred: source context is structural or opaque and does not identify an exact existing typed owner. |
+
+No remaining candidate has an exact, semantically equivalent owner and projection under the current contract. Any promotion requires the decision recorded in the relevant blocker category above.
 
 ## Completion boundary
 
