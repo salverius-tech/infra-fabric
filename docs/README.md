@@ -15,9 +15,11 @@ Public-safe documentation for this homelab infrastructure runbook.
 - [App-host runbook](onramp-host-runbook.md) covers `onramp_host` and `searxng_onramp` enable/disable, rollback, and live deployment validation.
 - [Service update policy](service-update-policy.md) defines the managed update workflow, current service boundaries, and Technitium version/checksum management.
 - [Canonical values migration boundary](canonical-values-migration.md) documents validation-only canonical and legacy input checks without consumer cutover.
+- [Canonical values Ansible inventory audit](canonical-values-ansible-inventory-audit.md) classifies static inventory data and defines the safe reduction order.
 - [Canonical values deferred-input register](canonical-values-model-blockers.md) classifies every unmatched source identity and records the remaining review decisions.
 - [Canonical values secret operations](canonical-values-secret-operations.md) defines the public-safe key, rotation, backup, recovery, and disposable-restore contract.
 - [Normalized plan equivalence](normalized-plan-equivalence.md) defines the report-only schema and comparison boundaries for public fixtures.
+
 - [Development testing environment](development-environment.md) documents disposable integration testing and the agent workflow for adding services.
 
 ## Repository review
