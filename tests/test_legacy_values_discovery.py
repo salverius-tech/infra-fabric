@@ -447,6 +447,32 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_hermes_operator_transport(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_domain: hermes.example.internal.\n"
+                "    hermes_runtime_user: anvil\n"
+                "    hermes_repo_path: /srv/homelab-infra\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "hermes_domain": "services.hermes.endpoints.public_names",
+            "hermes_runtime_user": "services.hermes.configuration.runtime_user",
+            "hermes_repo_path": "services.hermes.configuration.repository_path",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
+        self.assertFalse(report.candidate_ready)
+
     def test_forgejo_server_name_maps_to_normalized_public_name(self) -> None:
         temp, values = self.make_values()
         with temp:

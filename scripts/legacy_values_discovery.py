@@ -109,6 +109,9 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "infisical_domain": "services.infisical.endpoints.public_names",
         "infisical_version": "services.infisical.release.version",
         "infisical_vmid": "resources.guests.infisical.identity.vmid",
+        "hermes_domain": "services.hermes.endpoints.public_names",
+        "hermes_runtime_user": "services.hermes.configuration.runtime_user",
+        "hermes_repo_path": "services.hermes.configuration.repository_path",
         "HERMES_CONTROL_SOURCE_URL": "services.hermes.configuration.control.source_url",
         "HERMES_CONTROL_SOURCE_REF": "services.hermes.configuration.control.source_ref",
         "hermes_control_enabled": "services.hermes.configuration.control.enabled",
@@ -188,6 +191,7 @@ def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migrati
         "services.technitium.endpoints.public_names",
         "services.infisical.endpoints.public_names",
         "services.forgejo.endpoints.public_names",
+        "services.hermes.endpoints.public_names",
     }:
         public = _normalize_public_name(public)
     value_type = type(value).__name__
@@ -345,6 +349,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "infisical_domain",
         "infisical_version",
         "infisical_vmid",
+        "hermes_domain",
+        "hermes_runtime_user",
+        "hermes_repo_path",
         "hermes_discovery_version",
         "hermes_discovery_tag",
         "hermes_discovery_commit",
