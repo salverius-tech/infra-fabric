@@ -291,7 +291,10 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             report = legacy_values_discovery.discover_legacy(values)
             self.assertFalse(report.candidate_ready)
             with self.assertRaises(legacy_values_discovery.DiscoveryError):
-                legacy_values_discovery.build_candidate_site(report)
+                legacy_values_discovery.build_candidate_site(
+                    report,
+                    base_document={"schema_version": 1},
+                )
 
     def test_secret_only_report_remains_fail_closed(self) -> None:
         temp = tempfile.TemporaryDirectory()
@@ -379,6 +382,54 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(len(observations), 1)
         self.assertEqual(observations[0].proposed_path, "services.forgejo.endpoints.ports.ssh")
         self.assertEqual(observations[0].value, 2222)
+
+
+    def test_candidate_generation_overlays_public_values_and_omits_secrets(self) -> None:
+        report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        report.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation(
+                    ".env", "SERVER_NAME", "mapped", "services.technitium.endpoints.public_names", "list", ["dns.example.internal"]
+                ),
+                legacy_values_discovery.FieldObservation(
+                    ".env", "TECHNITIUM_API_TOKEN", "secret", None, "str", "<redacted>"
+                ),
+            ]
+        )
+        base = {"schema_version": 1, "site": {"name": "old"}, "services": {"technitium": {"enabled": True}}}
+
+        candidate = legacy_values_discovery.build_candidate_site(report, base_document=base, site_name="dev")
+
+        self.assertEqual(candidate["site"]["name"], "dev")
+        self.assertEqual(candidate["services"]["technitium"]["endpoints"]["public_names"], ["dns.example.internal"])
+        self.assertNotIn("TECHNITIUM_API_TOKEN", json.dumps(candidate))
+
+
+    def test_cli_writes_public_candidate_with_restricted_mode(self) -> None:
+        temp = tempfile.TemporaryDirectory()
+        values = Path(temp.name) / "values"
+        values.mkdir()
+        (values / ".env").write_text("SERVER_NAME=DNS.Example.Internal.\n", encoding="utf-8")
+        base = Path(temp.name) / "base.yaml"
+        base.write_text("schema_version: 1\nsite:\n  name: old\nservices: {}\n", encoding="utf-8")
+        output = Path(temp.name) / "candidate.yaml"
+        stdout = io.StringIO()
+        with temp:
+            with redirect_stdout(stdout):
+                result = legacy_values_discovery_cli.main(
+                    [
+                        "--values-dir", str(values),
+                        "--candidate-base", str(base),
+                        "--candidate-output", str(output),
+                        "--site", "dev",
+                    ]
+                )
+            self.assertEqual(result, 0)
+            self.assertIn("wrote public canonical candidate", stdout.getvalue())
+            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+            candidate = output.read_text(encoding="utf-8")
+            self.assertIn("name: dev", candidate)
+            self.assertIn("dns.example.internal", candidate)
 
 
 if __name__ == "__main__":

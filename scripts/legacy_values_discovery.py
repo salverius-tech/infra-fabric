@@ -5,6 +5,7 @@ It never generates, hashes, moves, deletes, or serializes secret values.
 """
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import re
@@ -37,8 +38,8 @@ class DiscoveryReport:
 
     @property
     def candidate_ready(self) -> bool:
-        return bool(self.observations) and not self.conflicts and not any(
-            item.classification in {"secret", "unknown", "unsupported"} for item in self.observations
+        return any(item.classification == "mapped" for item in self.observations) and not self.conflicts and not any(
+            item.classification in {"unknown", "unsupported"} for item in self.observations
         )
 
 
@@ -297,8 +298,43 @@ def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
     }
 
 
-def build_candidate_site(report: DiscoveryReport) -> dict[str, Any]:
-    """Refuse incomplete automatic conversion rather than dropping unmapped fields."""
+def _set_dotted_path(document: dict[str, Any], path: str, value: Any) -> None:
+    parts = path.split(".")
+    if any(not part or "<" in part or ">" in part for part in parts):
+        raise DiscoveryError(f"candidate path is not concrete: {path}")
+    current: dict[str, Any] = document
+    for part in parts[:-1]:
+        child = current.get(part)
+        if child is None:
+            child = {}
+            current[part] = child
+        if not isinstance(child, dict):
+            raise DiscoveryError(f"candidate path collides with a scalar: {path}")
+        current = child
+    current[parts[-1]] = copy.deepcopy(value)
+
+
+def build_candidate_site(
+    report: DiscoveryReport,
+    *,
+    base_document: dict[str, Any],
+    site_name: str | None = None,
+) -> dict[str, Any]:
+    """Overlay safe mapped observations onto an approved canonical base document."""
     if not report.candidate_ready:
         raise DiscoveryError("canonical candidate is not safe: review conflicts and unmapped legacy fields")
-    raise DiscoveryError("canonical candidate generation is not enabled until the mapping matrix is complete")
+    if not isinstance(base_document, dict) or base_document.get("schema_version") != 1:
+        raise DiscoveryError("candidate base document must be a canonical schema_version 1 mapping")
+    candidate = copy.deepcopy(base_document)
+    if site_name is not None:
+        site = candidate.setdefault("site", {})
+        if not isinstance(site, dict):
+            raise DiscoveryError("candidate base site section must be a mapping")
+        site["name"] = site_name
+    for observation in report.observations:
+        if observation.classification == "secret":
+            continue
+        if observation.classification != "mapped" or observation.proposed_path is None:
+            raise DiscoveryError(f"candidate observation is not safely mapped: {observation.key}")
+        _set_dotted_path(candidate, observation.proposed_path, observation.value)
+    return candidate

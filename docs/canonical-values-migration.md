@@ -41,6 +41,21 @@ temporary file is removed on exit. Do not combine `--canonical-ansible` with
 `apply-ansible-services.py` invocation remains legacy and the opt-in mode is
 not evidence of full plan/apply parity.
 
+The report-only discovery CLI can now generate a public candidate from an approved canonical base document. This is intentionally separate from secret migration:
+
+```bash
+scripts/legacy-values-discovery.py \\
+  --values-dir /path/to/legacy/values \\
+  --candidate-base /path/to/approved-base.yaml \\
+  --candidate-output /tmp/site-candidate.yaml \\
+  --site dev
+```
+
+Only mapped public observations are overlaid. Conflicts, unknowns, unsupported
+inventory observations, and non-concrete matrix paths fail closed. Secret
+observations are omitted and must be handled by the encrypted SOPS/age
+workflow; this command never creates plaintext or placeholder secret bundles.
+
 Review legacy inputs separately with the read-only discovery command:
 
 ```bash
@@ -52,13 +67,13 @@ scripts/python.sh scripts/legacy-values-discovery.py \
 The report reads `.env`, `terraform.tfvars`, settings/DNS JSON, and
 `ansible/inventory/local.yml` when present. It records mapped fields, conflicts,
 and unmapped values without storing secret or unknown value contents. The
-output must be outside `values/`; the command uses a restricted report file and
-never writes a `site.yaml` or changes legacy files.
+report output must be outside `values/`; discovery itself never changes legacy
+files. Candidate generation is a separate explicit command as documented above.
 
-Treat the report as migration review evidence only. Legacy inventory is
-currently classified as unsupported for automatic mapping, and any conflict,
-unknown, or unsupported observation keeps candidate generation fail-closed.
-There is no automatic importer in this validation slice.
+Treat the report as migration review evidence. Legacy inventory and any
+conflict, unknown, unsupported, or non-concrete observation keep candidate
+generation fail-closed. Secret bundle generation remains a separate SOPS/age
+operation and is not performed by the public candidate command.
 
 ## Source-of-truth boundary
 
