@@ -232,6 +232,26 @@ def _record_artifact_tree(report: DiscoveryReport, values: Path, root: Path, art
     )
 
 
+def _read_ansible_forgejo_domain(path: Path, report: DiscoveryReport, migration: Any) -> None:
+    try:
+        import yaml
+    except ImportError as error:  # pragma: no cover - environment setup failure
+        raise DiscoveryError("PyYAML is required for bounded Ansible importer discovery") from error
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise DiscoveryError(f"cannot parse Ansible inventory: {path}") from error
+    try:
+        value = document["all"]["vars"]["forgejo_domain"]
+    except (KeyError, TypeError) as error:
+        raise DiscoveryError("bounded Ansible importer requires all.vars.forgejo_domain") from error
+    if not isinstance(value, str) or not value.strip():
+        raise DiscoveryError("bounded Ansible forgejo_domain must be a non-empty string")
+    source = path.as_posix()
+    _observe(source, "forgejo_domain", value, report, migration)
+    report.observations.append(FieldObservation(source, "<inventory:remaining>", "unsupported", None, "yaml"))
+
+
 def _discover_ancillary_artifacts(values: Path, report: DiscoveryReport) -> None:
     known_hosts = values / "ansible" / "known_hosts"
     if known_hosts.exists() or known_hosts.is_symlink():
@@ -253,7 +273,11 @@ def _discover_ancillary_artifacts(values: Path, report: DiscoveryReport) -> None
         _record_artifact_tree(report, values, backups, "recovery-backups")
 
 
-def discover_legacy(values_dir: Path, repo: Path | None = None) -> DiscoveryReport:
+def discover_legacy(
+    values_dir: Path,
+    repo: Path | None = None,
+    ansible_inventory: Path | None = None,
+) -> DiscoveryReport:
     """Read legacy inputs and return a redacted migration review report."""
     values = values_dir.resolve()
     if not values.is_dir():
@@ -266,17 +290,27 @@ def discover_legacy(values_dir: Path, repo: Path | None = None) -> DiscoveryRepo
         (values / "settings.local.json", _read_json_keys),
         (values / "dns-records.local.json", _read_json_keys),
     )
-    inventory = values / "ansible" / "inventory" / "local.yml"
-    for path, reader in (*candidates, (inventory, None)):
+    for path, reader in candidates:
         if not path.is_file():
             continue
         report.files.append(path.relative_to(values).as_posix())
-        if reader is None:
-            report.observations.append(
-                FieldObservation(path.relative_to(values).as_posix(), "<inventory>", "unsupported", None, "yaml")
-            )
-        else:
-            reader(path, report, migration)
+        reader(path, report, migration)
+    inventory = values / "ansible" / "inventory" / "local.yml"
+    if ansible_inventory is not None:
+        inventory = ansible_inventory.expanduser().resolve()
+        if repo is not None:
+            expected = (repo.resolve() / "scaffold" / "ansible" / "inventory" / "local.yml").resolve()
+            if inventory != expected:
+                raise DiscoveryError("bounded Ansible importer accepts only the public scaffold inventory")
+        if not inventory.is_file():
+            raise DiscoveryError(f"Ansible inventory does not exist: {inventory}")
+        report.files.append(inventory.as_posix())
+        _read_ansible_forgejo_domain(inventory, report, migration)
+    elif inventory.is_file():
+        report.files.append(inventory.relative_to(values).as_posix())
+        report.observations.append(
+            FieldObservation(inventory.relative_to(values).as_posix(), "<inventory>", "unsupported", None, "yaml")
+        )
     _discover_ancillary_artifacts(values, report)
     return report
 

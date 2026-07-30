@@ -47,6 +47,38 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         (values / "ansible" / "inventory" / "local.yml").write_text("all:\n  hosts:\n    edge:\n", encoding="utf-8")
         return temp, values
 
+    def test_bounded_public_ansible_importer_admits_forgejo_domain_only(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    forgejo_domain: git.example.internal\n"
+                "  hosts:\n    edge:\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(observations[("forgejo_domain", "mapped")].value, ["git.example.internal"])
+        self.assertTrue(any(item.key == "<inventory:remaining>" and item.classification == "unsupported" for item in report.observations))
+        self.assertFalse(report.mapping_ready)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_conflicts_with_legacy_domain(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text(
+                (values / ".env").read_text(encoding="utf-8") + "FORGEJO_DOMAIN=other.example.internal\n",
+                encoding="utf-8",
+            )
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n", encoding="utf-8")
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        self.assertTrue(any(conflict["canonical_path"] == "services.forgejo.endpoints.public_names" for conflict in report.conflicts))
+
     def test_root_and_site_aware_layouts_have_equivalent_report_only_discovery(self) -> None:
         temp, values = self.make_values()
         with temp:
@@ -325,6 +357,29 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             rendered = output.read_text(encoding="utf-8")
             self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
             self.assertIn("TECHNITIUM_API_TOKEN", rendered)
+
+    def test_cli_admits_bounded_public_ansible_inventory_slice(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n", encoding="utf-8")
+            output = values.parent / "ansible-report.json"
+            result = legacy_values_discovery_cli.main(
+                [
+                    "--values-dir", str(values),
+                    "--repo", str(repo),
+                    "--ansible-inventory", str(inventory),
+                    "--output", str(output),
+                ]
+            )
+            self.assertEqual(result, 0)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+        mapped = [item for item in payload["observations"] if item["key"] == "forgejo_domain"]
+        self.assertTrue(mapped)
+        self.assertTrue(any(item["key"] == "<inventory:remaining>" for item in payload["observations"]))
+        self.assertFalse(payload["candidate_ready"])
 
     def test_cli_reports_invalid_values_directory_without_traceback(self) -> None:
         stderr = io.StringIO()

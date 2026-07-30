@@ -97,7 +97,23 @@ scripts/python.sh scripts/legacy-values-discovery.py \
 ```
 
 The report reads `.env`, `terraform.tfvars`, settings/DNS JSON, and
-`ansible/inventory/local.yml` when present. It records mapped fields, conflicts,
+`ansible/inventory/local.yml` when present. For the bounded public Ansible
+importer slice, opt in explicitly with the public repository root and scaffold
+inventory:
+
+```bash
+scripts/python.sh scripts/legacy-values-discovery.py \
+  --values-dir values \
+  --repo . \
+  --ansible-inventory scaffold/ansible/inventory/local.yml \
+  --output /tmp/legacy-values-ansible-review.json
+```
+
+That opt-in admits only `all.vars.forgejo_domain`; the remaining inventory is
+reported as unsupported. It performs normalization and conflict detection but
+still cannot generate a candidate or enable consumer cutover.
+
+The report records mapped fields, conflicts,
 and unmapped values without storing secret or unknown value contents. The
 report output must be outside `values/`; discovery itself never changes legacy
 files. Candidate generation is a separate explicit command as documented above.

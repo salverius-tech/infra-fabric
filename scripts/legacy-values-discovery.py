@@ -50,13 +50,19 @@ def _write_candidate(path: Path, payload: dict[str, object]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--values-dir", type=Path, required=True)
+    parser.add_argument("--repo", type=Path, help="public repository root for bounded Ansible inventory admission")
+    parser.add_argument("--ansible-inventory", type=Path, help="opt-in public Ansible inventory source for bounded discovery")
     parser.add_argument("--output", type=Path, help="write the redacted JSON report to this path")
     parser.add_argument("--candidate-base", type=Path, help="approved canonical YAML base for public candidate generation")
     parser.add_argument("--candidate-output", type=Path, help="write a public candidate YAML outside the legacy values directory")
     parser.add_argument("--site", help="override candidate site.name")
     args = parser.parse_args(argv)
     try:
-        report = discover_legacy(args.values_dir)
+        report = discover_legacy(
+            args.values_dir,
+            repo=args.repo,
+            ansible_inventory=args.ansible_inventory,
+        )
         payload = render_migration_report(report)
         if args.candidate_base is not None or args.candidate_output is not None:
             if args.candidate_base is None or args.candidate_output is None:
