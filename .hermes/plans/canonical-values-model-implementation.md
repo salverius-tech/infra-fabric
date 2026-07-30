@@ -170,7 +170,7 @@ The implementation is complete when all of the following are true:
 - [ ] Generate candidate `site.yaml` and encrypted `secrets.sops.yaml` in dry-run mode by default.
 - [~] Detect and report conflicts after semantic normalization; narrow mapped dotenv/tfvars conflict detection is covered, while the complete matrix remains open.
 - [ ] Generate missing persistent secrets idempotently through an explicit policy, without logging values.
-- [ ] Preserve unknown values and source paths in a migration report.
+- [~] Preserve unknown values and source paths in a migration report; unsupported keys retain source/type metadata, dynamic expressions are marked for review, and value contents remain omitted.
 - [ ] Create and verify a backup before mutation; record source/destination hashes, schema/renderer versions, site, decisions, generated-secret actions, and backup ID in a manifest.
 - [ ] Support explicit apply only, refuse overwrite without explicit migration mode, and roll back completed moves if later work fails.
 - [ ] Preserve or deliberately migrate state, known hosts, plans, backups, and private artifact references.
@@ -548,3 +548,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-30 — Extended the bounded Forgejo Ansible importer to existing non-secret release/configuration/action projection fields: version, Caddy/system-SSH/initial-config flags, bootstrap/actions flags, and actions URL. Lowercase source aliases, normalized mapping, residual unsupported inventory, candidate blocking, and CLI behavior passed 29 focused and 428 full-suite tests plus fresh `hermes-verify-*` ad-hoc verification.
 - 2026-07-30 — Defined and implemented Forgejo SSH-port semantics: canonical normalization materializes port 22 when `ssh` is an enabled protocol, rejects an SSH port without the SSH protocol, conditionally projects `forgejo_ssh_port`, and admits decimal legacy SSH-port values. Canonical, compatibility, importer, and full-suite verification passed (430 tests) plus fresh `hermes-verify-*` ad-hoc verification.
 - 2026-07-30 — Improved bounded Ansible residual reporting: each unadmitted inventory key now retains its source path and type with no arbitrary value content; secret-classified residuals remain `[REDACTED]`, dynamic semantics remain unsupported, and candidate readiness remains false. Focused tests passed (29), full suite passed (430), and fresh `hermes-verify-*` ad-hoc verification passed.
+- 2026-07-30 — Marked residual Jinja-style Ansible values as `dynamic-expression` metadata while keeping them unsupported, value-free, and candidate-blocking. Focused tests passed (29), full suite passed (430), and fresh `hermes-verify-*` ad-hoc verification passed.

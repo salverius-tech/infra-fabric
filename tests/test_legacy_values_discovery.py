@@ -54,7 +54,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
             inventory.write_text(
-                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_bootstrap_admin_email: review@example.internal\n    forgejo_ssh_port: 22\n    forgejo_enable_caddy: true\n    forgejo_configure_system_ssh: true\n    forgejo_write_initial_config: false\n    forgejo_bootstrap_enabled: true\n    forgejo_actions_enabled: true\n    forgejo_actions_default_url: https://data.forgejo.org\n"
+                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_bootstrap_admin_email: review@example.internal\n    forgejo_download_base: '{% dynamic %}'\n    forgejo_ssh_port: 22\n    forgejo_enable_caddy: true\n    forgejo_configure_system_ssh: true\n    forgejo_write_initial_config: false\n    forgejo_bootstrap_enabled: true\n    forgejo_actions_enabled: true\n    forgejo_actions_default_url: https://data.forgejo.org\n"
                 "  hosts:\n    edge:\n",
                 encoding="utf-8",
             )
@@ -76,6 +76,15 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             any(
                 item.key == "forgejo_bootstrap_admin_email"
                 and item.classification == "unsupported"
+                and item.value is None
+                for item in report.observations
+            )
+        )
+        self.assertTrue(
+            any(
+                item.key == "forgejo_download_base"
+                and item.classification == "unsupported"
+                and item.value_type == "dynamic-expression"
                 and item.value is None
                 for item in report.observations
             )

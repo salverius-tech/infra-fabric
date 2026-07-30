@@ -246,6 +246,12 @@ def _record_artifact_tree(report: DiscoveryReport, values: Path, root: Path, art
     )
 
 
+def _ansible_value_type(value: Any) -> str:
+    if isinstance(value, str) and ("{{" in value or "{%" in value):
+        return "dynamic-expression"
+    return type(value).__name__
+
+
 def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: Any) -> None:
     allowed_keys = {
         "forgejo_actions_default_url",
@@ -295,7 +301,7 @@ def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: 
                 key,
                 "secret" if classification == "secret" else "unsupported",
                 None,
-                type(variables[key]).__name__,
+                _ansible_value_type(variables[key]),
                 "<redacted>" if classification == "secret" else None,
             )
         )
