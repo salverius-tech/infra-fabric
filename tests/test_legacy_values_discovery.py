@@ -506,6 +506,51 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         )
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_onramp_runtime_and_ssh_keys(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    onramp_host_cloud_init_user: anvil\n"
+                "    onramp_host_ssh_public_keys:\n"
+                "      - ssh-ed25519 AAAA_PUBLIC_KEY_ONE\n"
+                "      - ssh-rsa AAAA_PUBLIC_KEY_TWO\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("onramp_host_cloud_init_user", "mapped")].proposed_path,
+            "resources.shared_hosts.onramp_host.runtime.cloud_init_user",
+        )
+        self.assertEqual(
+            observations[("onramp_host_ssh_public_keys", "mapped")].proposed_path,
+            "resources.shared_hosts.onramp_host.security.ssh_public_keys",
+        )
+        self.assertEqual(
+            observations[("onramp_host_ssh_public_keys", "mapped")].value,
+            ["ssh-ed25519 AAAA_PUBLIC_KEY_ONE", "ssh-rsa AAAA_PUBLIC_KEY_TWO"],
+        )
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_non_string_onramp_ssh_keys(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    onramp_host_ssh_public_keys:\n"
+                "      - 7\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "list of strings"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_bootstrap_metadata(self) -> None:
         temp, values = self.make_values()
         with temp:
