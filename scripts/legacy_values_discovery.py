@@ -81,6 +81,18 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_server_name": "services.forgejo.endpoints.public_names",
         "FORGEJO_VERSION": "services.forgejo.release.version",
         "forgejo_version": "services.forgejo.release.version",
+        "FORGEJO_ENABLE_CADDY": "services.forgejo.configuration.enable_caddy",
+        "forgejo_enable_caddy": "services.forgejo.configuration.enable_caddy",
+        "FORGEJO_CONFIGURE_SYSTEM_SSH": "services.forgejo.configuration.configure_system_ssh",
+        "forgejo_configure_system_ssh": "services.forgejo.configuration.configure_system_ssh",
+        "FORGEJO_WRITE_INITIAL_CONFIG": "services.forgejo.configuration.write_initial_config",
+        "forgejo_write_initial_config": "services.forgejo.configuration.write_initial_config",
+        "FORGEJO_BOOTSTRAP_ENABLED": "services.forgejo.configuration.bootstrap_enabled",
+        "forgejo_bootstrap_enabled": "services.forgejo.configuration.bootstrap_enabled",
+        "FORGEJO_ACTIONS_ENABLED": "services.forgejo.configuration.actions_enabled",
+        "forgejo_actions_enabled": "services.forgejo.configuration.actions_enabled",
+        "FORGEJO_ACTIONS_DEFAULT_URL": "services.forgejo.configuration.actions_default_url",
+        "forgejo_actions_default_url": "services.forgejo.configuration.actions_default_url",
         "FORGEJO_SSH_PORT": "services.forgejo.endpoints.ports.ssh",
         "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
         "HERMES_CONTROL_SOURCE_URL": "services.hermes.configuration.control.source_url",
@@ -257,6 +269,20 @@ def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: 
         if not isinstance(version, str) or not version.strip():
             raise DiscoveryError("bounded Ansible forgejo_version must be a non-empty string")
         _observe(source, "forgejo_version", version, report, migration)
+    for key in (
+        "forgejo_actions_default_url",
+        "forgejo_actions_enabled",
+        "forgejo_bootstrap_enabled",
+        "forgejo_configure_system_ssh",
+        "forgejo_enable_caddy",
+        "forgejo_write_initial_config",
+    ):
+        if key not in variables:
+            continue
+        value = variables[key]
+        if not isinstance(value, (str, bool, int, float)):
+            raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
+        _observe(source, key, value, report, migration)
     report.observations.append(FieldObservation(source, "<inventory:remaining>", "unsupported", None, "yaml"))
 
 
