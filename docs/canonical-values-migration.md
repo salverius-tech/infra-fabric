@@ -41,8 +41,9 @@ temporary file is removed on exit. Do not combine `--canonical-ansible` with
 `apply-ansible-services.py` invocation remains legacy and the opt-in mode is
 not evidence of full plan/apply parity.
 
-The site migration orchestrator can consume that candidate boundary during an
-explicit apply:
+The site migration orchestrator currently retains the legacy compatibility-only
+migration behavior. A `--canonical-base` candidate path is intentionally
+fail-closed until the declared runtime importer scope is admitted:
 
 ```bash
 scripts/python.sh scripts/migrate-site-values.py \\
@@ -52,14 +53,14 @@ scripts/python.sh scripts/migrate-site-values.py \\
   --apply
 ```
 
-Without `--canonical-base`, migration retains its legacy compatibility-only
-behavior and does not create `site.yaml`. With it, discovery and candidate
-construction happen before any move; unknown, unsupported, or conflicting
-legacy input aborts without mutation. Candidate output is written atomically
-with mode `0600`; secret observations remain excluded and no
-`secrets.sops.yaml` is fabricated.
+At present, the command performs discovery before any move and then refuses
+candidate construction because runtime importer admission is incomplete. It
+must leave the legacy values unchanged. This strict gate prevents token-level
+mapping matches from being mistaken for complete importer readiness.
 
-The report-only discovery CLI can also generate a public candidate directly:
+The report-only discovery CLI retains the candidate-shaped interface for a
+future explicitly admitted runtime scope, but currently fails closed and writes
+no candidate:
 
 ```bash
 scripts/legacy-values-discovery.py \\
@@ -69,10 +70,23 @@ scripts/legacy-values-discovery.py \\
   --site dev
 ```
 
-Only mapped public observations are overlaid. Conflicts, unknowns, unsupported
-inventory observations, and non-concrete matrix paths fail closed. Secret
-observations are omitted and must be handled by the encrypted SOPS/age
-workflow; this command never creates plaintext or placeholder secret bundles.
+No `site.yaml` or `secrets.sops.yaml` is fabricated by these blocked paths.
+
+The first report-only Ansible semantic discovery slice can inspect the public
+inventory and static consumer references without executing Ansible:
+
+```bash
+scripts/python.sh scripts/ansible_semantic_discovery.py \\
+  --repo . \\
+  --output /tmp/ansible-semantic-discovery.json
+```
+
+The report records exact inventory identities, supported consumer references,
+value-free secret/provider classification, and operational/lifecycle review
+dispositions. It never retains inventory values, generates candidates, decrypts
+secrets, mutates legacy inputs, or enables consumer cutover. Dynamic Ansible
+resolution, cross-source correlation, and runtime importer admission remain
+review-required.
 
 Review legacy inputs separately with the read-only discovery command:
 

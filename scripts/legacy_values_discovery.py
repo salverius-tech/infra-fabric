@@ -37,10 +37,15 @@ class DiscoveryReport:
     ancillary_artifacts: list[dict[str, Any]] = field(default_factory=list)
 
     @property
-    def candidate_ready(self) -> bool:
+    def mapping_ready(self) -> bool:
         return any(item.classification == "mapped" for item in self.observations) and not self.conflicts and not any(
             item.classification in {"unknown", "unsupported"} for item in self.observations
         )
+
+    @property
+    def candidate_ready(self) -> bool:
+        """Strict candidate readiness remains false until runtime admission exists."""
+        return False
 
 
 def _load_migration_module() -> Any:
@@ -281,6 +286,7 @@ def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
     return {
         "values_dir": report.values_dir,
         "files": sorted(report.files),
+        "mapping_ready": report.mapping_ready,
         "candidate_ready": report.candidate_ready,
         "observations": [
             {
@@ -319,10 +325,13 @@ def build_candidate_site(
     *,
     base_document: dict[str, Any],
     site_name: str | None = None,
+    runtime_importer_ready: bool = False,
 ) -> dict[str, Any]:
     """Overlay safe mapped observations onto an approved canonical base document."""
-    if not report.candidate_ready:
+    if not report.mapping_ready:
         raise DiscoveryError("canonical candidate is not safe: review conflicts and unmapped legacy fields")
+    if not runtime_importer_ready:
+        raise DiscoveryError("canonical candidate is blocked: runtime importer admission is incomplete")
     if not isinstance(base_document, dict) or base_document.get("schema_version") != 1:
         raise DiscoveryError("candidate base document must be a canonical schema_version 1 mapping")
     candidate = copy.deepcopy(base_document)

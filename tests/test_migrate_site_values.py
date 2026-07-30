@@ -82,7 +82,7 @@ class SiteMigrationTests(unittest.TestCase):
             self.assertTrue((values / "terraform.tfvars").is_file())
             self.assertEqual((values.parent / "settings.local.json").read_bytes(), original_settings)
 
-    def test_apply_generates_public_site_candidate_from_approved_base(self) -> None:
+    def test_apply_candidate_generation_remains_blocked_without_runtime_admission(self) -> None:
         temp = tempfile.TemporaryDirectory()
         root = Path(temp.name)
         values = root / "values"
@@ -91,12 +91,10 @@ class SiteMigrationTests(unittest.TestCase):
         base = root / "base.yaml"
         base.write_text("schema_version: 1\nsite:\n  name: old\nservices: {}\n", encoding="utf-8")
         with temp:
-            migration.migrate(values, root, "dev", "development", "disposable", True, True, True, base)
-            candidate = values / "sites" / "dev" / "site.yaml"
-            self.assertEqual(candidate.stat().st_mode & 0o777, 0o600)
-            self.assertIn("name: dev", candidate.read_text(encoding="utf-8"))
-            self.assertIn("dns.example.internal", candidate.read_text(encoding="utf-8"))
-            self.assertFalse((values / ".env").exists())
+            with self.assertRaises(migration.SiteMigrationError):
+                migration.migrate(values, root, "dev", "development", "disposable", True, True, True, base)
+            self.assertTrue((values / ".env").exists())
+            self.assertFalse((values / "sites" / "dev").exists())
 
     def test_candidate_generation_blocks_unknown_legacy_input_before_mutation(self) -> None:
         temp = tempfile.TemporaryDirectory()

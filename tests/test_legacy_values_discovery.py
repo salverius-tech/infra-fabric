@@ -398,7 +398,9 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         )
         base = {"schema_version": 1, "site": {"name": "old"}, "services": {"technitium": {"enabled": True}}}
 
-        candidate = legacy_values_discovery.build_candidate_site(report, base_document=base, site_name="dev")
+        candidate = legacy_values_discovery.build_candidate_site(
+            report, base_document=base, site_name="dev", runtime_importer_ready=True
+        )
 
         self.assertEqual(candidate["site"]["name"], "dev")
         self.assertEqual(candidate["services"]["technitium"]["endpoints"]["public_names"], ["dns.example.internal"])
@@ -424,12 +426,9 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                         "--site", "dev",
                     ]
                 )
-            self.assertEqual(result, 0)
-            self.assertIn("wrote public canonical candidate", stdout.getvalue())
-            self.assertEqual(output.stat().st_mode & 0o777, 0o600)
-            candidate = output.read_text(encoding="utf-8")
-            self.assertIn("name: dev", candidate)
-            self.assertIn("dns.example.internal", candidate)
+            self.assertEqual(result, 1)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":
