@@ -1,9 +1,9 @@
 # Canonical Values Model — Deferred Input Register
 
-**Status:** Canonical mapping complete; candidate generation is authorized, but consumer cutover remains deferred.
+**Status:** Source inventory/classification complete within scope; semantic mapping and complete importer authorization remain incomplete; bounded public candidate generation exists, but consumer cutover remains deferred.
 **Scope:** Every unmatched identity in the current public-safe source inventory is classified here or by the machine-readable inventory report. No values are read or retained by this register.
 
-The current source inventory contains 378 identities. Of these, 368 are mapping-eligible canonical candidates; 10 are explicitly excluded as generated projections, operational artifacts, or retired inputs. All eligible identities are matched and classified, with zero unclassified identities. Candidate generation is permitted; consumer cutover remains deferred pending semantic equivalence evidence.
+The current source inventory contains 378 identities. Of these, 368 are mapping-eligible for token-level reconciliation; 10 are explicitly excluded as generated projections, operational artifacts, or retired inputs. All eligible identities currently match one matrix token, but the live report still marks semantic mapping `incomplete`, and the runtime importer does not consume every source family through a field-level adapter. Candidate generation is limited to the bounded public overlay path over an approved canonical base; it is not authorization for complete legacy import or consumer cutover.
 
 Regenerate the value-free inventory with:
 
@@ -11,7 +11,7 @@ Regenerate the value-free inventory with:
 python3 scripts/canonical-mapping-inventory.py
 ```
 
-**Current baseline: 307 mapping rows, 368 matched eligible inputs, 0 unmatched eligible inputs, 10 excluded non-canonical identities, and 0 ambiguous eligible matches.** The inventory's `deferred_classification.items` is the authoritative identity-level list; this document records the remaining cutover blockers.
+**Current baseline: 307 mapping rows, 368 token-level matched eligible inputs, 0 unmatched eligible inputs, 10 excluded non-canonical identities, and 0 ambiguous eligible matches.** The same live report says `semantic_mapping_status: incomplete`, `canonical_projection_authoritative: false`, and `consumer_cutover_status: deferred`. The inventory's `deferred_classification.items` is the authoritative identity-level list for that report; this document records the remaining semantic/runtime/importer and cutover blockers.
 
 ## Secret or protected inputs
 
@@ -27,7 +27,7 @@ python3 scripts/canonical-mapping-inventory.py
 
 **Exact decision needed:** approve a logical secret schema and consumer delivery matrix, including provider/bootstrap/runtime/recovery classification, state exposure policy, and resource-scoped replacement for generic aliases.
 
-**Safe interim disposition:** metadata-only report; never read, print, project, generate, or migrate values. Candidate generation and secret delivery remain blocked.
+**Safe interim disposition:** metadata-only report; never read, print, project, generate, or migrate values. Secret delivery remains blocked. Public candidate generation must omit these observations and does not resolve the protected importer boundary.
 
 ## Behavior or configuration without a typed owner
 
@@ -79,7 +79,7 @@ python3 scripts/canonical-mapping-inventory.py
 
 ## Exact-owner audit of all remaining unmatched identities
 
-The eligible remainder was audited against the current typed model, matrix rows, and projection adapters. The live mapping inventory contains no unmatched eligible identities:
+The eligible remainder was audited against the current typed model, matrix rows, and projection adapters. The live token-level mapping inventory contains no unmatched eligible identities, but that result is not semantic/runtime completion:
 
 | Classification | Count | Decision |
 | --- | ---: | --- |
@@ -90,4 +90,4 @@ The exact identities are preserved in `deferred_classification.items` in the mac
 
 
 
-Canonical mapping is complete. The canonical projection remains non-authoritative until protected delivery is exercised and semantic equivalence evidence is reviewed. Existing legacy OpenTofu and Ansible consumers remain active during this compatibility window.
+Token-level source reconciliation is complete for the current report. Semantic mapping, runtime importer support, protected delivery, and complete projection/consumer integration are not complete. The canonical projection remains non-authoritative, and existing legacy OpenTofu and Ansible consumers remain active during this compatibility window. See `docs/canonical-values-implementation-audit-2026-07-30.md` for the evidence reconciliation.

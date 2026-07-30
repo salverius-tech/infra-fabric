@@ -1,10 +1,10 @@
 # Canonical Site Values Model — Implementation Plan
 
-**Status:** Phase 0 inventory/classification gate complete — DNS ownership slice verified; remaining semantic blockers, migration, and consumer cutover remain deferred
+**Status:** Audit baseline (2026-07-30): source inventory/classification gate complete within scope; semantic mapping, importer completeness, operational secret delivery, and consumer cutover remain incomplete/deferred
 **Branch:** `feat/canonical-values-model`
 **PRD:** [`canonical-values-model-prd.md`](./canonical-values-model-prd.md)
 **Repository:** `infra-fabric`
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
 ## Purpose
 
@@ -26,7 +26,7 @@ This document is the implementation companion to the Canonical Site Values Model
 - `[x]` implemented and verified
 - `[!]` blocked or requires a product decision
 
-Phase status is meaningful only when its exit gate has evidence recorded in this document.
+Phase status is meaningful only when its exit gate has evidence recorded in this document. A source inventory result, matrix-token match, focused test, or bounded projection probe cannot close a different gate. In particular, `candidate_generation_allowed` from the inventory report is not importer-readiness or consumer-cutover evidence while `semantic_mapping_status` is incomplete or the runtime adapter lacks the corresponding source path.
 
 ## Definition of done
 
@@ -48,7 +48,7 @@ The implementation is complete when all of the following are true:
 
 | ID | Workstream | Depends on | Status |
 | --- | --- | --- | --- |
-| W0 | Implementation design and repository inventory | PRD | `[x]` |
+| W0 | Implementation design and repository inventory | PRD | `[x]` (inventory/classification scope only) |
 | W1 | Canonical schema, strict YAML loader, normalization, digests | W0 | `[~]` |
 | W2 | Secret provider, SOPS/age policy, transport and cleanup | W0, W1 | `[~]` |
 | W3 | Service catalog and mapping matrix | W0, W1 | `[~]` |
@@ -74,9 +74,9 @@ The implementation is complete when all of the following are true:
 - [x] Define service-specific typed override keys and configuration-schema ownership.
 - [x] Define compatibility-window warning text, owner, duration, and removal release criteria.
 
-**Exit gate:** The design decisions affecting W1–W3 are recorded below, every named source and discovered input has an explicit initial classification or `unsupported/review`-equivalent disposition, and no Phase 0 inventory ambiguity remains. Full semantic matrix completion remains a W3 gate.
+**Exit gate:** The design decisions affecting W1–W3 are recorded below, every named source and discovered input has an explicit initial classification or `unsupported/review`-equivalent disposition, and no Phase 0 inventory ambiguity remains. This closes only source inventory/classification. Full semantic matrix completion, runtime importer support, candidate authorization, and consumer integration remain separate W3–W5 gates.
 
-- **Current gap:** Phase 0 inventory/classification is complete: the checker consumes 16 named source files and emits 378 unique contextual input records with explicit dispositions. The live mapping gate has 368 eligible inputs, all 368 matched, 0 unmatched, and 10 excluded generated/operational/retired identities; generic secret aliases fail closed while mapping to the scoped Technitium bootstrap owner, and migration manifests record value-free ownership/action/rollback metadata. Candidate generation is allowed; protected delivery exercise, semantic equivalence, and consumer cutover remain deferred.
+- **Current gap:** Phase 0 inventory/classification is complete within scope: the checker consumes 16 named source files and emits 378 unique contextual input records with explicit dispositions. The current token-level reconciliation reports 368 eligible inputs matched, 0 unmatched, 0 ambiguous, and 10 excluded generated/operational/retired identities. This does not close semantic mapping: the live report still says `semantic_mapping_status: incomplete`, the mapping matrix has 307 rows, and the runtime legacy discovery adapter still records the complete legacy Ansible inventory as one unsupported observation. Candidate generation is therefore only a bounded public overlay onto an approved canonical base; it is not complete-importer authorization. Protected secret delivery, complete migration, semantic equivalence, and consumer cutover remain deferred. See `docs/canonical-values-implementation-audit-2026-07-30.md`.
 
 ## Phase 1 — Canonical schema and loader
 
@@ -362,6 +362,7 @@ Update this table with real command output, fixture names, or review links. Do n
 | 2026-07-29 | W5 static Ansible inventory audit | `git diff --check`; focused documentation/index inspection; fresh ad-hoc documentation contract probe | `[~]` | Classified `scaffold/ansible/inventory/local.yml` as mixed connection, infrastructure, service-configuration, and secret-transport input; documented the safe reduction order. Removal remains deferred until paired parity evidence. |
 | 2026-07-29 | W4 public candidate generation boundary | `.venv/bin/python -m unittest tests.test_legacy_values_discovery tests.test_migrate_values tests.test_migrate_site_values`; `.venv/bin/python -m py_compile scripts/legacy_values_discovery.py scripts/legacy-values-discovery.py tests/test_legacy_values_discovery.py`; `git diff --check`; fresh ad-hoc candidate CLI probe | `[~]` | Candidate generation now overlays mapped public observations onto an approved schema-version-1 base YAML, omits secret observations, rejects unknown/unsupported/conflicting/non-concrete inputs, writes mode-0600 output outside legacy values, and never creates plaintext secret bundles. SOPS/age secret-bundle generation and full inventory mapping remain open. |
 | 2026-07-30 | W4 site migration candidate integration | `.venv/bin/python -m unittest tests.test_migrate_site_values tests.test_legacy_values_discovery tests.test_migrate_values`; `.venv/bin/python -m py_compile scripts/migrate-site-values.py scripts/legacy_values_discovery.py scripts/legacy-values-discovery.py tests/test_migrate_site_values.py tests/test_legacy_values_discovery.py`; `git diff --check`; fresh ad-hoc site-import candidate probe | `[~]` | Explicit `migrate-site-values.py --canonical-base ... --apply` now performs discovery/candidate construction before any move, writes atomic mode-0600 `site.yaml`, and preserves pre-mutation fail-closed behavior. Secret bundle generation and full inventory mapping remain open. |
+| 2026-07-30 | Project PRD/tracker/code audit | `.venv/bin/python scripts/canonical-mapping-inventory.py --repo .`; `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest tests.test_legacy_values_discovery tests.test_migrate_values tests.test_migrate_site_values tests.test_migration_backup tests.test_projection_manifest tests.test_secret_provider`; `git diff --check`; Markdown link check | `[x]` | Inventory/classification is complete within scope, but the live report still says semantic mapping incomplete; token-level 368/368 matching does not prove runtime importer support. The runtime importer still treats the complete legacy Ansible inventory as one unsupported observation; consumer cutover remains deferred. Findings and corrected status are in `docs/canonical-values-implementation-audit-2026-07-30.md`. |
 | 2026-07-27 | Host-only unittest discovery | `.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` | `[!]` | Host run was not authoritative: missing declared dependencies and `/workspace` assumptions caused environment failures. |
 
 ## Risks and stop conditions
@@ -502,3 +503,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-29 — Documented the opt-in paired canonical Ansible operator contract; default consumer authority remains legacy.
 - 2026-07-29 — Audited static Ansible inventory and documented the safe reduction boundary; duplicated legacy entries remain until paired parity evidence exists.
 - 2026-07-29 — Added fail-closed public candidate generation over an approved canonical base; secret bundle generation remains separate and requires the SOPS/age execution contract.
+- 2026-07-30 — Audited the original PRD, implementation tracker, live inventory, runtime importer, focused tests, and relevant Hermes skills. Reclassified the 368/368 result as token-level reconciliation rather than semantic/importer completion; corrected tracker and deferred-register status and added `docs/canonical-values-implementation-audit-2026-07-30.md`.
