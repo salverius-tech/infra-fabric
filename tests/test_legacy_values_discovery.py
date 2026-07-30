@@ -469,6 +469,31 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_caddy_email(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    caddy_email: admin@example.internal\n"
+                "    CF_DNS_API_TOKEN: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("caddy_email", "mapped")].proposed_path,
+            "platform.ingress.acme.email",
+        )
+        self.assertEqual(observations[("caddy_email", "mapped")].value, "admin@example.internal")
+        self.assertEqual(
+            observations[("CF_DNS_API_TOKEN", "secret")].value,
+            "<redacted>",
+        )
+        self.assertFalse(report.candidate_ready)
+
     def test_bounded_ansible_importer_admits_forgejo_runner_dns_servers(self) -> None:
         temp, values = self.make_values()
         with temp:
