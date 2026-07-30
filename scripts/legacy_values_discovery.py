@@ -102,6 +102,10 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "onramp_host_allowed_ssh_cidrs": "resources.shared_hosts.onramp_host.security.allowed_ssh_cidrs",
         "onramp_host_cloud_init_user": "resources.shared_hosts.onramp_host.runtime.cloud_init_user",
         "onramp_host_ssh_public_keys": "resources.shared_hosts.onramp_host.security.ssh_public_keys",
+        "tailscale_client_enabled": "services.tailscale_client.enabled",
+        "hermes_ssh_public_keys": "resources.guests.hermes.security.ssh_public_keys",
+        "searxng_server_name": "services.searxng_onramp.endpoints.public_names.0",
+        "searxng_public_url": "services.searxng_onramp.endpoints.public_url",
         "FORGEJO_ACTIONS_ENABLED": "services.forgejo.configuration.actions_enabled",
         "forgejo_actions_enabled": "services.forgejo.configuration.actions_enabled",
         "FORGEJO_ACTIONS_DEFAULT_URL": "services.forgejo.configuration.actions_default_url",
@@ -392,6 +396,10 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "onramp_host_allowed_ssh_cidrs",
         "onramp_host_cloud_init_user",
         "onramp_host_ssh_public_keys",
+        "tailscale_client_enabled",
+        "hermes_ssh_public_keys",
+        "searxng_server_name",
+        "searxng_public_url",
         "forgejo_configure_system_ssh",
         "forgejo_domain",
         "forgejo_enable_caddy",
@@ -470,7 +478,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
-        if key in {"tailscale_client_up_args", "forgejo_runner_labels", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys"}:
+        if key in {"tailscale_client_up_args", "forgejo_runner_labels", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
         elif key == "forgejo_runner_hosts":

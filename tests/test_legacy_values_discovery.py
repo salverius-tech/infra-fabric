@@ -469,6 +469,44 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_typed_extra_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    tailscale_client_enabled: true\n"
+                "    hermes_ssh_public_keys:\n"
+                "      - ssh-ed25519 HERMES_PUBLIC_KEY\n"
+                "    searxng_server_name: search.example.internal\n"
+                "    searxng_public_url: https://search.example.internal/\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "tailscale_client_enabled": "services.tailscale_client.enabled",
+            "hermes_ssh_public_keys": "resources.guests.hermes.security.ssh_public_keys",
+            "searxng_server_name": "services.searxng_onramp.endpoints.public_names.0",
+            "searxng_public_url": "services.searxng_onramp.endpoints.public_url",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_non_string_hermes_ssh_keys(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text("all:\n  vars:\n    hermes_ssh_public_keys:\n      - 7\n", encoding="utf-8")
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "list of strings"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_onramp_security(self) -> None:
         temp, values = self.make_values()
         with temp:
