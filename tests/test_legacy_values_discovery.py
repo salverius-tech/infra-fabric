@@ -526,6 +526,193 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("TECHNITIUM_API_TOKEN", "secret")].value, "<redacted>")
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_tailscale_forwarding_policy(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    tailscale_client_enable_ip_forwarding: true\n"
+                "    TAILSCALE_AUTH_KEY: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("tailscale_client_enable_ip_forwarding", "mapped")].proposed_path,
+            "services.tailscale_client.configuration.enable_ip_forwarding",
+        )
+        self.assertEqual(observations[("TAILSCALE_AUTH_KEY", "secret")].value, "<redacted>")
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_admits_tailscale_restore_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    tailscale_client_restore_backup: false\n"
+                "    tailscale_client_backup_archive: /srv/tailscale/backup.tar\n"
+                "    TAILSCALE_AUTH_KEY: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("tailscale_client_restore_backup", "mapped")].proposed_path,
+            "services.tailscale_client.configuration.restore_backup",
+        )
+        self.assertEqual(
+            observations[("tailscale_client_backup_archive", "mapped")].proposed_path,
+            "services.tailscale_client.configuration.backup_archive",
+        )
+        self.assertEqual(observations[("TAILSCALE_AUTH_KEY", "secret")].value, "<redacted>")
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_admits_tailscale_up_args(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    tailscale_client_up_args:\n"
+                "      - --accept-dns=false\n"
+                "      - --ssh\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("tailscale_client_up_args", "mapped")].proposed_path,
+            "services.tailscale_client.configuration.up_args",
+        )
+        self.assertEqual(
+            observations[("tailscale_client_up_args", "mapped")].value,
+            ["--accept-dns=false", "--ssh"],
+        )
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_admits_forgejo_runner_labels(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_labels:\n"
+                "      - docker\n"
+                "      - linux-amd64\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("forgejo_runner_labels", "mapped")].proposed_path,
+            "services.forgejo_runner.configuration.labels",
+        )
+        self.assertEqual(
+            observations[("forgejo_runner_labels", "mapped")].value,
+            ["docker", "linux-amd64"],
+        )
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_admits_forgejo_runner_hosts(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_hosts:\n"
+                "      - name: forgejo\n"
+                "        address: forgejo.example.internal\n"
+                "      - name: runner\n"
+                "        address: runner.example.internal\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("forgejo_runner_hosts", "mapped")].proposed_path,
+            "services.forgejo_runner.configuration.hosts",
+        )
+        self.assertEqual(
+            observations[("forgejo_runner_hosts", "mapped")].value,
+            [
+                {"name": "forgejo", "address": "forgejo.example.internal"},
+                {"name": "runner", "address": "runner.example.internal"},
+            ],
+        )
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_malformed_forgejo_runner_hosts(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_hosts:\n"
+                "      - name: forgejo\n"
+                "        address: ''\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "name/address objects"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
+    def test_bounded_ansible_importer_rejects_non_string_tailscale_up_args(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    tailscale_client_up_args:\n"
+                "      - 22\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "list of strings"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
+    def test_bounded_ansible_importer_admits_searxng_configuration(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    searxng_container_port: 8080\n"
+                "    searxng_bind_address: 127.0.0.1\n"
+                "    searxng_instance_name: Homelab SearXNG\n"
+                "    searxng_enable_public_url: true\n"
+                "    SEARXNG_SECRET_KEY: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "searxng_container_port": "services.searxng_onramp.configuration.container_port",
+            "searxng_bind_address": "services.searxng_onramp.configuration.bind_address",
+            "searxng_instance_name": "services.searxng_onramp.configuration.instance_name",
+            "searxng_enable_public_url": "services.searxng_onramp.configuration.enable_public_url",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertEqual(observations[("SEARXNG_SECRET_KEY", "secret")].value, "<redacted>")
+        self.assertFalse(report.candidate_ready)
+
     def test_forgejo_server_name_maps_to_normalized_public_name(self) -> None:
         temp, values = self.make_values()
         with temp:

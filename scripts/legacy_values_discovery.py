@@ -98,11 +98,21 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
         "FORGEJO_ROOT_URL": "services.forgejo.endpoints.public_url",
         "forgejo_root_url": "services.forgejo.endpoints.public_url",
+        "tailscale_client_enable_ip_forwarding": "services.tailscale_client.configuration.enable_ip_forwarding",
+        "tailscale_client_restore_backup": "services.tailscale_client.configuration.restore_backup",
+        "tailscale_client_backup_archive": "services.tailscale_client.configuration.backup_archive",
+        "tailscale_client_up_args": "services.tailscale_client.configuration.up_args",
+        "searxng_container_port": "services.searxng_onramp.configuration.container_port",
+        "searxng_bind_address": "services.searxng_onramp.configuration.bind_address",
+        "searxng_instance_name": "services.searxng_onramp.configuration.instance_name",
+        "searxng_enable_public_url": "services.searxng_onramp.configuration.enable_public_url",
         "forgejo_runner_version": "services.forgejo_runner.release.version",
         "forgejo_runner_url": "services.forgejo_runner.configuration.url",
         "forgejo_runner_name": "services.forgejo_runner.configuration.name",
         "forgejo_runner_scope": "services.forgejo_runner.configuration.scope",
         "forgejo_runner_label": "services.forgejo_runner.configuration.label",
+        "forgejo_runner_labels": "services.forgejo_runner.configuration.labels",
+        "forgejo_runner_hosts": "services.forgejo_runner.configuration.hosts",
         "infisical_data_dir": "services.infisical.configuration.data_dir",
         "infisical_postgres_user": "services.infisical.configuration.postgres_user",
         "infisical_postgres_db": "services.infisical.configuration.postgres_db",
@@ -154,6 +164,13 @@ def _public_value(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, list) and all(isinstance(item, (str, int, float, bool)) for item in value):
+        return value
+    if isinstance(value, list) and all(
+        isinstance(item, dict)
+        and set(item) == {"name", "address"}
+        and all(isinstance(item[field], str) for field in ("name", "address"))
+        for item in value
+    ):
         return value
     return None
 
@@ -353,11 +370,21 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_domain",
         "forgejo_enable_caddy",
         "forgejo_root_url",
+        "tailscale_client_enable_ip_forwarding",
+        "tailscale_client_restore_backup",
+        "tailscale_client_backup_archive",
+        "tailscale_client_up_args",
+        "searxng_container_port",
+        "searxng_bind_address",
+        "searxng_instance_name",
+        "searxng_enable_public_url",
         "forgejo_runner_version",
         "forgejo_runner_url",
         "forgejo_runner_name",
         "forgejo_runner_scope",
         "forgejo_runner_label",
+        "forgejo_runner_labels",
+        "forgejo_runner_hosts",
         "infisical_data_dir",
         "infisical_postgres_user",
         "infisical_postgres_db",
@@ -417,7 +444,18 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
-        if not isinstance(value, (str, bool, int, float)):
+        if key in {"tailscale_client_up_args", "forgejo_runner_labels"}:
+            if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
+        elif key == "forgejo_runner_hosts":
+            if not isinstance(value, list) or not all(
+                isinstance(item, dict)
+                and set(item) == {"name", "address"}
+                and all(isinstance(item[field], str) and item[field].strip() for field in ("name", "address"))
+                for item in value
+            ):
+                raise DiscoveryError(f"bounded Ansible {key} must be a list of name/address objects")
+        elif not isinstance(value, (str, bool, int, float)):
             raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
         if isinstance(value, str) and not value.strip():
             raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
