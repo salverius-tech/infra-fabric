@@ -111,6 +111,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_actions_enabled": "services.forgejo.configuration.actions_enabled",
         "FORGEJO_ACTIONS_DEFAULT_URL": "services.forgejo.configuration.actions_default_url",
         "caddy_email": "platform.ingress.acme.email",
+        "caddy_server_names": "services.technitium.configuration.caddy.server_names",
         "forgejo_actions_default_url": "services.forgejo.configuration.actions_default_url",
         "FORGEJO_SSH_PORT": "services.forgejo.endpoints.ports.ssh",
         "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
@@ -405,6 +406,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "searxng_public_url",
         "searxng_container_image",
         "caddy_email",
+        "caddy_server_names",
         "forgejo_configure_system_ssh",
         "forgejo_domain",
         "forgejo_enable_caddy",
@@ -484,7 +486,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
-        if key in {"tailscale_client_up_args", "forgejo_runner_labels", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers"}:
+        if key in {"tailscale_client_up_args", "forgejo_runner_labels", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers", "caddy_server_names"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
         elif key == "forgejo_runner_hosts":

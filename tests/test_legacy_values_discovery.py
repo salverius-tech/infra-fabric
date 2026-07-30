@@ -469,6 +469,32 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_caddy_server_names(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    caddy_server_names:\n"
+                "      - dns.example.internal\n"
+                "      - technitium.example.internal\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        observation = observations[("caddy_server_names", "mapped")]
+        self.assertEqual(
+            observation.proposed_path,
+            "services.technitium.configuration.caddy.server_names",
+        )
+        self.assertEqual(
+            observation.value,
+            ["dns.example.internal", "technitium.example.internal"],
+        )
+        self.assertFalse(report.candidate_ready)
+
     def test_bounded_ansible_importer_admits_caddy_email(self) -> None:
         temp, values = self.make_values()
         with temp:
