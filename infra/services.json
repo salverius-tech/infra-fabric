@@ -170,6 +170,8 @@
         "tf_host": "infisical_lan_ip",
         "domain_var": "infisical_domain",
         "canonical_play_vars": {
+          "infisical_domain": "endpoints.public_names.0",
+          "infisical_version": "release.version",
           "infisical_data_dir": "configuration.data_dir",
           "infisical_postgres_user": "configuration.postgres_user",
           "infisical_postgres_db": "configuration.postgres_db"

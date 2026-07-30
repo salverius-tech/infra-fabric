@@ -98,8 +98,44 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
         "FORGEJO_ROOT_URL": "services.forgejo.endpoints.public_url",
         "forgejo_root_url": "services.forgejo.endpoints.public_url",
+        "forgejo_runner_version": "services.forgejo_runner.release.version",
+        "forgejo_runner_url": "services.forgejo_runner.configuration.url",
+        "forgejo_runner_name": "services.forgejo_runner.configuration.name",
+        "forgejo_runner_scope": "services.forgejo_runner.configuration.scope",
+        "forgejo_runner_label": "services.forgejo_runner.configuration.label",
+        "infisical_data_dir": "services.infisical.configuration.data_dir",
+        "infisical_postgres_user": "services.infisical.configuration.postgres_user",
+        "infisical_postgres_db": "services.infisical.configuration.postgres_db",
+        "infisical_domain": "services.infisical.endpoints.public_names",
+        "infisical_version": "services.infisical.release.version",
+        "infisical_vmid": "resources.guests.infisical.identity.vmid",
         "HERMES_CONTROL_SOURCE_URL": "services.hermes.configuration.control.source_url",
         "HERMES_CONTROL_SOURCE_REF": "services.hermes.configuration.control.source_ref",
+        "hermes_control_enabled": "services.hermes.configuration.control.enabled",
+        "hermes_control_domain": "services.hermes.configuration.control.domain",
+        "hermes_control_api_host": "services.hermes.configuration.control.api_host",
+        "hermes_control_api_port": "services.hermes.configuration.control.api_port",
+        "hermes_control_require_task_approval": "services.hermes.configuration.control.require_task_approval",
+        "hermes_control_plugin_socket": "services.hermes.configuration.control.plugin_socket",
+        "hermes_discovery_version": "services.hermes.release.version",
+        "hermes_discovery_tag": "services.hermes.release.tag",
+        "hermes_discovery_commit": "services.hermes.release.commit",
+        "hermes_discovery_wheel_sha256": "services.hermes.release.checksum",
+        "hermes_node_version": "services.hermes.configuration.node.version",
+        "hermes_node_sha256_amd64": "services.hermes.configuration.node.checksums.amd64",
+        "hermes_node_sha256_arm64": "services.hermes.configuration.node.checksums.arm64",
+        "hermes_dashboard_enabled": "services.hermes.configuration.dashboard.enabled",
+        "hermes_dashboard_port": "services.hermes.endpoints.ports.dashboard",
+        "hermes_dashboard_host": "services.hermes.configuration.dashboard.host",
+        "hermes_dashboard_basic_auth_username": "services.hermes.configuration.dashboard.auth_username",
+        "hermes_runtime_passwordless_sudo": "resources.guests.hermes.security.allow_passwordless_sudo",
+        "hermes_allow_legacy_runtime": "services.hermes.configuration.allow_legacy_runtime",
+        "hermes_compression_threshold": "services.hermes.configuration.tuning.compression_threshold",
+        "hermes_max_concurrent_children": "services.hermes.configuration.tuning.max_concurrent_children",
+        "hermes_max_spawn_depth": "services.hermes.configuration.tuning.max_spawn_depth",
+        "hermes_web_searxng_url": "services.hermes.configuration.web.searxng_url",
+        "technitium_discovery_version": "services.technitium.release.version",
+        "technitium_portable_sha256": "services.technitium.release.checksum",
     }
     if key in paths:
         return "mapped", paths[key]
@@ -283,7 +319,13 @@ def _ansible_value_type(value: Any) -> str:
     return type(value).__name__
 
 
-def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: Any) -> None:
+def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: Any) -> None:
+    """Import only explicitly admitted, non-secret inventory fields.
+
+    The adapter remains report-only and intentionally leaves all other inventory
+    identities as residual unsupported observations. Each admitted family must
+    be independently safe to normalize and compare with legacy sources.
+    """
     allowed_keys = {
         "forgejo_actions_default_url",
         "forgejo_actions_enabled",
@@ -292,9 +334,45 @@ def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_domain",
         "forgejo_enable_caddy",
         "forgejo_root_url",
+        "forgejo_runner_version",
+        "forgejo_runner_url",
+        "forgejo_runner_name",
+        "forgejo_runner_scope",
+        "forgejo_runner_label",
+        "infisical_data_dir",
+        "infisical_postgres_user",
+        "infisical_postgres_db",
+        "infisical_domain",
+        "infisical_version",
+        "infisical_vmid",
+        "hermes_discovery_version",
+        "hermes_discovery_tag",
+        "hermes_discovery_commit",
+        "hermes_discovery_wheel_sha256",
+        "hermes_node_version",
+        "hermes_node_sha256_amd64",
+        "hermes_node_sha256_arm64",
+        "hermes_dashboard_enabled",
+        "hermes_dashboard_port",
+        "hermes_dashboard_host",
+        "hermes_dashboard_basic_auth_username",
+        "hermes_runtime_passwordless_sudo",
+        "hermes_allow_legacy_runtime",
+        "hermes_compression_threshold",
+        "hermes_max_concurrent_children",
+        "hermes_max_spawn_depth",
+        "hermes_web_searxng_url",
+        "hermes_control_enabled",
+        "hermes_control_domain",
+        "hermes_control_api_host",
+        "hermes_control_api_port",
+        "hermes_control_require_task_approval",
+        "hermes_control_plugin_socket",
         "forgejo_ssh_port",
         "forgejo_version",
         "forgejo_write_initial_config",
+        "technitium_discovery_version",
+        "technitium_portable_sha256",
     }
     try:
         import yaml
@@ -306,24 +384,17 @@ def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: 
         raise DiscoveryError(f"cannot parse Ansible inventory: {path}") from error
     try:
         variables = document["all"]["vars"]
-        domain = variables["forgejo_domain"]
     except (KeyError, TypeError) as error:
-        raise DiscoveryError("bounded Ansible importer requires all.vars.forgejo_domain") from error
-    if not isinstance(domain, str) or not domain.strip():
-        raise DiscoveryError("bounded Ansible forgejo_domain must be a non-empty string")
+        raise DiscoveryError("bounded Ansible importer requires all.vars mapping") from error
+    if not isinstance(variables, dict):
+        raise DiscoveryError("bounded Ansible inventory vars must be a mapping")
     source = path.as_posix()
-    _observe(source, "forgejo_domain", domain, report, migration)
-    if "forgejo_version" in variables:
-        version = variables["forgejo_version"]
-        if not isinstance(version, str) or not version.strip():
-            raise DiscoveryError("bounded Ansible forgejo_version must be a non-empty string")
-        _observe(source, "forgejo_version", version, report, migration)
-    for key in sorted(allowed_keys - {"forgejo_domain", "forgejo_version"}):
-        if key not in variables:
-            continue
+    for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
         if not isinstance(value, (str, bool, int, float)):
             raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
+        if isinstance(value, str) and not value.strip():
+            raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
         _observe(source, key, value, report, migration)
     for key in sorted(set(variables) - allowed_keys):
         classification, _ = _classification(key, migration)
@@ -396,7 +467,7 @@ def discover_legacy(
         if not inventory.is_file():
             raise DiscoveryError(f"Ansible inventory does not exist: {inventory}")
         report.files.append(inventory.as_posix())
-        _read_ansible_forgejo_slice(inventory, report, migration)
+        _read_ansible_bounded_slice(inventory, report, migration)
     elif inventory.is_file():
         report.files.append(inventory.relative_to(values).as_posix())
         report.observations.append(

@@ -551,6 +551,53 @@ class CanonicalValuesTests(unittest.TestCase):
                 with self.assertRaises(CanonicalValuesError):
                     load_site(self.write_site(VALID_SITE.replace("      visibility: internal", replacement)))
 
+    def test_technitium_release_fields_project_to_ansible_compatibility_vars(self) -> None:
+        content = (
+            VALID_SITE.replace("forgejo", "technitium")
+            .replace("git.example.internal", "dns.example.internal")
+            .replace("12.0.4", "15.2.0")
+            .replace(
+                "      version: 15.2.0",
+                "      version: 15.2.0\n      checksum: " + "a" * 64,
+            )
+        )
+        site_path = self.write_site(content)
+        catalog_path = Path(__file__).resolve().parents[1] / "infra" / "services.json"
+        model = load_site(site_path, catalog_path=catalog_path)
+        catalog = load_catalog(catalog_path)
+        ansible_vars = render_ansible_vars(model, catalog)
+        legacy_vars = ansible_vars["services"]["technitium"]["legacy_vars"]
+        self.assertEqual(legacy_vars["technitium_discovery_version"], "15.2.0")
+        self.assertEqual(legacy_vars["technitium_portable_sha256"], "a" * 64)
+
+    def test_infisical_scalar_fields_project_to_ansible_compatibility_vars(self) -> None:
+        content = VALID_SITE.replace(
+            "  forgejo:\n    enabled: true",
+            "  infisical:\n"
+            "    enabled: true\n"
+            "    resource: forgejo\n"
+            "    configuration:\n"
+            "      data_dir: /var/lib/infisical\n"
+            "      postgres_user: infisical\n"
+            "      postgres_db: infisical\n"
+            "    endpoints:\n"
+            "      public_names: [infisical.example.internal]\n"
+            "    release:\n"
+            "      version: 'v0.162.3@sha256:" + "a" * 64 + "'\n"
+            "  forgejo:\n    enabled: true",
+        )
+        site_path = self.write_site(content)
+        catalog_path = Path(__file__).resolve().parents[1] / "infra" / "services.json"
+        model = load_site(site_path, catalog_path=catalog_path)
+        catalog = load_catalog(catalog_path)
+        ansible_vars = render_ansible_vars(model, catalog)
+        legacy_vars = ansible_vars["services"]["infisical"]["legacy_vars"]
+        self.assertEqual(legacy_vars["infisical_data_dir"], "/var/lib/infisical")
+        self.assertEqual(legacy_vars["infisical_postgres_user"], "infisical")
+        self.assertEqual(legacy_vars["infisical_postgres_db"], "infisical")
+        self.assertEqual(legacy_vars["infisical_domain"], "infisical.example.internal")
+        self.assertEqual(legacy_vars["infisical_version"], "v0.162.3@sha256:" + "a" * 64)
+
     def test_non_secret_consumer_projections_use_canonical_ownership(self) -> None:
         content = VALID_SITE.replace(
             "      visibility: internal",

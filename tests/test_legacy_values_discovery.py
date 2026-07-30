@@ -93,6 +93,34 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertFalse(report.mapping_ready)
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_technitium_release_fields(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    technitium_discovery_version: '15.2.0'\n"
+                "    technitium_portable_sha256: 2e39fb8d0718475790cc025e083a1bcfd837a5e79e4a1d0ed775881bd90287ef\n"
+                "    TECHNITIUM_API_TOKEN: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("technitium_discovery_version", "mapped")].proposed_path,
+            "services.technitium.release.version",
+        )
+        self.assertEqual(observations[("technitium_discovery_version", "mapped")].value, "15.2.0")
+        self.assertEqual(
+            observations[("technitium_portable_sha256", "mapped")].proposed_path,
+            "services.technitium.release.checksum",
+        )
+        self.assertEqual(observations[("technitium_portable_sha256", "mapped")].value, "2e39fb8d0718475790cc025e083a1bcfd837a5e79e4a1d0ed775881bd90287ef")
+        self.assertEqual(observations[("TECHNITIUM_API_TOKEN", "secret")].value, "<redacted>")
+        self.assertFalse(report.candidate_ready)
+
     def test_bounded_ansible_importer_conflicts_with_legacy_domain(self) -> None:
         temp, values = self.make_values()
         with temp:
@@ -106,6 +134,90 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n", encoding="utf-8")
             report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
         self.assertTrue(any(conflict["canonical_path"] == "services.forgejo.endpoints.public_names" for conflict in report.conflicts))
+
+    def test_bounded_ansible_importer_admits_forgejo_runner_release_version(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_version: '12.7.3'\n"
+                "    FORGEJO_RUNNER_REGISTRATION_SECRET: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("forgejo_runner_version", "mapped")].proposed_path,
+            "services.forgejo_runner.release.version",
+        )
+        self.assertEqual(observations[("forgejo_runner_version", "mapped")].value, "12.7.3")
+        self.assertEqual(observations[("FORGEJO_RUNNER_REGISTRATION_SECRET", "secret")].value, "<redacted>")
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_admits_forgejo_runner_scalar_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_url: 'https://git.example.internal/'\n"
+                "    forgejo_runner_name: homelab-deploy\n"
+                "    forgejo_runner_scope: owner/homelab-infra-values\n"
+                "    forgejo_runner_label: homelab-deploy\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "forgejo_runner_url": "services.forgejo_runner.configuration.url",
+            "forgejo_runner_name": "services.forgejo_runner.configuration.name",
+            "forgejo_runner_scope": "services.forgejo_runner.configuration.scope",
+            "forgejo_runner_label": "services.forgejo_runner.configuration.label",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_admits_infisical_scalar_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    infisical_vmid: 110\n"
+                "    infisical_data_dir: /var/lib/infisical\n"
+                "    infisical_postgres_user: infisical\n"
+                "    infisical_postgres_db: infisical\n"
+                "    infisical_domain: infisical.example.internal\n"
+                "    infisical_version: 'v0.162.3@sha256:"
+                + "a" * 64
+                + "'\n"
+                "    INFISICAL_ENCRYPTION_KEY: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "infisical_vmid": "resources.guests.infisical.identity.vmid",
+            "infisical_data_dir": "services.infisical.configuration.data_dir",
+            "infisical_postgres_user": "services.infisical.configuration.postgres_user",
+            "infisical_postgres_db": "services.infisical.configuration.postgres_db",
+            "infisical_domain": "services.infisical.endpoints.public_names",
+            "infisical_version": "services.infisical.release.version",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertEqual(observations[("INFISICAL_ENCRYPTION_KEY", "secret")].value, "<redacted>")
+        self.assertFalse(report.candidate_ready)
 
     def test_root_and_site_aware_layouts_have_equivalent_report_only_discovery(self) -> None:
         temp, values = self.make_values()
@@ -248,6 +360,92 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertIn("unmapped_public_key", rendered)
         self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
         self.assertNotIn("review-me", rendered)
+
+    def test_bounded_ansible_importer_admits_hermes_release_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_discovery_version: 0.18.0\n"
+                "    hermes_discovery_tag: v2026.7.1\n"
+                "    hermes_discovery_commit: 7c1a029553d87c43ecff8a3821336bc95872213b\n"
+                "    hermes_discovery_wheel_sha256: " + "b" * 64 + "\n"
+                "    hermes_node_version: 22.23.1\n"
+                "    hermes_node_sha256_amd64: " + "c" * 64 + "\n"
+                "    hermes_node_sha256_arm64: " + "d" * 64 + "\n"
+                "    hermes_dashboard_enabled: true\n"
+                "    hermes_dashboard_port: 9119\n"
+                "    hermes_dashboard_host: 127.0.0.1\n"
+                "    hermes_dashboard_basic_auth_username: admin\n"
+                "    hermes_control_enabled: false\n"
+                "    hermes_control_domain: control.hermes.example.internal\n"
+                "    hermes_control_api_host: 127.0.0.1\n"
+                "    hermes_control_api_port: 9120\n"
+                "    hermes_control_require_task_approval: true\n"
+                "    hermes_control_plugin_socket: /run/hermes/control.sock\n"
+                "    HERMES_CONTROL_API_TOKEN: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "hermes_discovery_version": "services.hermes.release.version",
+            "hermes_discovery_tag": "services.hermes.release.tag",
+            "hermes_discovery_commit": "services.hermes.release.commit",
+            "hermes_discovery_wheel_sha256": "services.hermes.release.checksum",
+            "hermes_node_version": "services.hermes.configuration.node.version",
+            "hermes_node_sha256_amd64": "services.hermes.configuration.node.checksums.amd64",
+            "hermes_node_sha256_arm64": "services.hermes.configuration.node.checksums.arm64",
+            "hermes_dashboard_enabled": "services.hermes.configuration.dashboard.enabled",
+            "hermes_dashboard_port": "services.hermes.endpoints.ports.dashboard",
+            "hermes_dashboard_host": "services.hermes.configuration.dashboard.host",
+            "hermes_dashboard_basic_auth_username": "services.hermes.configuration.dashboard.auth_username",
+            "hermes_control_enabled": "services.hermes.configuration.control.enabled",
+            "hermes_control_domain": "services.hermes.configuration.control.domain",
+            "hermes_control_api_host": "services.hermes.configuration.control.api_host",
+            "hermes_control_api_port": "services.hermes.configuration.control.api_port",
+            "hermes_control_require_task_approval": "services.hermes.configuration.control.require_task_approval",
+            "hermes_control_plugin_socket": "services.hermes.configuration.control.plugin_socket",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertEqual(observations[("HERMES_CONTROL_API_TOKEN", "secret")].value, "<redacted>")
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_admits_hermes_runtime_scalars(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_runtime_passwordless_sudo: false\n"
+                "    hermes_allow_legacy_runtime: false\n"
+                "    hermes_compression_threshold: 0.75\n"
+                "    hermes_max_concurrent_children: 5\n"
+                "    hermes_max_spawn_depth: 2\n"
+                "    hermes_web_searxng_url: https://searxng.apps.example.net\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "hermes_runtime_passwordless_sudo": "resources.guests.hermes.security.allow_passwordless_sudo",
+            "hermes_allow_legacy_runtime": "services.hermes.configuration.allow_legacy_runtime",
+            "hermes_compression_threshold": "services.hermes.configuration.tuning.compression_threshold",
+            "hermes_max_concurrent_children": "services.hermes.configuration.tuning.max_concurrent_children",
+            "hermes_max_spawn_depth": "services.hermes.configuration.tuning.max_spawn_depth",
+            "hermes_web_searxng_url": "services.hermes.configuration.web.searxng_url",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertFalse(report.candidate_ready)
 
     def test_forgejo_server_name_maps_to_normalized_public_name(self) -> None:
         temp, values = self.make_values()
