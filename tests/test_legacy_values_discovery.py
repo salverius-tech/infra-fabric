@@ -73,13 +73,9 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             "forgejo_actions_default_url",
         ):
             self.assertEqual(observations[(key, "mapped")].key, key)
-        self.assertTrue(
-            any(
-                item.key == "forgejo_bootstrap_admin_email"
-                and item.classification == "unsupported"
-                and item.value is None
-                for item in report.observations
-            )
+        self.assertEqual(
+            observations[("forgejo_bootstrap_admin_email", "mapped")].proposed_path,
+            "services.forgejo.configuration.bootstrap_admin_email",
         )
         self.assertTrue(
             any(
@@ -471,6 +467,31 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_admits_forgejo_bootstrap_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_bootstrap_admin_username: forgejo-admin\n"
+                "    forgejo_bootstrap_admin_email: admin@example.internal\n"
+                "    forgejo_bootstrap_owner_email: owner@example.internal\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "forgejo_bootstrap_admin_username": "services.forgejo.configuration.bootstrap_admin_username",
+            "forgejo_bootstrap_admin_email": "services.forgejo.configuration.bootstrap_admin_email",
+            "forgejo_bootstrap_owner_email": "services.forgejo.configuration.bootstrap_owner_email",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
         self.assertFalse(report.candidate_ready)
 
     def test_bounded_ansible_importer_admits_service_resource_vmids(self) -> None:
@@ -890,7 +911,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         version = [item for item in payload["observations"] if item["key"] == "forgejo_version"]
         self.assertTrue(mapped)
         self.assertTrue(version)
-        self.assertTrue(any(item["key"] == "forgejo_bootstrap_admin_email" and item["classification"] == "unsupported" and item["value"] is None for item in payload["observations"]))
+        self.assertTrue(any(item["key"] == "forgejo_bootstrap_admin_email" and item["classification"] == "mapped" and item["proposed_path"] == "services.forgejo.configuration.bootstrap_admin_email" for item in payload["observations"]))
         self.assertFalse(payload["candidate_ready"])
 
     def test_cli_reports_invalid_values_directory_without_traceback(self) -> None:
