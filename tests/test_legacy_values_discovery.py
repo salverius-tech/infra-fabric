@@ -494,6 +494,52 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_forgejo_database_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_database:\n"
+                "      type: postgres\n"
+                "      managed: false\n"
+                "      host: db.example.internal\n"
+                "      port: 5432\n"
+                "      name: forgejo\n"
+                "      user: forgejo\n"
+                "      ssl_mode: require\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("forgejo_database", "mapped")].proposed_path,
+            "services.forgejo.configuration.database",
+        )
+        self.assertEqual(
+            observations[("forgejo_database", "mapped")].value["port"],
+            5432,
+        )
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_invalid_forgejo_database_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_database:\n"
+                "      type: postgres\n"
+                "      port: 70000\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "valid database metadata"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_service_resource_vmids(self) -> None:
         temp, values = self.make_values()
         with temp:

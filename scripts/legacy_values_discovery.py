@@ -93,6 +93,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_bootstrap_admin_username": "services.forgejo.configuration.bootstrap_admin_username",
         "forgejo_bootstrap_admin_email": "services.forgejo.configuration.bootstrap_admin_email",
         "forgejo_bootstrap_owner_email": "services.forgejo.configuration.bootstrap_owner_email",
+        "forgejo_database": "services.forgejo.configuration.database",
         "FORGEJO_ACTIONS_ENABLED": "services.forgejo.configuration.actions_enabled",
         "forgejo_actions_enabled": "services.forgejo.configuration.actions_enabled",
         "FORGEJO_ACTIONS_DEFAULT_URL": "services.forgejo.configuration.actions_default_url",
@@ -174,6 +175,8 @@ def _public_value(value: Any) -> Any:
         and all(isinstance(item[field], str) for field in ("name", "address"))
         for item in value
     ):
+        return value
+    if isinstance(value, dict) and set(value) <= {"type", "managed", "host", "port", "name", "user", "ssl_mode"}:
         return value
     return None
 
@@ -372,6 +375,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_bootstrap_admin_username",
         "forgejo_bootstrap_admin_email",
         "forgejo_bootstrap_owner_email",
+        "forgejo_database",
         "forgejo_configure_system_ssh",
         "forgejo_domain",
         "forgejo_enable_caddy",
@@ -461,6 +465,19 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                 for item in value
             ):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of name/address objects")
+        elif key == "forgejo_database":
+            allowed = {"type", "managed", "host", "port", "name", "user", "ssl_mode"}
+            valid = isinstance(value, dict) and set(value) <= allowed
+            if valid:
+                valid = all(
+                    (field == "type" and item in {"sqlite", "postgres"})
+                    or (field == "managed" and isinstance(item, bool))
+                    or (field == "port" and isinstance(item, int) and not isinstance(item, bool) and 1 <= item <= 65535)
+                    or (field in {"host", "name", "user", "ssl_mode"} and isinstance(item, str) and item.strip())
+                    for field, item in value.items()
+                )
+            if not valid:
+                raise DiscoveryError(f"bounded Ansible {key} must be valid database metadata")
         elif not isinstance(value, (str, bool, int, float)):
             raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
         if isinstance(value, str) and not value.strip():
