@@ -210,6 +210,8 @@ The implementation is complete when all of the following are true:
 - [~] Add bounded Hermes dashboard scalar admission: enabled flag, dashboard port, bind host, and auth username map to typed configuration/endpoint owners; dashboard secrets and runtime cutover remain deferred.
 - [~] Add bounded Hermes Control scalar admission: enabled flag, domain, API host/port, task-approval requirement, and plugin socket map to typed control owners; tokens, secret delivery, and runtime activation remain deferred.
 - [~] Add bounded Hermes runtime scalar admission: passwordless-sudo policy, legacy-runtime policy, tuning limits, and SearXNG URL map to existing typed resource/service owners; structured runtime controls, secrets, candidate generation, and cutover remain deferred.
+- [~] Add bounded Hermes operator transport admission: domain, runtime user, and normalized repository path map to existing endpoint/configuration owners; resource identity, SSH keys, secrets, candidate generation, and cutover remain deferred.
+- [~] Add bounded service resource-identity admission: `forgejo_runner_vmid` and `hermes_vmid` map to typed guest VMID owners; resource shape, mutation/apply, secrets, candidate generation, and cutover remain deferred.
 - [ ] Reduce static `ansible/inventory/local.yml` to genuine Ansible-only overrides.
 - [ ] Update validation, plan, apply, and `apply-ansible-services.py` to consume the same snapshot/projection set.
 - [ ] Inject secrets separately and only into tasks that require them.

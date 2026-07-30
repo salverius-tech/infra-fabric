@@ -473,6 +473,29 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_service_resource_vmids(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_vmid: 109\n"
+                "    hermes_vmid: 111\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "forgejo_runner_vmid": "resources.guests.forgejo_runner.identity.vmid",
+            "hermes_vmid": "resources.guests.hermes.identity.vmid",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertFalse(report.candidate_ready)
+
     def test_forgejo_server_name_maps_to_normalized_public_name(self) -> None:
         temp, values = self.make_values()
         with temp:
