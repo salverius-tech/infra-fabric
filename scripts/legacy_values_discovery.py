@@ -80,7 +80,9 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "FORGEJO_SERVER_NAME": "services.forgejo.endpoints.public_names",
         "forgejo_server_name": "services.forgejo.endpoints.public_names",
         "FORGEJO_VERSION": "services.forgejo.release.version",
+        "forgejo_version": "services.forgejo.release.version",
         "FORGEJO_SSH_PORT": "services.forgejo.endpoints.ports.ssh",
+        "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
         "HERMES_CONTROL_SOURCE_URL": "services.hermes.configuration.control.source_url",
         "HERMES_CONTROL_SOURCE_REF": "services.hermes.configuration.control.source_ref",
     }
@@ -232,7 +234,7 @@ def _record_artifact_tree(report: DiscoveryReport, values: Path, root: Path, art
     )
 
 
-def _read_ansible_forgejo_domain(path: Path, report: DiscoveryReport, migration: Any) -> None:
+def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: Any) -> None:
     try:
         import yaml
     except ImportError as error:  # pragma: no cover - environment setup failure
@@ -242,13 +244,19 @@ def _read_ansible_forgejo_domain(path: Path, report: DiscoveryReport, migration:
     except (OSError, yaml.YAMLError) as error:
         raise DiscoveryError(f"cannot parse Ansible inventory: {path}") from error
     try:
-        value = document["all"]["vars"]["forgejo_domain"]
+        variables = document["all"]["vars"]
+        domain = variables["forgejo_domain"]
     except (KeyError, TypeError) as error:
         raise DiscoveryError("bounded Ansible importer requires all.vars.forgejo_domain") from error
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(domain, str) or not domain.strip():
         raise DiscoveryError("bounded Ansible forgejo_domain must be a non-empty string")
     source = path.as_posix()
-    _observe(source, "forgejo_domain", value, report, migration)
+    _observe(source, "forgejo_domain", domain, report, migration)
+    if "forgejo_version" in variables:
+        version = variables["forgejo_version"]
+        if not isinstance(version, str) or not version.strip():
+            raise DiscoveryError("bounded Ansible forgejo_version must be a non-empty string")
+        _observe(source, "forgejo_version", version, report, migration)
     report.observations.append(FieldObservation(source, "<inventory:remaining>", "unsupported", None, "yaml"))
 
 
@@ -305,7 +313,7 @@ def discover_legacy(
         if not inventory.is_file():
             raise DiscoveryError(f"Ansible inventory does not exist: {inventory}")
         report.files.append(inventory.as_posix())
-        _read_ansible_forgejo_domain(inventory, report, migration)
+        _read_ansible_forgejo_slice(inventory, report, migration)
     elif inventory.is_file():
         report.files.append(inventory.relative_to(values).as_posix())
         report.observations.append(

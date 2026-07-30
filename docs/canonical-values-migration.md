@@ -109,7 +109,8 @@ scripts/python.sh scripts/legacy-values-discovery.py \
   --output /tmp/legacy-values-ansible-review.json
 ```
 
-That opt-in admits only `all.vars.forgejo_domain`; the remaining inventory is
+That opt-in admits only `all.vars.forgejo_domain` and
+`all.vars.forgejo_version`; the remaining inventory is
 reported as unsupported. It performs normalization and conflict detection but
 still cannot generate a candidate or enable consumer cutover.
 

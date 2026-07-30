@@ -54,13 +54,14 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
             inventory.write_text(
-                "all:\n  vars:\n    forgejo_domain: git.example.internal\n"
+                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n"
                 "  hosts:\n    edge:\n",
                 encoding="utf-8",
             )
             report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
         observations = {(item.key, item.classification): item for item in report.observations}
         self.assertEqual(observations[("forgejo_domain", "mapped")].value, ["git.example.internal"])
+        self.assertEqual(observations[("forgejo_version", "mapped")].value, "12.0.4")
         self.assertTrue(any(item.key == "<inventory:remaining>" and item.classification == "unsupported" for item in report.observations))
         self.assertFalse(report.mapping_ready)
         self.assertFalse(report.candidate_ready)
@@ -364,7 +365,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             repo = Path(temp.name) / "repo"
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
-            inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n", encoding="utf-8")
+            inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n", encoding="utf-8")
             output = values.parent / "ansible-report.json"
             result = legacy_values_discovery_cli.main(
                 [
@@ -377,7 +378,9 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             self.assertEqual(result, 0)
             payload = json.loads(output.read_text(encoding="utf-8"))
         mapped = [item for item in payload["observations"] if item["key"] == "forgejo_domain"]
+        version = [item for item in payload["observations"] if item["key"] == "forgejo_version"]
         self.assertTrue(mapped)
+        self.assertTrue(version)
         self.assertTrue(any(item["key"] == "<inventory:remaining>" for item in payload["observations"]))
         self.assertFalse(payload["candidate_ready"])
 
