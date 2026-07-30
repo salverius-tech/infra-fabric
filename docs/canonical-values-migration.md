@@ -110,7 +110,7 @@ scripts/python.sh scripts/legacy-values-discovery.py \
 ```
 
 That opt-in admits the non-secret Forgejo fields `all.vars.forgejo_domain`,
-`all.vars.forgejo_version`, `all.vars.forgejo_enable_caddy`,
+`all.vars.forgejo_version`, `all.vars.forgejo_ssh_port`, `all.vars.forgejo_enable_caddy`,
 `all.vars.forgejo_configure_system_ssh`, `all.vars.forgejo_write_initial_config`,
 `all.vars.forgejo_bootstrap_enabled`, `all.vars.forgejo_actions_enabled`, and
 `all.vars.forgejo_actions_default_url`; the remaining inventory is

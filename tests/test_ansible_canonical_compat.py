@@ -115,6 +115,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             mapping,
             {
                 "forgejo_domain": "endpoints.public_names.0",
+                "forgejo_ssh_port": "endpoints.ports.ssh",
                 "forgejo_version": "release.version",
                 "forgejo_database": "configuration.database",
                 "forgejo_enable_caddy": "configuration.enable_caddy",
@@ -135,6 +136,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             projected["services"]["forgejo"]["legacy_vars"],
             {
                 "forgejo_domain": "git.example.internal",
+                "forgejo_ssh_port": 22,
                 "forgejo_version": "10.0.0",
                 "forgejo_database": {
                     "type": "sqlite",

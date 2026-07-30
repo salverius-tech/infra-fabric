@@ -67,6 +67,7 @@
         },
         "canonical_play_vars": {
           "forgejo_domain": "endpoints.public_names.0",
+          "forgejo_ssh_port": "endpoints.ports.ssh",
           "forgejo_version": "release.version",
           "forgejo_database": "configuration.database",
           "forgejo_enable_caddy": "configuration.enable_caddy",

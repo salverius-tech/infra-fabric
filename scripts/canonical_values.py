@@ -743,6 +743,14 @@ class ServiceEndpoints(StrictModel):
             raise ValueError("service endpoint ports must be between 1 and 65535")
         return value
 
+    @model_validator(mode="after")
+    def validate_protocol_ports(self) -> "ServiceEndpoints":
+        if "ssh" in self.protocols:
+            self.ports.setdefault("ssh", 22)
+        elif "ssh" in self.ports:
+            raise ValueError("service endpoint ssh port requires ssh protocol")
+        return self
+
 
 class ServiceRelease(StrictModel):
     version: StrictStr | None = None

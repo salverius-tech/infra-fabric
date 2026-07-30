@@ -54,7 +54,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
             inventory.write_text(
-                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_enable_caddy: true\n    forgejo_configure_system_ssh: true\n    forgejo_write_initial_config: false\n    forgejo_bootstrap_enabled: true\n    forgejo_actions_enabled: true\n    forgejo_actions_default_url: https://data.forgejo.org\n"
+                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_ssh_port: 22\n    forgejo_enable_caddy: true\n    forgejo_configure_system_ssh: true\n    forgejo_write_initial_config: false\n    forgejo_bootstrap_enabled: true\n    forgejo_actions_enabled: true\n    forgejo_actions_default_url: https://data.forgejo.org\n"
                 "  hosts:\n    edge:\n",
                 encoding="utf-8",
             )
@@ -64,6 +64,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("forgejo_version", "mapped")].value, "12.0.4")
         for key in (
             "forgejo_enable_caddy",
+            "forgejo_ssh_port",
             "forgejo_configure_system_ssh",
             "forgejo_write_initial_config",
             "forgejo_bootstrap_enabled",

@@ -250,6 +250,8 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
             for legacy_name, canonical_path in compatibility.items():
                 if not isinstance(legacy_name, str) or not isinstance(canonical_path, str):
                     raise ProjectionError(f"invalid canonical compatibility mapping for service {name}")
+                if name == "forgejo" and legacy_name == "forgejo_ssh_port" and "ssh" not in service.endpoints.protocols:
+                    continue
                 value = _compatibility_value(service, resource, canonical_path)
                 if value is not None:
                     legacy_vars[legacy_name] = value

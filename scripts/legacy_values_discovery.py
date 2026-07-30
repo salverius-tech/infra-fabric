@@ -275,6 +275,7 @@ def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_bootstrap_enabled",
         "forgejo_configure_system_ssh",
         "forgejo_enable_caddy",
+        "forgejo_ssh_port",
         "forgejo_write_initial_config",
     ):
         if key not in variables:

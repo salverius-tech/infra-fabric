@@ -12,7 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import atomic_output
 from atomic_output import atomic_output_directory
-from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, SearxngConfiguration, ServiceRelease, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
+from pydantic import ValidationError
+
+from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, ServiceEndpoints, ServiceRelease, SearxngConfiguration, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
     render_ansible_inventory,
@@ -91,6 +93,14 @@ services:
 
 
 class CanonicalValuesTests(unittest.TestCase):
+    def test_ssh_protocol_materializes_default_port(self) -> None:
+        endpoints = ServiceEndpoints.model_validate({"protocols": ["https", "ssh"]})
+        self.assertEqual(endpoints.ports["ssh"], 22)
+
+    def test_ssh_port_requires_ssh_protocol(self) -> None:
+        with self.assertRaises(ValidationError):
+            ServiceEndpoints.model_validate({"ports": {"ssh": 22}})
+
     def write_site(self, content: str, *, directory_name: str = "dev") -> Path:
         root = Path(tempfile.mkdtemp())
         site_dir = root / directory_name
