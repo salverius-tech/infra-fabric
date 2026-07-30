@@ -121,8 +121,10 @@ The report records mapped fields, conflicts, and each unsupported inventory key
 with its source path and type; dynamic Jinja-style expressions are marked as
 `dynamic-expression` and remain unsupported, without storing secret or unknown value contents. The
 report output must be outside `values/`; discovery itself never changes legacy
-files. Candidate generation is a separate explicit command as documented above.
-
+files. When `--values-dir` points at a site-aware directory containing `site.json`, the
+report also includes the public site identity/policy metadata without changing
+that file. Candidate generation remains a separate explicit command as
+documented above.
 Treat the report as migration review evidence. Legacy inventory and any
 conflict, unknown, unsupported, or non-concrete observation keep candidate
 generation fail-closed. Secret bundle generation remains a separate SOPS/age

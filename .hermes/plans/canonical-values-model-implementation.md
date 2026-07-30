@@ -162,7 +162,7 @@ The implementation is complete when all of the following are true:
 **Goal:** Produce canonical files from both supported legacy layouts safely.
 
 - [ ] Import legacy root layout: `.env`, `terraform.tfvars`, static inventory, DNS JSON, state, and settings metadata.
-- [ ] Import current site-aware layout: `site.json`, site `.env`, site `terraform.tfvars`, inventory, known hosts, DNS JSON, state, plans, backups, and artifacts.
+- [~] Import current site-aware layout: `site.json` metadata is now reported read-only; site `.env`, site `terraform.tfvars`, inventory, known hosts, DNS JSON, state, plans, backups, and artifacts remain pending.
 - [ ] Reuse existing values-context and migration contracts; do not create a competing path resolver.
 - [x] Add report-only legacy discovery for dotenv, tfvars, settings, DNS, and inventory inputs. Secret/unknown values are redacted, all reads are non-mutating, candidate generation refuses incomplete mapping, and a restricted JSON CLI report is available.
 - [~] Add bounded public Ansible importer admission for `all.vars.forgejo_domain`: normalized canonical observation and legacy conflict detection are covered; the remaining inventory, runtime admission, canonical installation, backup/rollback, and candidate gates remain blocked.
@@ -549,3 +549,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-30 — Defined and implemented Forgejo SSH-port semantics: canonical normalization materializes port 22 when `ssh` is an enabled protocol, rejects an SSH port without the SSH protocol, conditionally projects `forgejo_ssh_port`, and admits decimal legacy SSH-port values. Canonical, compatibility, importer, and full-suite verification passed (430 tests) plus fresh `hermes-verify-*` ad-hoc verification.
 - 2026-07-30 — Improved bounded Ansible residual reporting: each unadmitted inventory key now retains its source path and type with no arbitrary value content; secret-classified residuals remain `[REDACTED]`, dynamic semantics remain unsupported, and candidate readiness remains false. Focused tests passed (29), full suite passed (430), and fresh `hermes-verify-*` ad-hoc verification passed.
 - 2026-07-30 — Marked residual Jinja-style Ansible values as `dynamic-expression` metadata while keeping them unsupported, value-free, and candidate-blocking. Focused tests passed (29), full suite passed (430), and fresh `hermes-verify-*` ad-hoc verification passed.
+- 2026-07-30 — Added read-only site-aware `site.json` metadata reporting for name/class/lifecycle/apply/destroy policy while preserving non-mutation and candidate blocking. Focused tests passed (30), full suite passed (431), and fresh `hermes-verify-*` ad-hoc verification passed.

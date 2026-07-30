@@ -35,6 +35,7 @@ class DiscoveryReport:
     conflicts: list[dict[str, Any]] = field(default_factory=list)
     files: list[str] = field(default_factory=list)
     ancillary_artifacts: list[dict[str, Any]] = field(default_factory=list)
+    site_metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def mapping_ready(self) -> bool:
@@ -192,6 +193,20 @@ def _read_json_keys(path: Path, report: DiscoveryReport, migration: Any) -> None
         _observe(source, str(key), item, report, migration)
 
 
+def _read_site_metadata(path: Path, report: DiscoveryReport) -> None:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise DiscoveryError(f"invalid site metadata: {path}") from error
+    if not isinstance(value, dict):
+        raise DiscoveryError(f"site metadata must be an object: {path}")
+    allowed = ("name", "class", "lifecycle", "allow_apply", "allow_destroy")
+    metadata = {key: value[key] for key in allowed if key in value}
+    if any(not isinstance(item, (str, bool)) for item in metadata.values()):
+        raise DiscoveryError(f"site metadata contains invalid scalar values: {path}")
+    report.site_metadata = metadata
+
+
 def _artifact_relative(values: Path, path: Path) -> str:
     """Return a contained, non-symlinked artifact path for metadata reporting."""
     try:
@@ -339,6 +354,10 @@ def discover_legacy(
         raise DiscoveryError(f"legacy values directory does not exist: {values}")
     migration = _load_migration_module()
     report = DiscoveryReport(values_dir=str(values))
+    site_metadata = values / "site.json"
+    if site_metadata.is_file():
+        report.files.append(site_metadata.relative_to(values).as_posix())
+        _read_site_metadata(site_metadata, report)
     candidates = (
         (values / ".env", _read_env),
         (values / "terraform.tfvars", _read_tfvars),
@@ -390,6 +409,7 @@ def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
         ],
         "conflicts": report.conflicts,
         "ancillary_artifacts": sorted(report.ancillary_artifacts, key=lambda item: item["path"]),
+        "site_metadata": report.site_metadata,
     }
 
 

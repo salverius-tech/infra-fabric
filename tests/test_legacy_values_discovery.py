@@ -385,6 +385,24 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
             self.assertIn("TECHNITIUM_API_TOKEN", rendered)
 
+    def test_site_aware_metadata_is_reported_without_mutation(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            metadata = {
+                "name": "dev",
+                "class": "development",
+                "lifecycle": "disposable",
+                "allow_apply": True,
+                "allow_destroy": True,
+                "services": ["forgejo"],
+            }
+            site = values / "site.json"
+            site.write_text(json.dumps(metadata), encoding="utf-8")
+            report = legacy_values_discovery.discover_legacy(values)
+            rendered = legacy_values_discovery.render_migration_report(report)
+            self.assertTrue(site.exists())
+        self.assertEqual(rendered["site_metadata"], {key: metadata[key] for key in ("name", "class", "lifecycle", "allow_apply", "allow_destroy")})
+
     def test_cli_admits_bounded_public_ansible_inventory_slice(self) -> None:
         temp, values = self.make_values()
         with temp:
