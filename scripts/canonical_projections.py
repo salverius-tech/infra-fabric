@@ -59,6 +59,11 @@ def _path_value(value: Any, path: str) -> Any:
             if part not in value:
                 raise ProjectionError(f"canonical projection path does not exist: {path}")
             value = value[part]
+        elif isinstance(value, list) and part.isdecimal():
+            index = int(part)
+            if index >= len(value):
+                raise ProjectionError(f"canonical projection path does not exist: {path}")
+            value = value[index]
         else:
             if not hasattr(value, part):
                 raise ProjectionError(f"canonical projection path does not exist: {path}")

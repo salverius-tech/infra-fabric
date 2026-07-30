@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from canonical_projections import _compatibility_value, _resource_variables, render_ansible_inventory, render_ansible_vars
+from canonical_projections import _compatibility_value, _resource_variables, render_ansible_inventory, render_ansible_vars, render_opentofu_variables
 from canonical_values import HermesConfiguration, Service, load_site
 from service_catalog import load_catalog
 
@@ -114,6 +114,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         self.assertEqual(
             mapping,
             {
+                "forgejo_domain": "endpoints.public_names.0",
                 "forgejo_version": "release.version",
                 "forgejo_database": "configuration.database",
                 "forgejo_enable_caddy": "configuration.enable_caddy",
@@ -133,6 +134,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         self.assertEqual(
             projected["services"]["forgejo"]["legacy_vars"],
             {
+                "forgejo_domain": "git.example.internal",
                 "forgejo_version": "10.0.0",
                 "forgejo_database": {
                     "type": "sqlite",
@@ -193,6 +195,12 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             self.assertEqual(identity["canonical_service"], name)
             self.assertEqual(identity["canonical_resource"], service_vars["resource"])
             self.assertEqual(identity["service_runtime_current"]["type"], service_vars["resource_type"])
+
+    def test_forgejo_public_name_has_paired_ansible_and_opentofu_transport(self) -> None:
+        ansible = render_ansible_vars(self.model, self.catalog)
+        tofu = render_opentofu_variables(self.model)
+        self.assertEqual(ansible["services"]["forgejo"]["legacy_vars"]["forgejo_domain"], "git.example.internal")
+        self.assertEqual(tofu["forgejo_server_name"], "git.example.internal")
 
     def test_projection_does_not_emit_sensitive_sentinel(self) -> None:
         inventory = render_ansible_inventory(self.model, self.catalog)
