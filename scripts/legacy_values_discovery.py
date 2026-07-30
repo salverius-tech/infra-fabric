@@ -139,6 +139,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "hermes_max_concurrent_children": "services.hermes.configuration.tuning.max_concurrent_children",
         "hermes_max_spawn_depth": "services.hermes.configuration.tuning.max_spawn_depth",
         "hermes_web_searxng_url": "services.hermes.configuration.web.searxng_url",
+        "technitium_admin_user": "services.technitium.configuration.admin_user",
         "technitium_discovery_version": "services.technitium.release.version",
         "technitium_portable_sha256": "services.technitium.release.checksum",
     }
@@ -183,8 +184,17 @@ def _normalize_port(value: Any) -> Any:
     return value
 
 
-def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migration: Any) -> None:
+def _observe(
+    source: str,
+    key: str,
+    value: Any,
+    report: DiscoveryReport,
+    migration: Any,
+    proposed_path_override: str | None = None,
+) -> None:
     classification, proposed_path = _classification(key, migration)
+    if proposed_path_override is not None:
+        proposed_path = proposed_path_override
     if classification == "secret":
         report.observations.append(FieldObservation(source, key, classification, None, type(value).__name__, "<redacted>"))
         return
@@ -197,7 +207,10 @@ def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migrati
     }:
         public = _normalize_public_name(public)
     value_type = type(value).__name__
-    if proposed_path == "services.forgejo.endpoints.public_url":
+    if proposed_path in {
+        "services.forgejo.endpoints.public_url",
+        "services.technitium.configuration.api_url",
+    }:
         public = _normalize_public_url(public)
     if proposed_path == "services.forgejo.endpoints.ports.ssh":
         public = _normalize_port(public)
@@ -356,6 +369,8 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "hermes_runtime_user",
         "hermes_repo_path",
         "hermes_vmid",
+        "technitium_api_url",
+        "technitium_admin_user",
         "hermes_discovery_version",
         "hermes_discovery_tag",
         "hermes_discovery_commit",
@@ -406,7 +421,16 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
         if isinstance(value, str) and not value.strip():
             raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
-        _observe(source, key, value, report, migration)
+        _observe(
+            source,
+            key,
+            value,
+            report,
+            migration,
+            "services.technitium.configuration.api_url"
+            if key == "technitium_api_url"
+            else None,
+        )
     for key in sorted(set(variables) - allowed_keys):
         classification, _ = _classification(key, migration)
         report.observations.append(

@@ -496,6 +496,36 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_technitium_api_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    technitium_api_url: https://dns.example.internal/api/\n"
+                "    technitium_admin_user: admin\n"
+                "    TECHNITIUM_API_TOKEN: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("technitium_api_url", "mapped")].proposed_path,
+            "services.technitium.configuration.api_url",
+        )
+        self.assertEqual(
+            observations[("technitium_api_url", "mapped")].value,
+            "https://dns.example.internal/api/",
+        )
+        self.assertEqual(
+            observations[("technitium_admin_user", "mapped")].proposed_path,
+            "services.technitium.configuration.admin_user",
+        )
+        self.assertEqual(observations[("TECHNITIUM_API_TOKEN", "secret")].value, "<redacted>")
+        self.assertFalse(report.candidate_ready)
+
     def test_forgejo_server_name_maps_to_normalized_public_name(self) -> None:
         temp, values = self.make_values()
         with temp:
