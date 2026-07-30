@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import ipaddress
 import json
 import re
 from dataclasses import dataclass, field
@@ -112,6 +113,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "FORGEJO_ACTIONS_DEFAULT_URL": "services.forgejo.configuration.actions_default_url",
         "caddy_email": "platform.ingress.acme.email",
         "caddy_server_names": "services.technitium.configuration.caddy.server_names",
+        "caddy_upstream": "services.technitium.configuration.caddy.upstream",
         "forgejo_actions_default_url": "services.forgejo.configuration.actions_default_url",
         "FORGEJO_SSH_PORT": "services.forgejo.endpoints.ports.ssh",
         "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
@@ -194,7 +196,29 @@ def _public_value(value: Any) -> Any:
         return value
     if isinstance(value, dict) and set(value) <= {"type", "managed", "host", "port", "name", "user", "ssl_mode"}:
         return value
+    if isinstance(value, dict) and set(value) == {"host", "port"}:
+        return value
     return None
+
+
+def _normalize_caddy_upstream(value: Any) -> dict[str, Any]:
+    if not isinstance(value, str):
+        raise DiscoveryError("bounded Ansible caddy_upstream must be host:port")
+    match = re.fullmatch(r"(?:\[([^\]]+)\]|([^:]+)):(\d+)", value.strip())
+    if match is None:
+        raise DiscoveryError("bounded Ansible caddy_upstream must be host:port")
+    host = match.group(1) or match.group(2)
+    port = int(match.group(3))
+    if not 1 <= port <= 65535:
+        raise DiscoveryError("bounded Ansible caddy_upstream port must be between 1 and 65535")
+    try:
+        host = str(ipaddress.ip_address(host))
+    except ValueError:
+        normalized = host.lower().rstrip(".")
+        if not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", normalized):
+            raise DiscoveryError("bounded Ansible caddy_upstream host must be an IP address or hostname")
+        host = normalized
+    return {"host": host, "port": port}
 
 
 def _normalize_public_name(value: Any) -> Any:
@@ -246,6 +270,8 @@ def _observe(
     }:
         public = _normalize_public_name(public)
     value_type = type(value).__name__
+    if proposed_path == "services.technitium.configuration.caddy.upstream":
+        public = _normalize_caddy_upstream(value)
     if proposed_path in {
         "services.forgejo.endpoints.public_url",
         "services.technitium.configuration.api_url",
@@ -407,6 +433,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "searxng_container_image",
         "caddy_email",
         "caddy_server_names",
+        "caddy_upstream",
         "forgejo_configure_system_ssh",
         "forgejo_domain",
         "forgejo_enable_caddy",
@@ -497,6 +524,8 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                 for item in value
             ):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of name/address objects")
+        elif key == "caddy_upstream":
+            _normalize_caddy_upstream(value)
         elif key == "forgejo_database":
             allowed = {"type", "managed", "host", "port", "name", "user", "ssl_mode"}
             valid = isinstance(value, dict) and set(value) <= allowed

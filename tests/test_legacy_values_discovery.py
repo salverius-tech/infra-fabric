@@ -469,6 +469,39 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_caddy_upstream(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    caddy_upstream: 127.0.0.1:5380\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        observation = observations[("caddy_upstream", "mapped")]
+        self.assertEqual(
+            observation.proposed_path,
+            "services.technitium.configuration.caddy.upstream",
+        )
+        self.assertEqual(observation.value, {"host": "127.0.0.1", "port": 5380})
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_malformed_caddy_upstream(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    caddy_upstream: 127.0.0.1:70000\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "between 1 and 65535"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_caddy_server_names(self) -> None:
         temp, values = self.make_values()
         with temp:
