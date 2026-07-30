@@ -119,8 +119,10 @@ still cannot generate a candidate or enable consumer cutover.
 
 The report records mapped fields, conflicts, and each unsupported inventory key
 with its source path and type; dynamic Jinja-style expressions are marked as
-`dynamic-expression` and remain unsupported, without storing secret or unknown value contents. The
-report output must be outside `values/`; discovery itself never changes legacy
+`dynamic-expression` and remain unsupported, without storing secret or unknown value contents.
+The bounded Forgejo importer also admits `forgejo_root_url` and normalizes
+absolute HTTP(S) URLs to a trailing-slash form before conflict comparison.
+The report output must be outside `values/`; discovery itself never changes legacy
 files. When `--values-dir` points at a site-aware directory containing `site.json`, the
 report also includes the public site identity/policy metadata without changing
 that file. Candidate generation remains a separate explicit command as

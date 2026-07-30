@@ -544,6 +544,9 @@ def build_report(repo: Path) -> dict[str, Any]:
     deferred = deferred_classification(matrix_coverage)
     alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
     candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
+    candidate_readiness["status"] = "blocked"
+    candidate_readiness["candidate_generation_allowed"] = False
+    candidate_readiness["reasons"].append("semantic mapping is incomplete")
     catalog_contract = _catalog_contract(repo / "infra/services.json")
     consumer_contract = load_consumer_contract(repo)
     return {

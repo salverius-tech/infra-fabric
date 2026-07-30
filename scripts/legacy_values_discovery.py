@@ -96,6 +96,8 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_actions_default_url": "services.forgejo.configuration.actions_default_url",
         "FORGEJO_SSH_PORT": "services.forgejo.endpoints.ports.ssh",
         "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
+        "FORGEJO_ROOT_URL": "services.forgejo.endpoints.public_url",
+        "forgejo_root_url": "services.forgejo.endpoints.public_url",
         "HERMES_CONTROL_SOURCE_URL": "services.hermes.configuration.control.source_url",
         "HERMES_CONTROL_SOURCE_REF": "services.hermes.configuration.control.source_ref",
     }
@@ -122,6 +124,18 @@ def _normalize_public_name(value: Any) -> Any:
     return value
 
 
+def _normalize_public_url(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    from urllib.parse import urlsplit, urlunsplit
+
+    parsed = urlsplit(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.query or parsed.fragment:
+        return value
+    path = parsed.path.rstrip("/") + "/"
+    return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), path, "", ""))
+
+
 def _normalize_port(value: Any) -> Any:
     if isinstance(value, str) and value.isdecimal():
         return int(value)
@@ -141,6 +155,8 @@ def _observe(source: str, key: str, value: Any, report: DiscoveryReport, migrati
     }:
         public = _normalize_public_name(public)
     value_type = type(value).__name__
+    if proposed_path == "services.forgejo.endpoints.public_url":
+        public = _normalize_public_url(public)
     if proposed_path == "services.forgejo.endpoints.ports.ssh":
         public = _normalize_port(public)
     if classification == "unknown":
@@ -275,6 +291,7 @@ def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_configure_system_ssh",
         "forgejo_domain",
         "forgejo_enable_caddy",
+        "forgejo_root_url",
         "forgejo_ssh_port",
         "forgejo_version",
         "forgejo_write_initial_config",

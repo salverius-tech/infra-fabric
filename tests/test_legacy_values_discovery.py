@@ -54,7 +54,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
             inventory.write_text(
-                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_bootstrap_admin_email: review@example.internal\n    forgejo_download_base: '{% dynamic %}'\n    forgejo_ssh_port: 22\n    forgejo_enable_caddy: true\n    forgejo_configure_system_ssh: true\n    forgejo_write_initial_config: false\n    forgejo_bootstrap_enabled: true\n    forgejo_actions_enabled: true\n    forgejo_actions_default_url: https://data.forgejo.org\n"
+                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_root_url: https://git.example.internal\n    forgejo_bootstrap_admin_email: review@example.internal\n    forgejo_download_base: '{% dynamic %}'\n    forgejo_ssh_port: 22\n    forgejo_enable_caddy: true\n    forgejo_configure_system_ssh: true\n    forgejo_write_initial_config: false\n    forgejo_bootstrap_enabled: true\n    forgejo_actions_enabled: true\n    forgejo_actions_default_url: https://data.forgejo.org\n"
                 "  hosts:\n    edge:\n",
                 encoding="utf-8",
             )
@@ -62,6 +62,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         observations = {(item.key, item.classification): item for item in report.observations}
         self.assertEqual(observations[("forgejo_domain", "mapped")].value, ["git.example.internal"])
         self.assertEqual(observations[("forgejo_version", "mapped")].value, "12.0.4")
+        self.assertEqual(observations[("forgejo_root_url", "mapped")].value, "https://git.example.internal/")
         for key in (
             "forgejo_enable_caddy",
             "forgejo_ssh_port",
@@ -409,7 +410,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             repo = Path(temp.name) / "repo"
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
-            inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_bootstrap_admin_email: review@example.internal\n", encoding="utf-8")
+            inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_root_url: https://git.example.internal\n    forgejo_bootstrap_admin_email: review@example.internal\n", encoding="utf-8")
             output = values.parent / "ansible-report.json"
             result = legacy_values_discovery_cli.main(
                 [

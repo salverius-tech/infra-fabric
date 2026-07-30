@@ -115,6 +115,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             mapping,
             {
                 "forgejo_domain": "endpoints.public_names.0",
+                "forgejo_root_url": "endpoints.public_url",
                 "forgejo_ssh_port": "endpoints.ports.ssh",
                 "forgejo_version": "release.version",
                 "forgejo_database": "configuration.database",
@@ -136,6 +137,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             projected["services"]["forgejo"]["legacy_vars"],
             {
                 "forgejo_domain": "git.example.internal",
+                "forgejo_root_url": "https://git.example.internal/",
                 "forgejo_ssh_port": 22,
                 "forgejo_version": "10.0.0",
                 "forgejo_database": {
