@@ -497,6 +497,40 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_immutable_searxng_image(self) -> None:
+        temp, values = self.make_values()
+        image = "docker.io/searxng/searxng@sha256:" + "a" * 64
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                f"    searxng_container_image: {image}\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("searxng_container_image", "mapped")].proposed_path,
+            "services.searxng_onramp.release",
+        )
+        self.assertEqual(observations[("searxng_container_image", "mapped")].value, image)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_mutable_searxng_image(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    searxng_container_image: docker.io/searxng/searxng:latest\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "immutable"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_rejects_non_string_hermes_ssh_keys(self) -> None:
         temp, values = self.make_values()
         with temp:

@@ -106,6 +106,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "hermes_ssh_public_keys": "resources.guests.hermes.security.ssh_public_keys",
         "searxng_server_name": "services.searxng_onramp.endpoints.public_names.0",
         "searxng_public_url": "services.searxng_onramp.endpoints.public_url",
+        "searxng_container_image": "services.searxng_onramp.release",
         "FORGEJO_ACTIONS_ENABLED": "services.forgejo.configuration.actions_enabled",
         "forgejo_actions_enabled": "services.forgejo.configuration.actions_enabled",
         "FORGEJO_ACTIONS_DEFAULT_URL": "services.forgejo.configuration.actions_default_url",
@@ -400,6 +401,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "hermes_ssh_public_keys",
         "searxng_server_name",
         "searxng_public_url",
+        "searxng_container_image",
         "forgejo_configure_system_ssh",
         "forgejo_domain",
         "forgejo_enable_caddy",
@@ -502,6 +504,13 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                 )
             if not valid:
                 raise DiscoveryError(f"bounded Ansible {key} must be valid database metadata")
+        elif key == "searxng_container_image":
+            if not isinstance(value, str) or not re.fullmatch(
+                r"[a-z0-9][a-z0-9./_-]*@sha256:[0-9a-f]{64}", value
+            ):
+                raise DiscoveryError(
+                    f"bounded Ansible {key} must be an immutable repository@sha256:digest reference"
+                )
         elif not isinstance(value, (str, bool, int, float)):
             raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
         if isinstance(value, str) and not value.strip():
