@@ -469,6 +469,39 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_forgejo_runner_dns_servers(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_dns_servers:\n"
+                "      - 192.0.2.1\n"
+                "      - 2001:db8::53\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        observation = observations[("forgejo_runner_dns_servers", "mapped")]
+        self.assertEqual(observation.proposed_path, "resources.guests.forgejo_runner.network.dns_servers")
+        self.assertEqual(observation.value, ["192.0.2.1", "2001:db8::53"])
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_non_string_forgejo_runner_dns_servers(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    forgejo_runner_dns_servers:\n      - 7\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "list of strings"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_typed_extra_metadata(self) -> None:
         temp, values = self.make_values()
         with temp:

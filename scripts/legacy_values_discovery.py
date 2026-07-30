@@ -137,6 +137,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "infisical_version": "services.infisical.release.version",
         "infisical_vmid": "resources.guests.infisical.identity.vmid",
         "forgejo_runner_vmid": "resources.guests.forgejo_runner.identity.vmid",
+        "forgejo_runner_dns_servers": "resources.guests.forgejo_runner.network.dns_servers",
         "hermes_domain": "services.hermes.endpoints.public_names",
         "hermes_runtime_user": "services.hermes.configuration.runtime_user",
         "hermes_repo_path": "services.hermes.configuration.repository_path",
@@ -428,6 +429,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "infisical_version",
         "infisical_vmid",
         "forgejo_runner_vmid",
+        "forgejo_runner_dns_servers",
         "hermes_domain",
         "hermes_runtime_user",
         "hermes_repo_path",
@@ -480,7 +482,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
-        if key in {"tailscale_client_up_args", "forgejo_runner_labels", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys"}:
+        if key in {"tailscale_client_up_args", "forgejo_runner_labels", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
         elif key == "forgejo_runner_hosts":
