@@ -117,8 +117,8 @@ That opt-in admits the non-secret Forgejo fields `all.vars.forgejo_domain`,
 reported as unsupported. It performs normalization and conflict detection but
 still cannot generate a candidate or enable consumer cutover.
 
-The report records mapped fields, conflicts,
-and unmapped values without storing secret or unknown value contents. The
+The report records mapped fields, conflicts, and each unsupported inventory key
+with its source path and type, without storing secret or unknown value contents. The
 report output must be outside `values/`; discovery itself never changes legacy
 files. Candidate generation is a separate explicit command as documented above.
 

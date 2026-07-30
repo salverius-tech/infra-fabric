@@ -247,6 +247,17 @@ def _record_artifact_tree(report: DiscoveryReport, values: Path, root: Path, art
 
 
 def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: Any) -> None:
+    allowed_keys = {
+        "forgejo_actions_default_url",
+        "forgejo_actions_enabled",
+        "forgejo_bootstrap_enabled",
+        "forgejo_configure_system_ssh",
+        "forgejo_domain",
+        "forgejo_enable_caddy",
+        "forgejo_ssh_port",
+        "forgejo_version",
+        "forgejo_write_initial_config",
+    }
     try:
         import yaml
     except ImportError as error:  # pragma: no cover - environment setup failure
@@ -269,22 +280,25 @@ def _read_ansible_forgejo_slice(path: Path, report: DiscoveryReport, migration: 
         if not isinstance(version, str) or not version.strip():
             raise DiscoveryError("bounded Ansible forgejo_version must be a non-empty string")
         _observe(source, "forgejo_version", version, report, migration)
-    for key in (
-        "forgejo_actions_default_url",
-        "forgejo_actions_enabled",
-        "forgejo_bootstrap_enabled",
-        "forgejo_configure_system_ssh",
-        "forgejo_enable_caddy",
-        "forgejo_ssh_port",
-        "forgejo_write_initial_config",
-    ):
+    for key in sorted(allowed_keys - {"forgejo_domain", "forgejo_version"}):
         if key not in variables:
             continue
         value = variables[key]
         if not isinstance(value, (str, bool, int, float)):
             raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
         _observe(source, key, value, report, migration)
-    report.observations.append(FieldObservation(source, "<inventory:remaining>", "unsupported", None, "yaml"))
+    for key in sorted(set(variables) - allowed_keys):
+        classification, _ = _classification(key, migration)
+        report.observations.append(
+            FieldObservation(
+                source,
+                key,
+                "secret" if classification == "secret" else "unsupported",
+                None,
+                type(variables[key]).__name__,
+                "<redacted>" if classification == "secret" else None,
+            )
+        )
 
 
 def _discover_ancillary_artifacts(values: Path, report: DiscoveryReport) -> None:

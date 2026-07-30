@@ -54,7 +54,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
             inventory.write_text(
-                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_ssh_port: 22\n    forgejo_enable_caddy: true\n    forgejo_configure_system_ssh: true\n    forgejo_write_initial_config: false\n    forgejo_bootstrap_enabled: true\n    forgejo_actions_enabled: true\n    forgejo_actions_default_url: https://data.forgejo.org\n"
+                "all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_bootstrap_admin_email: review@example.internal\n    forgejo_ssh_port: 22\n    forgejo_enable_caddy: true\n    forgejo_configure_system_ssh: true\n    forgejo_write_initial_config: false\n    forgejo_bootstrap_enabled: true\n    forgejo_actions_enabled: true\n    forgejo_actions_default_url: https://data.forgejo.org\n"
                 "  hosts:\n    edge:\n",
                 encoding="utf-8",
             )
@@ -72,7 +72,14 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             "forgejo_actions_default_url",
         ):
             self.assertEqual(observations[(key, "mapped")].key, key)
-        self.assertTrue(any(item.key == "<inventory:remaining>" and item.classification == "unsupported" for item in report.observations))
+        self.assertTrue(
+            any(
+                item.key == "forgejo_bootstrap_admin_email"
+                and item.classification == "unsupported"
+                and item.value is None
+                for item in report.observations
+            )
+        )
         self.assertFalse(report.mapping_ready)
         self.assertFalse(report.candidate_ready)
 
@@ -375,7 +382,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             repo = Path(temp.name) / "repo"
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
-            inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n", encoding="utf-8")
+            inventory.write_text("all:\n  vars:\n    forgejo_domain: git.example.internal\n    forgejo_version: 12.0.4\n    forgejo_bootstrap_admin_email: review@example.internal\n", encoding="utf-8")
             output = values.parent / "ansible-report.json"
             result = legacy_values_discovery_cli.main(
                 [
@@ -391,7 +398,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         version = [item for item in payload["observations"] if item["key"] == "forgejo_version"]
         self.assertTrue(mapped)
         self.assertTrue(version)
-        self.assertTrue(any(item["key"] == "<inventory:remaining>" for item in payload["observations"]))
+        self.assertTrue(any(item["key"] == "forgejo_bootstrap_admin_email" and item["classification"] == "unsupported" and item["value"] is None for item in payload["observations"]))
         self.assertFalse(payload["candidate_ready"])
 
     def test_cli_reports_invalid_values_directory_without_traceback(self) -> None:
