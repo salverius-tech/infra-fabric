@@ -469,6 +469,43 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_onramp_security(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    onramp_host_password_authentication: false\n"
+                "    onramp_host_permit_root_login: false\n"
+                "    onramp_host_deploy_user: anvil\n"
+                "    onramp_host_deploy_dir: /srv/onramp\n"
+                "    onramp_host_allow_passwordless_sudo: true\n"
+                "    onramp_host_allowed_ssh_cidrs:\n"
+                "      - 10.0.0.0/8\n"
+                "      - 192.168.0.0/16\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "onramp_host_password_authentication": "resources.shared_hosts.onramp_host.security.password_authentication",
+            "onramp_host_permit_root_login": "resources.shared_hosts.onramp_host.security.permit_root_login",
+            "onramp_host_deploy_user": "resources.shared_hosts.onramp_host.security.deploy_user",
+            "onramp_host_deploy_dir": "resources.shared_hosts.onramp_host.security.deploy_dir",
+            "onramp_host_allow_passwordless_sudo": "resources.shared_hosts.onramp_host.security.allow_passwordless_sudo",
+            "onramp_host_allowed_ssh_cidrs": "resources.shared_hosts.onramp_host.security.allowed_ssh_cidrs",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertEqual(
+            observations[("onramp_host_allowed_ssh_cidrs", "mapped")].value,
+            ["10.0.0.0/8", "192.168.0.0/16"],
+        )
+        self.assertFalse(report.candidate_ready)
+
     def test_bounded_ansible_importer_admits_forgejo_bootstrap_metadata(self) -> None:
         temp, values = self.make_values()
         with temp:

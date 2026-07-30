@@ -94,6 +94,12 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_bootstrap_admin_email": "services.forgejo.configuration.bootstrap_admin_email",
         "forgejo_bootstrap_owner_email": "services.forgejo.configuration.bootstrap_owner_email",
         "forgejo_database": "services.forgejo.configuration.database",
+        "onramp_host_password_authentication": "resources.shared_hosts.onramp_host.security.password_authentication",
+        "onramp_host_permit_root_login": "resources.shared_hosts.onramp_host.security.permit_root_login",
+        "onramp_host_deploy_user": "resources.shared_hosts.onramp_host.security.deploy_user",
+        "onramp_host_deploy_dir": "resources.shared_hosts.onramp_host.security.deploy_dir",
+        "onramp_host_allow_passwordless_sudo": "resources.shared_hosts.onramp_host.security.allow_passwordless_sudo",
+        "onramp_host_allowed_ssh_cidrs": "resources.shared_hosts.onramp_host.security.allowed_ssh_cidrs",
         "FORGEJO_ACTIONS_ENABLED": "services.forgejo.configuration.actions_enabled",
         "forgejo_actions_enabled": "services.forgejo.configuration.actions_enabled",
         "FORGEJO_ACTIONS_DEFAULT_URL": "services.forgejo.configuration.actions_default_url",
@@ -376,6 +382,12 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_bootstrap_admin_email",
         "forgejo_bootstrap_owner_email",
         "forgejo_database",
+        "onramp_host_password_authentication",
+        "onramp_host_permit_root_login",
+        "onramp_host_deploy_user",
+        "onramp_host_deploy_dir",
+        "onramp_host_allow_passwordless_sudo",
+        "onramp_host_allowed_ssh_cidrs",
         "forgejo_configure_system_ssh",
         "forgejo_domain",
         "forgejo_enable_caddy",
@@ -454,7 +466,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
-        if key in {"tailscale_client_up_args", "forgejo_runner_labels"}:
+        if key in {"tailscale_client_up_args", "forgejo_runner_labels", "onramp_host_allowed_ssh_cidrs"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
         elif key == "forgejo_runner_hosts":
