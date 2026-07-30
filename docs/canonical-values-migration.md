@@ -41,7 +41,25 @@ temporary file is removed on exit. Do not combine `--canonical-ansible` with
 `apply-ansible-services.py` invocation remains legacy and the opt-in mode is
 not evidence of full plan/apply parity.
 
-The report-only discovery CLI can now generate a public candidate from an approved canonical base document. This is intentionally separate from secret migration:
+The site migration orchestrator can consume that candidate boundary during an
+explicit apply:
+
+```bash
+scripts/python.sh scripts/migrate-site-values.py \\
+  --values-dir values \\
+  --site dev \\
+  --canonical-base /path/to/approved-base.yaml \\
+  --apply
+```
+
+Without `--canonical-base`, migration retains its legacy compatibility-only
+behavior and does not create `site.yaml`. With it, discovery and candidate
+construction happen before any move; unknown, unsupported, or conflicting
+legacy input aborts without mutation. Candidate output is written atomically
+with mode `0600`; secret observations remain excluded and no
+`secrets.sops.yaml` is fabricated.
+
+The report-only discovery CLI can also generate a public candidate directly:
 
 ```bash
 scripts/legacy-values-discovery.py \\

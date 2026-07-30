@@ -12,6 +12,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from values_context import SITE_NAME_RE
+from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy
 
 
 class SiteMigrationError(ValueError):
@@ -143,6 +144,31 @@ def remove_services_from_root_settings(repo: Path) -> None:
         raise
 
 
+def _load_candidate_base(path: Path) -> dict[str, Any]:
+    try:
+        from ruamel.yaml import YAML
+
+        document = YAML(typ="safe").load(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise SiteMigrationError(f"invalid canonical candidate base: {path}") from error
+    if not isinstance(document, dict) or document.get("schema_version") != 1:
+        raise SiteMigrationError("canonical candidate base must be a schema_version 1 mapping")
+    return document
+
+
+def _write_candidate(path: Path, candidate: dict[str, Any]) -> None:
+    from ruamel.yaml import YAML
+
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        with temporary.open("w", encoding="utf-8") as handle:
+            YAML().dump(candidate, handle)
+        temporary.chmod(0o600)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def rollback_migration(
     target: Path,
     moved: list[tuple[Path, Path]],
@@ -170,12 +196,25 @@ def migrate(
     allow_apply: bool,
     allow_destroy: bool,
     apply: bool,
+    canonical_base: Path | None = None,
 ) -> list[str]:
     metadata = site_metadata(repo, site, site_class, lifecycle, allow_apply, allow_destroy)
     target, items = validate_request(values_root, site, metadata)
     settings_path = repo / "settings.local.json"
     original_settings = settings_path.read_bytes() if settings_path.is_file() else None
     actions = [f"create {target}/site.json", f"create {target}/migration-manifest.json"]
+    candidate: dict[str, Any] | None = None
+    if canonical_base is not None:
+        try:
+            report = discover_legacy(values_root)
+            candidate = build_candidate_site(
+                report,
+                base_document=_load_candidate_base(canonical_base),
+                site_name=site,
+            )
+        except (DiscoveryError, OSError, SiteMigrationError) as error:
+            raise SiteMigrationError(f"canonical candidate generation blocked: {error}") from error
+        actions.append(f"create {target}/site.yaml")
     actions.extend(f"move {source} -> {destination}" for source, destination in items)
     if (repo / "settings.local.json").is_file():
         actions.append("remove services from settings.local.json")
@@ -190,6 +229,8 @@ def migrate(
             json.dumps(migration_manifest(site, items, values_root), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        if candidate is not None:
+            _write_candidate(target / "site.yaml", candidate)
         for source, destination in items:
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(source), str(destination))
@@ -213,6 +254,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--class", dest="site_class", default=None)
     parser.add_argument("--lifecycle", default=None)
     parser.add_argument("--allow-destroy", action="store_true")
+    parser.add_argument("--canonical-base", type=Path, help="approved canonical YAML base for explicit candidate generation")
     parser.add_argument("--apply", action="store_true", help="perform the migration; default is dry-run")
     args = parser.parse_args(argv)
 
@@ -233,6 +275,7 @@ def main(argv: list[str] | None = None) -> int:
             allow_apply,
             allow_destroy,
             args.apply,
+            args.canonical_base,
         )
     except (OSError, SiteMigrationError, json.JSONDecodeError) as error:
         print(f"site migration failed: {error}", file=sys.stderr)
