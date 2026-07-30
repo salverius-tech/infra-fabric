@@ -65,7 +65,8 @@ class AnsibleSemanticDiscoveryTests(unittest.TestCase):
         temp, repo = self.make_repo()
         with temp:
             report = ansible_semantic_discovery.discover_ansible(repo)
-            rendered = json.dumps(ansible_semantic_discovery.render_report(report), sort_keys=True)
+            rendered_report = ansible_semantic_discovery.render_report(report)
+            rendered = json.dumps(rendered_report, sort_keys=True)
         observations = {item.key: item for item in report.observations}
         self.assertEqual(observations["forgejo_domain"].classification, "mapped")
         self.assertEqual(
@@ -76,6 +77,12 @@ class AnsibleSemanticDiscoveryTests(unittest.TestCase):
         nested = observations["forgejo_runtime.type"]
         self.assertTrue(nested.consumers)
         self.assertTrue(observations["dynamic_endpoint"].dynamic)
+        self.assertEqual(observations["dynamic_endpoint"].normalization, "dynamic expression retained as metadata; value normalization deferred")
+        self.assertIn("canonical-first", observations["forgejo_domain"].conflict_behavior)
+        self.assertIn("does not render", observations["forgejo_domain"].projection_evidence)
+        self.assertEqual(rendered_report["summary"]["gates"]["semantic_mapping_status"], "incomplete")
+        self.assertEqual(rendered_report["summary"]["gates"]["runtime_importer_status"], "incomplete")
+        self.assertEqual(rendered_report["summary"]["gates"]["candidate_eligibility"], "blocked")
         expressions = "\\n".join(reference.expression for reference in observations["forgejo_domain"].consumers)
         self.assertIn("<redacted>", expressions)
         self.assertNotIn("INLINE_SECRET_SENTINEL", expressions)

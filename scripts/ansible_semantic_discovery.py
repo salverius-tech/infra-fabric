@@ -39,6 +39,11 @@ class InventoryObservation:
     dynamic: bool
     consumers: list[ConsumerReference] = field(default_factory=list)
     disposition: str = "review-required"
+    semantic_interpretation: str = "static reference evidence only; execution semantics unresolved"
+    normalization: str = "YAML type preserved; no value normalization performed"
+    conflict_behavior: str = "canonical-first conflict gate required; report-only discovery does not compare values"
+    projection_evidence: str = "none: report-only discovery does not render projections"
+    verification_evidence: str = "focused fixture and live scaffold report required"
 
 
 @dataclass
@@ -227,6 +232,16 @@ def discover_ansible(repo: Path, inventory: Path | None = None) -> AnsibleDiscov
                 dynamic=dynamic,
                 consumers=consumers,
                 disposition=disposition,
+                semantic_interpretation=(
+                    "dynamic/static reference only; execution semantics unresolved"
+                    if dynamic
+                    else "static reference evidence only; execution semantics unresolved"
+                ),
+                normalization=(
+                    "dynamic expression retained as metadata; value normalization deferred"
+                    if source_dynamic
+                    else "YAML type preserved; no value normalization performed"
+                ),
             )
         )
 
@@ -267,6 +282,15 @@ def render_report(report: AnsibleDiscoveryReport) -> dict[str, Any]:
             ),
             "candidate_generation_allowed": False,
             "consumer_cutover_allowed": False,
+            "gates": {
+                "discovery_status": "complete",
+                "classification_status": "complete",
+                "semantic_mapping_status": "incomplete",
+                "runtime_importer_status": "incomplete",
+                "import_eligibility": "blocked",
+                "candidate_eligibility": "blocked",
+                "consumer_cutover_status": "blocked",
+            },
         },
     }
 
