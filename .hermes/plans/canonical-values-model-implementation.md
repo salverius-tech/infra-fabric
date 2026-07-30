@@ -1,6 +1,6 @@
 # Canonical Site Values Model — Implementation Plan
 
-**Status:** Audit baseline (2026-07-30): source inventory/classification gate complete within scope; semantic mapping, importer completeness, operational secret delivery, and consumer cutover remain incomplete/deferred
+**Status:** Audit baseline (2026-07-30): source inventory/classification gate complete within scope; semantic mapping, importer completeness, operational secret delivery, and consumer cutover remain incomplete/deferred. Architectural decision ledger approved; implementation edits still require explicit execution authorization.
 **Branch:** `feat/canonical-values-model`
 **PRD:** [`canonical-values-model-prd.md`](./canonical-values-model-prd.md)
 **Repository:** `infra-fabric`
@@ -9,6 +9,35 @@
 ## Purpose
 
 This document is the implementation companion to the Canonical Site Values Model PRD. It decomposes the PRD into reviewable work packages and is the progress tracker for this branch. Checkboxes, phase status, decision records, and verification evidence must be updated as work lands; do not mark a phase complete from code inspection alone.
+
+## Approved architectural decision ledger — 2026-07-30
+
+The following decisions were discussed and approved in review mode. They define the implementation contract; they do not by themselves authorize source, test, migration, infrastructure, or consumer changes.
+
+1. **Candidate generation is a strict readiness gate.** No candidate output is allowed while semantic mapping or runtime importer coverage is incomplete for the declared import scope. Token-level inventory matching and `candidate_generation_allowed` signals cannot close this gate.
+2. **The full Ansible inventory is a migration source.** Every relevant inventory identity must be traced through its playbook/role consumers and assigned an explicit disposition. Supported desired-state values move to canonical ownership; derived values are generated; execution/lifecycle/protected values use separate contracts; obsolete or unsupported values remain explicitly documented rather than silently discarded.
+3. **Canonical-first, conflict-failing precedence applies.** Once canonical state exists, it is authoritative. Equivalent legacy values may remain during transition; meaningful canonical/legacy conflicts fail closed. Before canonical state exists, equivalent legacy values may be imported, but conflicting legacy sources require explicit review rather than arbitrary source precedence.
+4. **Canonical and operational concerns remain separate.** `site.yaml` represents supported desired infrastructure/service state; generated inventory/tfvars/dotenv are projections; controller execution settings remain operational; lifecycle actions are explicit operations; protected values use the secret contract.
+5. **Secrets use a strict logical-secret/provider boundary.** Ordinary canonical state contains no secret values. Logical requirements may be declared; encrypted values belong in the protected per-site secret bundle; resolution and consumer delivery require explicit provider/consumer contracts; missing, conflicting, or unauthorized delivery fails closed.
+6. **Generated projections use a controlled persistent lifecycle.** Complete projection sets are rendered from one canonical snapshot into restricted staging, identity-bound with a manifest, atomically installed, and rejected when stale or altered. Generated artifacts are derived and non-editable, not a second authority.
+7. **Migration is additive, backed up, and reversible.** Migration is dry-run by default, conflict-failing, staged, and source-preserving. Durable backup/restore evidence is required before destructive action. Legacy removal is a later, separately approved operation.
+8. **Consumer cutover is staged and parity-gated.** Canonical consumers are enabled by real consumer boundary, with paired Ansible inventory/vars treated as one boundary. Each cutover requires projection identity, parity, conflict rejection, secret safety, and rollback evidence. Compatibility removal requires a later explicit decision after the defined transition window.
+
+**Execution boundary:** The next authorized work should first convert these decisions into an implementation scope and evidence plan, then implement the smallest approved slice. Review-mode concurrence is not authorization to begin source edits, migration, candidate generation, consumer cutover, or infrastructure mutation.
+
+## Approved execution-planning sequence — 2026-07-30
+
+The following execution-planning items were discussed and approved. They sequence the work without authorizing implementation, migration apply, consumer cutover, or infrastructure mutation.
+
+1. **Define exact Ansible reconciliation surfaces.** Inventory source discovery must be connected to complete supported Ansible consumer tracing, cross-source duplication analysis, canonical ownership, projection compatibility, and execution classification.
+2. **Implement the reconciliation evidence contract.** Each source identity requires exact source context, consumer evidence, semantic category, canonical owner or explicit disposition, normalization/conflict behavior, projection evidence, and verification evidence. Discovery, mapping, runtime admission, import eligibility, candidate eligibility, and cutover eligibility remain separate statuses.
+3. **Correct the scoped readiness model.** Readiness is calculated for an explicit scope and dependency chain. Candidate output is impossible when any required semantic, runtime-importer, secret-contract, projection, conflict, or canonical-base gate is incomplete; bounded matching cannot claim site-wide readiness.
+4. **Start with report-only Ansible semantic discovery.** The first implementation slice observes the complete in-scope inventory and supported consumer references without executing arbitrary playbooks, mutating legacy inputs, writing canonical state, generating candidates, decrypting or delivering secrets, or changing consumer authority.
+5. **Select the first bounded vertical importer slice after discovery.** The slice must cover one complete resource/service path through legacy evidence, canonical import, Ansible and OpenTofu projections, identity/conflict checks, parity, and rollback. It should avoid unresolved generic aliases, destructive lifecycle actions, and uncontracted secret delivery.
+6. **Expand coverage through dependency-ordered waves.** Resource/platform state, non-secret service state, protected secret contracts, derived/cross-consumer values, operational/lifecycle boundaries, and residual legacy dispositions are promoted independently only after each wave meets its evidence contract.
+7. **Use staged migration and consumer cutover.** Report-only discovery precedes dry-run import, which precedes additive canonical installation, opt-in consumer execution, default canonical authority, the compatibility window, and separately approved legacy removal. No stage automatically authorizes the next stage.
+
+**Execution gate:** The next implementation authorization should be limited to the first report-only Ansible discovery slice and its tests/evidence. Migration apply, candidate generation, default consumer cutover, legacy removal, and infrastructure mutation remain separately gated.
 
 ## Scope and guardrails
 
@@ -504,3 +533,5 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-29 — Audited static Ansible inventory and documented the safe reduction boundary; duplicated legacy entries remain until paired parity evidence exists.
 - 2026-07-29 — Added fail-closed public candidate generation over an approved canonical base; secret bundle generation remains separate and requires the SOPS/age execution contract.
 - 2026-07-30 — Audited the original PRD, implementation tracker, live inventory, runtime importer, focused tests, and relevant Hermes skills. Reclassified the 368/368 result as token-level reconciliation rather than semantic/importer completion; corrected tracker and deferred-register status and added `docs/canonical-values-implementation-audit-2026-07-30.md`.
+- 2026-07-30 — Recorded the approved architectural decision ledger: strict candidate readiness, full Ansible migration-source reconciliation, canonical-first conflict-failing precedence, semantic separation of desired/operational/lifecycle/secret data, strict logical-secret boundaries, controlled persistent projections, additive reversible migration, and staged parity-gated cutover. Implementation remains pending explicit execution authorization.
+- 2026-07-30 — Recorded the approved execution-planning sequence: exact Ansible reconciliation surfaces, evidence contract, scoped readiness correction, report-only semantic discovery, bounded vertical importer selection, dependency-ordered coverage waves, and independently gated migration/cutover stages. The next implementation authorization is limited to report-only discovery and its evidence.
