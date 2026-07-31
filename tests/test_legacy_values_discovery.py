@@ -1579,6 +1579,25 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "Linux user identifier"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_rejects_invalid_forgejo_aliases(self) -> None:
+        invalid_values = {
+            "FORGEJO_DOMAIN": "bad_domain.example.internal",
+            "FORGEJO_SSH_PORT": 0,
+            "FORGEJO_ACTIONS_ENABLED": "true",
+            "FORGEJO_ACTIONS_DEFAULT_URL": "http://actions.example.internal",
+        }
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                temp, values = self.make_values()
+                with temp:
+                    repo = Path(temp.name) / "repo"
+                    inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+                    inventory.parent.mkdir(parents=True)
+                    rendered = repr(value) if isinstance(value, str) else str(value)
+                    inventory.write_text(f"all:\n  vars:\n    {key}: {rendered}\n", encoding="utf-8")
+                    with self.assertRaises(legacy_values_discovery.DiscoveryError):
+                        legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_tailscale_policy_boundary(self) -> None:
         temp, values = self.make_values()
         with temp:

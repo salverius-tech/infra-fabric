@@ -454,6 +454,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_actions_enabled",
         "FORGEJO_ACTIONS_ENABLED",
         "forgejo_bootstrap_enabled",
+        "FORGEJO_BOOTSTRAP_ENABLED",
         "forgejo_bootstrap_admin_username",
         "forgejo_bootstrap_admin_email",
         "forgejo_bootstrap_owner_email",
@@ -477,8 +478,11 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "caddy_upstream",
         "caddy_extra_vhosts",
         "forgejo_configure_system_ssh",
+        "FORGEJO_CONFIGURE_SYSTEM_SSH",
         "forgejo_domain",
+        "FORGEJO_DOMAIN",
         "forgejo_enable_caddy",
+        "FORGEJO_ENABLE_CADDY",
         "forgejo_root_url",
         "FORGEJO_ROOT_URL",
         "tailscale_client_enable_ip_forwarding",
@@ -544,7 +548,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_ssh_port",
         "FORGEJO_SSH_PORT",
         "forgejo_version",
+        "FORGEJO_VERSION",
         "forgejo_write_initial_config",
+        "FORGEJO_WRITE_INITIAL_CONFIG",
         "technitium_discovery_version",
         "technitium_portable_sha256",
     }
@@ -637,13 +643,13 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             _normalize_caddy_upstream(value)
         elif key == "caddy_extra_vhosts":
             _normalize_caddy_extra_vhosts(value)
-        elif key == "forgejo_domain":
+        elif key in {"forgejo_domain", "FORGEJO_DOMAIN"}:
             if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
                 raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
-        elif key == "forgejo_version":
+        elif key in {"forgejo_version", "FORGEJO_VERSION"}:
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
-        elif key in {"forgejo_enable_caddy", "forgejo_configure_system_ssh", "forgejo_write_initial_config", "forgejo_bootstrap_enabled"}:
+        elif key in {"forgejo_enable_caddy", "FORGEJO_ENABLE_CADDY", "forgejo_configure_system_ssh", "FORGEJO_CONFIGURE_SYSTEM_SSH", "forgejo_write_initial_config", "FORGEJO_WRITE_INITIAL_CONFIG", "forgejo_bootstrap_enabled", "FORGEJO_BOOTSTRAP_ENABLED"}:
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
         elif key in {"forgejo_bootstrap_admin_username", "forgejo_bootstrap_admin_email", "forgejo_bootstrap_owner_email"}:
@@ -750,10 +756,13 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         }:
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise DiscoveryError(f"bounded Ansible {key} must be a positive integer")
-        elif key == "forgejo_actions_enabled":
+        elif key in {"forgejo_ssh_port", "FORGEJO_SSH_PORT"}:
+            if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 65535:
+                raise DiscoveryError(f"bounded Ansible {key} must be between 1 and 65535")
+        elif key in {"forgejo_actions_enabled", "FORGEJO_ACTIONS_ENABLED"}:
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
-        elif key == "forgejo_actions_default_url":
+        elif key in {"forgejo_actions_default_url", "FORGEJO_ACTIONS_DEFAULT_URL"}:
             from urllib.parse import urlsplit
 
             if not isinstance(value, str):
