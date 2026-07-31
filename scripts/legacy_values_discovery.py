@@ -66,6 +66,13 @@ def _load_migration_module() -> Any:
 
 
 def _classification(key: str, migration: Any) -> tuple[str, str | None]:
+    if key in {"infisical_encryption_key"}:
+        return "secret", None
+    if key in {"hermes_control_source_url", "hermes_control_source_ref"}:
+        return "provider", {
+            "hermes_control_source_url": "services.hermes.configuration.control.source_url",
+            "hermes_control_source_ref": "services.hermes.configuration.control.source_ref",
+        }[key]
     if key in migration.SECRET_KEYS or key.startswith("TF_VAR_") and key.removeprefix("TF_VAR_") in {
         "container_root_password",
         "lxc_root_password",
@@ -297,6 +304,16 @@ def _normalize_port(value: Any) -> Any:
     return value
 
 
+def _equivalent_alias_values(previous: FieldObservation, value: Any) -> bool:
+    left = previous.value
+    right = value
+    if isinstance(left, list) and len(left) == 1 and not isinstance(right, list):
+        return left[0] == right
+    if isinstance(right, list) and len(right) == 1 and not isinstance(left, list):
+        return right[0] == left
+    return left == right
+
+
 def _observe(
     source: str,
     key: str,
@@ -337,6 +354,9 @@ def _observe(
     observation = FieldObservation(source, key, classification, proposed_path, value_type, public)
     for previous in report.observations:
         if previous.proposed_path == proposed_path and proposed_path is not None and previous.value != public:
+            same_source_alias = previous.source == source and {previous.key, key} <= {"caddy_server_name", "caddy_server_names"}
+            if same_source_alias and _equivalent_alias_values(previous, public):
+                continue
             report.conflicts.append(
                 {
                     "canonical_path": proposed_path,
@@ -658,8 +678,9 @@ def _read_ansible_bounded_slice(
                 dynamic_chain = (key, provider_reference)
                 dynamic_resolution = "provider"
             secret = secret_like or key.upper() in migration.SECRET_KEYS or key.upper() in migration.GENERATED_SECRET_KEYS
-            classification = "secret" if secret else "provider" if provider_reference else "unsupported"
-            proposed_path = None if secret else _classification(key, migration)[1]
+            declared_classification, declared_path = _classification(key, migration)
+            classification = "secret" if secret else "provider" if provider_reference or declared_classification == "provider" else "unsupported"
+            proposed_path = None if secret else declared_path
             report.observations.append(
                 FieldObservation(
                     source,
@@ -1344,7 +1365,7 @@ def build_candidate_site(
             raise DiscoveryError("candidate base site section must be a mapping")
         site["name"] = site_name
     for observation in report.observations:
-        if observation.classification == "secret":
+        if observation.classification in {"secret", "provider"}:
             continue
         if observation.classification != "mapped" or observation.proposed_path is None:
             raise DiscoveryError(f"candidate observation is not safely mapped: {observation.key}")
