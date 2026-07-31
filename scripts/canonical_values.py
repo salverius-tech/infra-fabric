@@ -946,6 +946,17 @@ class HermesConfiguration(StrictModel):
         return value
 
 
+SERVICE_CONFIGURATION_MODELS: dict[str, type[StrictModel]] = {
+    "forgejo": ForgejoConfiguration,
+    "forgejo_runner": ForgejoRunnerConfiguration,
+    "hermes": HermesConfiguration,
+    "infisical": InfisicalConfiguration,
+    "searxng_onramp": SearxngConfiguration,
+    "tailscale_client": TailscaleConfiguration,
+    "technitium": TechnitiumConfiguration,
+}
+
+
 class Service(StrictModel):
     enabled: StrictBool
     resource: StrictStr | None = None

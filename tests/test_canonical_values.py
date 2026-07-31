@@ -14,6 +14,7 @@ import atomic_output
 from atomic_output import atomic_output_directory
 from pydantic import ValidationError
 
+import canonical_values
 from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, ServiceEndpoints, ServiceRelease, SearxngConfiguration, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
@@ -93,6 +94,16 @@ services:
 
 
 class CanonicalValuesTests(unittest.TestCase):
+    def test_service_configuration_registry_covers_typed_services(self) -> None:
+        self.assertEqual(
+            set(canonical_values.SERVICE_CONFIGURATION_MODELS),
+            {"forgejo", "forgejo_runner", "hermes", "infisical", "searxng_onramp", "tailscale_client", "technitium"},
+        )
+        for name, model in canonical_values.SERVICE_CONFIGURATION_MODELS.items():
+            with self.subTest(service=name):
+                with self.assertRaises(ValidationError):
+                    model.model_validate({"unknown_field": True})
+
     def test_ssh_protocol_materializes_default_port(self) -> None:
         endpoints = ServiceEndpoints.model_validate({"protocols": ["https", "ssh"]})
         self.assertEqual(endpoints.ports["ssh"], 22)

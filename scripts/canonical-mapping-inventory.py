@@ -261,15 +261,7 @@ def resolve_model_path(path: str) -> bool:
     """Return whether a non-secret canonical path exists in the Pydantic model."""
     import canonical_values
 
-    configuration_models = {
-        "forgejo": canonical_values.ForgejoConfiguration,
-        "forgejo_runner": canonical_values.ForgejoRunnerConfiguration,
-        "hermes": canonical_values.HermesConfiguration,
-        "infisical": canonical_values.InfisicalConfiguration,
-        "searxng_onramp": canonical_values.SearxngConfiguration,
-        "tailscale_client": canonical_values.TailscaleConfiguration,
-        "technitium": canonical_values.TechnitiumConfiguration,
-    }
+    configuration_models = canonical_values.SERVICE_CONFIGURATION_MODELS
     current: Any = canonical_values.CanonicalSite
     mapping_key = False
     segments = iter(path.split("."))
