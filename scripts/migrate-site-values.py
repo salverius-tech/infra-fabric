@@ -12,7 +12,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from values_context import SITE_NAME_RE
-from migration_backup import BackupManifestError, build_manifest, expand_backup_paths
+from migration_backup import BackupManifestError, build_manifest, create_backup, expand_backup_paths
 from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, runtime_importer_admission
 
 
@@ -46,7 +46,7 @@ def artifact_disposition(relative: Path) -> tuple[str, str]:
     return "operational-artifact", "private migration/recovery workflow"
 
 
-def migration_manifest(site: str, items: list[tuple[Path, Path]], values_root: Path) -> dict[str, Any]:
+def migration_manifest(site: str, items: list[tuple[Path, Path]], values_root: Path, backup_id: str | None = None) -> dict[str, Any]:
     operations: list[dict[str, str]] = []
     for source, destination in items:
         relative = source.relative_to(values_root)
@@ -78,6 +78,7 @@ def migration_manifest(site: str, items: list[tuple[Path, Path]], values_root: P
         "canonical_destination": f"sites/{site}",
         "operations": operations,
         "secret_values_included": False,
+        "backup_id": backup_id,
     }
 
 
@@ -305,12 +306,21 @@ def migrate(
     if not apply:
         return actions
 
+    backup_output = values_root.parent / ".migration-backups" / site
+    backup_id: str | None = None
+    try:
+        create_backup(values_root, backup_paths, backup_output)
+        backup_id = backup_output.name
+        actions.insert(0, f"create and verify private backup {backup_id}")
+    except (BackupManifestError, OSError) as error:
+        raise SiteMigrationError(f"apply refused: private backup creation failed: {error}") from error
+
     target.mkdir(parents=True)
     moved: list[tuple[Path, Path]] = []
     try:
         (target / "site.json").write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (target / "migration-manifest.json").write_text(
-            json.dumps(migration_manifest(site, items, values_root), indent=2, sort_keys=True) + "\n",
+            json.dumps(migration_manifest(site, items, values_root, backup_id), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         if candidate is not None:

@@ -49,6 +49,10 @@ class SiteMigrationTests(unittest.TestCase):
             self.assertEqual(json.loads((site / "site.json").read_text())["services"], ["hermes"])
             manifest = json.loads((site / "migration-manifest.json").read_text())
             self.assertFalse(manifest["secret_values_included"])
+            self.assertEqual(manifest["backup_id"], "dev")
+            backup = values.parent / ".migration-backups" / "dev"
+            self.assertTrue((backup / "manifest.json").is_file())
+            self.assertTrue((backup / "tree" / ".env").is_file())
             self.assertEqual(manifest["canonical_destination"], "sites/dev")
             self.assertEqual(
                 {item["disposition"] for item in manifest["operations"]},

@@ -152,6 +152,23 @@ def emit_manifest(root: Path, relative_paths: list[str], output: Path) -> dict[s
     return manifest
 
 
+def create_backup(root: Path, relative_paths: list[str], output: Path) -> dict[str, Any]:
+    """Create and verify a private backup tree before an explicit mutation."""
+    if output.exists() or output.is_symlink():
+        raise BackupManifestError("backup output already exists")
+    output.mkdir(parents=True, mode=0o700)
+    tree = output / "tree"
+    tree.mkdir(mode=0o700)
+    try:
+        expanded_paths = expand_backup_paths(root, relative_paths)
+        _stage_selected_files(root, expanded_paths, tree)
+        manifest = build_manifest(tree, expanded_paths)
+        verify_manifest(tree, manifest)
+        _write_new_output(output / "manifest.json", manifest)
+        return manifest
+    except Exception:
+        shutil.rmtree(output, ignore_errors=True)
+        raise
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, required=True, help="source values tree (never modified)")
