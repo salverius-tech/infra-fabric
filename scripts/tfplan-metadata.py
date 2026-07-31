@@ -44,6 +44,8 @@ INPUT_GLOBS = (
     "settings.local.json",
 )
 VALUE_INPUTS = (
+    "site.yaml",
+    "secrets.sops.yaml",
     "terraform.tfvars",
     "dns-records.local.json",
     "ansible/inventory/local.yml",

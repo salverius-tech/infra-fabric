@@ -176,6 +176,24 @@ class TfplanMetadataTests(unittest.TestCase):
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
+    def test_changed_canonical_site_file_fails(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            (repo / "values" / "site.yaml").write_text("site: original\n", encoding="utf-8")
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            (repo / "values" / "site.yaml").write_text("site: altered\n", encoding="utf-8")
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_changed_encrypted_secret_ciphertext_fails(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            (repo / "values" / "secrets.sops.yaml").write_text("ciphertext-a\n", encoding="utf-8")
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            (repo / "values" / "secrets.sops.yaml").write_text("ciphertext-b\n", encoding="utf-8")
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
     def test_expired_plan_fails(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
