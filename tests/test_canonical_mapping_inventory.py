@@ -447,6 +447,29 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertIn("ansible/inventory/local.yml", boundary)
         self.assertNotIn("plan_equivalence.py", boundary)
 
+    def test_source_reconciliation_gate_fails_closed_for_missing_and_unexpected_inputs(self) -> None:
+        source_inputs = {
+            "inputs": [
+                {"source": "fixture.tfvars", "key": "present"},
+                {"source": "fixture.tfvars", "key": "missing"},
+            ]
+        }
+        coverage = {
+            "matched": [{"source": "fixture.tfvars", "key": "present", "canonical_path": "platform.value"}],
+            "excluded": [{"source": "other.tfvars", "key": "unexpected", "disposition": "operational-artifact"}],
+            "ambiguous_count": 0,
+        }
+        gate = MODULE.source_reconciliation_gate(source_inputs, coverage)
+        self.assertEqual(gate["source_identity_count"], 2)
+        self.assertEqual(gate["accounted_identity_count"], 2)
+        self.assertEqual(gate["missing"], [{"source": "fixture.tfvars", "key": "missing"}])
+        self.assertEqual(gate["unexpected"], [{"source": "other.tfvars", "key": "unexpected"}])
+        self.assertEqual(
+            gate["reasons"],
+            ["source identity lacks a matrix disposition", "matrix disposition references an unknown source identity"],
+        )
+        self.assertEqual(gate["status"], "review-required")
+
     def test_ambiguous_matrix_match_is_review_required(self) -> None:
         source_inputs = {"inputs": [{"source": "fixture.tfvars", "key": "shared_key"}]}
         matrix = {
