@@ -215,6 +215,32 @@ class ServiceCatalogTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ServiceCatalogError, "requires disabled services"):
             catalog.validate_selection({"app"})
+        with self.assertRaisesRegex(ServiceCatalogError, "requires disabled services"):
+            catalog.validate_model_services(
+                {
+                    "app": SimpleNamespace(enabled=True, dependencies=["db"], state=SimpleNamespace(capable=False)),
+                    "db": SimpleNamespace(enabled=False, dependencies=[], state=SimpleNamespace(capable=False)),
+                }
+            )
+
+    def test_disabled_services_do_not_emit_required_field_rows(self) -> None:
+        catalog = load_catalog(
+            self.write_catalog(
+                {
+                    "services": {
+                        "app": {"dependencies": [], "required_fields": ["resource"]},
+                        "disabled": {"dependencies": [], "required_fields": ["resource"]},
+                    }
+                }
+            )
+        )
+        report = catalog.required_field_report_for_model(
+            {
+                "app": SimpleNamespace(enabled=True, resource="app"),
+                "disabled": SimpleNamespace(enabled=False, resource=None),
+            }
+        )
+        self.assertEqual({entry["service"] for entry in report}, {"app"})
 
     def test_unknown_enabled_service_fails_closed(self) -> None:
         catalog = load_catalog(self.write_catalog({"services": {"app": {"dependencies": []}}}))

@@ -213,6 +213,8 @@ class ServiceCatalog:
         unknown = sorted(set(services) - self.names)
         if unknown:
             raise ServiceCatalogError(f"canonical services are not in catalog: {', '.join(unknown)}")
+        enabled = {name for name, service in services.items() if getattr(service, "enabled", False)}
+        self.validate_selection(enabled)
         required_report = self.required_field_report_for_model(services, resources)
         for name, service in services.items():
             declared = tuple(getattr(service, "dependencies", ()))

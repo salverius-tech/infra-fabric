@@ -769,3 +769,6 @@ Update this table with real command output, fixture names, or review links. Do n
 
 - 2026-08-01 — Completed Item #2 schema/catalog fixture slice: the public `dev` scaffold now declares all nine catalog services, with only Forgejo and Technitium enabled; canonical/catalog tests confirm every typed configuration rejects unknown fields and every catalog schema contract is represented. Full service-schema coverage remains bounded by the existing catalog-specific required-field and resource-owned contracts.
 
+- 2026-08-01 — Completed Item #2 required-field admission slice: `validate_model_services()` now enforces enabled-service dependency closure directly; disabled services remain absent from required-field reports; resource-owned nested requirements retain value-free presence evidence and fail closed when missing. 75 focused canonical/catalog tests and a fresh resource/dependency probe passed.
+
+
