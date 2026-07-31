@@ -1194,6 +1194,45 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "positive integer"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_admits_technitium_transport_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    technitium_api_url: https://dns.example.internal:5380\n"
+                "    technitium_admin_user: administrator\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("technitium_api_url", "mapped")].proposed_path,
+            "services.technitium.configuration.api_url",
+        )
+        self.assertEqual(
+            observations[("technitium_admin_user", "mapped")].proposed_path,
+            "services.technitium.configuration.admin_user",
+        )
+        self.assertEqual(observations[("technitium_api_url", "mapped")].value, "https://dns.example.internal:5380/")
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_technitium_api_credentials(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    technitium_api_url: https://user:password@dns.example.internal:5380\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTP\\(S\\) URL without credentials"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_runner_labels(self) -> None:
         temp, values = self.make_values()
         with temp:
