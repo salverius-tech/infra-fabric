@@ -489,9 +489,19 @@ def _ansible_value_type(value: Any) -> str:
     return type(value).__name__
 
 
-def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: Any) -> None:
-    """Import only explicitly admitted, non-secret inventory fields.
+def _read_ansible_bounded_slice(
+    path: Path,
+    report: DiscoveryReport,
+    migration: Any,
+    *,
+    source_label: str | None = None,
+) -> None:
+    """Reconcile inventory fields without retaining arbitrary inventory values.
 
+    The same parser is used for public bounded-import fixtures and for private
+    legacy inventory discovery.  Only the public scaffold is eligible for the
+    bounded importer admission contract; private inventory is still parsed
+    field-by-field so no real inventory is collapsed into an opaque sentinel.
     The adapter remains report-only and intentionally leaves all other inventory
     identities as residual unsupported observations. Each admitted family must
     be independently safe to normalize and compare with legacy sources.
@@ -621,13 +631,24 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         raise DiscoveryError(f"cannot parse Ansible inventory: {path}") from error
     try:
         variables = document["all"]["vars"]
-    except (KeyError, TypeError) as error:
+    except KeyError:
+        if isinstance(document.get("all"), dict) and "vars" not in document["all"]:
+            return
+        raise DiscoveryError("bounded Ansible importer requires all.vars mapping")
+    except (TypeError, AttributeError) as error:
         raise DiscoveryError("bounded Ansible importer requires all.vars mapping") from error
     if not isinstance(variables, dict):
         raise DiscoveryError("bounded Ansible inventory vars must be a mapping")
-    source = path.as_posix()
+    source = source_label or path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
+        lowered_key = key.lower()
+        secret_like = bool(
+            re.search(r"(?:^|_)(?:password|token|secret|private_key|auth_key|api_key)(?:_|$)", lowered_key)
+        ) and key not in {
+            "onramp_host_password_authentication",
+            "onramp_host_allow_passwordless_sudo",
+        }
         if isinstance(value, str) and ("{{" in value or "{%" in value):
             provider_reference = _ansible_provider_reference(value)
             dynamic_reference = provider_reference or _ansible_dynamic_reference(value)
@@ -635,7 +656,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             if provider_reference is not None:
                 dynamic_chain = (key, provider_reference)
                 dynamic_resolution = "provider"
-            secret = key.upper() in migration.SECRET_KEYS or key.upper() in migration.GENERATED_SECRET_KEYS
+            secret = secret_like or key.upper() in migration.SECRET_KEYS or key.upper() in migration.GENERATED_SECRET_KEYS
             classification = "secret" if secret else "provider" if provider_reference else "unsupported"
             proposed_path = None if secret else _classification(key, migration)[1]
             report.observations.append(
@@ -651,6 +672,11 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                     dynamic_chain,
                     dynamic_resolution,
                 )
+            )
+            continue
+        if secret_like:
+            report.observations.append(
+                FieldObservation(source, key, "secret", None, _ansible_value_type(value), "<redacted>")
             )
             continue
         if key in {"onramp_host_password_authentication", "onramp_host_permit_root_login", "onramp_host_allow_passwordless_sudo"}:
@@ -1001,9 +1027,13 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     secret_provider_keys = {"caddy_cloudflare_api_token", "CF_DNS_API_TOKEN"}
     for key in sorted(set(variables) - allowed_keys):
         classification, _ = _classification(key, migration)
+        lowered_key = key.lower()
         if key in protected_provider_keys:
             classification = "protected"
-        elif key in secret_provider_keys:
+        elif key in secret_provider_keys or any(
+            token in lowered_key
+            for token in ("password", "token", "secret", "private_key", "auth_key", "api_key")
+        ):
             classification = "secret"
         observation_classification = (
             "secret"
@@ -1084,8 +1114,11 @@ def discover_legacy(
         _read_ansible_bounded_slice(inventory, report, migration)
     elif inventory.is_file():
         report.files.append(inventory.relative_to(values).as_posix())
-        report.observations.append(
-            FieldObservation(inventory.relative_to(values).as_posix(), "<inventory>", "unsupported", None, "yaml")
+        _read_ansible_bounded_slice(
+            inventory,
+            report,
+            migration,
+            source_label=inventory.relative_to(values).as_posix(),
         )
     _discover_ancillary_artifacts(values, report)
     return report
@@ -1148,6 +1181,32 @@ def provider_references(report: DiscoveryReport) -> list[dict[str, Any]]:
     ]
 
 
+def reconciliation_summary(report: DiscoveryReport) -> dict[str, Any]:
+    """Summarize field-level reconciliation without exposing inventory values."""
+    by_source: dict[str, dict[str, int]] = {}
+    for item in report.observations:
+        counts = by_source.setdefault(
+            item.source,
+            {"total": 0, "mapped": 0, "secret": 0, "provider": 0, "unsupported": 0, "protected": 0},
+        )
+        counts["total"] += 1
+        if item.classification in counts:
+            counts[item.classification] += 1
+        elif item.classification == "secret/provider":
+            counts["provider"] += 1
+    return {
+        "status": "complete" if report.observations and not any(item.key == "<inventory>" for item in report.observations) else "incomplete",
+        "field_level": True,
+        "opaque_inventory_observation": any(item.key == "<inventory>" for item in report.observations),
+        "source_counts": by_source,
+        "unresolved_count": sum(
+            item.classification in {"unknown", "unsupported", "review-required", "operational/review"}
+            for item in report.observations
+        ),
+        "secret_values_retained": False,
+    }
+
+
 def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
     """Return JSON-safe report data without secret values or arbitrary unknown values."""
     dynamic = [item for item in report.observations if item.value_type == "dynamic-expression"]
@@ -1175,6 +1234,7 @@ def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
         "files": sorted(report.files),
         "mapping_ready": report.mapping_ready,
         "candidate_ready": report.candidate_ready,
+        "reconciliation": reconciliation_summary(report),
         "runtime_importer_admission": runtime_importer_admission(report),
         "secret_contract": secret_contract,
         "dynamic_resolution": dynamic_summary,

@@ -2531,6 +2531,34 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertEqual(stdout.getvalue(), "")
             self.assertFalse(output.exists())
+    def test_private_inventory_is_reconciled_field_by_field(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            inventory = values / "ansible" / "inventory" / "local.yml"
+            inventory.write_text(
+                "all:\n"
+                "  vars:\n"
+                "    forgejo_domain: git.example.internal\n"
+                "    forgejo_secret_key: PRIVATE_SECRET_SENTINEL\n"
+                "    forgejo_runtime:\n"
+                "      type: lxc\n"
+                "    unknown_inventory_setting:\n"
+                "      nested: true\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+            rendered = json.dumps(legacy_values_discovery.render_migration_report(report), sort_keys=True)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertIn(("forgejo_domain", "mapped"), observations)
+        self.assertIn(("forgejo_runtime", "mapped"), observations)
+        self.assertIn(("forgejo_secret_key", "secret"), observations)
+        self.assertIn(("unknown_inventory_setting", "unsupported"), observations)
+        self.assertNotIn("<inventory>", rendered)
+        self.assertNotIn("PRIVATE_SECRET_SENTINEL", rendered)
+        reconciliation = legacy_values_discovery.render_migration_report(report)["reconciliation"]
+        self.assertTrue(reconciliation["field_level"])
+        self.assertFalse(reconciliation["opaque_inventory_observation"])
+        self.assertGreaterEqual(reconciliation["source_counts"]["ansible/inventory/local.yml"]["total"], 4)
 
 
 if __name__ == "__main__":
