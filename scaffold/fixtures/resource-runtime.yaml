@@ -1,0 +1,100 @@
+# Public-safe resource/runtime fixture corpus.
+# Includes both guest families and a shared host so LXC/VM-specific runtime
+# boundaries and shared-host identity are exercised together.
+guests:
+  example-lxc:
+    type: lxc
+    identity:
+      vmid: 201
+      hostname: example-lxc
+      description: Example LXC guest
+    network:
+      address: dhcp
+      expected_address: 192.0.2.201
+      bridge: vmbr0
+      dns_servers:
+        - 1.1.1.1
+      search_domain: example.internal
+    compute:
+      cores: 2
+      memory_mb: 1024
+      swap_mb: 256
+    storage:
+      root:
+        type: proxmox_volume
+        storage_id: local-lvm
+        size_gb: 8
+        target: /
+        backup: true
+    runtime:
+      started: true
+      start_on_boot: true
+      unprivileged: true
+      nesting: false
+  example-vm:
+    type: vm
+    identity:
+      vmid: 202
+      hostname: example-vm
+      description: Example VM guest
+    network:
+      address: 192.0.2.202/24
+      gateway: 192.0.2.1
+      bridge: vmbr0
+      mac_address: 02:00:00:00:02:02
+      dns_servers:
+        - 9.9.9.9
+      search_domain: example.internal
+    compute:
+      cores: 2
+      memory_mb: 2048
+      swap_mb: 0
+    storage:
+      root:
+        type: proxmox_volume
+        storage_id: local-lvm
+        size_gb: 16
+        target: /
+        backup: true
+    runtime:
+      started: true
+      start_on_boot: false
+      firmware: uefi
+      machine: q35
+      guest_agent: true
+      cloud_init_user: operator
+shared_hosts:
+  onramp-host:
+    type: lxc
+    identity:
+      vmid: 203
+      hostname: onramp-host
+      description: Example shared onramp host
+    network:
+      address: dhcp
+      expected_address: 192.0.2.203
+      bridge: vmbr0
+      dns_servers:
+        - 1.1.1.1
+      search_domain: example.internal
+    compute:
+      cores: 2
+      memory_mb: 2048
+    storage:
+      root:
+        type: directory
+        target: /
+        backup: true
+    runtime:
+      started: true
+      start_on_boot: true
+      unprivileged: true
+    security:
+      password_authentication: false
+      permit_root_login: false
+      deploy_user: operator
+      deploy_dir: /srv/onramp
+      allowed_ssh_cidrs:
+        - 192.0.2.0/24
+      ssh_public_keys:
+        - ssh-ed25519 AAAAexamplepublickey operator@example.internal

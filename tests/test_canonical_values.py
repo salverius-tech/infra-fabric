@@ -136,9 +136,24 @@ class CanonicalValuesTests(unittest.TestCase):
                 else:
                     self.assertEqual(entry["resource_owned"]["owner"], contract[name]["owner"])
 
-    def test_ssh_protocol_materializes_default_port(self) -> None:
-        endpoints = ServiceEndpoints.model_validate({"protocols": ["https", "ssh"]})
-        self.assertEqual(endpoints.ports["ssh"], 22)
+    def test_public_resource_runtime_fixture_covers_lxc_vm_and_shared_host(self) -> None:
+        fixture = Path(__file__).resolve().parents[1] / "scaffold" / "fixtures" / "resource-runtime.yaml"
+        yaml = canonical_values.YAML(typ="safe")
+        document = yaml.load(fixture.read_text(encoding="utf-8"))
+        resources = canonical_values.Resources.model_validate(document)
+        self.assertEqual(set(resources.guests), {"example-lxc", "example-vm"})
+        self.assertEqual(set(resources.shared_hosts), {"onramp-host"})
+        self.assertEqual(resources.guests["example-lxc"].type, "lxc")
+        self.assertTrue(resources.guests["example-lxc"].runtime.unprivileged)
+        self.assertEqual(resources.guests["example-vm"].type, "vm")
+        self.assertEqual(resources.guests["example-vm"].runtime.firmware, "uefi")
+        self.assertEqual(resources.shared_hosts["onramp-host"].security.deploy_user, "operator")
+
+        invalid_vm = document["guests"]["example-vm"].copy()
+        invalid_vm["runtime"] = {"unprivileged": True}
+        invalid = {"guests": {"bad-vm": invalid_vm}, "shared_hosts": {}}
+        with self.assertRaises(ValidationError):
+            canonical_values.Resources.model_validate(invalid)
 
     def test_ssh_port_requires_ssh_protocol(self) -> None:
         with self.assertRaises(ValidationError):

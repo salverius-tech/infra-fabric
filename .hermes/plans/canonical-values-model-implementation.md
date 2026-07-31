@@ -120,7 +120,7 @@ The implementation is complete when all of the following are true:
 - [~] Validate service catalog membership, dependencies, resource references, supported runtime/resource combinations, required fields, and state policy. Catalog membership/dependencies are implemented; complete per-service requirements remain.
 - [x] Implement normalized canonical representation and stable `model_digest`.
 - [x] Implement redacted model summaries and path-specific non-secret errors.
-- [~] Add public-safe schema fixtures covering all supported services, runtimes, shared hosts, stateful/stateless services, and invalid cases. The public `scaffold/sites/dev/site.yaml` fixture, typed service-configuration fixture corpus, and common invalid-case suite exist; full resource/runtime fixture coverage remains.
+- [~] Add public-safe schema fixtures covering all supported services, runtimes, shared hosts, stateful/stateless services, and invalid cases. The public `scaffold/sites/dev/site.yaml`, typed service-configuration, and LXC/VM/shared-host resource-runtime fixture corpora now exist; broader stateful/stateless and full-service integration fixtures remain.
 
 **Exit gate:** Strict schema and loader tests pass; a valid fixture loads with stable identity across formatting-only changes; consumers are unchanged.
 
@@ -702,3 +702,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-31 — Added matrix classification coverage: all 307 rows now require known class/secret-class values and coherent secret-path handling, including the explicit canonical/deprecated bootstrap-secret exception.
 - 2026-07-31 — Added the complete service configuration contract: all nine catalog services now resolve to either a typed configuration model or an explicit resource-owned exemption; exempt service configuration is rejected when populated.
 - 2026-07-31 — Added the public-safe typed service-configuration fixture corpus and registry-matching regression gate: all nine catalog services are represented, seven typed configurations validate through their strict models, and two resource-owned exemptions retain their exact owners; full resource/runtime fixture coverage remains open.
+- 2026-07-31 — Added a public-safe resource-runtime fixture corpus and model gate covering an LXC guest, VM guest, and shared onramp host, including family-specific runtime fields, DHCP/static addressing, storage, MAC normalization, and security metadata; invalid VM/LXC runtime combinations remain rejected and broader integration fixtures remain open.
