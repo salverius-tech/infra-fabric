@@ -2466,7 +2466,10 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         base = {"schema_version": 1, "site": {"name": "old"}, "services": {"technitium": {"enabled": True}}}
 
         candidate = legacy_values_discovery.build_candidate_site(
-            report, base_document=base, site_name="dev", runtime_importer_ready=True
+            report,
+            base_document=base,
+            site_name="dev",
+            runtime_importer_admission={"admitted": True},
         )
 
         self.assertEqual(candidate["site"]["name"], "dev")

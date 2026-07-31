@@ -8,10 +8,10 @@ import sys
 from pathlib import Path
 
 try:
-    from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, render_migration_report
+    from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, render_migration_report, runtime_importer_admission
 except ModuleNotFoundError:  # pragma: no cover - direct import from another cwd
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, render_migration_report
+    from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, render_migration_report, runtime_importer_admission
 
 
 def _reject_values_output(output: Path, values_dir: Path) -> None:
@@ -74,7 +74,12 @@ def main(argv: list[str] | None = None) -> int:
 
             yaml = YAML(typ="safe")
             base = yaml.load(args.candidate_base.read_text(encoding="utf-8"))
-            candidate = build_candidate_site(report, base_document=base, site_name=args.site)
+            candidate = build_candidate_site(
+                report,
+                base_document=base,
+                site_name=args.site,
+                runtime_importer_admission=runtime_importer_admission(report),
+            )
             _write_candidate(args.candidate_output, candidate)
             print(f"wrote public canonical candidate: {args.candidate_output}")
             return 0

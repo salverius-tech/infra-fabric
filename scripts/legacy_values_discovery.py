@@ -1179,12 +1179,12 @@ def build_candidate_site(
     *,
     base_document: dict[str, Any],
     site_name: str | None = None,
-    runtime_importer_ready: bool = False,
+    runtime_importer_admission: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Overlay safe mapped observations onto an approved canonical base document."""
     if not report.mapping_ready:
         raise DiscoveryError("canonical candidate is not safe: review conflicts and unmapped legacy fields")
-    if not runtime_importer_ready:
+    if not runtime_importer_admission or not runtime_importer_admission.get("admitted", False):
         raise DiscoveryError("canonical candidate is blocked: runtime importer admission is incomplete")
     if not isinstance(base_document, dict) or base_document.get("schema_version") != 1:
         raise DiscoveryError("candidate base document must be a canonical schema_version 1 mapping")
