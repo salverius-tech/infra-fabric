@@ -596,8 +596,8 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             if not normalized or any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", item) for item in normalized) or len(normalized) != len(set(normalized)):
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty list of unique hostnames")
         elif key == "caddy_email":
-            if not isinstance(value, str) or not value.strip():
-                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
+            if not isinstance(value, str) or not re.fullmatch(r"[^@\s]+@[^@\s]+", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be an email address")
         elif key == "hermes_ssh_public_keys":
             if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings with non-empty items")

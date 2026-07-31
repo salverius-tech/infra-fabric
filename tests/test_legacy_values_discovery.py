@@ -947,6 +947,16 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "list of strings"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_rejects_invalid_caddy_email(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text("all:\n  vars:\n    caddy_email: acme.example.internal\n", encoding="utf-8")
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "email address"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_bootstrap_metadata(self) -> None:
         temp, values = self.make_values()
         with temp:
