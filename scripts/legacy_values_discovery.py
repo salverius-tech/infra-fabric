@@ -589,6 +589,20 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                 )
             if not valid:
                 raise DiscoveryError(f"bounded Ansible {key} must be valid database metadata")
+        elif key == "searxng_server_name":
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
+                raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
+        elif key == "searxng_public_url":
+            from urllib.parse import urlsplit
+
+            if not isinstance(value, str):
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
+        elif key == "searxng_instance_name":
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
         elif key == "searxng_container_image":
             if not isinstance(value, str) or not re.fullmatch(
                 r"[a-z0-9][a-z0-9./_-]*@sha256:[0-9a-f]{64}", value

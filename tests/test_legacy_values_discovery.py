@@ -1503,6 +1503,53 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "lowercase 40-character commit"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_admits_searxng_service_boundary(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    searxng_server_name: search.example.internal\n"
+                "    searxng_public_url: https://search.example.internal/search\n"
+                "    searxng_container_image: ghcr.io/example/searxng@sha256:" + "a" * 64 + "\n"
+                "    searxng_container_port: 8080\n"
+                "    searxng_bind_address: 127.0.0.1\n"
+                "    searxng_instance_name: primary\n"
+                "    searxng_enable_public_url: true\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "searxng_server_name": "services.searxng_onramp.endpoints.public_names.0",
+            "searxng_public_url": "services.searxng_onramp.endpoints.public_url",
+            "searxng_container_image": "services.searxng_onramp.release",
+            "searxng_container_port": "services.searxng_onramp.configuration.container_port",
+            "searxng_bind_address": "services.searxng_onramp.configuration.bind_address",
+            "searxng_instance_name": "services.searxng_onramp.configuration.instance_name",
+            "searxng_enable_public_url": "services.searxng_onramp.configuration.enable_public_url",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_searxng_public_url_credentials(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    searxng_public_url: https://user:password@example.internal/search\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTPS URL without credentials"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_runner_labels(self) -> None:
         temp, values = self.make_values()
         with temp:
