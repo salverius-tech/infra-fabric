@@ -102,7 +102,8 @@ workflow and separate approval.
 
 The repository currently supports structural bundle validation, logical-path
 resolution, secret/ciphertext identities, metadata-only SOPS/age checks, required
-secret evaluation, and protected temporary material helpers. It does **not** yet
-make provider, bootstrap, runtime, recovery, or generated secrets authoritative for
-all live consumers. Legacy consumer inputs and consumer cutover therefore remain
+secret evaluation, protected temporary material helpers, and explicit transient
+consumer delivery for the canonical Ansible bootstrap boundary. It does **not** yet
+make provider, runtime, recovery, or generated secrets authoritative for all live
+consumers. Legacy consumer inputs and broader consumer cutover therefore remain
 unchanged and deferred.

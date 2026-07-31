@@ -186,6 +186,16 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertEqual([result.service for result in results], ["forgejo"])
         self.assertEqual(results[0].returncode, 2)
         self.assertEqual(len(commands), 1)
+    def test_canonical_secret_environment_ignores_missing_bundle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+
+            class Context:
+                @staticmethod
+                def path(name: str) -> Path:
+                    return root / name
+
+            self.assertEqual(apply_ansible_services.canonical_secret_environment(Context()), {})
 
 
 if __name__ == "__main__":
