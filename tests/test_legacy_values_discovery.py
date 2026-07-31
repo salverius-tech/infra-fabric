@@ -1010,6 +1010,15 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertTrue(any(item.classification == "secret" for item in report.observations))
         self.assertFalse(report.candidate_ready)
 
+    def test_artifact_paths_cannot_escape_values_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "values"
+            outside = Path(temp_dir) / "outside.txt"
+            root.mkdir()
+            outside.write_text("outside", encoding="utf-8")
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "escapes"):
+                legacy_values_discovery._artifact_relative(root, outside)
+
     def test_bounded_report_requires_manual_review_for_canonical_conflicts(self) -> None:
         migration = legacy_values_discovery._load_migration_module()
         report = legacy_values_discovery.DiscoveryReport("/tmp/values")
