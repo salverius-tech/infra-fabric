@@ -22,7 +22,7 @@ if SETTINGS_SPEC is None or SETTINGS_SPEC.loader is None:
 settings = importlib.util.module_from_spec(SETTINGS_SPEC)
 SETTINGS_SPEC.loader.exec_module(settings)
 try:
-    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
     from secret_delivery import deliver_environment
@@ -31,7 +31,7 @@ try:
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(REPO / "scripts"))
-    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
     from secret_delivery import deliver_environment
@@ -145,6 +145,12 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
         raise RuntimeError("canonical generated projection is unavailable or invalid") from error
     if projections != expected_projections:
         raise RuntimeError("canonical generated projection does not match the selected model")
+    verify_cross_projection_identity(
+        site=model.site.name,
+        opentofu=projections["terraform.auto.tfvars.json"],
+        inventory=projections["ansible-inventory.json"],
+        ansible_vars=projections["ansible-vars.json"],
+    )
     manifest_path = getattr(context, "projection_manifest_path")
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

@@ -344,10 +344,50 @@ def render_dns_records(model: CanonicalSite) -> dict[str, Any]:
     }
 
 
+def verify_cross_projection_identity(
+    *,
+    site: str,
+    opentofu: Mapping[str, Any],
+    inventory: Mapping[str, Any],
+    ansible_vars: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify service/resource/runtime identity across generated projections."""
+    inventory_site = inventory.get("all", {}).get("vars", {}).get("canonical_site")
+    vars_site = ansible_vars.get("canonical_site")
+    if inventory_site != site or vars_site != site:
+        raise ProjectionError("generated projections disagree with the selected site")
+    hosts = inventory.get("_meta", {}).get("hostvars", {})
+    services = ansible_vars.get("services")
+    runtimes = opentofu.get("service_runtime")
+    if not isinstance(hosts, Mapping) or not isinstance(services, Mapping) or not isinstance(runtimes, Mapping):
+        raise ProjectionError("generated projections have an invalid identity shape")
+    identities: dict[str, dict[str, str]] = {}
+    for name, values in services.items():
+        if not isinstance(values, Mapping):
+            raise ProjectionError(f"Ansible vars identity is invalid: {name}")
+        resource = values.get("resource")
+        resource_type = values.get("resource_type")
+        runtime = runtimes.get(name)
+        if not isinstance(resource, str) or not isinstance(resource_type, str) or not isinstance(runtime, Mapping):
+            raise ProjectionError(f"projection identity is incomplete: {name}")
+        if runtime.get("type") != resource_type:
+            raise ProjectionError(f"runtime type disagrees across projections: {name}")
+        matching_hosts = [
+            hostvars
+            for hostvars in hosts.values()
+            if isinstance(hostvars, Mapping) and hostvars.get("canonical_service") == name
+        ]
+        if len(matching_hosts) != 1 or matching_hosts[0].get("canonical_resource") != resource:
+            raise ProjectionError(f"resource identity disagrees across projections: {name}")
+        identities[name] = {"resource": resource, "resource_type": resource_type}
+    return {"site": site, "services": identities, "status": "verified"}
+
+
 __all__ = [
     "ProjectionError",
     "render_ansible_inventory",
     "render_ansible_vars",
     "render_dns_records",
     "render_opentofu_variables",
+    "verify_cross_projection_identity",
 ]
