@@ -1053,6 +1053,19 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "regular file"):
                 legacy_values_discovery._record_artifact(report, root, directory, "fixture")
 
+    def test_artifact_tree_nested_symlink_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "values"
+            tree = root / "tree"
+            outside = Path(temp_dir) / "outside"
+            tree.mkdir(parents=True)
+            outside.mkdir()
+            (outside / "artifact.txt").write_text("outside", encoding="utf-8")
+            (tree / "linked.txt").symlink_to(outside / "artifact.txt")
+            report = legacy_values_discovery.DiscoveryReport(str(root))
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "symlinks"):
+                legacy_values_discovery._record_artifact_tree(report, root, tree, "fixture")
+
     def test_bounded_report_requires_manual_review_for_canonical_conflicts(self) -> None:
         migration = legacy_values_discovery._load_migration_module()
         report = legacy_values_discovery.DiscoveryReport("/tmp/values")
