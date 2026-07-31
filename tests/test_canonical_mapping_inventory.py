@@ -396,9 +396,10 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(report["classification"]["inventory_status"], "complete")
         self.assertEqual(report["classification"]["semantic_mapping_status"], "semantic-coverage-complete")
         self.assertEqual(report["classification"]["consumer_cutover_status"], "deferred")
-        self.assertEqual(report["candidate_generation"]["status"], "ready")
-        self.assertTrue(report["candidate_generation"]["candidate_generation_allowed"])
-        self.assertEqual(report["candidate_generation"]["reasons"], [])
+        self.assertEqual(report["candidate_generation"]["status"], "blocked")
+        self.assertFalse(report["candidate_generation"]["candidate_generation_allowed"])
+        self.assertIn("runtime importer admission is incomplete", report["candidate_generation"]["reasons"])
+        self.assertEqual(report["candidate_projection"], {"status": "blocked", "row_count": 0, "source_reference_count": 0, "rows": []})
         aliases = report["legacy_alias_classification"]["ambiguous_resource_aliases"]
         self.assertEqual(len(aliases), 0)
         self.assertTrue(all(item["classification"] == "ambiguous" for item in aliases))
@@ -426,8 +427,8 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 for item in report["matrix_coverage"]["matched"]
             ],
         )
-        self.assertTrue(report["candidate_generation"]["candidate_generation_allowed"])
-        self.assertEqual(report["candidate_generation"]["reasons"], [])
+        self.assertFalse(report["candidate_generation"]["candidate_generation_allowed"])
+        self.assertIn("runtime importer admission is incomplete", report["candidate_generation"]["reasons"])
 
         families = {item["family"] for item in report["opentofu"]["variables"]}
         self.assertIn("provider", families)

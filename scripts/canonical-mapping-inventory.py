@@ -794,6 +794,17 @@ def candidate_generation_readiness(matrix_coverage: dict[str, Any], alias_classi
     }
 
 
+def build_candidate_projection(matrix_coverage: dict[str, Any], *, allowed: bool) -> dict[str, Any]:
+    """Build a value-free projection manifest only after importer admission."""
+    if not allowed:
+        return {"status": "blocked", "row_count": 0, "source_reference_count": 0, "rows": []}
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for item in matrix_coverage["matched"]:
+        grouped.setdefault(item["canonical_path"], []).append({"source": item["source"], "key": item["key"]})
+    rows = [{"canonical_path": path, "sources": sorted(sources, key=lambda item: (item["source"], item["key"]))} for path, sources in sorted(grouped.items())]
+    return {"status": "complete" if rows and not matrix_coverage["unmatched"] else "blocked", "row_count": len(rows), "source_reference_count": sum(len(row["sources"]) for row in rows), "rows": rows}
+
+
 def build_report(repo: Path) -> dict[str, Any]:
     variables = load_variables(repo / "infra/opentofu/variables.tf")
     catalog = load_catalog(repo / "infra/services.json")
@@ -813,6 +824,10 @@ def build_report(repo: Path) -> dict[str, Any]:
     deferred = deferred_classification(matrix_coverage)
     alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
     candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
+    candidate_readiness["status"] = "blocked"
+    candidate_readiness["candidate_generation_allowed"] = False
+    candidate_readiness["reasons"].append("runtime importer admission is incomplete")
+    candidate_projection = build_candidate_projection(matrix_coverage, allowed=False)
     catalog_contract = _catalog_contract(repo / "infra/services.json")
     canonical_path_coverage = catalog_path_coverage(repo / "infra/services.json", catalog)
     consumer_contract = load_consumer_contract(repo)
@@ -837,6 +852,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "deferred_classification": deferred,
         "legacy_alias_classification": alias_classification,
         "candidate_generation": candidate_readiness,
+        "candidate_projection": candidate_projection,
         "protected_secret_contracts": PROTECTED_SECRET_CONTRACTS,
         "consumer_contract": consumer_contract,
         "source_inventory": source_inventory,
