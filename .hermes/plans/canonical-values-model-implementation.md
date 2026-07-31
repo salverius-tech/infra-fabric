@@ -153,7 +153,7 @@ The implementation is complete when all of the following are true:
 - [ ] Define conflict/default/destructive-impact behavior for every mapping row.
 - [ ] Add automated coverage checks so new current inputs cannot bypass the matrix.
 - [ ] Preserve unknown legacy values in a review report rather than dropping them.
-- [~] Add report-only Ansible semantic discovery for the public inventory: exact inventory identities, static consumer references, value-free secret/provider classification, operational/lifecycle review dispositions, per-identity normalization/conflict/projection evidence, separate discovery/classification/mapping/importer/candidate/cutover statuses, and hard candidate/cutover false gates are verified; cross-source correlation, dynamic Ansible resolution, and runtime importer admission remain open.
+- [~] Add report-only Ansible semantic discovery for the public inventory: exact inventory identities, static consumer references, value-free secret/provider classification, operational/lifecycle review dispositions, per-identity normalization/conflict/projection evidence, separate discovery/classification/mapping/importer/candidate/cutover statuses, and hard candidate/cutover false gates are verified; cross-source correlation, dynamic Ansible resolution, and broader runtime importer admission remain open.
 
 **Exit gate:** Matrix coverage check passes against all named source files and every enabled service has a schema/fixture contract.
 
@@ -165,7 +165,7 @@ The implementation is complete when all of the following are true:
 - [~] Import current site-aware layout: `site.json` metadata is now reported read-only; site `.env`, site `terraform.tfvars`, inventory, known hosts, DNS JSON, state, plans, backups, and artifacts remain pending.
 - [ ] Reuse existing values-context and migration contracts; do not create a competing path resolver.
 - [x] Add report-only legacy discovery for dotenv, tfvars, settings, DNS, and inventory inputs. Secret/unknown values are redacted, all reads are non-mutating, candidate generation refuses incomplete mapping, and a restricted JSON CLI report is available.
-- [~] Add bounded public Ansible importer admission for `all.vars.forgejo_domain` and `all.vars.forgejo_root_url`: normalized canonical observations and legacy conflict detection are covered; the remaining inventory, runtime admission, canonical installation, backup/rollback, and candidate gates remain blocked.
+- [x] Bounded public Ansible importer admission for `all.vars.forgejo_domain` and `all.vars.forgejo_root_url`: normalized canonical observations, real scaffold admission evidence, and legacy conflict detection are covered; broader inventory, runtime installation, backup/rollback, candidate, and cutover gates remain blocked.
 - [~] Extend the bounded Forgejo Ansible importer to non-secret release/configuration/action fields with existing canonical projection transport; SSH-port semantics are now normalized/validated and conditionally projected; secrets, runner/state/infrastructure fields, residual inventory, runtime installation, backup/rollback, candidate generation, and cutover remain blocked.
 - [~] Extend the bounded importer to the non-secret Technitium release slice: `all.vars.technitium_discovery_version` → `services.technitium.release.version` and `all.vars.technitium_portable_sha256` → `services.technitium.release.checksum`; complete inventory admission and consumer cutover remain deferred.
 - [ ] Generate candidate `site.yaml` and encrypted `secrets.sops.yaml` in dry-run mode by default.

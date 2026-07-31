@@ -47,6 +47,20 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         (values / "ansible" / "inventory" / "local.yml").write_text("all:\n  hosts:\n    edge:\n", encoding="utf-8")
         return temp, values
 
+    def test_repository_scaffold_admits_bounded_forgejo_runtime_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = legacy_values_discovery.discover_legacy(
+                Path(temp_dir),
+                repo=Path(__file__).resolve().parents[1],
+                ansible_inventory=Path(__file__).resolve().parents[1] / "scaffold/ansible/inventory/local.yml",
+            )
+        admission = legacy_values_discovery.runtime_importer_admission(report)
+        self.assertTrue(admission["admitted"])
+        self.assertEqual(admission["status"], "complete")
+        self.assertEqual(admission["missing"], [])
+        self.assertEqual(admission["invalid"], [])
+        self.assertEqual(admission["conflicts"], [])
+
     def test_bounded_public_ansible_importer_admits_forgejo_domain_only(self) -> None:
         temp, values = self.make_values()
         with temp:
