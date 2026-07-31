@@ -7,6 +7,7 @@
     "technitium": {
       "state_capable": true,
       "configuration_schema": "TechnitiumConfiguration",
+      "release_sources": ["package", "container", "binary", "image"],
       "state_order": 3,
       "terraform_addresses": [
         "module.technitium_dns[",
@@ -39,6 +40,7 @@
     "forgejo": {
       "state_capable": true,
       "configuration_schema": "ForgejoConfiguration",
+      "release_sources": ["package", "container", "binary", "image"],
       "state_order": 2,
       "terraform_addresses": [
         "module.forgejo[",
@@ -88,6 +90,7 @@
     "tailscale_client": {
       "state_capable": false,
       "configuration_schema": "TailscaleConfiguration",
+      "release_sources": ["package", "container", "binary", "image"],
       "terraform_addresses": [
         "module.tailscale_client[",
         "module.tailscale_client_vm["
@@ -120,6 +123,7 @@
     "forgejo_runner": {
       "state_capable": false,
       "configuration_schema": "ForgejoRunnerConfiguration",
+      "release_sources": ["package", "container", "binary", "image"],
       "terraform_addresses": [
         "module.forgejo_runner[",
         "module.forgejo_runner_vm["
@@ -154,6 +158,7 @@
     "infisical": {
       "state_capable": true,
       "configuration_schema": "InfisicalConfiguration",
+      "release_sources": ["package", "container", "binary", "image"],
       "state_order": 5,
       "terraform_addresses": [
         "module.infisical[",
@@ -187,6 +192,7 @@
     "infisical_onramp": {
       "state_capable": true,
       "configuration_schema": null,
+      "release_sources": [],
       "state_order": 5,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["
@@ -217,6 +223,7 @@
     "hermes": {
       "state_capable": true,
       "configuration_schema": "HermesConfiguration",
+      "release_sources": ["package", "container", "binary", "image"],
       "state_order": 1,
       "terraform_addresses": [
         "module.hermes[",
@@ -299,6 +306,7 @@
     "onramp_host": {
       "state_capable": true,
       "configuration_schema": null,
+      "release_sources": [],
       "state_order": 4,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["
@@ -339,6 +347,7 @@
     "searxng_onramp": {
       "state_capable": true,
       "configuration_schema": "SearxngConfiguration",
+      "release_sources": ["package", "container", "binary", "image"],
       "state_order": 6,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["

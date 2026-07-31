@@ -186,6 +186,7 @@ class CanonicalValuesTests(unittest.TestCase):
         catalog.validate_model_services(canonical.services, canonical.resources)
         self.assertEqual(enabled, set(catalog.names))
         self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
+        self.assertEqual(canonical.services["forgejo"].release.source, "package")
         self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
 
     def test_full_catalog_cross_field_failure_matrix(self) -> None:
@@ -199,6 +200,9 @@ class CanonicalValuesTests(unittest.TestCase):
             "unknown_service_resource": lambda site: site["services"]["forgejo"].update({"resource": "missing"}),
             "stateless_service_claims_state": lambda site: site["services"]["tailscale_client"].update(
                 {"state": {"capable": True, "disable_policy": "retain"}}
+            ),
+            "resource_owned_release": lambda site: site["services"]["onramp_host"].update(
+                {"release": {"source": "package", "version": "1.0.0"}}
             ),
         }
         for name, mutate in cases.items():

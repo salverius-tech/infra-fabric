@@ -17,6 +17,7 @@ _LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "generated"]
 _SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))  # public-safety: allow-secret
 _SCHEMA_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,127}$")
+_RELEASE_SOURCES = frozenset(("package", "container", "binary", "image"))
 
 
 def _path_value(value: Any, path: str) -> Any:
@@ -33,6 +34,7 @@ class ServiceCapability:
     name: str
     state_capable: bool
     configuration_schema: str | None
+    release_sources: tuple[str, ...]
     dependencies: tuple[str, ...]
     required_secrets: tuple[str, ...]
     secret_classifications: dict[str, SecretClassification]
@@ -155,6 +157,11 @@ class ServiceCatalog:
             state = getattr(service, "state", None)
             if state is not None and getattr(state, "capable", False) and not self.get(name).state_capable:
                 raise ServiceCatalogError(f"service {name} declares state capability not present in catalog")
+            release_source = getattr(getattr(service, "release", None), "source", None)
+            if release_source is not None and release_source not in self.get(name).release_sources:
+                raise ServiceCatalogError(
+                    f"service {name} release source {release_source!r} is not supported by catalog"
+                )
             if resources is not None and getattr(service, "enabled", False):
                 resource_name = getattr(service, "resource", None)
                 resource_map = {
@@ -250,10 +257,16 @@ def load_catalog(path: Path) -> ServiceCatalog:
         configuration_schema = raw.get("configuration_schema")
         if configuration_schema is not None and (not isinstance(configuration_schema, str) or not _SCHEMA_RE.fullmatch(configuration_schema)):
             raise ServiceCatalogError(f"service {name} configuration_schema must be a model identifier or null")
+        release_sources = raw.get("release_sources", [])
+        if not isinstance(release_sources, list) or any(
+            not isinstance(source, str) or source not in _RELEASE_SOURCES for source in release_sources
+        ) or len(release_sources) != len(set(release_sources)):
+            raise ServiceCatalogError(f"service {name} release_sources must contain unique supported release forms")
         capabilities[name] = ServiceCapability(
             name=name,
             state_capable=raw.get("state_capable") is True,
             configuration_schema=configuration_schema,
+            release_sources=tuple(release_sources),
             dependencies=tuple(dependencies),
             required_secrets=tuple(required_secrets),
             secret_classifications=dict(secret_classifications),

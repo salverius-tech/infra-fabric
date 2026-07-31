@@ -10,6 +10,9 @@ services:
   forgejo:
     enabled: true
     resource: example-lxc
+    release:
+      source: package
+      version: 1.0.0
     state:
       capable: true
       disable_policy: retain
