@@ -25,7 +25,7 @@ try:
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver_environment
+    from secret_delivery import deliver_services_environment
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -34,7 +34,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver_environment
+    from secret_delivery import deliver_services_environment
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -171,8 +171,8 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     return {"DNS_RECORDS_FILE": str(dns_path)}
 
 
-def canonical_secret_environment(context: object) -> dict[str, str]:
-    """Resolve only explicitly contracted bootstrap secrets for Ansible."""
+def canonical_secret_environment(context: object, services: list[str] | tuple[str, ...] = ()) -> dict[str, str]:
+    """Resolve only the selected services' explicitly contracted secrets."""
     try:
         bundle_path = getattr(context, "path")("secrets.sops.yaml")
     except (AttributeError, TypeError, ValueError) as error:
@@ -180,15 +180,15 @@ def canonical_secret_environment(context: object) -> dict[str, str]:
     if not bundle_path.is_file():
         return {}
     provider = SopsAgeProvider(bundle_path)
-    return deliver_environment(provider, consumer="ansible-bootstrap")
+    return deliver_services_environment(provider, services)
 
 
-def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsibleTransport | None:
+def canonical_ansible_transport(context: object, log_dir: Path, services: list[str] | tuple[str, ...]) -> CanonicalAnsibleTransport | None:
     """Build an opt-in paired inventory/vars transport from verified projections."""
     if getattr(context, "canonical_site_path", None) is None:
         return None
     environment = canonical_dns_environment(context)
-    environment.update(canonical_secret_environment(context))
+    environment.update(canonical_secret_environment(context, services))
     generated_path = getattr(context, "generated_path")
     inventory_path = generated_path("ansible-inventory.json")
     vars_projection_path = generated_path("ansible-vars.json")
@@ -385,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
     transport: CanonicalAnsibleTransport | None = None
     try:
         if args.canonical_ansible:
-            transport = canonical_ansible_transport(context, log_dir)
+            transport = canonical_ansible_transport(context, log_dir, services)
             if transport is None:
                 raise RuntimeError("--canonical-ansible requires a selected canonical site")
             base_env.update(transport.environment)

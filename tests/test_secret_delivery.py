@@ -37,6 +37,27 @@ class SecretDeliveryTests(unittest.TestCase):
         self.assertEqual(delivered.environment_name, "TF_VAR_container_root_password")
         self.assertEqual(delivered.value, "SENTINEL")
 
+    def test_service_delivery_is_scoped_to_selected_services(self) -> None:
+        provider = FakeProvider(
+            {
+                "secrets.bootstrap.technitium.root_password": "ROOT",
+                **{requirement.path: f"VALUE_{requirement.environment_name}" for requirement in secret_delivery.SERVICE_REQUIREMENTS if requirement.service == "forgejo"},
+            }
+        )
+        environment = secret_delivery.deliver_services_environment(provider, ["forgejo"])
+        self.assertEqual(environment["TF_VAR_container_root_password"], "ROOT")
+        self.assertEqual(environment["FORGEJO_SECRET_KEY"], "VALUE_FORGEJO_SECRET_KEY")
+        self.assertNotIn("HERMES_CONTROL_API_TOKEN", environment)
+
+    def test_service_delivery_requires_every_selected_contract_secret(self) -> None:
+        provider = FakeProvider({"secrets.bootstrap.technitium.root_password": "ROOT"})
+        with self.assertRaises(secret_delivery.SecretDeliveryError):
+            secret_delivery.deliver_services_environment(provider, ["forgejo"])
+
+    def test_all_contract_secrets_forbid_state_exposure(self) -> None:
+        self.assertTrue(secret_delivery.ALL_REQUIREMENTS)
+        self.assertTrue(all(requirement.state_exposure == "forbidden" for requirement in secret_delivery.ALL_REQUIREMENTS))
+
     def test_delivery_rejects_wrong_consumer(self) -> None:
         provider = FakeProvider({"secrets.bootstrap.technitium.root_password": "SENTINEL"})
         with self.assertRaises(secret_delivery.SecretDeliveryError):

@@ -22,6 +22,8 @@ class SecretRequirement:
     classification: str
     consumers: frozenset[str]
     environment_name: str | None = None
+    service: str | None = None
+    state_exposure: str = "forbidden"
 
 
 @dataclass(frozen=True)
@@ -39,8 +41,49 @@ DEFAULT_REQUIREMENTS: tuple[SecretRequirement, ...] = (
         "bootstrap",
         frozenset({"ansible-bootstrap"}),
         "TF_VAR_container_root_password",
+        state_exposure="forbidden",
     ),
 )
+
+
+def _service_requirement(service: str, key: str, environment_name: str) -> SecretRequirement:
+    return SecretRequirement(
+        f"secrets.services.{service}.{key}",
+        "runtime",
+        frozenset({f"ansible-service:{service}"}),
+        environment_name,
+        service,
+        "forbidden",
+    )
+
+
+SERVICE_REQUIREMENTS: tuple[SecretRequirement, ...] = (
+    _service_requirement("forgejo", "bootstrap_admin_password", "FORGEJO_ADMIN_PASSWORD"),
+    _service_requirement("forgejo", "bootstrap_owner_password", "FORGEJO_REPO_OWNER_PASSWORD"),
+    _service_requirement("forgejo", "internal_token", "FORGEJO_INTERNAL_TOKEN"),
+    _service_requirement("forgejo", "lfs_jwt_secret", "FORGEJO_LFS_JWT_SECRET"),
+    _service_requirement("forgejo", "oauth2_jwt_secret", "FORGEJO_OAUTH2_JWT_SECRET"),
+    _service_requirement("forgejo", "postgres_password", "FORGEJO_POSTGRES_PASSWORD"),
+    _service_requirement("forgejo", "secret_key", "FORGEJO_SECRET_KEY"),
+    _service_requirement("forgejo_runner", "registration_secret", "FORGEJO_RUNNER_REGISTRATION_SECRET"),
+    _service_requirement("hermes", "control_api_token", "HERMES_CONTROL_API_TOKEN"),
+    _service_requirement("hermes", "control_bridge_token", "HERMES_CONTROL_BRIDGE_TOKEN"),
+    _service_requirement("hermes", "dashboard_basic_auth_password_hash", "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH"),
+    _service_requirement("hermes", "dashboard_basic_auth_secret", "HERMES_DASHBOARD_BASIC_AUTH_SECRET"),
+    _service_requirement("infisical", "auth_secret", "INFISICAL_AUTH_SECRET"),
+    _service_requirement("infisical", "encryption_key", "INFISICAL_ENCRYPTION_KEY"),
+    _service_requirement("infisical", "postgres_password", "INFISICAL_POSTGRES_PASSWORD"),
+    _service_requirement("searxng_onramp", "secret_key", "SEARXNG_SECRET_KEY"),
+    _service_requirement("tailscale_client", "auth_key", "TS_AUTHKEY"),
+    _service_requirement("caddy", "cloudflare_api_token", "CLOUDFLARE_API_TOKEN"),
+)
+
+ALL_REQUIREMENTS = DEFAULT_REQUIREMENTS + SERVICE_REQUIREMENTS
+
+
+def requirements_for_services(services: list[str] | tuple[str, ...]) -> tuple[SecretRequirement, ...]:
+    selected = set(services)
+    return DEFAULT_REQUIREMENTS + tuple(requirement for requirement in SERVICE_REQUIREMENTS if requirement.service in selected)
 
 
 def requirement_index(
@@ -98,18 +141,36 @@ def deliver_environment(
     return environment
 
 
+def deliver_services_environment(provider: SecretProvider, services: list[str] | tuple[str, ...]) -> dict[str, str]:
+    """Resolve bootstrap plus only the runtime secrets required by selected services."""
+    environment = deliver_environment(provider, consumer="ansible-bootstrap", requirements=DEFAULT_REQUIREMENTS)
+    for service in services:
+        delivered = deliver_environment(
+            provider,
+            consumer=f"ansible-service:{service}",
+            requirements=requirements_for_services([service]),
+        )
+        for name, value in delivered.items():
+            if name in environment and environment[name] != value:
+                raise SecretDeliveryError("conflicting secret environment delivery")
+            environment[name] = value
+    return environment
 def redact_environment(environment: Mapping[str, str], secret_names: set[str]) -> dict[str, str]:
     """Return metadata-only environment diagnostics."""
     return {name: "<redacted>" if name in secret_names else value for name, value in environment.items()}
 
 
 __all__ = [
+    "ALL_REQUIREMENTS",
     "DEFAULT_REQUIREMENTS",
+    "SERVICE_REQUIREMENTS",
     "DeliveredSecret",
     "SecretDeliveryError",
     "SecretRequirement",
     "deliver",
     "deliver_environment",
+    "deliver_services_environment",
     "redact_environment",
     "requirement_index",
+    "requirements_for_services",
 ]
