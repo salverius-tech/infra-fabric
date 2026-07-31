@@ -155,6 +155,16 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             canonical_values.Resources.model_validate(invalid)
 
+    def test_service_state_policy_is_explicit_for_stateful_and_stateless_services(self) -> None:
+        stateful = canonical_values.ServiceState.model_validate({"capable": True, "disable_policy": "retain"})
+        self.assertTrue(stateful.capable)
+        with self.assertRaises(ValidationError):
+            canonical_values.ServiceState.model_validate({"capable": True})
+        with self.assertRaises(ValidationError):
+            canonical_values.ServiceState.model_validate({"capable": False, "disable_policy": "retain"})
+        with self.assertRaises(ValidationError):
+            canonical_values.ServiceState.model_validate({"capable": False, "backup": {"retention_days": 7}})
+
     def _full_catalog_site_document(self) -> dict:
         root = Path(__file__).resolve().parents[1]
         yaml = canonical_values.YAML(typ="safe")

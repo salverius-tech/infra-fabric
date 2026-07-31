@@ -702,6 +702,16 @@ class ServiceState(StrictModel):
     backup: dict[str, Any] = Field(default_factory=dict)
     disable_policy: Literal["retain", "archive", "destroy"] | None = None
 
+    @model_validator(mode="after")
+    def validate_policy(self) -> "ServiceState":
+        if self.capable and self.disable_policy is None:
+            raise ValueError("state-capable services require a disable_policy")
+        if not self.capable and self.disable_policy is not None:
+            raise ValueError("stateless services cannot declare a disable_policy")
+        if not self.capable and self.backup:
+            raise ValueError("stateless services cannot declare backup metadata")
+        return self
+
 
 class ServiceEndpointDNS(StrictModel):
     enabled: StrictBool = False
