@@ -1127,6 +1127,7 @@ def discover_legacy(
 RUNTIME_IMPORTER_SCOPE = {
     "forgejo_domain": "services.forgejo.endpoints.public_names",
     "forgejo_root_url": "services.forgejo.endpoints.public_url",
+    "forgejo_runtime": "resources.guests.forgejo.runtime",
 }
 
 
@@ -1142,6 +1143,11 @@ def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
         expected_path = RUNTIME_IMPORTER_SCOPE[key]
         if items and any(item.classification != "mapped" or item.proposed_path != expected_path for item in items):
             invalid.append({"key": key, "reason": "observation is not a normalized mapped value"})
+        if key == "forgejo_runtime" and items:
+            for item in items:
+                value = item.value
+                if not isinstance(value, dict) or set(value) != {"type"} or value.get("type") not in {"lxc", "vm"}:
+                    invalid.append({"key": key, "reason": "runtime selector must be exactly {type: lxc|vm}"})
     conflict_paths = {
         conflict["canonical_path"]
         for conflict in report.conflicts
