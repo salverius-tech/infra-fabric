@@ -999,6 +999,17 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 self.assertEqual("<redacted>", observations[key].value)
             self.assertFalse(report.candidate_ready)
 
+    def test_bounded_report_never_becomes_candidate_ready(self) -> None:
+        migration = legacy_values_discovery._load_migration_module()
+        report = legacy_values_discovery.DiscoveryReport("/tmp/values")
+        legacy_values_discovery._observe("fixture", "SERVER_NAME", "dns.example.internal", report, migration)
+        legacy_values_discovery._observe("fixture", "unmapped_public_key", "value", report, migration)
+        legacy_values_discovery._observe("fixture", "TECHNITIUM_API_TOKEN", "[REDACTED]", report, migration)
+        self.assertTrue(any(item.classification == "mapped" for item in report.observations))
+        self.assertTrue(any(item.classification == "unknown" for item in report.observations))
+        self.assertTrue(any(item.classification == "secret" for item in report.observations))
+        self.assertFalse(report.candidate_ready)
+
     def test_bounded_ansible_importer_rejects_invalid_caddy_email(self) -> None:
         temp, values = self.make_values()
         with temp:
