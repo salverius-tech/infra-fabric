@@ -27,6 +27,7 @@ class FieldObservation:
     proposed_path: str | None
     value_type: str
     value: Any = None
+    dynamic_reference: str | None = None
 
 
 @dataclass
@@ -444,6 +445,13 @@ def _record_artifact_tree(report: DiscoveryReport, values: Path, root: Path, art
     )
 
 
+def _ansible_dynamic_reference(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    match = re.fullmatch(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}", value.strip())
+    return match.group(1) if match else None
+
+
 def _ansible_value_type(value: Any) -> str:
     if isinstance(value, str) and ("{{" in value or "{%" in value):
         return "dynamic-expression"
@@ -582,7 +590,15 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         value = variables[key]
         if isinstance(value, str) and ("{{" in value or "{%" in value):
             report.observations.append(
-                FieldObservation(source, key, "unsupported", None, "dynamic-expression", None)
+                FieldObservation(
+                    source,
+                    key,
+                    "unsupported",
+                    None,
+                    "dynamic-expression",
+                    None,
+                    _ansible_dynamic_reference(value),
+                )
             )
             continue
         if key in {"onramp_host_password_authentication", "onramp_host_permit_root_login", "onramp_host_allow_passwordless_sudo"}:

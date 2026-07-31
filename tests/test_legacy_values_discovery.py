@@ -103,6 +103,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         observation = next(item for item in report.observations if item.key == "forgejo_domain")
         self.assertEqual(observation.classification, "unsupported")
         self.assertEqual(observation.value_type, "dynamic-expression")
+        self.assertEqual(observation.dynamic_reference, "inventory_hostname")
         self.assertIsNone(observation.value)
         self.assertFalse(report.candidate_ready)
 
