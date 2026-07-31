@@ -155,6 +155,21 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             canonical_values.Resources.model_validate(invalid)
 
+    def test_full_catalog_fixture_loads_as_one_valid_canonical_site(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        yaml = canonical_values.YAML(typ="safe")
+        site = yaml.load((root / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8"))
+        site["resources"] = yaml.load((root / "scaffold/fixtures/resource-runtime.yaml").read_text(encoding="utf-8"))
+        site["services"] = yaml.load((root / "scaffold/fixtures/full-catalog-services.yaml").read_text(encoding="utf-8"))["services"]
+        canonical = canonical_values.CanonicalSite.model_validate(site)
+        catalog = load_catalog(root / "infra/services.json")
+        enabled = set(canonical.services)
+        catalog.validate_selection(enabled)
+        catalog.validate_model_services(canonical.services, canonical.resources)
+        self.assertEqual(enabled, set(catalog.names))
+        self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
+        self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
+
     def test_ssh_port_requires_ssh_protocol(self) -> None:
         with self.assertRaises(ValidationError):
             ServiceEndpoints.model_validate({"ports": {"ssh": 22}})

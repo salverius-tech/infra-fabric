@@ -1,0 +1,51 @@
+# Public-safe full service-catalog integration fixture.
+# Resource names deliberately point at the shared resource-runtime fixture.
+services:
+  technitium:
+    enabled: true
+    resource: example-lxc
+    state:
+      capable: true
+      disable_policy: retain
+  forgejo:
+    enabled: true
+    resource: example-lxc
+    state:
+      capable: true
+      disable_policy: retain
+  tailscale_client:
+    enabled: true
+    resource: example-vm
+  forgejo_runner:
+    enabled: true
+    resource: example-lxc
+    dependencies:
+      - forgejo
+  infisical:
+    enabled: true
+    resource: example-lxc
+    state:
+      capable: true
+      disable_policy: retain
+  infisical_onramp:
+    enabled: true
+    resource: onramp-host
+    dependencies:
+      - onramp_host
+  hermes:
+    enabled: true
+    resource: example-vm
+    state:
+      capable: true
+      disable_policy: retain
+  onramp_host:
+    enabled: true
+    resource: onramp-host
+    state:
+      capable: true
+      disable_policy: retain
+  searxng_onramp:
+    enabled: true
+    resource: onramp-host
+    dependencies:
+      - onramp_host
