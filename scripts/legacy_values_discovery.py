@@ -638,6 +638,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             parsed = urlsplit(value)
             if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
                 raise DiscoveryError(f"bounded Ansible {key} must be an HTTP(S) URL without credentials")
+        elif key in {"hermes_runtime_passwordless_sudo", "hermes_allow_legacy_runtime"}:
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
         elif key in {
             "hermes_compression_threshold",
             "hermes_max_concurrent_children",
