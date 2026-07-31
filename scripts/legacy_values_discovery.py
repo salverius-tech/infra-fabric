@@ -504,6 +504,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "technitium_vmid",
         "forgejo_vmid",
         "tailscale_client_vmid",
+        "infisical_vmid",
+        "forgejo_runner_vmid",
+        "hermes_vmid",
         "hermes_domain",
         "hermes_runtime_user",
         "hermes_repo_path",
@@ -606,7 +609,14 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key == "searxng_enable_public_url":
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
-        elif key in {"technitium_vmid", "forgejo_vmid", "tailscale_client_vmid"}:
+        elif key in {
+            "technitium_vmid",
+            "forgejo_vmid",
+            "tailscale_client_vmid",
+            "infisical_vmid",
+            "forgejo_runner_vmid",
+            "hermes_vmid",
+        }:
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise DiscoveryError(f"bounded Ansible {key} must be a positive integer")
         elif key == "forgejo_actions_enabled":

@@ -1153,7 +1153,10 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 "all:\n  vars:\n"
                 "    technitium_vmid: 106\n"
                 "    forgejo_vmid: 107\n"
-                "    tailscale_client_vmid: 108\n",
+                "    tailscale_client_vmid: 108\n"
+                "    infisical_vmid: 109\n"
+                "    forgejo_runner_vmid: 110\n"
+                "    hermes_vmid: 111\n",
                 encoding="utf-8",
             )
             report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
@@ -1162,6 +1165,9 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             "technitium_vmid": "resources.guests.technitium.identity.vmid",
             "forgejo_vmid": "resources.guests.forgejo.identity.vmid",
             "tailscale_client_vmid": "resources.guests.tailscale_client.identity.vmid",
+            "infisical_vmid": "resources.guests.infisical.identity.vmid",
+            "forgejo_runner_vmid": "resources.guests.forgejo_runner.identity.vmid",
+            "hermes_vmid": "resources.guests.hermes.identity.vmid",
         }
         for key, canonical_path in expected.items():
             with self.subTest(key=key):
@@ -1169,6 +1175,9 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("technitium_vmid", "mapped")].value, 106)
         self.assertEqual(observations[("forgejo_vmid", "mapped")].value, 107)
         self.assertEqual(observations[("tailscale_client_vmid", "mapped")].value, 108)
+        self.assertEqual(observations[("infisical_vmid", "mapped")].value, 109)
+        self.assertEqual(observations[("forgejo_runner_vmid", "mapped")].value, 110)
+        self.assertEqual(observations[("hermes_vmid", "mapped")].value, 111)
         self.assertFalse(report.candidate_ready)
 
     def test_bounded_ansible_importer_rejects_invalid_service_vmid(self) -> None:
