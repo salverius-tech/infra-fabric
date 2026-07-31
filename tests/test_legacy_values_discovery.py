@@ -125,6 +125,11 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observation.dynamic_reference_chain, ("forgejo_domain", "forgejo_root_url"))
         self.assertEqual(observation.dynamic_resolution, "resolved")
         self.assertTrue(observation.dynamic_reference_available)
+        rendered = legacy_values_discovery.render_migration_report(report)
+        self.assertEqual(rendered["dynamic_resolution"], {"count": 1, "available_count": 1, "missing_count": 0, "cycle_count": 0, "resolved_count": 1})
+        rendered_observation = next(item for item in rendered["observations"] if item["key"] == "forgejo_domain")
+        self.assertEqual(rendered_observation["dynamic_reference_chain"], ["forgejo_domain", "forgejo_root_url"])
+        self.assertEqual(rendered_observation["dynamic_resolution"], "resolved")
         self.assertFalse(report.candidate_ready)
 
     def test_bounded_ansible_importer_reports_dynamic_reference_cycles(self) -> None:

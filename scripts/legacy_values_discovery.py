@@ -1067,11 +1067,20 @@ def discover_legacy(
 
 def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
     """Return JSON-safe report data without secret values or arbitrary unknown values."""
+    dynamic = [item for item in report.observations if item.value_type == "dynamic-expression"]
+    dynamic_summary = {
+        "count": len(dynamic),
+        "available_count": sum(item.dynamic_reference_available is True for item in dynamic),
+        "missing_count": sum(item.dynamic_resolution == "missing" for item in dynamic),
+        "cycle_count": sum(item.dynamic_resolution == "cycle" for item in dynamic),
+        "resolved_count": sum(item.dynamic_resolution == "resolved" for item in dynamic),
+    }
     return {
         "values_dir": report.values_dir,
         "files": sorted(report.files),
         "mapping_ready": report.mapping_ready,
         "candidate_ready": report.candidate_ready,
+        "dynamic_resolution": dynamic_summary,
         "observations": [
             {
                 "source": item.source,
@@ -1080,6 +1089,10 @@ def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
                 "proposed_path": item.proposed_path,
                 "value_type": item.value_type,
                 "value": item.value,
+                "dynamic_reference": item.dynamic_reference,
+                "dynamic_reference_available": item.dynamic_reference_available,
+                "dynamic_reference_chain": list(item.dynamic_reference_chain),
+                "dynamic_resolution": item.dynamic_resolution,
             }
             for item in report.observations
         ],
