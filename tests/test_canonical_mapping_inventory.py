@@ -34,6 +34,10 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(report["matrix_path_coverage"]["invalid_count"], 0)
         self.assertEqual(report["matrix_path_coverage"]["excluded_count"], 62)
         self.assertEqual(report["matrix_path_coverage"]["status"], "complete")
+        self.assertEqual(report["matrix_classification_coverage"]["checked_count"], 307)
+        self.assertEqual(report["matrix_classification_coverage"]["valid_count"], 307)
+        self.assertEqual(report["matrix_classification_coverage"]["invalid_count"], 0)
+        self.assertEqual(report["matrix_classification_coverage"]["status"], "complete")
         self.assertEqual(report["consumer_evidence"]["token_count"], 244)
         self.assertEqual(report["consumer_evidence"]["exact_evidence_count"], 195)
         self.assertEqual(report["consumer_evidence"]["dynamic_evidence_count"], 49)
@@ -446,6 +450,29 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertIn("terraform.tfvars", boundary)
         self.assertIn("ansible/inventory/local.yml", boundary)
         self.assertNotIn("plan_equivalence.py", boundary)
+
+    def test_matrix_classification_gate_rejects_unknown_and_incoherent_rows(self) -> None:
+        coverage = MODULE.matrix_classification_coverage(
+            {
+                "rows": [
+                    {"Canonical path": "services.example.value", "Class": "new-class", "Secret class": "public"},
+                    {"Canonical path": "secrets.example.value", "Class": "canonical/derived", "Secret class": "secret"},
+                    {"Canonical path": "services.example.protected", "Class": "protected", "Secret class": "public"},
+                ]
+            }
+        )
+        self.assertEqual(coverage["checked_count"], 3)
+        self.assertEqual(coverage["valid_count"], 0)
+        self.assertEqual(coverage["invalid_count"], 3)
+        self.assertEqual(coverage["status"], "review-required")
+        self.assertEqual(
+            coverage["invalid"],
+            [
+                {"canonical_path": "services.example.value", "reasons": ["unknown matrix class"]},
+                {"canonical_path": "secrets.example.value", "reasons": ["secret path lacks secret/protected row class"]},
+                {"canonical_path": "services.example.protected", "reasons": ["secret/protected row is marked public"]},
+            ],
+        )
 
     def test_source_reconciliation_gate_fails_closed_for_missing_and_unexpected_inputs(self) -> None:
         source_inputs = {

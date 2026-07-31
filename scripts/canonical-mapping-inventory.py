@@ -57,6 +57,27 @@ MATRIX_HEADERS = (
     "Secret class",
     "Destructive impact",
 )
+VALID_MATRIX_CLASSES = {
+    "canonical",
+    "canonical/derived",
+    "canonical/deprecated",
+    "derived",
+    "derived compatibility",
+    "derived/canonical",
+    "secret",
+    "protected",
+    "OpenTofu-only",
+    "Ansible-only/OpenTofu-only",
+}
+VALID_SECRET_CLASSES = {
+    "public",
+    "runtime",
+    "secret",
+    "provider",
+    "protected",
+    "secret/bootstrap",
+    "protected metadata",
+}
 ENV_NAME_RE = re.compile(r'\b(?:TF_VAR_|INFRA_|VALUES_|PROXMOX_|ANSIBLE_|DNS_)[A-Z][A-Z0-9_]*\b')
 
 
@@ -341,6 +362,40 @@ def matrix_path_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
         "excluded_count": len(excluded),
         "invalid": invalid,
         "excluded": excluded,
+        "status": "complete" if not invalid else "review-required",
+    }
+
+
+def matrix_classification_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
+    """Validate that every matrix row has an explicit, coherent disposition."""
+    invalid: list[dict[str, Any]] = []
+    class_counts: dict[str, int] = {}
+    secret_class_counts: dict[str, int] = {}
+    for row in matrix["rows"]:
+        row_class = row["Class"]
+        secret_class = row["Secret class"]
+        class_counts[row_class] = class_counts.get(row_class, 0) + 1
+        secret_class_counts[secret_class] = secret_class_counts.get(secret_class, 0) + 1
+        reasons: list[str] = []
+        if row_class not in VALID_MATRIX_CLASSES:
+            reasons.append("unknown matrix class")
+        if secret_class not in VALID_SECRET_CLASSES:
+            reasons.append("unknown secret class")
+        protected_row = row_class in {"secret", "protected"}
+        secret_path = row["Canonical path"].startswith("secrets.")
+        if protected_row and secret_class == "public":
+            reasons.append("secret/protected row is marked public")
+        if secret_path and row_class not in {"secret", "protected", "canonical/deprecated"}:
+            reasons.append("secret path lacks secret/protected row class")
+        if reasons:
+            invalid.append({"canonical_path": row["Canonical path"], "reasons": reasons})
+    return {
+        "checked_count": len(matrix["rows"]),
+        "valid_count": len(matrix["rows"]) - len(invalid),
+        "invalid_count": len(invalid),
+        "invalid": invalid,
+        "class_counts": dict(sorted(class_counts.items())),
+        "secret_class_counts": dict(sorted(secret_class_counts.items())),
         "status": "complete" if not invalid else "review-required",
     }
 
@@ -748,6 +803,7 @@ def build_report(repo: Path) -> dict[str, Any]:
     matrix_coverage = reconcile_matrix_inputs(source_inputs, matrix)
     source_reconciliation = source_reconciliation_gate(source_inputs, matrix_coverage)
     matrix_path_status = matrix_path_coverage(matrix)
+    matrix_classification_status = matrix_classification_coverage(matrix)
     consumer_evidence_status = consumer_evidence(repo, matrix)
     deferred = deferred_classification(matrix_coverage)
     alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
@@ -772,6 +828,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "canonical_path_coverage": canonical_path_coverage,
         "mapping_matrix": matrix,
         "matrix_path_coverage": matrix_path_status,
+        "matrix_classification_coverage": matrix_classification_status,
         "consumer_evidence": consumer_evidence_status,
         "matrix_coverage": matrix_coverage,
         "source_reconciliation": source_reconciliation,
