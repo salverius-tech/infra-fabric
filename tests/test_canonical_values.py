@@ -215,7 +215,8 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
         self.assertEqual(canonical.services["forgejo"].release.source, "package")
         self.assertEqual(canonical.services["forgejo"].overrides["ansible"]["forgejo_domain"], "git.example.internal")
-        self.assertEqual(catalog.get("forgejo").required_fields, ("resource",))
+        self.assertEqual(catalog.get("forgejo").required_fields, ("resource", "state.capable"))
+        self.assertEqual(catalog.get("tailscale_client").required_fields, ("resource",))
         self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
 
     def test_full_catalog_cross_field_failure_matrix(self) -> None:
@@ -226,6 +227,7 @@ class CanonicalValuesTests(unittest.TestCase):
                 {"capable": True, "disable_policy": None}
             ),
             "enabled_service_missing_resource": lambda site: site["services"]["forgejo"].update({"resource": None}),
+            "stateful_service_missing_state_capability": lambda site: site["services"]["forgejo"].update({"state": {"capable": False}}),
             "unknown_service_resource": lambda site: site["services"]["forgejo"].update({"resource": "missing"}),
             "stateless_service_claims_state": lambda site: site["services"]["tailscale_client"].update(
                 {"state": {"capable": True, "disable_policy": "retain"}}
@@ -751,6 +753,9 @@ class CanonicalValuesTests(unittest.TestCase):
             "  infisical:\n"
             "    enabled: true\n"
             "    resource: forgejo\n"
+            "    state:\n"
+            "      capable: true\n"
+            "      disable_policy: retain\n"
             "    configuration:\n"
             "      data_dir: /var/lib/infisical\n"
             "      postgres_user: infisical\n"

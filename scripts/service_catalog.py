@@ -30,6 +30,12 @@ def _path_value(value: Any, path: str) -> Any:
     return value
 
 
+def _required_field_missing(field: str, value: object) -> bool:
+    if field == "state.capable":
+        return value is not True
+    return value in (None, "", [])
+
+
 @dataclass(frozen=True)
 class ServiceCapability:
     name: str
@@ -191,7 +197,7 @@ class ServiceCatalog:
                 missing_fields = [
                     field
                     for field in self.get(name).required_fields
-                    if _path_value(service, field) in (None, "", [])
+                    if _required_field_missing(field, _path_value(service, field))
                 ]
                 if missing_fields:
                     raise ServiceCatalogError(

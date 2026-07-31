@@ -36,6 +36,9 @@ services:
   infisical_onramp:
     enabled: true
     resource: onramp-host
+    state:
+      capable: true
+      disable_policy: retain
     dependencies:
       - onramp_host
   hermes:
@@ -53,5 +56,8 @@ services:
   searxng_onramp:
     enabled: true
     resource: onramp-host
+    state:
+      capable: true
+      disable_policy: retain
     dependencies:
       - onramp_host
