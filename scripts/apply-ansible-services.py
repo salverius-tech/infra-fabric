@@ -118,6 +118,8 @@ def refresh_root_password_from_tfvars(tfvars_file: Path, env: dict[str, str]) ->
         values = hcl2.load(handle)
     password = values.get("lxc_root_password")
     if isinstance(password, str) and password:
+        if len(password) >= 2 and password[0] == password[-1] == '"':
+            password = password[1:-1]
         env["TF_VAR_lxc_root_password"] = password
 
 

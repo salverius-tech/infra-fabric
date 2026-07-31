@@ -31,6 +31,16 @@ class StorageVarsError(ValueError):
     pass
 
 
+def _unquote_hcl_values(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: _unquote_hcl_values(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_unquote_hcl_values(child) for child in value]
+    if isinstance(value, str) and len(value) >= 2 and value[0] == value[-1] == '"':
+        return value[1:-1]
+    return value
+
+
 def load_tfvars(path: Path) -> dict[str, Any]:
     try:
         with path.open("r", encoding="utf-8") as file:
@@ -41,7 +51,7 @@ def load_tfvars(path: Path) -> dict[str, Any]:
         raise StorageVarsError(f"cannot parse {path}: {error}") from error
     if not isinstance(data, dict):
         raise StorageVarsError(f"{path} must contain an object")
-    return data
+    return _unquote_hcl_values(data)
 
 
 def legacy_forgejo_storage(tfvars: dict[str, Any]) -> dict[str, Any] | None:
