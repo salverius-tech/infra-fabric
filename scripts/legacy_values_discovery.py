@@ -638,6 +638,12 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             parsed = urlsplit(value)
             if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
                 raise DiscoveryError(f"bounded Ansible {key} must be an HTTP(S) URL without credentials")
+        elif key in {"hermes_discovery_version", "hermes_discovery_tag", "hermes_discovery_commit"}:
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty release identifier")
+        elif key == "hermes_discovery_wheel_sha256":
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a 64-character SHA-256 digest")
         elif key == "technitium_discovery_version":
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty version")
