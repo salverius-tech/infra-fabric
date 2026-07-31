@@ -145,7 +145,7 @@ The implementation is complete when all of the following are true:
 
 **Goal:** Make service capability and legacy translation explicit and testable.
 
-- [~] Extend or formalize `infra/services.json` as the capability/schema registry. All nine catalog entries now declare and validate their typed configuration schema identity or explicit resource-owned `null` boundary; broader capability metadata remains.
+- [~] Extend or formalize `infra/services.json` as the capability/schema registry. All nine catalog entries now declare and validate configuration schema identity, release forms, override namespaces, and required fields; canonical site loading rejects incomplete registry metadata.
 - [~] Add required canonical fields, required logical secret paths, configuration schema identifiers, supported release forms, and allowed consumer overrides. Configuration schema identities, supported release-source metadata, `ansible`/`opentofu` override namespaces, and enabled-service `resource` requirements are now catalog-linked and enforced; broader required-field and per-namespace override inventories remain.
 - [ ] Add the versioned mapping matrix covering Terraform, Ansible, inventory, DNS, dotenv, migration scripts, scaffold, and current service inputs.
 - [~] Define normalization for HCL quoting, CIDR/bare addresses, `null`, `dhcp`, booleans, lists, checksums, hostnames, generated names, and derived DNS records. Forgejo public-name aliases now normalize scalar hostnames to canonical lowercase lists; broader normalization remains open.
@@ -710,3 +710,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-31 — Formalized catalog release-source ownership: all typed services declare supported `package`/`container`/`binary`/`image` forms, resource-owned services declare none, and model validation rejects release projections outside each service boundary.
 - 2026-07-31 — Formalized catalog override ownership: typed services allow only the declared `ansible` and `opentofu` namespaces, resource-owned services allow none, and canonical model validation rejects undeclared consumer namespaces.
 - 2026-07-31 — Formalized catalog required-field ownership: all nine services declare `resource` as an enabled-service requirement, and catalog validation now rejects missing required paths independently of the Pydantic loader boundary.
+- 2026-07-31 — Added a registry-completeness gate for full canonical site loading: repository catalog entries must explicitly carry schema, release, override, and required-field metadata; lightweight secret-only catalog APIs remain compatible with minimal test catalogs.

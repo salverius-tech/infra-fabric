@@ -60,6 +60,22 @@ class ServiceCatalog:
         except KeyError as error:
             raise ServiceCatalogError(f"unknown service catalog entry: {name}") from error
 
+    def validate_registry_completeness(self) -> None:
+        required_keys = {
+            "configuration_schema",
+            "release_sources",
+            "allowed_override_namespaces",
+            "required_fields",
+        }
+        for name, capability in self._capabilities.items():
+            missing = sorted(required_keys - capability.raw.keys())
+            if missing:
+                raise ServiceCatalogError(
+                    f"service {name} is missing registry metadata: {', '.join(missing)}"
+                )
+            if not capability.required_fields:
+                raise ServiceCatalogError(f"service {name} must declare at least one required canonical field")
+
     def validate_selection(self, enabled: set[str]) -> None:
         unknown = sorted(enabled - self.names)
         if unknown:

@@ -1165,6 +1165,7 @@ def load_site(
     if catalog_path is not None:
         try:
             catalog = load_catalog(catalog_path)
+            catalog.validate_registry_completeness()
             service_configuration_contract(
                 set(catalog.names),
                 {name: catalog.get(name).configuration_schema for name in catalog.names},
