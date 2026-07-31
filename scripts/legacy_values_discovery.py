@@ -659,14 +659,21 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             allowed = {"type", "managed", "host", "port", "name", "user", "ssl_mode"}
             valid = isinstance(value, dict) and set(value) <= allowed
             if valid:
-                valid = all(
-                    (field == "type" and item in {"sqlite", "postgres"})
-                    or (field == "managed" and isinstance(item, bool))
-                    or (field == "port" and isinstance(item, int) and not isinstance(item, bool) and 1 <= item <= 65535)
-                    or (field in {"host", "ssl_mode"} and isinstance(item, str) and item.strip())
-                    or (field in {"name", "user"} and isinstance(item, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item))
-                    for field, item in value.items()
-                )
+                database_type = value.get("type")
+                postgres_fields = {"managed", "host", "port", "name", "user", "ssl_mode"}
+                if database_type == "postgres":
+                    valid = {"name", "user"} <= set(value)
+                elif database_type == "sqlite":
+                    valid = not (set(value) & postgres_fields)
+                if valid:
+                    valid = all(
+                        (field == "type" and item in {"sqlite", "postgres"})
+                        or (field == "managed" and isinstance(item, bool))
+                        or (field == "port" and isinstance(item, int) and not isinstance(item, bool) and 1 <= item <= 65535)
+                        or (field in {"host", "ssl_mode"} and isinstance(item, str) and item.strip())
+                        or (field in {"name", "user"} and isinstance(item, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item))
+                        for field, item in value.items()
+                    )
             if not valid:
                 raise DiscoveryError(f"bounded Ansible {key} must be valid database metadata")
         elif key in {"forgejo_root_url", "FORGEJO_ROOT_URL"}:
@@ -691,19 +698,6 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             parsed = urlsplit(value)
             if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
                 raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
-        elif key == "forgejo_database":
-            allowed = {"type", "managed", "host", "port", "name", "user", "ssl_mode"}
-            valid = isinstance(value, dict) and set(value) <= allowed
-            if valid:
-                valid = all(
-                    (field == "type" and item in {"sqlite", "postgres"})
-                    or (field == "managed" and isinstance(item, bool))
-                    or (field == "port" and isinstance(item, int) and not isinstance(item, bool) and 1 <= item <= 65535)
-                    or (field in {"host", "name", "user", "ssl_mode"} and isinstance(item, str) and item.strip())
-                    for field, item in value.items()
-                )
-            if not valid:
-                raise DiscoveryError(f"bounded Ansible {key} must be valid database metadata")
         elif key == "searxng_server_name":
             if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
                 raise DiscoveryError(f"bounded Ansible {key} must be a hostname")

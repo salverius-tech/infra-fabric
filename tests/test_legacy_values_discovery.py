@@ -1018,6 +1018,21 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "valid database metadata"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_rejects_invalid_forgejo_database_shape(self) -> None:
+        invalid_documents = [
+            "all:\n  vars:\n    forgejo_database: {type: postgres, host: db}\n",
+            "all:\n  vars:\n    forgejo_database: {type: sqlite, name: forgejo}\n",
+        ]
+        for document in invalid_documents:
+            temp, values = self.make_values()
+            with temp:
+                repo = Path(temp.name) / "repo"
+                inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+                inventory.parent.mkdir(parents=True)
+                inventory.write_text(document, encoding="utf-8")
+                with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "valid database metadata"):
+                    legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_service_resource_vmids(self) -> None:
         temp, values = self.make_values()
         with temp:
