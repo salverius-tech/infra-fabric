@@ -127,8 +127,10 @@ class SiteMigrationTests(unittest.TestCase):
                 json.dumps({"canonical_destination": "sites/dev", "secret_values_included": False}),
                 encoding="utf-8",
             )
+            (target / ".env").write_text("SERVER_NAME=dns.example.internal\n", encoding="utf-8")
             actions = migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, False)
-            self.assertEqual(actions[1], "no-op: site migration is already complete")
+            self.assertEqual(actions[2], "no-op: site migration is already complete")
+            self.assertEqual(actions[1], "site artifact inventory: 1 files")
             self.assertTrue((values / ".env").exists())
 
     def test_existing_site_metadata_conflict_fails_closed_in_dry_run(self) -> None:

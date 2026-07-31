@@ -108,6 +108,32 @@ def migration_items(values_root: Path, target: Path) -> list[tuple[Path, Path]]:
     return items
 
 
+SITE_ARTIFACT_ROOTS = (
+    (Path(".env"), "dotenv"),
+    (Path("terraform.tfvars"), "tfvars"),
+    (Path("ansible/inventory/local.yml"), "inventory"),
+    (Path("ansible/known_hosts"), "known-hosts"),
+    (Path("dns-records.local.json"), "dns"),
+    (Path("terraform.tfstate"), "state"),
+    (Path("terraform.tfstate.backup"), "state-backup"),
+    (Path("plans"), "plan"),
+    (Path("backups"), "backup"),
+    (Path("service-backups"), "service-backup"),
+    (Path("artifacts"), "artifact"),
+)
+
+
+def site_artifact_inventory(target: Path) -> list[dict[str, str]]:
+    inventory: list[dict[str, str]] = []
+    for relative, kind in SITE_ARTIFACT_ROOTS:
+        path = target / relative
+        if path.is_file():
+            inventory.append({"path": relative.as_posix(), "kind": kind, "type": "file"})
+        elif path.is_dir():
+            for child in sorted(path.rglob("*")):
+                if child.is_file() and not child.is_symlink():
+                    inventory.append({"path": child.relative_to(target).as_posix(), "kind": kind, "type": "file"})
+    return inventory
 def inspect_existing_site(target: Path, site: str, metadata: dict[str, Any]) -> list[str]:
     site_json = target / "site.json"
     manifest_json = target / "migration-manifest.json"
@@ -122,7 +148,12 @@ def inspect_existing_site(target: Path, site: str, metadata: dict[str, Any]) -> 
         raise SiteMigrationError(f"existing site target metadata conflicts: {target}")
     if manifest.get("canonical_destination") != f"sites/{site}" or manifest.get("secret_values_included") is not False:
         raise SiteMigrationError(f"existing site target manifest conflicts: {target}")
-    return [f"existing site target verified: {target}", "no-op: site migration is already complete"]
+    artifacts = site_artifact_inventory(target)
+    return [
+        f"existing site target verified: {target}",
+        f"site artifact inventory: {len(artifacts)} files",
+        "no-op: site migration is already complete",
+    ]
 def validate_request(values_root: Path, site: str, metadata: dict[str, Any]) -> tuple[Path, list[tuple[Path, Path]]]:
     if not SITE_NAME_RE.fullmatch(site) or ".." in site:
         raise SiteMigrationError("site must be a simple site identifier")
