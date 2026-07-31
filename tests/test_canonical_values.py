@@ -23,7 +23,7 @@ from canonical_projections import (
     render_dns_records,
     render_opentofu_variables,
 )
-from service_catalog import load_catalog
+from service_catalog import ServiceCatalogError, load_catalog
 
 
 VALID_SITE = """
@@ -155,12 +155,17 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             canonical_values.Resources.model_validate(invalid)
 
-    def test_full_catalog_fixture_loads_as_one_valid_canonical_site(self) -> None:
+    def _full_catalog_site_document(self) -> dict:
         root = Path(__file__).resolve().parents[1]
         yaml = canonical_values.YAML(typ="safe")
         site = yaml.load((root / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8"))
         site["resources"] = yaml.load((root / "scaffold/fixtures/resource-runtime.yaml").read_text(encoding="utf-8"))
         site["services"] = yaml.load((root / "scaffold/fixtures/full-catalog-services.yaml").read_text(encoding="utf-8"))["services"]
+        return site
+
+    def test_full_catalog_fixture_loads_as_one_valid_canonical_site(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        site = self._full_catalog_site_document()
         canonical = canonical_values.CanonicalSite.model_validate(site)
         catalog = load_catalog(root / "infra/services.json")
         enabled = set(canonical.services)
@@ -169,6 +174,32 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(enabled, set(catalog.names))
         self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
         self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
+
+    def test_full_catalog_cross_field_failure_matrix(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        catalog = load_catalog(root / "infra/services.json")
+        cases = {
+            "stateful_missing_disable_policy": lambda site: site["services"]["forgejo"]["state"].update(
+                {"capable": True, "disable_policy": None}
+            ),
+            "enabled_service_missing_resource": lambda site: site["services"]["forgejo"].update({"resource": None}),
+            "unknown_service_resource": lambda site: site["services"]["forgejo"].update({"resource": "missing"}),
+            "stateless_service_claims_state": lambda site: site["services"]["tailscale_client"].update(
+                {"state": {"capable": True, "disable_policy": "retain"}}
+            ),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(case=name):
+                site = self._full_catalog_site_document()
+                mutate(site)
+                with self.assertRaises((ValidationError, ServiceCatalogError)):
+                    canonical = canonical_values.CanonicalSite.model_validate(site)
+                    catalog.validate_model_services(canonical.services, canonical.resources)
+
+        missing_dependency = self._full_catalog_site_document()
+        missing_dependency["services"]["forgejo"]["enabled"] = False
+        with self.assertRaises(ServiceCatalogError):
+            catalog.validate_selection({name for name, service in missing_dependency["services"].items() if service["enabled"]})
 
     def test_ssh_port_requires_ssh_protocol(self) -> None:
         with self.assertRaises(ValidationError):
