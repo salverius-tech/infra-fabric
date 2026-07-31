@@ -58,8 +58,18 @@ python scripts/tfplan-metadata.py verify \
 python scripts/tfplan-metadata.py summary --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json"
 python scripts/settings.py summary
 ansible_inventory="${INFRA_VALUES_DIR}/ansible/inventory/local.yml"
-if [[ -f "${INFRA_VALUES_DIR}/generated/manifest.json" && -f "${INFRA_VALUES_DIR}/generated/ansible-inventory.json" ]]; then
+canonical_ansible_args=()
+if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
+  for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
+    if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
+      printf 'Canonical site exists but generated projection is missing: %s. Run just plan again.\n' "${required_projection}" >&2
+      exit 1
+    fi
+  done
+  python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
   ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
+  tofu_vars_file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"
+  canonical_ansible_args=(--canonical-ansible)
 fi
 
 storage_vars_args=()
@@ -113,9 +123,16 @@ ansible_service_args=()
 if [[ -n "${target_service}" ]]; then
   ansible_service_args+=(--service "${target_service}")
 fi
-python scripts/apply-ansible-services.py \
-  --inventory "${ansible_inventory}" \
-  --inventory infra/ansible/inventory/tfvars.py \
-  --env-file "${INFRA_VALUES_DIR}/.env" \
-  "${ansible_service_args[@]}"
+if [[ "${#canonical_ansible_args[@]}" -gt 0 ]]; then
+  python scripts/apply-ansible-services.py \
+    "${canonical_ansible_args[@]}" \
+    --env-file "${INFRA_VALUES_DIR}/.env" \
+    "${ansible_service_args[@]}"
+else
+  python scripts/apply-ansible-services.py \
+    --inventory "${ansible_inventory}" \
+    --inventory infra/ansible/inventory/tfvars.py \
+    --env-file "${INFRA_VALUES_DIR}/.env" \
+    "${ansible_service_args[@]}"
+fi
 ' bash "${target_service}" "${replace_service}" "${destroy_verify_flag}" "${stateful_batch_verify_flag}"

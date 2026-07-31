@@ -140,15 +140,18 @@ operational migration should use the transactional mode.
 
 ## Source-of-truth boundary
 
-Until a separately reviewed cutover is complete:
+Until a separately reviewed compatibility-removal phase is complete:
 
-- `values/sites/<site>/site.yaml` is the canonical model under validation only.
+- `values/sites/<site>/site.yaml` is the canonical operator-edited model for a
+  selected site.
+- For a selected canonical site, `validate`, `plan`, and `apply` require and verify
+  the complete generated projection set; they do not silently fall back to legacy
+  inventory or tfvars.
 - `values/terraform.tfvars`, `values/.env`,
-  `values/ansible/inventory/local.yml`, and the other legacy files remain the
-  active consumer inputs.
-- Passing canonical validation does **not** prove semantic parity with legacy
-  inputs, Ansible inventory compatibility, OpenTofu plan equivalence, or
-  migration readiness.
+  `values/ansible/inventory/local.yml`, and other legacy files remain the
+  compatibility inputs when no canonical site is selected.
+- Passing canonical validation does **not** prove provider-specific plan equivalence,
+  live infrastructure health, backup/restore acceptance, or production readiness.
 - Passing legacy discovery does **not** create or update canonical files.
 - Do not use the generated report as an OpenTofu/Ansible input and do not run
   migration apply, infrastructure apply, destroy, import, or state surgery as

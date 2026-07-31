@@ -69,8 +69,19 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
 fi
 
 ansible_inventory="${INFRA_VALUES_DIR}/ansible/inventory/local.yml"
-if [[ -f "${INFRA_VALUES_DIR}/generated/manifest.json" && -f "${INFRA_VALUES_DIR}/generated/ansible-inventory.json" ]]; then
+tofu_vars_file="../../${INFRA_VALUES_DIR}/terraform.tfvars"
+canonical_site=false
+if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
+  for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
+    if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
+      printf 'Canonical site exists but generated projection is missing: %s. Render projections before planning.\n' "${required_projection}" >&2
+      exit 1
+    fi
+  done
+  python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
   ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
+  tofu_vars_file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"
+  canonical_site=true
 fi
 
 storage_vars_args=()
@@ -90,8 +101,12 @@ ansible-playbook \
 tofu -chdir=infra/opentofu init
 
 enabled_services="$(python scripts/settings.py tofu-var)"
+enabled_services_args=("-var" "enabled_services=${enabled_services}")
 target_args=()
 replace_args=()
+if [[ "${canonical_site}" == true ]]; then
+  enabled_services_args=()
+fi
 if [[ -n "${1:-}" ]]; then
   while IFS= read -r target; do
     [[ -n "${target}" ]] && target_args+=("-target=${target}")
@@ -107,8 +122,8 @@ if [[ -n "${2:-}" ]]; then
 fi
 
 tofu -chdir=infra/opentofu plan \
-  -var "enabled_services=${enabled_services}" \
-  -var-file=../../${INFRA_VALUES_DIR}/terraform.tfvars \
+  "${enabled_services_args[@]}" \
+  -var-file="${tofu_vars_file}" \
   -state=../../${INFRA_VALUES_DIR}/terraform.tfstate \
   "${target_args[@]}" \
   "${replace_args[@]}" \
