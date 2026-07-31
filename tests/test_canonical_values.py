@@ -188,6 +188,7 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
         self.assertEqual(canonical.services["forgejo"].release.source, "package")
         self.assertEqual(canonical.services["forgejo"].overrides["ansible"]["forgejo_domain"], "git.example.internal")
+        self.assertEqual(catalog.get("forgejo").required_fields, ("resource",))
         self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
 
     def test_full_catalog_cross_field_failure_matrix(self) -> None:
@@ -221,6 +222,11 @@ class CanonicalValuesTests(unittest.TestCase):
         missing_dependency["services"]["forgejo"]["enabled"] = False
         with self.assertRaises(ServiceCatalogError):
             catalog.validate_selection({name for name, service in missing_dependency["services"].items() if service["enabled"]})
+
+        canonical = canonical_values.CanonicalSite.model_validate(self._full_catalog_site_document())
+        canonical.services["forgejo"].resource = None
+        with self.assertRaises(ServiceCatalogError):
+            catalog.validate_model_services(canonical.services, canonical.resources)
 
     def test_ssh_port_requires_ssh_protocol(self) -> None:
         with self.assertRaises(ValidationError):

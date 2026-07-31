@@ -9,6 +9,7 @@
       "configuration_schema": "TechnitiumConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
+      "required_fields": ["resource"],
       "state_order": 3,
       "terraform_addresses": [
         "module.technitium_dns[",
@@ -43,6 +44,7 @@
       "configuration_schema": "ForgejoConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
+      "required_fields": ["resource"],
       "state_order": 2,
       "terraform_addresses": [
         "module.forgejo[",
@@ -94,6 +96,7 @@
       "configuration_schema": "TailscaleConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
+      "required_fields": ["resource"],
       "terraform_addresses": [
         "module.tailscale_client[",
         "module.tailscale_client_vm["
@@ -128,6 +131,7 @@
       "configuration_schema": "ForgejoRunnerConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
+      "required_fields": ["resource"],
       "terraform_addresses": [
         "module.forgejo_runner[",
         "module.forgejo_runner_vm["
@@ -164,6 +168,7 @@
       "configuration_schema": "InfisicalConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
+      "required_fields": ["resource"],
       "state_order": 5,
       "terraform_addresses": [
         "module.infisical[",
@@ -199,6 +204,7 @@
       "configuration_schema": null,
       "release_sources": [],
       "allowed_override_namespaces": [],
+      "required_fields": ["resource"],
       "state_order": 5,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["
@@ -231,6 +237,7 @@
       "configuration_schema": "HermesConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
+      "required_fields": ["resource"],
       "state_order": 1,
       "terraform_addresses": [
         "module.hermes[",
@@ -315,6 +322,7 @@
       "configuration_schema": null,
       "release_sources": [],
       "allowed_override_namespaces": [],
+      "required_fields": ["resource"],
       "state_order": 4,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["
@@ -357,6 +365,7 @@
       "configuration_schema": "SearxngConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
+      "required_fields": ["resource"],
       "state_order": 6,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["

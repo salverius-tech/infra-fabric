@@ -37,6 +37,7 @@ class ServiceCapability:
     configuration_schema: str | None
     release_sources: tuple[str, ...]
     allowed_override_namespaces: tuple[str, ...]
+    required_fields: tuple[str, ...]
     dependencies: tuple[str, ...]
     required_secrets: tuple[str, ...]
     secret_classifications: dict[str, SecretClassification]
@@ -171,6 +172,16 @@ class ServiceCatalog:
                     f"service {name} override namespaces are not allowed: {', '.join(unknown_overrides)}"
                 )
             if resources is not None and getattr(service, "enabled", False):
+                missing_fields = [
+                    field
+                    for field in self.get(name).required_fields
+                    if _path_value(service, field) in (None, "", [])
+                ]
+                if missing_fields:
+                    raise ServiceCatalogError(
+                        f"enabled service {name} is missing required fields: {', '.join(missing_fields)}"
+                    )
+            if resources is not None and getattr(service, "enabled", False):
                 resource_name = getattr(service, "resource", None)
                 resource_map = {
                     **getattr(resources, "guests", {}),
@@ -276,12 +287,21 @@ def load_catalog(path: Path) -> ServiceCatalog:
             for namespace in allowed_override_namespaces
         ) or len(allowed_override_namespaces) != len(set(allowed_override_namespaces)):
             raise ServiceCatalogError(f"service {name} allowed_override_namespaces must contain unique supported namespaces")
+        required_fields = raw.get("required_fields", [])
+        if not isinstance(required_fields, list) or any(
+            not isinstance(field, str)
+            or not field
+            or not all(_LOGICAL_PART_RE.fullmatch(part) for part in field.split("."))
+            for field in required_fields
+        ) or len(required_fields) != len(set(required_fields)):
+            raise ServiceCatalogError(f"service {name} required_fields must contain unique logical field paths")
         capabilities[name] = ServiceCapability(
             name=name,
             state_capable=raw.get("state_capable") is True,
             configuration_schema=configuration_schema,
             release_sources=tuple(release_sources),
             allowed_override_namespaces=tuple(allowed_override_namespaces),
+            required_fields=tuple(required_fields),
             dependencies=tuple(dependencies),
             required_secrets=tuple(required_secrets),
             secret_classifications=dict(secret_classifications),
