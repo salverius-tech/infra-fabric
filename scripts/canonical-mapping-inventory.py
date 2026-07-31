@@ -349,6 +349,35 @@ def matrix_path_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def source_reconciliation_gate(source_inputs: dict[str, Any], matrix_coverage: dict[str, Any]) -> dict[str, Any]:
+    """Require every current source identity to have one reviewed matrix disposition."""
+    source_identities = {(item["source"], item["key"]) for item in source_inputs["inputs"]}
+    matched_identities = {(item["source"], item["key"]) for item in matrix_coverage["matched"]}
+    excluded_identities = {(item["source"], item["key"]) for item in matrix_coverage["excluded"]}
+    accounted = matched_identities | excluded_identities
+    duplicate_matched = len(matched_identities) != len(matrix_coverage["matched"])
+    duplicate_excluded = len(excluded_identities) != len(matrix_coverage["excluded"])
+    missing = sorted(source_identities - accounted)
+    unexpected = sorted(accounted - source_identities)
+    reasons: list[str] = []
+    if duplicate_matched or duplicate_excluded:
+        reasons.append("source identity has multiple matrix dispositions")
+    if missing:
+        reasons.append("source identity lacks a matrix disposition")
+    if unexpected:
+        reasons.append("matrix disposition references an unknown source identity")
+    if matrix_coverage["ambiguous_count"]:
+        reasons.append("source identity has ambiguous canonical matches")
+    return {
+        "source_identity_count": len(source_identities),
+        "accounted_identity_count": len(accounted),
+        "missing": [{"source": source, "key": key} for source, key in missing],
+        "unexpected": [{"source": source, "key": key} for source, key in unexpected],
+        "reasons": reasons,
+        "status": "complete" if not reasons and len(source_identities) == len(accounted) else "review-required",
+    }
+
+
 def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
     """Report exact and renderer-backed evidence for generated consumer fields."""
     files: list[Path] = []
@@ -688,6 +717,7 @@ def build_report(repo: Path) -> dict[str, Any]:
     source_inputs = load_source_input_inventory(repo)
     matrix = load_mapping_matrix(repo / "docs/canonical-values-mapping-v1.md")
     matrix_coverage = reconcile_matrix_inputs(source_inputs, matrix)
+    source_reconciliation = source_reconciliation_gate(source_inputs, matrix_coverage)
     matrix_path_status = matrix_path_coverage(matrix)
     consumer_evidence_status = consumer_evidence(repo, matrix)
     deferred = deferred_classification(matrix_coverage)
@@ -715,6 +745,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "matrix_path_coverage": matrix_path_status,
         "consumer_evidence": consumer_evidence_status,
         "matrix_coverage": matrix_coverage,
+        "source_reconciliation": source_reconciliation,
         "deferred_classification": deferred,
         "legacy_alias_classification": alias_classification,
         "candidate_generation": candidate_readiness,
