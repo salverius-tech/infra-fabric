@@ -165,7 +165,13 @@ class CanonicalValuesTests(unittest.TestCase):
                 else:
                     self.assertEqual(entry["resource_owned"]["owner"], contract[name]["owner"])
 
-    def test_public_resource_runtime_fixture_covers_lxc_vm_and_shared_host(self) -> None:
+    def test_public_scaffold_declares_every_catalog_service(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        catalog = load_catalog(root / "infra" / "services.json")
+        site = load_site(root / "scaffold" / "sites" / "dev" / "site.yaml", expected_site="dev", catalog_path=root / "infra" / "services.json")
+        self.assertEqual(set(site.services), set(catalog.names))
+        self.assertEqual({name for name, service in site.services.items() if service.enabled}, {"forgejo", "technitium"})
+
         fixture = Path(__file__).resolve().parents[1] / "scaffold" / "fixtures" / "resource-runtime.yaml"
         yaml = canonical_values.YAML(typ="safe")
         document = yaml.load(fixture.read_text(encoding="utf-8"))

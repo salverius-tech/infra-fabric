@@ -767,3 +767,5 @@ Update this table with real command output, fixture names, or review links. Do n
 
 - 2026-08-01 — Completed final integration acceptance: full backend suite passes (567 tests), public safety and OpenTofu/Ansible validation pass, and ShellCheck warnings were removed. `just validate` reaches the final private-values prerequisite and stops because this checkout has no configured values workspace (`Run just setup or just setup <remote>`).
 
+- 2026-08-01 — Completed Item #2 schema/catalog fixture slice: the public `dev` scaffold now declares all nine catalog services, with only Forgejo and Technitium enabled; canonical/catalog tests confirm every typed configuration rejects unknown fields and every catalog schema contract is represented. Full service-schema coverage remains bounded by the existing catalog-specific required-field and resource-owned contracts.
+

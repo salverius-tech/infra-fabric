@@ -131,3 +131,17 @@ services:
     configuration:
       database:
         type: sqlite
+  forgejo_runner:
+    enabled: false
+  hermes:
+    enabled: false
+  infisical:
+    enabled: false
+  infisical_onramp:
+    enabled: false
+  onramp_host:
+    enabled: false
+  searxng_onramp:
+    enabled: false
+  tailscale_client:
+    enabled: false
