@@ -1143,6 +1143,45 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         )
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_service_vmids(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    technitium_vmid: 106\n"
+                "    forgejo_vmid: 107\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "technitium_vmid": "resources.guests.technitium.identity.vmid",
+            "forgejo_vmid": "resources.guests.forgejo.identity.vmid",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertEqual(observations[("technitium_vmid", "mapped")].value, 106)
+        self.assertEqual(observations[("forgejo_vmid", "mapped")].value, 107)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_invalid_service_vmid(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    technitium_vmid: 0\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "positive integer"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_runner_labels(self) -> None:
         temp, values = self.make_values()
         with temp:

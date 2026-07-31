@@ -95,6 +95,8 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_bootstrap_admin_email": "services.forgejo.configuration.bootstrap_admin_email",
         "forgejo_bootstrap_owner_email": "services.forgejo.configuration.bootstrap_owner_email",
         "forgejo_database": "services.forgejo.configuration.database",
+        "technitium_vmid": "resources.guests.technitium.identity.vmid",
+        "forgejo_vmid": "resources.guests.forgejo.identity.vmid",
         "onramp_host_password_authentication": "resources.shared_hosts.onramp_host.security.password_authentication",
         "onramp_host_permit_root_login": "resources.shared_hosts.onramp_host.security.permit_root_login",
         "onramp_host_deploy_user": "resources.shared_hosts.onramp_host.security.deploy_user",
@@ -498,6 +500,8 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "infisical_vmid",
         "forgejo_runner_vmid",
         "forgejo_runner_dns_servers",
+        "technitium_vmid",
+        "forgejo_vmid",
         "hermes_domain",
         "hermes_runtime_user",
         "hermes_repo_path",
@@ -600,6 +604,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key == "searxng_enable_public_url":
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+        elif key in {"technitium_vmid", "forgejo_vmid"}:
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                raise DiscoveryError(f"bounded Ansible {key} must be a positive integer")
         elif key == "forgejo_actions_enabled":
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
