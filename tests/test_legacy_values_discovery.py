@@ -1550,6 +1550,51 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTPS URL without credentials"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_admits_forgejo_service_boundary(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_root_url: https://forgejo.example.internal/\n"
+                "    FORGEJO_ROOT_URL: https://forgejo.example.internal/\n"
+                "    forgejo_ssh_port: 2222\n"
+                "    FORGEJO_SSH_PORT: 2222\n"
+                "    forgejo_actions_enabled: true\n"
+                "    FORGEJO_ACTIONS_ENABLED: true\n"
+                "    forgejo_actions_default_url: https://forgejo.example.internal/actions\n"
+                "    FORGEJO_ACTIONS_DEFAULT_URL: https://forgejo.example.internal/actions\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "forgejo_root_url": "services.forgejo.endpoints.public_url",
+            "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
+            "forgejo_actions_enabled": "services.forgejo.configuration.actions_enabled",
+            "forgejo_actions_default_url": "services.forgejo.configuration.actions_default_url",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_forgejo_service_boundary_values(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_root_url: https://user:password@example.internal/\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTPS URL without credentials"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_runner_boundary(self) -> None:
         temp, values = self.make_values()
         with temp:

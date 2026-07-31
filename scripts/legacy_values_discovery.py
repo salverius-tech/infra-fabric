@@ -450,7 +450,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     """
     allowed_keys = {
         "forgejo_actions_default_url",
+        "FORGEJO_ACTIONS_DEFAULT_URL",
         "forgejo_actions_enabled",
+        "FORGEJO_ACTIONS_ENABLED",
         "forgejo_bootstrap_enabled",
         "forgejo_bootstrap_admin_username",
         "forgejo_bootstrap_admin_email",
@@ -478,6 +480,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_domain",
         "forgejo_enable_caddy",
         "forgejo_root_url",
+        "FORGEJO_ROOT_URL",
         "tailscale_client_enable_ip_forwarding",
         "tailscale_client_restore_backup",
         "tailscale_client_backup_archive",
@@ -539,6 +542,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "hermes_control_require_task_approval",
         "hermes_control_plugin_socket",
         "forgejo_ssh_port",
+        "FORGEJO_SSH_PORT",
         "forgejo_version",
         "forgejo_write_initial_config",
         "technitium_discovery_version",
@@ -590,6 +594,28 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             _normalize_caddy_upstream(value)
         elif key == "caddy_extra_vhosts":
             _normalize_caddy_extra_vhosts(value)
+        elif key in {"forgejo_root_url", "FORGEJO_ROOT_URL"}:
+            from urllib.parse import urlsplit
+
+            if not isinstance(value, str):
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
+        elif key in {"forgejo_ssh_port", "FORGEJO_SSH_PORT"}:
+            if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 65535:
+                raise DiscoveryError(f"bounded Ansible {key} must be between 1 and 65535")
+        elif key in {"forgejo_actions_enabled", "FORGEJO_ACTIONS_ENABLED"}:
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+        elif key in {"forgejo_actions_default_url", "FORGEJO_ACTIONS_DEFAULT_URL"}:
+            from urllib.parse import urlsplit
+
+            if not isinstance(value, str):
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
         elif key == "forgejo_database":
             allowed = {"type", "managed", "host", "port", "name", "user", "ssl_mode"}
             valid = isinstance(value, dict) and set(value) <= allowed
