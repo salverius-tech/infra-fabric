@@ -565,7 +565,24 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
-        if key == "caddy_server_name":
+        if key in {"onramp_host_password_authentication", "onramp_host_permit_root_login", "onramp_host_allow_passwordless_sudo"}:
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+        elif key in {"onramp_host_deploy_user", "onramp_host_cloud_init_user", "onramp_host_deploy_dir"}:
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
+        elif key == "onramp_host_allowed_ssh_cidrs":
+            if not isinstance(value, list) or not value:
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty list of CIDRs")
+            for cidr in value:
+                try:
+                    ipaddress.ip_network(cidr, strict=False)
+                except (TypeError, ValueError) as error:
+                    raise DiscoveryError(f"bounded Ansible {key} must contain valid CIDRs") from error
+        elif key == "onramp_host_ssh_public_keys":
+            if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a list of strings with non-empty items")
+        elif key == "caddy_server_name":
             if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
                 raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
         elif key == "caddy_server_names":
@@ -575,7 +592,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key == "caddy_email":
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
-        elif key in {"tailscale_client_up_args", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers"}:
+        elif key in {"tailscale_client_up_args", "hermes_ssh_public_keys", "forgejo_runner_dns_servers"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
         elif key == "infisical_data_dir":
