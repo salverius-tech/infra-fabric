@@ -1043,6 +1043,16 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "symlinks"):
                 legacy_values_discovery._record_artifact_tree(report, root, link, "fixture")
 
+    def test_artifact_file_entry_must_be_regular_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "values"
+            root.mkdir()
+            directory = root / "not-a-file"
+            directory.mkdir()
+            report = legacy_values_discovery.DiscoveryReport(str(root))
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "regular file"):
+                legacy_values_discovery._record_artifact(report, root, directory, "fixture")
+
     def test_bounded_report_requires_manual_review_for_canonical_conflicts(self) -> None:
         migration = legacy_values_discovery._load_migration_module()
         report = legacy_values_discovery.DiscoveryReport("/tmp/values")
