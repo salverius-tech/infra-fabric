@@ -1,11 +1,15 @@
 # Canonical Values Migration Boundary
 
-**Status:** validation-only compatibility window; no consumer cutover
+**Status:** canonical operational authority with explicit legacy compatibility
 
-The canonical site model is being introduced alongside the existing private values
-inputs. During this window, `site.yaml` is validated as a separate, additive
-input. The existing `terraform.tfvars`, dotenv, DNS, and Ansible inventory files
-remain the active consumer inputs for the normal infrastructure workflow.
+For a selected site, `site.yaml` plus verified generated projections are the
+normal consumer inputs. Legacy `terraform.tfvars`, dotenv, DNS, and Ansible
+inventory inputs are compatibility-only and are rejected by `plan`, `apply`,
+and `validate` unless the operator explicitly sets:
+
+```bash
+INFRA_ALLOW_LEGACY_COMPATIBILITY=true
+```
 
 ## Validation-only workflow
 
@@ -37,9 +41,9 @@ This mode requires a selected canonical site, reads the identity-verified
 `ansible-inventory.json`, writes flattened non-secret compatibility variables to
 a temporary mode-0600 file, and passes both inputs to every playbook. The
 temporary file is removed on exit. Do not combine `--canonical-ansible` with
-`--inventory`; mixed canonical/legacy authority is rejected. The default
-`apply-ansible-services.py` invocation remains legacy and the opt-in mode is
-not evidence of full plan/apply parity.
+`--inventory`; mixed canonical/legacy authority is rejected. The canonical Ansible mode is now the operational path for selected canonical
+sites. The legacy invocation is retained only for the explicit compatibility
+environment override above.
 
 The site migration orchestrator currently retains the legacy compatibility-only
 migration behavior. A `--canonical-base` candidate path is intentionally

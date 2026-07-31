@@ -3,6 +3,7 @@ set -euo pipefail
 
 source scripts/site-context.sh
 require_site_context
+require_canonical_authority
 values_dir="$(site_values_dir)"
 rm -f "${values_dir}/tfplan" "${values_dir}/tfplan.meta.json"
 

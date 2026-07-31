@@ -16,6 +16,20 @@ require_site_context() {
   fi
 }
 
+require_canonical_authority() {
+  local values_path
+  values_path="$(site_values_dir)" || return
+  if [[ -f "${values_path}/site.yaml" ]]; then
+    return 0
+  fi
+  if [[ "${INFRA_ALLOW_LEGACY_COMPATIBILITY:-}" == "true" ]]; then
+    printf 'WARNING: legacy compatibility explicitly enabled for %s.\n' "${values_path}" >&2
+    return 0
+  fi
+  printf 'Canonical site.yaml is required for operational consumers: %s/site.yaml. Set INFRA_ALLOW_LEGACY_COMPATIBILITY=true only for a reviewed legacy-only run.\n' "${values_path}" >&2
+  return 2
+}
+
 site_values_dir() {
   local root="${VALUES_DIR:-values}"
   local site="${VALUES_SITE:-}"

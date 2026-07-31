@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source scripts/site-context.sh
+require_canonical_authority
+
 # shellcheck disable=SC2016
 scripts/run-infra.sh bash -euo pipefail -c '
 python scripts/workspace-preflight.py --require-values
