@@ -592,7 +592,10 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key == "caddy_email":
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
-        elif key in {"tailscale_client_up_args", "hermes_ssh_public_keys", "forgejo_runner_dns_servers"}:
+        elif key == "hermes_ssh_public_keys":
+            if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a list of strings with non-empty items")
+        elif key in {"tailscale_client_up_args", "forgejo_runner_dns_servers"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
         elif key == "infisical_data_dir":
