@@ -1133,6 +1133,14 @@ RUNTIME_IMPORTER_SCOPE = {
 }
 
 
+def _runtime_importer_observations(report: DiscoveryReport) -> dict[str, list[FieldObservation]]:
+    observations: dict[str, list[FieldObservation]] = {key: [] for key in RUNTIME_IMPORTER_SCOPE}
+    for item in report.observations:
+        if item.classification == "mapped" and item.proposed_path is not None:
+            observations.setdefault(item.key, []).append(item)
+    return observations
+
+
 def _runtime_admission_digest(observations: dict[str, list[FieldObservation]]) -> str:
     evidence = [
         {
@@ -1151,16 +1159,19 @@ def _runtime_admission_digest(observations: dict[str, list[FieldObservation]]) -
 
 
 def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
-    """Return evidence-bound admission for the complete bounded importer scope."""
-    observations: dict[str, list[FieldObservation]] = {key: [] for key in RUNTIME_IMPORTER_SCOPE}
-    for item in report.observations:
-        if item.key in observations:
-            observations[item.key].append(item)
-    missing = [key for key, items in observations.items() if not items]
+    """Return evidence-bound admission for every normalized non-secret mapped field."""
+    observations = _runtime_importer_observations(report)
+    missing = [key for key in RUNTIME_IMPORTER_SCOPE if not observations.get(key)]
+    scope: dict[str, str] = {}
     invalid = []
     for key, items in observations.items():
-        expected_path = RUNTIME_IMPORTER_SCOPE[key]
-        if items and any(item.classification != "mapped" or item.proposed_path != expected_path for item in items):
+        paths = {item.proposed_path for item in items if item.proposed_path is not None}
+        if len(paths) != 1:
+            invalid.append({"key": key, "reason": "mapped importer observation must have exactly one canonical path"})
+            continue
+        expected_path = next(iter(paths))
+        scope[key] = expected_path
+        if any(item.classification != "mapped" or item.proposed_path != expected_path for item in items):
             invalid.append({"key": key, "reason": "observation is not a normalized mapped value"})
         if key == "forgejo_runtime" and items:
             for item in items:
@@ -1174,7 +1185,7 @@ def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
     conflict_paths = {
         conflict["canonical_path"]
         for conflict in report.conflicts
-        if conflict.get("canonical_path") in RUNTIME_IMPORTER_SCOPE.values()
+        if conflict.get("canonical_path") in set(scope.values())
     }
     conflicts = sorted(conflict_paths)
     reasons = []
@@ -1185,7 +1196,7 @@ def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
     if conflicts:
         reasons.append("scoped importer observations conflict across sources")
     return {
-        "scope": dict(RUNTIME_IMPORTER_SCOPE),
+        "scope": scope,
         "status": "complete" if not reasons else "blocked",
         "admitted": not reasons,
         "missing": sorted(missing),

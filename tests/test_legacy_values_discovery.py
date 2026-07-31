@@ -47,7 +47,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         (values / "ansible" / "inventory" / "local.yml").write_text("all:\n  hosts:\n    edge:\n", encoding="utf-8")
         return temp, values
 
-    def test_repository_scaffold_admits_bounded_forgejo_runtime_scope(self) -> None:
+    def test_repository_scaffold_reports_bounded_runtime_scope_conflicts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             report = legacy_values_discovery.discover_legacy(
                 Path(temp_dir),
@@ -55,11 +55,11 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 ansible_inventory=Path(__file__).resolve().parents[1] / "scaffold/ansible/inventory/local.yml",
             )
         admission = legacy_values_discovery.runtime_importer_admission(report)
-        self.assertTrue(admission["admitted"])
-        self.assertEqual(admission["status"], "complete")
+        self.assertFalse(admission["admitted"])
+        self.assertEqual(admission["status"], "blocked")
         self.assertEqual(admission["missing"], [])
         self.assertEqual(admission["invalid"], [])
-        self.assertEqual(admission["conflicts"], [])
+        self.assertEqual(admission["conflicts"], ["services.technitium.configuration.caddy.server_names"])
         runtime = next(item for item in report.observations if item.key == "forgejo_runtime")
         self.assertEqual(runtime.classification, "mapped")
         self.assertEqual(runtime.proposed_path, "resources.guests.forgejo.runtime")
@@ -2468,12 +2468,15 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"),
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.runtime", "dict", {"type": "lxc"}),
                 legacy_values_discovery.FieldObservation("inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106),
+                legacy_values_discovery.FieldObservation("inventory", "hermes_domain", "mapped", "services.hermes.endpoints.public_names", "str", "hermes.example.internal"),
             ]
         )
         admission = legacy_values_discovery.runtime_importer_admission(complete)
         self.assertTrue(admission["admitted"])
         self.assertEqual(admission["status"], "complete")
         self.assertEqual(admission["missing"], [])
+        self.assertEqual(admission["scope"]["hermes_domain"], "services.hermes.endpoints.public_names")
+        self.assertEqual(set(admission["scope"]), {"forgejo_domain", "forgejo_root_url", "forgejo_runtime", "technitium_vmid", "hermes_domain"})
 
         invalid_runtime = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
         invalid_runtime.observations.extend(
@@ -2508,8 +2511,8 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         admission = legacy_values_discovery.runtime_importer_admission(blocked)
         self.assertFalse(admission["admitted"])
         self.assertEqual(admission["status"], "blocked")
-        self.assertEqual(admission["missing"], ["forgejo_root_url", "forgejo_runtime", "technitium_vmid"])
-        self.assertEqual(admission["conflicts"], ["services.forgejo.endpoints.public_url"])
+        self.assertEqual(admission["missing"], ["forgejo_domain", "forgejo_root_url", "forgejo_runtime", "technitium_vmid"])
+        self.assertEqual(admission["conflicts"], [])
 
         report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
         report.observations.extend(
