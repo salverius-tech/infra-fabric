@@ -74,6 +74,10 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(provider.dynamic_reference, "FORGEJO_ADMIN_EMAIL")
         self.assertEqual(provider.dynamic_resolution, "provider")
         self.assertEqual(provider.proposed_path, "services.forgejo.configuration.bootstrap_admin_email")
+        rendered = legacy_values_discovery.render_migration_report(report)
+        reference = next(item for item in rendered["provider_references"] if item["key"] == "forgejo_bootstrap_admin_email")
+        self.assertEqual(reference["provider"], "FORGEJO_ADMIN_EMAIL")
+        self.assertIsNone(reference["value"])
 
     def test_bounded_public_ansible_importer_admits_forgejo_domain_only(self) -> None:
         temp, values = self.make_values()

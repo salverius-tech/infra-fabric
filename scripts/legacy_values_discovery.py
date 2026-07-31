@@ -1133,6 +1133,21 @@ def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
     }
 
 
+def provider_references(report: DiscoveryReport) -> list[dict[str, Any]]:
+    return [
+        {
+            "source": item.source,
+            "key": item.key,
+            "canonical_path": item.proposed_path,
+            "provider": item.dynamic_reference,
+            "resolution": item.dynamic_resolution,
+            "value": None,
+        }
+        for item in report.observations
+        if item.classification == "provider"
+    ]
+
+
 def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
     """Return JSON-safe report data without secret values or arbitrary unknown values."""
     dynamic = [item for item in report.observations if item.value_type == "dynamic-expression"]
@@ -1163,6 +1178,7 @@ def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
         "runtime_importer_admission": runtime_importer_admission(report),
         "secret_contract": secret_contract,
         "dynamic_resolution": dynamic_summary,
+        "provider_references": provider_references(report),
         "observations": [
             {
                 "source": item.source,
