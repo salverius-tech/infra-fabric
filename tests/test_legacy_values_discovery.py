@@ -2515,6 +2515,18 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         report.observations.extend(
             [
                 legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.runtime", "dict", {"type": "lxc"}
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106
+                ),
+                legacy_values_discovery.FieldObservation(
                     ".env", "SERVER_NAME", "mapped", "services.technitium.endpoints.public_names", "list", ["dns.example.internal"]
                 ),
                 legacy_values_discovery.FieldObservation(
@@ -2523,17 +2535,28 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             ]
         )
         base = {"schema_version": 1, "site": {"name": "old"}, "services": {"technitium": {"enabled": True}}}
+        admission = legacy_values_discovery.runtime_importer_admission(report)
 
         candidate = legacy_values_discovery.build_candidate_site(
             report,
             base_document=base,
             site_name="dev",
-            runtime_importer_admission={"admitted": True},
+            runtime_importer_admission=admission,
         )
 
         self.assertEqual(candidate["site"]["name"], "dev")
         self.assertEqual(candidate["services"]["technitium"]["endpoints"]["public_names"], ["dns.example.internal"])
         self.assertNotIn("TECHNITIUM_API_TOKEN", json.dumps(candidate))
+
+        detached = dict(admission)
+        detached["evidence_digest"] = "0" * 64
+        with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "not bound to this report"):
+            legacy_values_discovery.build_candidate_site(
+                report,
+                base_document=base,
+                site_name="dev",
+                runtime_importer_admission=detached,
+            )
 
 
     def test_cli_writes_public_candidate_with_restricted_mode(self) -> None:

@@ -6,6 +6,7 @@ It never generates, hashes, moves, deletes, or serializes secret values.
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import ipaddress
 import json
@@ -1132,8 +1133,25 @@ RUNTIME_IMPORTER_SCOPE = {
 }
 
 
+def _runtime_admission_digest(observations: dict[str, list[FieldObservation]]) -> str:
+    evidence = [
+        {
+            "source": item.source,
+            "key": item.key,
+            "classification": item.classification,
+            "proposed_path": item.proposed_path,
+            "value_type": item.value_type,
+            "value": item.value,
+        }
+        for key in sorted(observations)
+        for item in sorted(observations[key], key=lambda entry: (entry.source, entry.key, entry.proposed_path or ""))
+    ]
+    payload = json.dumps(evidence, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
-    """Report-only admission evidence for the currently bounded Forgejo scope."""
+    """Return evidence-bound admission for the complete bounded importer scope."""
     observations: dict[str, list[FieldObservation]] = {key: [] for key in RUNTIME_IMPORTER_SCOPE}
     for item in report.observations:
         if item.key in observations:
@@ -1174,7 +1192,11 @@ def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
         "invalid": invalid,
         "conflicts": conflicts,
         "reasons": reasons,
+        "evidence_digest": _runtime_admission_digest(observations),
     }
+
+
+_compute_runtime_importer_admission = runtime_importer_admission
 
 
 def provider_references(report: DiscoveryReport) -> list[dict[str, Any]]:
@@ -1299,6 +1321,9 @@ def build_candidate_site(
         raise DiscoveryError("canonical candidate is not safe: review conflicts and unmapped legacy fields")
     if not runtime_importer_admission or not runtime_importer_admission.get("admitted", False):
         raise DiscoveryError("canonical candidate is blocked: runtime importer admission is incomplete")
+    actual_admission = _compute_runtime_importer_admission(report)
+    if runtime_importer_admission.get("evidence_digest") != actual_admission["evidence_digest"]:
+        raise DiscoveryError("canonical candidate is blocked: importer admission is not bound to this report")
     if not isinstance(base_document, dict) or base_document.get("schema_version") != 1:
         raise DiscoveryError("candidate base document must be a canonical schema_version 1 mapping")
     candidate = copy.deepcopy(base_document)
