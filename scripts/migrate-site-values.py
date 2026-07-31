@@ -12,7 +12,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from values_context import SITE_NAME_RE
-from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy
+from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, runtime_importer_admission
 
 
 class SiteMigrationError(ValueError):
@@ -211,6 +211,7 @@ def migrate(
                 report,
                 base_document=_load_candidate_base(canonical_base),
                 site_name=site,
+                runtime_importer_admission=runtime_importer_admission(report),
             )
         except (DiscoveryError, OSError, SiteMigrationError) as error:
             raise SiteMigrationError(f"canonical candidate generation blocked: {error}") from error
