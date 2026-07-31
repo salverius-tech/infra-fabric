@@ -1386,6 +1386,62 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "non-empty string"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_admits_hermes_tuning_and_web_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_compression_threshold: 0.8\n"
+                "    hermes_max_concurrent_children: 4\n"
+                "    hermes_max_spawn_depth: 2\n"
+                "    hermes_web_searxng_url: https://searxng.example.internal\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "hermes_compression_threshold": "services.hermes.configuration.tuning.compression_threshold",
+            "hermes_max_concurrent_children": "services.hermes.configuration.tuning.max_concurrent_children",
+            "hermes_max_spawn_depth": "services.hermes.configuration.tuning.max_spawn_depth",
+            "hermes_web_searxng_url": "services.hermes.configuration.web.searxng_url",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertEqual(observations[("hermes_web_searxng_url", "mapped")].value, "https://searxng.example.internal")
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_invalid_hermes_tuning(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_max_spawn_depth: 4\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "outside its canonical range"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
+    def test_bounded_ansible_importer_rejects_hermes_web_credentials(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_web_searxng_url: https://user:password@searxng.example.internal\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTP\\(S\\) URL without credentials"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_runner_labels(self) -> None:
         temp, values = self.make_values()
         with temp:

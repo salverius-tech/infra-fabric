@@ -639,6 +639,31 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
                 raise DiscoveryError(f"bounded Ansible {key} must be an HTTP(S) URL without credentials")
         elif key in {
+            "hermes_compression_threshold",
+            "hermes_max_concurrent_children",
+            "hermes_max_spawn_depth",
+        }:
+            bounds = {
+                "hermes_compression_threshold": (0.5, 0.95),
+                "hermes_max_concurrent_children": (1, 10),
+                "hermes_max_spawn_depth": (1, 3),
+            }
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not bounds[key][0] <= value <= bounds[key][1]
+                or (key != "hermes_compression_threshold" and not isinstance(value, int))
+            ):
+                raise DiscoveryError(f"bounded Ansible {key} is outside its canonical range")
+        elif key == "hermes_web_searxng_url":
+            from urllib.parse import urlsplit
+
+            if not isinstance(value, str):
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTP(S) URL without credentials")
+            parsed = urlsplit(value)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTP(S) URL without credentials")
+        elif key in {
             "hermes_control_domain",
             "hermes_control_api_host",
             "hermes_control_plugin_socket",
