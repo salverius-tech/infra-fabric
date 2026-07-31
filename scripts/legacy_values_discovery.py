@@ -456,6 +456,12 @@ def _ansible_dynamic_reference(value: Any) -> str | None:
     return match.group(1) if match else None
 
 
+def _ansible_provider_reference(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    match = re.fullmatch(r"\{\{\s*lookup\(\s*'env'\s*,\s*'([A-Za-z_][A-Za-z0-9_]*)'\s*\)\s*\}\}", value.strip())
+    return match.group(1) if match else None
+
 def _resolve_ansible_dynamic_reference(
     key: str, variables: dict[str, Any]
 ) -> tuple[tuple[str, ...], str]:
@@ -623,14 +629,19 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
         if isinstance(value, str) and ("{{" in value or "{%" in value):
-            dynamic_reference = _ansible_dynamic_reference(value)
+            provider_reference = _ansible_provider_reference(value)
+            dynamic_reference = provider_reference or _ansible_dynamic_reference(value)
             dynamic_chain, dynamic_resolution = _resolve_ansible_dynamic_reference(key, variables)
+            if provider_reference is not None:
+                dynamic_chain = (key, provider_reference)
+                dynamic_resolution = "provider"
             secret = key.upper() in migration.SECRET_KEYS or key.upper() in migration.GENERATED_SECRET_KEYS
+            classification = "secret" if secret else "provider" if provider_reference else "unsupported"
             report.observations.append(
                 FieldObservation(
                     source,
                     key,
-                    "secret" if secret else "unsupported",
+                    classification,
                     None,
                     "dynamic-expression",
                     "<redacted>" if secret else None,

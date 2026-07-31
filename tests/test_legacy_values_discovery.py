@@ -69,6 +69,10 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             if item.key in dynamic_secrets:
                 self.assertEqual(item.classification, "secret")
                 self.assertEqual(item.value, "<redacted>")
+        provider = next(item for item in report.observations if item.key == "forgejo_bootstrap_admin_email")
+        self.assertEqual(provider.classification, "provider")
+        self.assertEqual(provider.dynamic_reference, "FORGEJO_ADMIN_EMAIL")
+        self.assertEqual(provider.dynamic_resolution, "provider")
 
     def test_bounded_public_ansible_importer_admits_forgejo_domain_only(self) -> None:
         temp, values = self.make_values()
