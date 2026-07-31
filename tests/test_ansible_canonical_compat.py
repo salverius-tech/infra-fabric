@@ -176,7 +176,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "services.hermes.secrets.dashboard_basic_auth_secret",
             },
         )
-        self.assertEqual(mapping["hermes_runtime_passwordless_sudo"], "resource.security.allow_passwordless_sudo")
+        self.assertEqual(mapping["hermes_runtime_passwordless_sudo"], "resources.guests.hermes.security.allow_passwordless_sudo")
 
         self.assertEqual(mapping["hermes_discovery_tag"], "release.tag")
         self.assertEqual(mapping["hermes_discovery_commit"], "release.commit")

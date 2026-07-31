@@ -13,8 +13,11 @@ import ast
 import json
 import re
 import sys
+import types
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Union, get_args, get_origin
+
+from pydantic import BaseModel
 
 
 VARIABLE_RE = re.compile(r'^variable\s+"([^"]+)"', re.MULTILINE)
@@ -236,6 +239,86 @@ def load_mapping_matrix(path: Path) -> dict[str, Any]:
         "row_count": len(rows),
         "rows": rows,
         "status": "semantic-coverage-incomplete",
+    }
+
+
+def _unwrap_model_type(annotation: Any) -> Any:
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin in (types.UnionType, Union):
+        non_none = [arg for arg in args if arg is not type(None)]
+        return non_none[0] if len(non_none) == 1 else annotation
+    if origin is Annotated:
+        return args[0]
+    if origin is dict and len(args) == 2:
+        return args[1]
+    if origin is list and len(args) == 1:
+        return args[0]
+    return annotation
+
+
+def resolve_model_path(path: str) -> bool:
+    """Return whether a non-secret canonical path exists in the Pydantic model."""
+    import canonical_values
+
+    configuration_models = {
+        "forgejo": canonical_values.ForgejoConfiguration,
+        "forgejo_runner": canonical_values.ForgejoRunnerConfiguration,
+        "hermes": canonical_values.HermesConfiguration,
+        "infisical": canonical_values.InfisicalConfiguration,
+        "searxng_onramp": canonical_values.SearxngConfiguration,
+        "tailscale_client": canonical_values.TailscaleConfiguration,
+        "technitium": canonical_values.TechnitiumConfiguration,
+    }
+    current: Any = canonical_values.CanonicalSite
+    mapping_key = False
+    segments = iter(path.split("."))
+    for segment in segments:
+        if mapping_key:
+            mapping_key = False
+            continue
+        if segment.isdigit():
+            continue
+        if current is canonical_values.Service and segment in configuration_models:
+            continue
+        if current is canonical_values.Resource and segment not in current.model_fields:
+            continue
+        if current is canonical_values.Service and segment == "resource":
+            current = canonical_values.Resource
+            continue
+        if not isinstance(current, type) or not issubclass(current, BaseModel):
+            return False
+        field = current.model_fields.get(segment)
+        if field is None:
+            return False
+        field_origin = get_origin(field.annotation)
+        current = _unwrap_model_type(field.annotation)
+        mapping_key = field_origin is dict
+        if segment == "configuration":
+            service = path.split(".")[1]
+            current = configuration_models.get(service)
+            mapping_key = False
+            if current is None:
+                return False
+    return True
+
+
+def catalog_path_coverage(catalog_path: Path, catalog: dict[str, Any]) -> dict[str, Any]:
+    """Validate every catalog Ansible canonical owner against the canonical model."""
+    valid: list[dict[str, str]] = []
+    invalid: list[dict[str, str]] = []
+    for service in catalog["services"]:
+        raw = json.loads(catalog_path.read_text(encoding="utf-8"))["services"][service["name"]]
+        for legacy_key, relative_path in raw.get("inventory", {}).get("canonical_play_vars", {}).items():
+            path = relative_path if relative_path.startswith(("services.", "resources.")) else f"services.{service['name']}.{relative_path}"
+            item = {"service": service["name"], "legacy_key": legacy_key, "canonical_path": path}
+            (valid if resolve_model_path(path) else invalid).append(item)
+    return {
+        "checked_count": len(valid) + len(invalid),
+        "valid_count": len(valid),
+        "invalid_count": len(invalid),
+        "invalid": invalid,
+        "status": "complete" if not invalid else "review-required",
     }
 
 
@@ -548,6 +631,7 @@ def build_report(repo: Path) -> dict[str, Any]:
     candidate_readiness["candidate_generation_allowed"] = False
     candidate_readiness["reasons"].append("semantic mapping is incomplete")
     catalog_contract = _catalog_contract(repo / "infra/services.json")
+    canonical_path_coverage = catalog_path_coverage(repo / "infra/services.json", catalog)
     consumer_contract = load_consumer_contract(repo)
     return {
         "schema": 1,
@@ -560,6 +644,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         },
         "service_catalog": catalog,
         "service_contracts": catalog_contract,
+        "canonical_path_coverage": canonical_path_coverage,
         "mapping_matrix": matrix,
         "matrix_coverage": matrix_coverage,
         "deferred_classification": deferred,

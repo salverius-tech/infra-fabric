@@ -55,6 +55,8 @@ def _resource(model: CanonicalSite, name: str) -> Any:
 
 def _path_value(value: Any, path: str) -> Any:
     for part in path.split("."):
+        if value is None:
+            return None
         if isinstance(value, Mapping):
             if part not in value:
                 raise ProjectionError(f"canonical projection path does not exist: {path}")
@@ -71,7 +73,35 @@ def _path_value(value: Any, path: str) -> Any:
     return value
 
 
-def _compatibility_value(service: Any, resource: Any, path: str) -> Any:
+def _compatibility_value(
+    model_or_service: CanonicalSite | Any,
+    service_or_resource: Any,
+    resource_or_path: Any,
+    path: str | None = None,
+) -> Any:
+    if path is None:
+        model = None
+        service = model_or_service
+        resource = service_or_resource
+        path = resource_or_path
+    else:
+        model = model_or_service
+        service = service_or_resource
+        resource = resource_or_path
+    assert isinstance(path, str)
+    if path.startswith("resources."):
+        if model is not None:
+            try:
+                return _path_value(model, path)
+            except ProjectionError:
+                parts = path.split(".")
+                if len(parts) >= 4 and parts[1] in {"guests", "shared_hosts"}:
+                    return _path_value(resource, ".".join(parts[3:]))
+                raise
+        parts = path.split(".")
+        if len(parts) >= 4 and parts[1] in {"guests", "shared_hosts"}:
+            return _path_value(resource, ".".join(parts[3:]))
+        raise ProjectionError(f"canonical projection path requires a model: {path}")
     if path.startswith("resource."):
         return _path_value(resource, path.removeprefix("resource."))
     return _path_value(service, path)
@@ -252,7 +282,7 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                     raise ProjectionError(f"invalid canonical compatibility mapping for service {name}")
                 if name == "forgejo" and legacy_name == "forgejo_ssh_port" and "ssh" not in service.endpoints.protocols:
                     continue
-                value = _compatibility_value(service, resource, canonical_path)
+                value = _compatibility_value(model, service, resource, canonical_path)
                 if value is not None:
                     legacy_vars[legacy_name] = value
         if name == "technitium":

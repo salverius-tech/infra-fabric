@@ -269,7 +269,7 @@
           "hermes_control_api_port": "configuration.control.api_port",
           "hermes_control_require_task_approval": "configuration.control.require_task_approval",
           "hermes_control_plugin_socket": "configuration.control.plugin_socket",
-          "hermes_runtime_passwordless_sudo": "resource.security.allow_passwordless_sudo",
+          "hermes_runtime_passwordless_sudo": "resources.guests.hermes.security.allow_passwordless_sudo",
           "hermes_allow_legacy_runtime": "configuration.allow_legacy_runtime",
           "hermes_compression_threshold": "configuration.tuning.compression_threshold",
           "hermes_max_concurrent_children": "configuration.tuning.max_concurrent_children",
@@ -308,12 +308,12 @@
         "domain_var": "onramp_host_hostname",
         "tf_domain": "onramp_host_hostname",
         "canonical_play_vars": {
-          "onramp_host_password_authentication": "security.password_authentication",
-          "onramp_host_permit_root_login": "security.permit_root_login",
-          "onramp_host_deploy_user": "security.deploy_user",
-          "onramp_host_deploy_dir": "security.deploy_dir",
-          "onramp_host_allow_passwordless_sudo": "security.allow_passwordless_sudo",
-          "onramp_host_allowed_ssh_cidrs": "security.allowed_ssh_cidrs"
+          "onramp_host_password_authentication": "resources.shared_hosts.onramp_host.security.password_authentication",
+          "onramp_host_permit_root_login": "resources.shared_hosts.onramp_host.security.permit_root_login",
+          "onramp_host_deploy_user": "resources.shared_hosts.onramp_host.security.deploy_user",
+          "onramp_host_deploy_dir": "resources.shared_hosts.onramp_host.security.deploy_dir",
+          "onramp_host_allow_passwordless_sudo": "resources.shared_hosts.onramp_host.security.allow_passwordless_sudo",
+          "onramp_host_allowed_ssh_cidrs": "resources.shared_hosts.onramp_host.security.allowed_ssh_cidrs"
         },
         "user_var": "onramp_host_deploy_user",
         "tf_user": "onramp_host_deploy_user",

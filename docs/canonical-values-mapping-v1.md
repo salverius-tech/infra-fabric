@@ -361,7 +361,7 @@ The top-level DNS JSON shapes are now owned by `platform.dns`: `settings` maps t
 
 Technitium release inputs `technitium_discovery_version` and `technitium_portable_sha256` remain unmatched until the service catalog declares a Technitium release contract and a reviewed Ansible adapter projects canonical version/checksum fields to the role’s flattened variables.
 
-Onramp host security/SSH inputs `onramp_host_ssh_public_keys`, `onramp_host_password_authentication`, `onramp_host_permit_root_login`, `onramp_host_deploy_user`, `onramp_host_deploy_dir`, `onramp_host_allow_passwordless_sudo`, and `onramp_host_allowed_ssh_cidrs` remain unmatched until a field-level canonical security model and non-opaque Ansible projection contract exist. The generic provider-key fallback remains outside this public mapping slice.
+Onramp host security/SSH inputs `onramp_host_ssh_public_keys`, `onramp_host_password_authentication`, `onramp_host_permit_root_login`, `onramp_host_deploy_user`, `onramp_host_deploy_dir`, `onramp_host_allow_passwordless_sudo`, and `onramp_host_allowed_ssh_cidrs` now resolve to the canonical `resources.shared_hosts.onramp_host.security` owner. Secret delivery and consumer cutover remain separately gated.
 
 
 `FORGEJO_UPSTREAM` is retired historical input: migration removes it from generated dotenv output, but it has no canonical owner. A future custom Forgejo mirror feature would require an explicit artifact URL, checksum/signature, and source allowlist contract; it is intentionally not represented by the current canonical model.
