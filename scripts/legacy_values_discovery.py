@@ -578,6 +578,19 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key in {"tailscale_client_up_args", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
+        elif key == "infisical_data_dir":
+            data_path: PurePosixPath | None = PurePosixPath(value) if isinstance(value, str) else None
+            if data_path is None or not value.startswith("/") or ".." in data_path.parts:
+                raise DiscoveryError(f"bounded Ansible {key} must be a normalized absolute POSIX path")
+        elif key in {"infisical_postgres_user", "infisical_postgres_db"}:
+            if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a PostgreSQL identifier")
+        elif key == "infisical_domain":
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
+                raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
+        elif key == "infisical_version":
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
         elif key == "forgejo_runner_url":
             from urllib.parse import urlsplit
 

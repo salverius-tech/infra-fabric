@@ -1550,6 +1550,24 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTPS URL without credentials"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_rejects_invalid_infisical_metadata(self) -> None:
+        invalid_values = {
+            "infisical_data_dir": "../var/lib/infisical",
+            "infisical_postgres_user": "infisical-user",
+            "infisical_postgres_db": "infisical-db",
+            "infisical_domain": "bad_domain.example.internal",
+        }
+        for key, invalid_value in invalid_values.items():
+            with self.subTest(key=key):
+                temp, values = self.make_values()
+                with temp:
+                    repo = Path(temp.name) / "repo"
+                    inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+                    inventory.parent.mkdir(parents=True)
+                    inventory.write_text(f"all:\n  vars:\n    {key}: {invalid_value}\n", encoding="utf-8")
+                    with self.assertRaises(legacy_values_discovery.DiscoveryError):
+                        legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_caddy_ingress_boundary(self) -> None:
         temp, values = self.make_values()
         with temp:
