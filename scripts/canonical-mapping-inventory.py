@@ -350,20 +350,36 @@ def matrix_path_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
 
 
 def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
-    """Report exact generated-consumer tokens not found in implementation surfaces."""
+    """Report exact and renderer-backed evidence for generated consumer fields."""
     files: list[Path] = []
     for root in (repo / "infra", repo / "scripts"):
         files.extend(path for path in root.rglob("*") if path.is_file() and path.suffix in {".py", ".tf", ".sh", ".yml", ".yaml", ".json"})
     corpus = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in files)
-    checked: list[dict[str, str]] = []
+    dynamic_rules = (
+        (re.compile(r"^(?:technitium|forgejo|forgejo_runner|infisical|hermes|tailscale_client|onramp_host)_container_"), "canonical_projections._resource_variables"),
+        (re.compile(r"^service_storage\."), "canonical_projections._resource_variables"),
+        (re.compile(r"^dns-records\.json\."), "canonical_projections.render_dns_records"),
+        (re.compile(r"^platform\.images\."), "canonical_projections.render_opentofu_variables"),
+        (re.compile(r"^(?:[a-z0-9_]+)_server_name$|^(?:[a-z0-9_]+)_public_url$"), "canonical_projections.render_opentofu_variables"),
+    )
+    exact: list[dict[str, str]] = []
+    dynamic: list[dict[str, str]] = []
     missing: list[dict[str, str]] = []
     for row in matrix["rows"]:
         for token in re.findall(r"`([^`]+)`", row["Generated consumer field(s)"]):
             item = {"canonical_path": row["Canonical path"], "consumer_token": token}
-            (checked if token in corpus else missing).append(item)
+            if token in corpus:
+                exact.append(item)
+                continue
+            evidence = next((owner for pattern, owner in dynamic_rules if pattern.search(token)), None)
+            if evidence and evidence.split(".")[-1] in corpus:
+                dynamic.append({**item, "evidence": evidence})
+            else:
+                missing.append(item)
     return {
-        "token_count": len(checked) + len(missing),
-        "exact_evidence_count": len(checked),
+        "token_count": len(exact) + len(dynamic) + len(missing),
+        "exact_evidence_count": len(exact),
+        "dynamic_evidence_count": len(dynamic),
         "missing_exact_evidence_count": len(missing),
         "missing_exact_evidence": missing,
         "status": "complete" if not missing else "review-required",
