@@ -53,6 +53,9 @@ class SiteMigrationTests(unittest.TestCase):
             backup = values.parent / ".migration-backups" / "dev"
             self.assertTrue((backup / "manifest.json").is_file())
             self.assertTrue((backup / "tree" / ".env").is_file())
+            dotenv_operation = next(item for item in manifest["operations"] if item["source"] == ".env")
+            self.assertTrue(dotenv_operation["source_sha256"])
+            self.assertEqual(dotenv_operation["source_sha256"], dotenv_operation["destination_sha256"])
             self.assertEqual(manifest["canonical_destination"], "sites/dev")
             self.assertEqual(
                 {item["disposition"] for item in manifest["operations"]},

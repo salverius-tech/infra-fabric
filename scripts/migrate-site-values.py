@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import sys
@@ -46,8 +47,15 @@ def artifact_disposition(relative: Path) -> tuple[str, str]:
     return "operational-artifact", "private migration/recovery workflow"
 
 
-def migration_manifest(site: str, items: list[tuple[Path, Path]], values_root: Path, backup_id: str | None = None) -> dict[str, Any]:
-    operations: list[dict[str, str]] = []
+def migration_manifest(
+    site: str,
+    items: list[tuple[Path, Path]],
+    values_root: Path,
+    backup_id: str | None = None,
+    backup_manifest: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    source_hashes = {entry["path"]: entry["sha256"] for entry in (backup_manifest or {}).get("entries", [])}
+    operations: list[dict[str, Any]] = []
     for source, destination in items:
         relative = source.relative_to(values_root)
         disposition, owner = artifact_disposition(relative)
@@ -59,6 +67,8 @@ def migration_manifest(site: str, items: list[tuple[Path, Path]], values_root: P
                 "owner": owner,
                 "action": "move-for-compatibility",
                 "rollback": "restore-from-private-backup",
+                "source_sha256": source_hashes.get(relative.as_posix()),
+                "destination_sha256": None,
             }
         )
     if (values_root.parent / "settings.local.json").is_file():
@@ -70,6 +80,8 @@ def migration_manifest(site: str, items: list[tuple[Path, Path]], values_root: P
                 "owner": "private operator/workspace configuration",
                 "action": "remove-services-after-migration",
                 "rollback": "restore-from-private-backup",
+                "source_sha256": None,
+                "destination_sha256": None,
             }
         )
     return {
@@ -308,8 +320,9 @@ def migrate(
 
     backup_output = values_root.parent / ".migration-backups" / site
     backup_id: str | None = None
+    created_backup_manifest: dict[str, Any] | None = None
     try:
-        create_backup(values_root, backup_paths, backup_output)
+        created_backup_manifest = create_backup(values_root, backup_paths, backup_output)
         backup_id = backup_output.name
         actions.insert(0, f"create and verify private backup {backup_id}")
     except (BackupManifestError, OSError) as error:
@@ -320,7 +333,7 @@ def migrate(
     try:
         (target / "site.json").write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (target / "migration-manifest.json").write_text(
-            json.dumps(migration_manifest(site, items, values_root, backup_id), indent=2, sort_keys=True) + "\n",
+            json.dumps(migration_manifest(site, items, values_root, backup_id, created_backup_manifest), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         if candidate is not None:
@@ -329,6 +342,15 @@ def migrate(
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(source), str(destination))
             moved.append((source, destination))
+        finalized_manifest = migration_manifest(site, items, values_root, backup_id, created_backup_manifest)
+        for operation in finalized_manifest["operations"]:
+            destination = values_root / operation["destination"]
+            if destination.is_file() and not destination.is_symlink():
+                operation["destination_sha256"] = hashlib.sha256(destination.read_bytes()).hexdigest()
+        (target / "migration-manifest.json").write_text(
+            json.dumps(finalized_manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         remove_services_from_root_settings(repo)
     except Exception as error:
         try:
