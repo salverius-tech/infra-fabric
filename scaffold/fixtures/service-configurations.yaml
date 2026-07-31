@@ -11,8 +11,7 @@ services:
   infisical:
     configuration: {}
   infisical_onramp:
-    resource_owned:
-      owner: resources.shared_hosts.onramp_host
+    configuration: {}
   onramp_host:
     resource_owned:
       owner: resources.shared_hosts.onramp_host

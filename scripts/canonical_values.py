@@ -673,6 +673,75 @@ class InfisicalConfiguration(StrictModel):
     postgres_db: StrictStr | None = None
 
 
+class InfisicalOnrampConfiguration(StrictModel):
+    """Typed non-secret Infisical onramp deployment settings."""
+
+    base_dir: StrictStr | None = None
+    container_port: StrictInt | None = None
+    bind_address: StrictStr | None = None
+    compose_provider_command: StrictStr | None = None
+    version: StrictStr | None = None
+    postgres_user: StrictStr | None = None
+    postgres_db: StrictStr | None = None
+    required_packages: list[StrictStr] = Field(default_factory=list)
+
+    @field_validator("container_port")
+    @classmethod
+    def validate_container_port(cls, value: int | None) -> int | None:
+        if value is not None and not 1 <= value <= 65535:
+            raise ValueError("Infisical onramp container_port must be between 1 and 65535")
+        return value
+
+    @field_validator("bind_address")
+    @classmethod
+    def validate_bind_address(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError as error:
+                raise ValueError("Infisical onramp bind_address must be an IP address") from error
+            if not address.is_loopback:
+                raise ValueError("Infisical onramp bind_address must be loopback-only")
+        return value
+
+    @field_validator("base_dir")
+    @classmethod
+    def validate_base_dir(cls, value: str | None) -> str | None:
+        if value is not None:
+            path = PurePosixPath(value)
+            if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+                raise ValueError("Infisical onramp base_dir must be a normalized absolute POSIX path")
+        return value
+
+    @field_validator("compose_provider_command")
+    @classmethod
+    def validate_compose_command(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"[A-Za-z0-9_.-]+", value):
+            raise ValueError("Infisical onramp compose_provider_command must be a simple executable name")
+        return value
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str | None) -> str | None:
+        if value is not None and (not value.strip() or any(char.isspace() for char in value)):
+            raise ValueError("Infisical onramp version must be a non-whitespace image tag or digest")
+        return value
+
+    @field_validator("postgres_user", "postgres_db")
+    @classmethod
+    def validate_postgres_identifier(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+            raise ValueError("Infisical onramp PostgreSQL identifiers must be SQL identifiers")
+        return value
+
+    @field_validator("required_packages")
+    @classmethod
+    def validate_required_packages(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)) or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9+_.-]*", item) for item in value):
+            raise ValueError("Infisical onramp required_packages must be unique package identifiers")
+        return value
+
+
 class ForgejoConfiguration(StrictModel):
     """Typed non-secret Forgejo role configuration."""
 
@@ -961,15 +1030,12 @@ SERVICE_CONFIGURATION_MODELS: dict[str, type[StrictModel]] = {
     "forgejo_runner": ForgejoRunnerConfiguration,
     "hermes": HermesConfiguration,
     "infisical": InfisicalConfiguration,
+    "infisical_onramp": InfisicalOnrampConfiguration,
     "searxng_onramp": SearxngConfiguration,
     "tailscale_client": TailscaleConfiguration,
     "technitium": TechnitiumConfiguration,
 }
 SERVICE_CONFIGURATION_EXEMPTIONS = {
-    "infisical_onramp": {
-        "owner": "resources.shared_hosts.onramp_host",
-        "reason": "onramp deployment boundary owns runtime configuration",
-    },
     "onramp_host": {
         "owner": "resources.shared_hosts.onramp_host",
         "reason": "shared-host resource owns security and runtime configuration",
@@ -1089,6 +1155,14 @@ class CanonicalSite(StrictModel):
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
                 raise ValueError(f"services.infisical.configuration: {details}") from error
+        infisical_onramp = self.services.get("infisical_onramp")
+        if infisical_onramp is not None:
+            try:
+                configuration = InfisicalOnrampConfiguration.model_validate(infisical_onramp.configuration)
+                infisical_onramp.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.infisical_onramp.configuration: {details}") from error
         forgejo = self.services.get("forgejo")
         if forgejo is not None:
             try:

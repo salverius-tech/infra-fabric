@@ -15,7 +15,7 @@ from atomic_output import atomic_output_directory
 from pydantic import ValidationError
 
 import canonical_values
-from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, ServiceEndpoints, ServiceRelease, SearxngConfiguration, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
+from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, InfisicalOnrampConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, ServiceEndpoints, ServiceRelease, SearxngConfiguration, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
     render_ansible_inventory,
@@ -98,22 +98,46 @@ class CanonicalValuesTests(unittest.TestCase):
     def test_service_configuration_registry_covers_typed_services(self) -> None:
         self.assertEqual(
             set(canonical_values.SERVICE_CONFIGURATION_MODELS),
-            {"forgejo", "forgejo_runner", "hermes", "infisical", "searxng_onramp", "tailscale_client", "technitium"},
+            {"forgejo", "forgejo_runner", "hermes", "infisical", "infisical_onramp", "searxng_onramp", "tailscale_client", "technitium"},
         )
         for name, model in canonical_values.SERVICE_CONFIGURATION_MODELS.items():
             with self.subTest(service=name):
                 with self.assertRaises(ValidationError):
                     model.model_validate({"unknown_field": True})
 
-    def test_service_configuration_contract_covers_entire_catalog(self) -> None:
+    def test_infisical_onramp_configuration_validates_deployment_contract(self) -> None:
+        configuration = InfisicalOnrampConfiguration.model_validate(
+            {
+                "base_dir": "/srv/infisical",
+                "container_port": 8081,
+                "bind_address": "127.0.0.1",
+                "compose_provider_command": "podman-compose",
+                "version": "v1.2.3",
+                "postgres_user": "infisical",
+                "postgres_db": "infisical",
+                "required_packages": ["podman", "curl"],
+            }
+        )
+        self.assertEqual(configuration.container_port, 8081)
+        for field, value in (
+            ("base_dir", "../infisical"),
+            ("bind_address", "0.0.0.0"),
+            ("compose_provider_command", "podman compose"),
+            ("postgres_user", "bad-user"),
+            ("required_packages", ["podman", "podman"]),
+        ):
+            with self.subTest(field=field):
+                with self.assertRaises(ValidationError):
+                    InfisicalOnrampConfiguration.model_validate({field: value})
+
         catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
         contract = canonical_values.service_configuration_contract(
             set(catalog.names),
             {name: catalog.get(name).configuration_schema for name in catalog.names},
         )
         self.assertEqual(set(contract), set(catalog.names))
-        self.assertEqual(contract["infisical_onramp"]["kind"], "resource-owned")
-        self.assertEqual(contract["infisical_onramp"]["owner"], "resources.shared_hosts.onramp_host")
+        self.assertEqual(contract["infisical_onramp"]["kind"], "typed-model")
+        self.assertEqual(contract["infisical_onramp"]["model"], "InfisicalOnrampConfiguration")
         self.assertEqual(contract["onramp_host"]["kind"], "resource-owned")
         self.assertEqual(contract["forgejo"]["kind"], "typed-model")
         with self.assertRaises(CanonicalValuesError):

@@ -201,7 +201,7 @@
     },
     "infisical_onramp": {
       "state_capable": true,
-      "configuration_schema": null,
+      "configuration_schema": "InfisicalOnrampConfiguration",
       "release_sources": [],
       "allowed_override_namespaces": [],
       "required_fields": ["resource"],
