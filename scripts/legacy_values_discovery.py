@@ -11,7 +11,7 @@ import ipaddress
 import json
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -531,6 +531,8 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "hermes_max_spawn_depth",
         "hermes_web_searxng_url",
         "hermes_control_enabled",
+        "HERMES_CONTROL_SOURCE_URL",
+        "HERMES_CONTROL_SOURCE_REF",
         "hermes_control_domain",
         "hermes_control_api_host",
         "hermes_control_api_port",
@@ -638,6 +640,35 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             parsed = urlsplit(value)
             if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
                 raise DiscoveryError(f"bounded Ansible {key} must be an HTTP(S) URL without credentials")
+        elif key == "HERMES_CONTROL_SOURCE_URL":
+            from urllib.parse import urlsplit
+
+            if not isinstance(value, str):
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials or fragments")
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials or fragments")
+        elif key == "HERMES_CONTROL_SOURCE_REF":
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40}", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a lowercase 40-character commit")
+        elif key == "hermes_domain":
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
+                raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
+        elif key == "hermes_runtime_user":
+            if not isinstance(value, str) or value == "root" or not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-root Linux user identifier")
+        elif key == "hermes_repo_path":
+            repo_path: PurePosixPath | None = PurePosixPath(value) if isinstance(value, str) else None
+            if (
+                repo_path is None
+                or not value.startswith("/")
+                or value != str(repo_path)
+                or any(part in {"", ".", ".."} for part in repo_path.parts)
+            ):
+                raise DiscoveryError(f"bounded Ansible {key} must be a normalized absolute POSIX path")
+        elif key == "hermes_control_enabled":
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
         elif key in {"hermes_runtime_passwordless_sudo", "hermes_allow_legacy_runtime"}:
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
@@ -666,40 +697,60 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             parsed = urlsplit(value)
             if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
                 raise DiscoveryError(f"bounded Ansible {key} must be an HTTP(S) URL without credentials")
-        elif key in {
-            "hermes_control_domain",
-            "hermes_control_api_host",
-            "hermes_control_plugin_socket",
-        }:
+        elif key == "hermes_control_domain":
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
+                raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
+        elif key == "hermes_control_api_host":
+            if value != "127.0.0.1":
+                raise DiscoveryError(f"bounded Ansible {key} must be 127.0.0.1")
+        elif key == "hermes_control_plugin_socket":
+            socket_path: PurePosixPath | None = PurePosixPath(value) if isinstance(value, str) else None
+            if (
+                socket_path is None
+                or not value.startswith("/")
+                or value != str(socket_path)
+                or any(part in {"", ".", ".."} for part in socket_path.parts)
+            ):
+                raise DiscoveryError(f"bounded Ansible {key} must be a normalized absolute POSIX path")
+        elif key in {"hermes_control_domain", "hermes_control_api_host", "hermes_control_plugin_socket"}:
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
         elif key == "hermes_control_api_port":
             if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 65535:
                 raise DiscoveryError(f"bounded Ansible {key} must be between 1 and 65535")
         elif key == "hermes_control_require_task_approval":
-            if not isinstance(value, bool):
-                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+            if value is not True:
+                raise DiscoveryError(f"bounded Ansible {key} must be true")
         elif key == "hermes_dashboard_enabled":
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
         elif key == "hermes_dashboard_port":
             if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 65535:
                 raise DiscoveryError(f"bounded Ansible {key} must be between 1 and 65535")
-        elif key in {"hermes_dashboard_host", "hermes_dashboard_basic_auth_username"}:
+        elif key == "hermes_dashboard_host":
+            if value not in {"127.0.0.1", "::1", "localhost"}:
+                raise DiscoveryError(f"bounded Ansible {key} must be loopback-only")
+        elif key == "hermes_dashboard_basic_auth_username":
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
         elif key == "hermes_node_version":
-            if not isinstance(value, str) or not value.strip():
-                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty version")
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a strict semantic version")
         elif key in {"hermes_node_sha256_amd64", "hermes_node_sha256_arm64"}:
-            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value):
-                raise DiscoveryError(f"bounded Ansible {key} must be a 64-character SHA-256 digest")
-        elif key in {"hermes_discovery_version", "hermes_discovery_tag", "hermes_discovery_commit"}:
-            if not isinstance(value, str) or not value.strip():
-                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty release identifier")
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a lowercase 64-character SHA-256 digest")
+        elif key == "hermes_discovery_version":
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a strict semantic version")
+        elif key == "hermes_discovery_tag":
+            if not isinstance(value, str) or not re.fullmatch(r"v[0-9]{4}\.[0-9]+\.[0-9]+(?:\.[0-9]+)?", value):
+                raise DiscoveryError(f"bounded Ansible {key} must use the managed Hermes release-tag form")
+        elif key == "hermes_discovery_commit":
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40}", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a lowercase 40-character commit")
         elif key == "hermes_discovery_wheel_sha256":
-            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value):
-                raise DiscoveryError(f"bounded Ansible {key} must be a 64-character SHA-256 digest")
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a lowercase 64-character SHA-256 digest")
         elif key == "technitium_discovery_version":
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty version")

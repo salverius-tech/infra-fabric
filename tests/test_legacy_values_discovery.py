@@ -1298,7 +1298,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 "    hermes_discovery_tag: '   '\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "non-empty release identifier"):
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "managed Hermes release-tag form"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
     def test_bounded_ansible_importer_rejects_malformed_hermes_node_metadata(self) -> None:
@@ -1326,7 +1326,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 "    hermes_node_version: '   '\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "non-empty version"):
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "strict semantic version"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
     def test_bounded_ansible_importer_rejects_invalid_hermes_dashboard_metadata(self) -> None:
@@ -1355,7 +1355,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 "    hermes_dashboard_host: '   '\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "non-empty string"):
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "loopback-only"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
     def test_bounded_ansible_importer_rejects_invalid_hermes_control_metadata(self) -> None:
@@ -1383,7 +1383,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 "    hermes_control_plugin_socket: '   '\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "non-empty string"):
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "normalized absolute POSIX path"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
     def test_bounded_ansible_importer_admits_hermes_tuning_and_web_metadata(self) -> None:
@@ -1454,6 +1454,53 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "must be boolean"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
+    def test_bounded_ansible_importer_admits_hermes_remaining_contract_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            commit = "e" * 40
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_domain: hermes.example.internal\n"
+                "    hermes_runtime_user: hermes\n"
+                "    hermes_repo_path: /opt/hermes\n"
+                "    HERMES_CONTROL_SOURCE_URL: https://github.com/example/hermes\n"
+                f"    HERMES_CONTROL_SOURCE_REF: {commit}\n"
+                "    hermes_control_enabled: true\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "hermes_domain": "services.hermes.endpoints.public_names",
+            "hermes_runtime_user": "services.hermes.configuration.runtime_user",
+            "hermes_repo_path": "services.hermes.configuration.repository_path",
+            "HERMES_CONTROL_SOURCE_URL": "services.hermes.configuration.control.source_url",
+            "HERMES_CONTROL_SOURCE_REF": "services.hermes.configuration.control.source_ref",
+            "hermes_control_enabled": "services.hermes.configuration.control.enabled",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertEqual(observations[("HERMES_CONTROL_SOURCE_REF", "mapped")].value, commit)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_hermes_contract_boundary_values(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    HERMES_CONTROL_SOURCE_REF: main\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "lowercase 40-character commit"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
     def test_bounded_ansible_importer_admits_forgejo_runner_labels(self) -> None:
