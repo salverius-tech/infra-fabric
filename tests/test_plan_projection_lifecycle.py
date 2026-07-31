@@ -37,6 +37,13 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertIn('INFRA_EQUIVALENCE_BEFORE_JSON', content)
         self.assertIn('tofu -chdir=infra/opentofu show -json', content)
         self.assertIn('scripts/report-plan-equivalence.py', content)
+        apply_content = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
+        validate_content = (ROOT / "scripts" / "validate-values.sh").read_text(encoding="utf-8")
+        self.assertIn('apply-ansible-services.py', apply_content)
+        for consumer_content in (apply_content, validate_content):
+            self.assertIn('ansible_inventory="${INFRA_VALUES_DIR}/ansible/inventory/local.yml"', consumer_content)
+            self.assertIn('ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"', consumer_content)
+            self.assertIn('"${ansible_inventory}"', consumer_content)
         self.assertIn('Plan equivalence review failed', content)
         self.assertIn('rm -f "${equivalence_after_json}"', content)
         self.assertNotIn('cleanup_equivalence_json', content)

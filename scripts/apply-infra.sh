@@ -57,6 +57,11 @@ python scripts/tfplan-metadata.py verify \
   "${verify_args[@]}"
 python scripts/tfplan-metadata.py summary --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json"
 python scripts/settings.py summary
+ansible_inventory="${INFRA_VALUES_DIR}/ansible/inventory/local.yml"
+if [[ -f "${INFRA_VALUES_DIR}/generated/manifest.json" && -f "${INFRA_VALUES_DIR}/generated/ansible-inventory.json" ]]; then
+  ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
+fi
+
 storage_vars_args=()
 if [[ -n "${target_service}" ]]; then
   storage_vars_args+=(--service "${target_service}")
@@ -66,7 +71,7 @@ python scripts/guest-mount-feature-vars.py --summary
 
 guest_mount_feature_vars="$(python scripts/guest-mount-feature-vars.py)"
 ansible-playbook \
-  -i "${INFRA_VALUES_DIR}/ansible/inventory/local.yml" \
+  -i "${ansible_inventory}" \
   -i infra/ansible/inventory/tfvars.py \
   -e "${guest_mount_feature_vars}" \
   infra/ansible/playbooks/guest-mount-feature-preflight.yml
@@ -80,7 +85,7 @@ trap cleanup_plan_artifacts EXIT
 storage_vars="$(python scripts/storage-vars.py "${storage_vars_args[@]}")"
 if python -c "import json, sys; raise SystemExit(0 if json.loads(sys.argv[1]).get(\"storage_bind_mounts\") else 1)" "${storage_vars}"; then
   ansible-playbook \
-    -i "${INFRA_VALUES_DIR}/ansible/inventory/local.yml" \
+    -i "${ansible_inventory}" \
     -i infra/ansible/inventory/tfvars.py \
     -e "${storage_vars}" \
     infra/ansible/playbooks/storage-prep.yml
@@ -109,7 +114,7 @@ if [[ -n "${target_service}" ]]; then
   ansible_service_args+=(--service "${target_service}")
 fi
 python scripts/apply-ansible-services.py \
-  --inventory "${INFRA_VALUES_DIR}/ansible/inventory/local.yml" \
+  --inventory "${ansible_inventory}" \
   --inventory infra/ansible/inventory/tfvars.py \
   --env-file "${INFRA_VALUES_DIR}/.env" \
   "${ansible_service_args[@]}"
