@@ -1233,6 +1233,46 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTP\\(S\\) URL without credentials"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_admits_technitium_release_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            digest = "a" * 64
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    technitium_discovery_version: 13.2.1\n"
+                f"    technitium_portable_sha256: {digest}\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("technitium_discovery_version", "mapped")].proposed_path,
+            "services.technitium.release.version",
+        )
+        self.assertEqual(
+            observations[("technitium_portable_sha256", "mapped")].proposed_path,
+            "services.technitium.release.checksum",
+        )
+        self.assertEqual(observations[("technitium_portable_sha256", "mapped")].value, digest)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_malformed_technitium_digest(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    technitium_portable_sha256: not-a-digest\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "64-character SHA-256 digest"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_runner_labels(self) -> None:
         temp, values = self.make_values()
         with temp:
