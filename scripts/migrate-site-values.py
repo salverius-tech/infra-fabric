@@ -30,6 +30,13 @@ MIGRATED_FILES = (
     Path("backups"),
     Path("artifacts"),
 )
+SENSITIVE_MIGRATION_ROOTS = {
+    Path("ansible/known_hosts"),
+    Path("terraform.tfstate"),
+    Path("terraform.tfstate.backup"),
+    Path("backups"),
+    Path("service-backups"),
+}
 GENERATED_PROJECTIONS = {Path(".env"), Path("terraform.tfvars"), Path("dns-records.local.json"), Path("ansible/inventory/local.yml")}
 
 
@@ -136,6 +143,13 @@ def site_artifact_inventory(target: Path) -> list[dict[str, str]]:
                 if child.is_file() and not child.is_symlink():
                     inventory.append({"path": child.relative_to(target).as_posix(), "kind": kind, "type": "file"})
     return inventory
+def sensitive_migration_paths(items: list[tuple[Path, Path]], values_root: Path) -> list[str]:
+    paths: list[str] = []
+    for source, _ in items:
+        relative = source.relative_to(values_root)
+        if relative in SENSITIVE_MIGRATION_ROOTS:
+            paths.append(relative.as_posix())
+    return paths
 def inspect_existing_site(target: Path, site: str, metadata: dict[str, Any]) -> list[str]:
     site_json = target / "site.json"
     manifest_json = target / "migration-manifest.json"
@@ -246,6 +260,7 @@ def migrate(
     allow_destroy: bool,
     apply: bool,
     canonical_base: Path | None = None,
+    allow_sensitive_artifacts: bool = False,
 ) -> list[str]:
     metadata = site_metadata(repo, site, site_class, lifecycle, allow_apply, allow_destroy)
     target = values_root / "sites" / site
@@ -254,6 +269,11 @@ def migrate(
             raise SiteMigrationError("site must be a simple site identifier")
         return inspect_existing_site(target, site, metadata)
     target, items = validate_request(values_root, site, metadata)
+    sensitive_paths = sensitive_migration_paths(items, values_root)
+    if (site_class == "development" or lifecycle == "disposable") and sensitive_paths and not allow_sensitive_artifacts:
+        raise SiteMigrationError(
+            "development migration refuses sensitive artifacts without explicit opt-in: " + ", ".join(sensitive_paths)
+        )
     backup_paths = [source.relative_to(values_root).as_posix() for source, _ in items]
     try:
         backup_manifest = build_manifest(values_root, expand_backup_paths(values_root, backup_paths))
@@ -318,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--class", dest="site_class", default=None)
     parser.add_argument("--lifecycle", default=None)
     parser.add_argument("--allow-destroy", action="store_true")
+    parser.add_argument("--allow-sensitive-artifacts", action="store_true", help="allow state, backups, and known-hosts in a development migration")
     parser.add_argument("--canonical-base", type=Path, help="approved canonical YAML base for explicit candidate generation")
     parser.add_argument("--apply", action="store_true", help="perform the migration; default is dry-run")
     args = parser.parse_args(argv)
@@ -340,6 +361,7 @@ def main(argv: list[str] | None = None) -> int:
             allow_destroy,
             args.apply,
             args.canonical_base,
+            args.allow_sensitive_artifacts,
         )
     except (OSError, SiteMigrationError, json.JSONDecodeError) as error:
         print(f"site migration failed: {error}", file=sys.stderr)

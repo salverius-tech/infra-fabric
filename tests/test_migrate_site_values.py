@@ -68,11 +68,21 @@ class SiteMigrationTests(unittest.TestCase):
                 path = values / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("private artifact", encoding="utf-8")
-            migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, True)
+            migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, True, None, True)
             site = values / "sites" / "dev"
             for relative in ("plans/plan.txt", "backups/archive.tgz", "artifacts/debug.log"):
                 self.assertTrue((site / relative).is_file())
                 self.assertFalse((values / relative).exists())
+
+    def test_development_migration_refuses_sensitive_artifacts_without_opt_in(self) -> None:
+        temp, values = self.make_legacy_values()
+        with temp:
+            (values / "backups").mkdir()
+            (values / "backups" / "prod.tgz").write_text("backup", encoding="utf-8")
+            with self.assertRaisesRegex(migration.SiteMigrationError, "sensitive artifacts"):
+                migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, False)
+            self.assertFalse((values / "sites" / "dev").exists())
+            self.assertTrue((values / "backups" / "prod.tgz").exists())
 
     def test_interrupted_move_is_rolled_back(self) -> None:
         temp, values = self.make_legacy_values()
