@@ -880,6 +880,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key == "hermes_discovery_wheel_sha256":
             if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a lowercase 64-character SHA-256 digest")
+        elif key == "technitium_admin_user":
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a Linux user identifier")
         elif key == "technitium_discovery_version":
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty version")

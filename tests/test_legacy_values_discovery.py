@@ -1569,6 +1569,16 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                     with self.assertRaises(legacy_values_discovery.DiscoveryError):
                         legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_rejects_invalid_technitium_admin_user(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text("all:\n  vars:\n    technitium_admin_user: Admin.User\n", encoding="utf-8")
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "Linux user identifier"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_tailscale_policy_boundary(self) -> None:
         temp, values = self.make_values()
         with temp:
