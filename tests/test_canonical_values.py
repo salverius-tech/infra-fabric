@@ -117,6 +117,25 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(CanonicalValuesError):
             canonical_values.service_configuration_contract(set(catalog.names) - {"technitium"})
 
+    def test_public_service_configuration_fixture_matches_registry(self) -> None:
+        fixture = Path(__file__).resolve().parents[1] / "scaffold" / "fixtures" / "service-configurations.yaml"
+        yaml = canonical_values.YAML(typ="safe")
+        document = yaml.load(fixture.read_text(encoding="utf-8"))
+        self.assertIsInstance(document, dict)
+        services = document["services"]
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        contract = canonical_values.service_configuration_contract(set(catalog.names))
+        self.assertEqual(set(services), set(contract))
+        for name, entry in services.items():
+            with self.subTest(service=name):
+                self.assertIsInstance(entry, dict)
+                if contract[name]["kind"] == "typed-model":
+                    self.assertIn("configuration", entry)
+                    model = canonical_values.SERVICE_CONFIGURATION_MODELS[name]
+                    model.model_validate(entry["configuration"])
+                else:
+                    self.assertEqual(entry["resource_owned"]["owner"], contract[name]["owner"])
+
     def test_ssh_protocol_materializes_default_port(self) -> None:
         endpoints = ServiceEndpoints.model_validate({"protocols": ["https", "ssh"]})
         self.assertEqual(endpoints.ports["ssh"], 22)

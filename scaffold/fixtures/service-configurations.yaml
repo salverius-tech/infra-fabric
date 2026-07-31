@@ -1,0 +1,24 @@
+# Public-safe configuration fixture corpus.
+# Empty mappings intentionally exercise model defaults; service-specific behavior
+# belongs in the typed model tests and must not be inferred from this fixture.
+services:
+  forgejo:
+    configuration: {}
+  forgejo_runner:
+    configuration: {}
+  hermes:
+    configuration: {}
+  infisical:
+    configuration: {}
+  infisical_onramp:
+    resource_owned:
+      owner: resources.shared_hosts.onramp_host
+  onramp_host:
+    resource_owned:
+      owner: resources.shared_hosts.onramp_host
+  searxng_onramp:
+    configuration: {}
+  tailscale_client:
+    configuration: {}
+  technitium:
+    configuration: {}
