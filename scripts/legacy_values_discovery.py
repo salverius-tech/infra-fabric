@@ -565,7 +565,17 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
-        if key in {"tailscale_client_up_args", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers", "caddy_server_names"}:
+        if key == "caddy_server_name":
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
+                raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
+        elif key == "caddy_server_names":
+            normalized = [item.lower().rstrip(".") for item in value] if isinstance(value, list) and all(isinstance(item, str) for item in value) else []
+            if not normalized or any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", item) for item in normalized) or len(normalized) != len(set(normalized)):
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty list of unique hostnames")
+        elif key == "caddy_email":
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
+        elif key in {"tailscale_client_up_args", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
         elif key == "forgejo_runner_url":

@@ -1550,6 +1550,51 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTPS URL without credentials"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_admits_caddy_ingress_boundary(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    caddy_email: admin@example.internal\n"
+                "    caddy_server_name: dns.example.internal\n"
+                "    caddy_server_names: [dns.example.internal, app.example.internal]\n"
+                "    caddy_upstream: 127.0.0.1:5380\n"
+                "    caddy_extra_vhosts:\n"
+                "      - server_names: [app.example.internal]\n"
+                "        upstream: 127.0.0.1:8080\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "caddy_email": "platform.ingress.acme.email",
+            "caddy_server_name": "services.technitium.configuration.caddy.server_names",
+            "caddy_server_names": "services.technitium.configuration.caddy.server_names",
+            "caddy_upstream": "services.technitium.configuration.caddy.upstream",
+            "caddy_extra_vhosts": "services.technitium.configuration.caddy.extra_vhosts",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_invalid_caddy_server_names(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    caddy_server_names: [Example.Internal, example.internal]\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "unique hostnames"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_service_boundary(self) -> None:
         temp, values = self.make_values()
         with temp:
