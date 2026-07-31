@@ -30,6 +30,22 @@ def _path_value(value: Any, path: str) -> Any:
     return value
 
 
+def _service_required_field_value(service: object, field: str, resources: Any | None) -> object:
+    if not field.startswith("resource."):
+        return _path_value(service, field)
+    if resources is None:
+        return None
+    resource_name = getattr(service, "resource", None)
+    resource_map = {
+        **getattr(resources, "guests", {}),
+        **getattr(resources, "shared_hosts", {}),
+    }
+    resource = resource_map.get(resource_name)
+    if resource is None:
+        return None
+    return _path_value(resource, field.removeprefix("resource."))
+
+
 def _required_field_missing(field: str, value: object) -> bool:
     if field == "state.capable":
         return value is not True
@@ -181,7 +197,7 @@ class ServiceCatalog:
                 continue
             capability = self.get(name)
             for field in capability.required_fields:
-                value = _path_value(service, field)
+                value = _service_required_field_value(service, field, resources)
                 report.append(
                     {
                         "service": name,

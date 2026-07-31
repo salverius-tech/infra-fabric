@@ -204,7 +204,7 @@
       "configuration_schema": "InfisicalOnrampConfiguration",
       "release_sources": [],
       "allowed_override_namespaces": [],
-      "required_fields": ["resource", "state.capable"],
+      "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
       "state_order": 5,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["
@@ -322,7 +322,7 @@
       "configuration_schema": "ResourceOwnedConfiguration",
       "release_sources": [],
       "allowed_override_namespaces": [],
-      "required_fields": ["resource", "state.capable"],
+      "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
       "state_order": 4,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["
@@ -365,7 +365,7 @@
       "configuration_schema": "SearxngConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
-      "required_fields": ["resource", "state.capable"],
+      "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
       "state_order": 6,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["

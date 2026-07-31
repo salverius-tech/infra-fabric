@@ -49,6 +49,30 @@ class ServiceCatalogTests(unittest.TestCase):
             ),
         )
 
+    def test_resource_owned_required_fields_resolve_against_selected_resource(self) -> None:
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        service = SimpleNamespace(
+            enabled=True,
+            resource="onramp-host",
+            state=SimpleNamespace(capable=True),
+        )
+        complete = SimpleNamespace(
+            shared_hosts={
+                "onramp-host": SimpleNamespace(
+                    security=SimpleNamespace(deploy_user="operator", deploy_dir="/srv")
+                )
+            },
+            guests={},
+        )
+        report = catalog.required_field_report_for_model({"onramp_host": service}, complete)
+        self.assertTrue(all(entry["present"] for entry in report))
+        incomplete = SimpleNamespace(
+            shared_hosts={"onramp-host": SimpleNamespace(security=SimpleNamespace(deploy_user="operator"))},
+            guests={},
+        )
+        report = catalog.required_field_report_for_model({"onramp_host": service}, incomplete)
+        self.assertFalse(report[-1]["present"])
+
     def test_required_secret_paths_follow_enabled_services(self) -> None:
         catalog = load_catalog(
             self.write_catalog(
