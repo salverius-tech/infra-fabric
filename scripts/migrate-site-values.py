@@ -12,6 +12,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from values_context import SITE_NAME_RE
+from migration_backup import BackupManifestError, build_manifest, expand_backup_paths
 from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, runtime_importer_admission
 
 
@@ -220,9 +221,18 @@ def migrate(
             raise SiteMigrationError("site must be a simple site identifier")
         return inspect_existing_site(target, site, metadata)
     target, items = validate_request(values_root, site, metadata)
+    backup_paths = [source.relative_to(values_root).as_posix() for source, _ in items]
+    try:
+        backup_manifest = build_manifest(values_root, expand_backup_paths(values_root, backup_paths))
+    except BackupManifestError as error:
+        raise SiteMigrationError(f"migration backup preflight failed: {error}") from error
     settings_path = repo / "settings.local.json"
     original_settings = settings_path.read_bytes() if settings_path.is_file() else None
-    actions = [f"create {target}/site.json", f"create {target}/migration-manifest.json"]
+    actions = [
+        f"preflight private backup manifest for {len(backup_manifest['entries'])} files",
+        f"create {target}/site.json",
+        f"create {target}/migration-manifest.json",
+    ]
     candidate: dict[str, Any] | None = None
     if canonical_base is not None:
         try:
