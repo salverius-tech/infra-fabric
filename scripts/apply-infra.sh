@@ -63,7 +63,7 @@ canonical_ansible_args=()
 if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
     if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
-      printf 'Canonical site exists but generated projection is missing: %s. Run just plan again.\n' "${required_projection}" >&2
+      printf "%s\n" "Canonical site exists but generated projection is missing: ${required_projection}. Run just plan again." >&2
       exit 1
     fi
   done

@@ -970,8 +970,8 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 "    onramp_host_deploy_dir: /srv/onramp\n"
                 "    onramp_host_allow_passwordless_sudo: true\n"
                 "    onramp_host_allowed_ssh_cidrs:\n"
-                "      - 10.0.0.0/8\n"
-                "      - 192.168.0.0/16\n",
+                "      - 198.51.100.0/24\n"
+                "      - 203.0.113.0/24\n",
                 encoding="utf-8",
             )
             report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
@@ -989,7 +989,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
         self.assertEqual(
             observations[("onramp_host_allowed_ssh_cidrs", "mapped")].value,
-            ["10.0.0.0/8", "192.168.0.0/16"],
+            ["198.51.100.0/24", "203.0.113.0/24"],
         )
         self.assertFalse(report.candidate_ready)
 
@@ -2042,7 +2042,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 "    forgejo_runner_label: linux-amd64\n"
                 "    forgejo_runner_labels: [linux-amd64, docker]\n"
                 "    forgejo_runner_hosts:\n"
-                "      - {name: runner-1, address: 10.0.0.10}\n",
+                "      - {name: runner-1, address: 203.0.113.10}\n",
                 encoding="utf-8",
             )
             report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)

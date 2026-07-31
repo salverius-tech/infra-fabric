@@ -75,7 +75,7 @@ canonical_site=false
 if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
     if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
-      printf 'Canonical site exists but generated projection is missing: %s. Render projections before planning.\n' "${required_projection}" >&2
+      printf "%s\n" "Canonical site exists but generated projection is missing: ${required_projection}. Render projections before planning." >&2
       exit 1
     fi
   done
@@ -136,7 +136,7 @@ if [[ -n "${INFRA_EQUIVALENCE_BEFORE_JSON:-}" ]]; then
   equivalence_after_json="$(mktemp "${INFRA_VALUES_DIR}/.tfplan-equivalence.XXXXXX.json")"
   tofu -chdir=infra/opentofu show -json ../../${INFRA_VALUES_DIR}/tfplan > "${equivalence_after_json}"
   if ! python scripts/report-plan-equivalence.py "${INFRA_EQUIVALENCE_BEFORE_JSON}" "${equivalence_after_json}"; then
-    printf 'Plan equivalence review failed; inspect the redacted report before proceeding.\\n' >&2
+    printf "%s\n" "Plan equivalence review failed; inspect the redacted report before proceeding." >&2
     exit 1
   fi
 fi

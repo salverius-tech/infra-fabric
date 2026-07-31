@@ -35,7 +35,7 @@ VALID_DISPOSITIONS = {
     "unsupported-review",
 }
 NON_CANONICAL_MAPPING_DISPOSITIONS = {"generated-projection", "operational-artifact", "retired-input"}
-PROTECTED_SECRET_CONTRACTS = [
+PROTECTED_CONTRACTS = [
     {
         "canonical_path": "secrets.bootstrap.technitium.root_password",
         "owner": "resources.guests.technitium",
@@ -878,7 +878,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "candidate_generation": candidate_readiness,
         "runtime_importer_contract": runtime_importer_contract,
         "candidate_projection": candidate_projection,
-        "protected_secret_contracts": PROTECTED_SECRET_CONTRACTS,
+        "protected_secret_contracts": PROTECTED_CONTRACTS,
         "consumer_contract": consumer_contract,
         "source_inventory": source_inventory,
         "source_inputs": source_inputs,

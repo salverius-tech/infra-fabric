@@ -77,7 +77,7 @@ ENV_TO_INVENTORY = {
     "FORGEJO_ENABLE_CADDY": "forgejo_enable_caddy",
 }
 HISTORICAL_ENV_KEYS = ("FORGEJO_SERVER_NAME", "FORGEJO_UPSTREAM")
-UNSCOPED_SECRET_ENV_KEYS = (
+UNSCOPED_ENV_KEYS = (
     "TF_VAR_container_root_password",
     "TF_VAR_container_ssh_public_keys",
 )
@@ -101,7 +101,7 @@ TECHNITIUM_TFVARS_RENAMES = {
 
 MIGRATION_ENV_KEYS = {
     "TF_VAR_technitium_api_token",
-    *UNSCOPED_SECRET_ENV_KEYS,
+    *UNSCOPED_ENV_KEYS,
     "TECHNITIUM_API_TOKEN",
     "TECHNITIUM_API_URL",
     "DNS_RECORDS_FILE",
@@ -848,7 +848,7 @@ def enabled_optional_services(values_dir: Path) -> set[str]:
 
 
 def reject_unscoped_secret_aliases(env_entries: dict[str, EnvEntry], tfvars_lines: list[str]) -> None:
-    present = [key for key in UNSCOPED_SECRET_ENV_KEYS if key in env_entries]
+    present = [key for key in UNSCOPED_ENV_KEYS if key in env_entries]
     for key in ("container_root_password", "container_ssh_public_keys"):
         for line in tfvars_lines:
             match = TFVARS_LINE_RE.match(line)
