@@ -105,7 +105,42 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observation.value_type, "dynamic-expression")
         self.assertEqual(observation.dynamic_reference, "inventory_hostname")
         self.assertFalse(observation.dynamic_reference_available)
+        self.assertEqual(observation.dynamic_reference_chain, ("forgejo_domain", "inventory_hostname"))
+        self.assertEqual(observation.dynamic_resolution, "missing")
         self.assertIsNone(observation.value)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_reports_resolved_dynamic_chain_without_admitting_it(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    forgejo_domain: '{{ forgejo_root_url }}'\n    forgejo_root_url: 'https://forgejo.example.internal'\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observation = next(item for item in report.observations if item.key == "forgejo_domain")
+        self.assertEqual(observation.dynamic_reference_chain, ("forgejo_domain", "forgejo_root_url"))
+        self.assertEqual(observation.dynamic_resolution, "resolved")
+        self.assertTrue(observation.dynamic_reference_available)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_reports_dynamic_reference_cycles(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    forgejo_domain: '{{ forgejo_root_url }}'\n    forgejo_root_url: '{{ forgejo_domain }}'\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observation = next(item for item in report.observations if item.key == "forgejo_domain")
+        self.assertEqual(observation.dynamic_reference_chain, ("forgejo_domain", "forgejo_root_url", "forgejo_domain"))
+        self.assertEqual(observation.dynamic_resolution, "cycle")
         self.assertFalse(report.candidate_ready)
 
     def test_bounded_ansible_importer_admits_technitium_release_fields(self) -> None:

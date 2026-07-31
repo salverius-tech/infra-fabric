@@ -29,6 +29,8 @@ class FieldObservation:
     value: Any = None
     dynamic_reference: str | None = None
     dynamic_reference_available: bool | None = None
+    dynamic_reference_chain: tuple[str, ...] = ()
+    dynamic_resolution: str | None = None
 
 
 @dataclass
@@ -453,6 +455,27 @@ def _ansible_dynamic_reference(value: Any) -> str | None:
     return match.group(1) if match else None
 
 
+def _resolve_ansible_dynamic_reference(
+    key: str, variables: dict[str, Any]
+) -> tuple[tuple[str, ...], str]:
+    chain = [key]
+    current = key
+    seen = {key}
+    while True:
+        reference = _ansible_dynamic_reference(variables.get(current))
+        if reference is None:
+            if current not in variables:
+                return tuple(chain), "missing"
+            return tuple(chain), "resolved"
+        if reference in seen:
+            return tuple(chain + [reference]), "cycle"
+        chain.append(reference)
+        seen.add(reference)
+        if reference not in variables:
+            return tuple(chain), "missing"
+        current = reference
+
+
 def _ansible_value_type(value: Any) -> str:
     if isinstance(value, str) and ("{{" in value or "{%" in value):
         return "dynamic-expression"
@@ -591,6 +614,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         value = variables[key]
         if isinstance(value, str) and ("{{" in value or "{%" in value):
             dynamic_reference = _ansible_dynamic_reference(value)
+            dynamic_chain, dynamic_resolution = _resolve_ansible_dynamic_reference(key, variables)
             report.observations.append(
                 FieldObservation(
                     source,
@@ -601,6 +625,8 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                     None,
                     dynamic_reference,
                     dynamic_reference in variables if dynamic_reference else None,
+                    dynamic_chain,
+                    dynamic_resolution,
                 )
             )
             continue
