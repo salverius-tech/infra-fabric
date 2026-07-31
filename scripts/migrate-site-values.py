@@ -26,8 +26,10 @@ MIGRATED_FILES = (
     Path("dns-records.local.json"),
     Path("ansible/inventory/local.yml"),
     Path("ansible/known_hosts"),
+    Path("plans"),
+    Path("backups"),
+    Path("artifacts"),
 )
-
 GENERATED_PROJECTIONS = {Path(".env"), Path("terraform.tfvars"), Path("dns-records.local.json"), Path("ansible/inventory/local.yml")}
 
 
@@ -97,7 +99,7 @@ def migration_items(values_root: Path, target: Path) -> list[tuple[Path, Path]]:
     items: list[tuple[Path, Path]] = []
     for relative in MIGRATED_FILES:
         source = values_root / relative
-        if source.is_file():
+        if source.is_file() or source.is_dir():
             items.append((source, target / relative))
     for source in sorted(values_root.glob("terraform.tfstate*")):
         if source.is_file():

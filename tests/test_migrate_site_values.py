@@ -61,6 +61,19 @@ class SiteMigrationTests(unittest.TestCase):
             self.assertFalse((values / "terraform.tfvars").exists())
             self.assertNotIn("services", json.loads((values.parent / "settings.local.json").read_text()))
 
+    def test_apply_moves_private_plans_backups_and_artifacts(self) -> None:
+        temp, values = self.make_legacy_values()
+        with temp:
+            for relative in ("plans/plan.txt", "backups/archive.tgz", "artifacts/debug.log"):
+                path = values / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("private artifact", encoding="utf-8")
+            migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, True)
+            site = values / "sites" / "dev"
+            for relative in ("plans/plan.txt", "backups/archive.tgz", "artifacts/debug.log"):
+                self.assertTrue((site / relative).is_file())
+                self.assertFalse((values / relative).exists())
+
     def test_interrupted_move_is_rolled_back(self) -> None:
         temp, values = self.make_legacy_values()
         with temp:

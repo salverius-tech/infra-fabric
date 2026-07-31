@@ -51,8 +51,8 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(first_evidence["status"], "complete")
         self.assertTrue(first_evidence["exact"][0]["references"])
         self.assertTrue(all(reference["file"] and reference["lines"] for reference in first_evidence["exact"][0]["references"]))
-        self.assertEqual(report["source_reconciliation"]["source_identity_count"], 378)
-        self.assertEqual(report["source_reconciliation"]["accounted_identity_count"], 378)
+        self.assertEqual(report["source_reconciliation"]["source_identity_count"], 381)
+        self.assertEqual(report["source_reconciliation"]["accounted_identity_count"], 381)
         self.assertEqual(report["source_reconciliation"]["missing"], [])
         self.assertEqual(report["source_reconciliation"]["unexpected"], [])
         self.assertEqual(report["source_reconciliation"]["reasons"], [])
@@ -63,8 +63,8 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertGreater(report["source_inventory"]["scaffold"]["terraform_assignment_count"], 0)
         self.assertIn("a_records", report["source_inventory"]["scaffold"]["dns"]["top_level_keys"])
         self.assertIn("tf_vmid", report["source_inventory"]["ansible"]["inventory_fields"])
-        self.assertEqual(report["source_inputs"]["input_count"], 378)
-        self.assertEqual(report["source_inputs"]["unique_identities"], 378)
+        self.assertEqual(report["source_inputs"]["input_count"], 381)
+        self.assertEqual(report["source_inputs"]["unique_identities"], 381)
         self.assertEqual(
             set(report["source_inputs"]["disposition_counts"]),
             {"ansible-only", "deprecated", "generated-projection", "operational-artifact", "retired-input", "unsupported"},
@@ -73,8 +73,8 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(report["mapping_matrix"]["row_count"], 307)
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-complete")
         self.assertEqual(report["matrix_coverage"]["input_count"], 368)
-        self.assertEqual(report["matrix_coverage"]["source_input_count"], 378)
-        self.assertEqual(report["matrix_coverage"]["excluded_count"], 10)
+        self.assertEqual(report["matrix_coverage"]["source_input_count"], 381)
+        self.assertEqual(report["matrix_coverage"]["excluded_count"], 13)
         self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 368)
         self.assertEqual(report["matrix_coverage"]["matched_count"], 368)
         self.assertEqual(report["matrix_coverage"]["unmatched_count"], 0)
