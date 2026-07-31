@@ -251,6 +251,8 @@ def _normalize_caddy_extra_vhosts(value: Any) -> list[dict[str, Any]]:
         normalized_names = [name.lower().rstrip(".") for name in names]
         if any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", name) for name in normalized_names):
             raise DiscoveryError("bounded Ansible caddy_extra_vhosts server_names must be hostnames")
+        if len(normalized_names) != len(set(normalized_names)):
+            raise DiscoveryError("bounded Ansible caddy_extra_vhosts server_names must be unique")
         if seen_names & set(normalized_names):
             raise DiscoveryError("bounded Ansible caddy_extra_vhosts server_names must be unique")
         seen_names.update(normalized_names)
