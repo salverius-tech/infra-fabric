@@ -259,7 +259,11 @@ def _unwrap_model_type(annotation: Any) -> Any:
 
 def resolve_model_path(path: str) -> bool:
     """Return whether a non-secret canonical path exists in the Pydantic model."""
-    import canonical_values
+    try:
+        import canonical_values
+    except ModuleNotFoundError:  # pragma: no cover - direct import from another cwd
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import canonical_values
 
     configuration_models = canonical_values.SERVICE_CONFIGURATION_MODELS
     current: Any = canonical_values.CanonicalSite
@@ -371,11 +375,15 @@ def source_reconciliation_gate(source_inputs: dict[str, Any], matrix_coverage: d
 
 
 def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
-    """Report exact and renderer-backed evidence for generated consumer fields."""
+    """Report row-level consumer references, not token presence alone."""
     files: list[Path] = []
     for root in (repo / "infra", repo / "scripts"):
         files.extend(path for path in root.rglob("*") if path.is_file() and path.suffix in {".py", ".tf", ".sh", ".yml", ".yaml", ".json"})
-    corpus = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in files)
+    contents = {
+        path: path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        for path in files
+    }
+    corpus = "\n".join("\n".join(lines) for lines in contents.values())
     dynamic_rules = (
         (re.compile(r"^(?:technitium|forgejo|forgejo_runner|infisical|hermes|tailscale_client|onramp_host)_container_"), "canonical_projections._resource_variables"),
         (re.compile(r"^service_storage\."), "canonical_projections._resource_variables"),
@@ -383,26 +391,55 @@ def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
         (re.compile(r"^platform\.images\."), "canonical_projections.render_opentofu_variables"),
         (re.compile(r"^(?:[a-z0-9_]+)_server_name$|^(?:[a-z0-9_]+)_public_url$"), "canonical_projections.render_opentofu_variables"),
     )
-    exact: list[dict[str, str]] = []
-    dynamic: list[dict[str, str]] = []
+    exact: list[dict[str, Any]] = []
+    dynamic: list[dict[str, Any]] = []
     missing: list[dict[str, str]] = []
+    row_evidence: list[dict[str, Any]] = []
+    rows_with_tokens = 0
     for row in matrix["rows"]:
+        row_exact: list[dict[str, Any]] = []
+        row_dynamic: list[dict[str, Any]] = []
+        row_missing: list[dict[str, str]] = []
         for token in re.findall(r"`([^`]+)`", row["Generated consumer field(s)"]):
             item = {"canonical_path": row["Canonical path"], "consumer_token": token}
-            if token in corpus:
-                exact.append(item)
+            references = [
+                {"file": str(path.relative_to(repo)), "lines": [index + 1 for index, line in enumerate(lines) if token in line]}
+                for path, lines in contents.items()
+                if any(token in line for line in lines)
+            ]
+            if references:
+                evidence = {**item, "references": references}
+                exact.append(evidence)
+                row_exact.append(evidence)
                 continue
-            evidence = next((owner for pattern, owner in dynamic_rules if pattern.search(token)), None)
-            if evidence and evidence.split(".")[-1] in corpus:
-                dynamic.append({**item, "evidence": evidence})
+            owner = next((owner for pattern, owner in dynamic_rules if pattern.search(token)), None)
+            if owner and owner.split(".")[-1] in corpus:
+                evidence = {**item, "evidence": owner}
+                dynamic.append(evidence)
+                row_dynamic.append(evidence)
             else:
                 missing.append(item)
+                row_missing.append(item)
+        if row_exact or row_dynamic or row_missing:
+            rows_with_tokens += 1
+            row_evidence.append({
+                "canonical_path": row["Canonical path"],
+                "exact": row_exact,
+                "dynamic": row_dynamic,
+                "missing": row_missing,
+                "status": "complete" if not row_missing else "review-required",
+            })
     return {
         "token_count": len(exact) + len(dynamic) + len(missing),
         "exact_evidence_count": len(exact),
         "dynamic_evidence_count": len(dynamic),
         "missing_exact_evidence_count": len(missing),
         "missing_exact_evidence": missing,
+        "row_count": rows_with_tokens,
+        "evidenced_row_count": sum(item["status"] == "complete" for item in row_evidence),
+        "rows_without_evidence": [item["canonical_path"] for item in row_evidence if item["status"] != "complete"],
+        "row_evidence": row_evidence,
+        "semantic_status": "complete" if not missing else "review-required",
         "status": "complete" if not missing else "review-required",
     }
 
