@@ -71,7 +71,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         )
         self.assertEqual(report["source_inputs"]["status"], "classification-complete-with-review-dispositions")
         self.assertEqual(report["mapping_matrix"]["row_count"], 307)
-        self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-incomplete")
+        self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-complete")
         self.assertEqual(report["matrix_coverage"]["input_count"], 368)
         self.assertEqual(report["matrix_coverage"]["source_input_count"], 378)
         self.assertEqual(report["matrix_coverage"]["excluded_count"], 10)
@@ -394,11 +394,11 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertTrue(report["consumer_contract"]["legacy_terraform_input_present"])
         self.assertTrue(report["consumer_contract"]["legacy_static_inventory_present"])
         self.assertEqual(report["classification"]["inventory_status"], "complete")
-        self.assertEqual(report["classification"]["semantic_mapping_status"], "incomplete")
+        self.assertEqual(report["classification"]["semantic_mapping_status"], "semantic-coverage-complete")
         self.assertEqual(report["classification"]["consumer_cutover_status"], "deferred")
-        self.assertEqual(report["candidate_generation"]["status"], "blocked")
-        self.assertFalse(report["candidate_generation"]["candidate_generation_allowed"])
-        self.assertIn("semantic mapping is incomplete", report["candidate_generation"]["reasons"])
+        self.assertEqual(report["candidate_generation"]["status"], "ready")
+        self.assertTrue(report["candidate_generation"]["candidate_generation_allowed"])
+        self.assertEqual(report["candidate_generation"]["reasons"], [])
         aliases = report["legacy_alias_classification"]["ambiguous_resource_aliases"]
         self.assertEqual(len(aliases), 0)
         self.assertTrue(all(item["classification"] == "ambiguous" for item in aliases))
@@ -426,17 +426,17 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
                 for item in report["matrix_coverage"]["matched"]
             ],
         )
-        self.assertFalse(report["candidate_generation"]["candidate_generation_allowed"])
-        self.assertIn("semantic mapping is incomplete", report["candidate_generation"]["reasons"])
+        self.assertTrue(report["candidate_generation"]["candidate_generation_allowed"])
+        self.assertEqual(report["candidate_generation"]["reasons"], [])
 
         families = {item["family"] for item in report["opentofu"]["variables"]}
         self.assertIn("provider", families)
         self.assertIn("shared_onramp_resource", families)
         self.assertIn("searxng_service", families)
 
-    def test_consumer_cutover_remains_blocked_until_semantic_equivalence_is_ready(self) -> None:
+    def test_consumer_cutover_remains_deferred_after_semantic_equivalence_is_ready(self) -> None:
         report = MODULE.build_report(ROOT)
-        self.assertEqual(report["classification"]["semantic_mapping_status"], "incomplete")
+        self.assertEqual(report["classification"]["semantic_mapping_status"], "semantic-coverage-complete")
         self.assertEqual(report["consumer_contract"]["cutover_status"], "deferred")
         self.assertTrue(report["consumer_contract"]["legacy_terraform_input_present"])
         self.assertTrue(report["consumer_contract"]["legacy_static_inventory_present"])

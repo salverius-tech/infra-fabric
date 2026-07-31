@@ -805,12 +805,14 @@ def build_report(repo: Path) -> dict[str, Any]:
     matrix_path_status = matrix_path_coverage(matrix)
     matrix_classification_status = matrix_classification_coverage(matrix)
     consumer_evidence_status = consumer_evidence(repo, matrix)
+    if all(
+        status["status"] == "complete"
+        for status in (source_reconciliation, matrix_path_status, matrix_classification_status, consumer_evidence_status)
+    ) and matrix_coverage["status"] == "complete":
+        matrix["status"] = "semantic-coverage-complete"
     deferred = deferred_classification(matrix_coverage)
     alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
     candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
-    candidate_readiness["status"] = "blocked"
-    candidate_readiness["candidate_generation_allowed"] = False
-    candidate_readiness["reasons"].append("semantic mapping is incomplete")
     catalog_contract = _catalog_contract(repo / "infra/services.json")
     canonical_path_coverage = catalog_path_coverage(repo / "infra/services.json", catalog)
     consumer_contract = load_consumer_contract(repo)
@@ -843,7 +845,7 @@ def build_report(repo: Path) -> dict[str, Any]:
             "unclassified_variables": [],
             "inventory_status": "complete" if source_inputs["unique_identities"] == source_inputs["input_count"] else "incomplete",
             "classification_status": source_inputs["status"],
-            "semantic_mapping_status": "incomplete",
+            "semantic_mapping_status": matrix["status"],
             "consumer_cutover_status": consumer_contract["cutover_status"],
         },
     }
