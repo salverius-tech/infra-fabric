@@ -349,6 +349,27 @@ def matrix_path_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
+    """Report exact generated-consumer tokens not found in implementation surfaces."""
+    files: list[Path] = []
+    for root in (repo / "infra", repo / "scripts"):
+        files.extend(path for path in root.rglob("*") if path.is_file() and path.suffix in {".py", ".tf", ".sh", ".yml", ".yaml", ".json"})
+    corpus = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in files)
+    checked: list[dict[str, str]] = []
+    missing: list[dict[str, str]] = []
+    for row in matrix["rows"]:
+        for token in re.findall(r"`([^`]+)`", row["Generated consumer field(s)"]):
+            item = {"canonical_path": row["Canonical path"], "consumer_token": token}
+            (checked if token in corpus else missing).append(item)
+    return {
+        "token_count": len(checked) + len(missing),
+        "exact_evidence_count": len(checked),
+        "missing_exact_evidence_count": len(missing),
+        "missing_exact_evidence": missing,
+        "status": "complete" if not missing else "review-required",
+    }
+
+
 def _catalog_contract(catalog_path: Path) -> list[dict[str, Any]]:
     data = json.loads(catalog_path.read_text(encoding="utf-8"))
     return [
@@ -652,6 +673,7 @@ def build_report(repo: Path) -> dict[str, Any]:
     matrix = load_mapping_matrix(repo / "docs/canonical-values-mapping-v1.md")
     matrix_coverage = reconcile_matrix_inputs(source_inputs, matrix)
     matrix_path_status = matrix_path_coverage(matrix)
+    consumer_evidence_status = consumer_evidence(repo, matrix)
     deferred = deferred_classification(matrix_coverage)
     alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
     candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
@@ -675,6 +697,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "canonical_path_coverage": canonical_path_coverage,
         "mapping_matrix": matrix,
         "matrix_path_coverage": matrix_path_status,
+        "consumer_evidence": consumer_evidence_status,
         "matrix_coverage": matrix_coverage,
         "deferred_classification": deferred,
         "legacy_alias_classification": alias_classification,
