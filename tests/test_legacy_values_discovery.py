@@ -2428,7 +2428,30 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[0].value, 2222)
 
 
-    def test_candidate_generation_overlays_public_values_and_omits_secrets(self) -> None:
+    def test_runtime_importer_admission_is_scoped_and_fail_closed(self) -> None:
+        complete = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        complete.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation("inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]),
+                legacy_values_discovery.FieldObservation("inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"),
+            ]
+        )
+        admission = legacy_values_discovery.runtime_importer_admission(complete)
+        self.assertTrue(admission["admitted"])
+        self.assertEqual(admission["status"], "complete")
+        self.assertEqual(admission["missing"], [])
+
+        blocked = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        blocked.observations.append(
+            legacy_values_discovery.FieldObservation("inventory", "forgejo_domain", "unsupported", None, "dynamic-expression", None)
+        )
+        blocked.conflicts.append({"canonical_path": "services.forgejo.endpoints.public_url"})
+        admission = legacy_values_discovery.runtime_importer_admission(blocked)
+        self.assertFalse(admission["admitted"])
+        self.assertEqual(admission["status"], "blocked")
+        self.assertEqual(admission["missing"], ["forgejo_root_url"])
+        self.assertEqual(admission["conflicts"], ["services.forgejo.endpoints.public_url"])
+
         report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
         report.observations.extend(
             [

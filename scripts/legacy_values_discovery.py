@@ -1065,6 +1065,48 @@ def discover_legacy(
     return report
 
 
+RUNTIME_IMPORTER_SCOPE = {
+    "forgejo_domain": "services.forgejo.endpoints.public_names",
+    "forgejo_root_url": "services.forgejo.endpoints.public_url",
+}
+
+
+def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
+    """Report-only admission evidence for the currently bounded Forgejo scope."""
+    observations: dict[str, list[FieldObservation]] = {key: [] for key in RUNTIME_IMPORTER_SCOPE}
+    for item in report.observations:
+        if item.key in observations:
+            observations[item.key].append(item)
+    missing = [key for key, items in observations.items() if not items]
+    invalid = []
+    for key, items in observations.items():
+        expected_path = RUNTIME_IMPORTER_SCOPE[key]
+        if items and any(item.classification != "mapped" or item.proposed_path != expected_path for item in items):
+            invalid.append({"key": key, "reason": "observation is not a normalized mapped value"})
+    conflict_paths = {
+        conflict["canonical_path"]
+        for conflict in report.conflicts
+        if conflict.get("canonical_path") in RUNTIME_IMPORTER_SCOPE.values()
+    }
+    conflicts = sorted(conflict_paths)
+    reasons = []
+    if missing:
+        reasons.append("required scoped importer observations are missing")
+    if invalid:
+        reasons.append("scoped importer observations are not admitted")
+    if conflicts:
+        reasons.append("scoped importer observations conflict across sources")
+    return {
+        "scope": dict(RUNTIME_IMPORTER_SCOPE),
+        "status": "complete" if not reasons else "blocked",
+        "admitted": not reasons,
+        "missing": sorted(missing),
+        "invalid": invalid,
+        "conflicts": conflicts,
+        "reasons": reasons,
+    }
+
+
 def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
     """Return JSON-safe report data without secret values or arbitrary unknown values."""
     dynamic = [item for item in report.observations if item.value_type == "dynamic-expression"]
@@ -1092,6 +1134,7 @@ def render_migration_report(report: DiscoveryReport) -> dict[str, Any]:
         "files": sorted(report.files),
         "mapping_ready": report.mapping_ready,
         "candidate_ready": report.candidate_ready,
+        "runtime_importer_admission": runtime_importer_admission(report),
         "secret_contract": secret_contract,
         "dynamic_resolution": dynamic_summary,
         "observations": [
