@@ -187,6 +187,7 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(enabled, set(catalog.names))
         self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
         self.assertEqual(canonical.services["forgejo"].release.source, "package")
+        self.assertEqual(canonical.services["forgejo"].overrides["ansible"]["forgejo_domain"], "git.example.internal")
         self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
 
     def test_full_catalog_cross_field_failure_matrix(self) -> None:
@@ -203,6 +204,9 @@ class CanonicalValuesTests(unittest.TestCase):
             ),
             "resource_owned_release": lambda site: site["services"]["onramp_host"].update(
                 {"release": {"source": "package", "version": "1.0.0"}}
+            ),
+            "unknown_override_namespace": lambda site: site["services"]["forgejo"].update(
+                {"overrides": {"runtime": {"debug": True}}}
             ),
         }
         for name, mutate in cases.items():

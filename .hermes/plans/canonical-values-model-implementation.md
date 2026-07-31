@@ -146,7 +146,7 @@ The implementation is complete when all of the following are true:
 **Goal:** Make service capability and legacy translation explicit and testable.
 
 - [~] Extend or formalize `infra/services.json` as the capability/schema registry. All nine catalog entries now declare and validate their typed configuration schema identity or explicit resource-owned `null` boundary; broader capability metadata remains.
-- [~] Add required canonical fields, required logical secret paths, configuration schema identifiers, supported release forms, and allowed consumer overrides. Configuration schema identities and supported release-source metadata are now catalog-linked and enforced; required-field and override inventories remain.
+- [~] Add required canonical fields, required logical secret paths, configuration schema identifiers, supported release forms, and allowed consumer overrides. Configuration schema identities, supported release-source metadata, and `ansible`/`opentofu` override namespaces are now catalog-linked and enforced; required-field and per-namespace override inventories remain.
 - [ ] Add the versioned mapping matrix covering Terraform, Ansible, inventory, DNS, dotenv, migration scripts, scaffold, and current service inputs.
 - [~] Define normalization for HCL quoting, CIDR/bare addresses, `null`, `dhcp`, booleans, lists, checksums, hostnames, generated names, and derived DNS records. Forgejo public-name aliases now normalize scalar hostnames to canonical lowercase lists; broader normalization remains open.
 - [ ] Classify every current input as canonical, derived, Ansible-only, OpenTofu-only, deprecated, or unsupported.
@@ -708,3 +708,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-31 — Tightened `ServiceState` semantics at the model boundary: state-capable services require a disable policy, stateless services reject disable policies and backup metadata, and standalone state validation now matches full-site behavior.
 - 2026-07-31 — Formalized catalog configuration-schema ownership: all nine services now declare typed model identities or explicit resource-owned nulls in `infra/services.json`, and the canonical loader rejects catalog/model schema drift before service validation.
 - 2026-07-31 — Formalized catalog release-source ownership: all typed services declare supported `package`/`container`/`binary`/`image` forms, resource-owned services declare none, and model validation rejects release projections outside each service boundary.
+- 2026-07-31 — Formalized catalog override ownership: typed services allow only the declared `ansible` and `opentofu` namespaces, resource-owned services allow none, and canonical model validation rejects undeclared consumer namespaces.

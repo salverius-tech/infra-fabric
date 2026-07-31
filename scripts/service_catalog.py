@@ -18,6 +18,7 @@ SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "
 _SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))  # public-safety: allow-secret
 _SCHEMA_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,127}$")
 _RELEASE_SOURCES = frozenset(("package", "container", "binary", "image"))
+_OVERRIDE_NAMESPACES = frozenset(("ansible", "opentofu"))
 
 
 def _path_value(value: Any, path: str) -> Any:
@@ -35,6 +36,7 @@ class ServiceCapability:
     state_capable: bool
     configuration_schema: str | None
     release_sources: tuple[str, ...]
+    allowed_override_namespaces: tuple[str, ...]
     dependencies: tuple[str, ...]
     required_secrets: tuple[str, ...]
     secret_classifications: dict[str, SecretClassification]
@@ -162,6 +164,12 @@ class ServiceCatalog:
                 raise ServiceCatalogError(
                     f"service {name} release source {release_source!r} is not supported by catalog"
                 )
+            overrides = getattr(service, "overrides", {})
+            unknown_overrides = sorted(set(overrides) - set(self.get(name).allowed_override_namespaces))
+            if unknown_overrides:
+                raise ServiceCatalogError(
+                    f"service {name} override namespaces are not allowed: {', '.join(unknown_overrides)}"
+                )
             if resources is not None and getattr(service, "enabled", False):
                 resource_name = getattr(service, "resource", None)
                 resource_map = {
@@ -262,11 +270,18 @@ def load_catalog(path: Path) -> ServiceCatalog:
             not isinstance(source, str) or source not in _RELEASE_SOURCES for source in release_sources
         ) or len(release_sources) != len(set(release_sources)):
             raise ServiceCatalogError(f"service {name} release_sources must contain unique supported release forms")
+        allowed_override_namespaces = raw.get("allowed_override_namespaces", [])
+        if not isinstance(allowed_override_namespaces, list) or any(
+            not isinstance(namespace, str) or namespace not in _OVERRIDE_NAMESPACES
+            for namespace in allowed_override_namespaces
+        ) or len(allowed_override_namespaces) != len(set(allowed_override_namespaces)):
+            raise ServiceCatalogError(f"service {name} allowed_override_namespaces must contain unique supported namespaces")
         capabilities[name] = ServiceCapability(
             name=name,
             state_capable=raw.get("state_capable") is True,
             configuration_schema=configuration_schema,
             release_sources=tuple(release_sources),
+            allowed_override_namespaces=tuple(allowed_override_namespaces),
             dependencies=tuple(dependencies),
             required_secrets=tuple(required_secrets),
             secret_classifications=dict(secret_classifications),
