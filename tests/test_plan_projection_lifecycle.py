@@ -23,6 +23,8 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertIn('generated_backup="$(mktemp -d', content)
         self.assertIn('mv "${generated_dir}" "${generated_backup}"', content)
         self.assertIn('if ! mv "${generated_tmp}" "${generated_dir}"; then', content)
+        self.assertIn('python scripts/verify-projections.py', content)
+        self.assertIn('--generated-dir "${generated_dir}"', content)
         self.assertIn('if [[ -n "${generated_backup}" && ! -e "${generated_dir}" && -e "${generated_backup}" ]]; then', content)
         self.assertIn('trap cleanup_generated_tmp EXIT', content)
         self.assertIn('-var-file=../../${INFRA_VALUES_DIR}/terraform.tfvars', content)

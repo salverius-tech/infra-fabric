@@ -55,6 +55,9 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
     exit 1
   fi
   generated_tmp=""
+  python scripts/verify-projections.py \
+    --site-file "${INFRA_VALUES_DIR}/site.yaml" \
+    --generated-dir "${generated_dir}"
   if [[ -n "${generated_backup}" ]]; then
     rm -rf "${generated_backup}"
     generated_backup=""
