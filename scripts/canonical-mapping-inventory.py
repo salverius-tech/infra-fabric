@@ -283,6 +283,8 @@ def resolve_model_path(path: str) -> bool:
             continue
         if current is canonical_values.Resource and segment not in current.model_fields:
             continue
+        if current is canonical_values.SiteMetadata and segment == "class":
+            segment = "class_"
         if current is canonical_values.Service and segment == "resource":
             current = canonical_values.Resource
             continue
@@ -318,6 +320,31 @@ def catalog_path_coverage(catalog_path: Path, catalog: dict[str, Any]) -> dict[s
         "valid_count": len(valid),
         "invalid_count": len(invalid),
         "invalid": invalid,
+        "status": "complete" if not invalid else "review-required",
+    }
+
+
+def matrix_path_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
+    """Validate concrete public canonical matrix rows against the model schema."""
+    checked: list[dict[str, str]] = []
+    invalid: list[dict[str, str]] = []
+    excluded: list[dict[str, str]] = []
+    for row in matrix["rows"]:
+        path = row["Canonical path"]
+        if "<" in path or "*" in path:
+            excluded.append({"canonical_path": path, "reason": "schema-template"})
+        elif path.startswith("derived.") or ".secrets." in path or path.startswith("secrets."):
+            excluded.append({"canonical_path": path, "reason": "derived-or-protected-contract"})
+        else:
+            item = {"canonical_path": path, "source": row["Legacy source(s)"]}
+            (checked if resolve_model_path(path) else invalid).append(item)
+    return {
+        "checked_count": len(checked),
+        "valid_count": len(checked) - len(invalid),
+        "invalid_count": len(invalid),
+        "excluded_count": len(excluded),
+        "invalid": invalid,
+        "excluded": excluded,
         "status": "complete" if not invalid else "review-required",
     }
 
@@ -624,6 +651,7 @@ def build_report(repo: Path) -> dict[str, Any]:
     source_inputs = load_source_input_inventory(repo)
     matrix = load_mapping_matrix(repo / "docs/canonical-values-mapping-v1.md")
     matrix_coverage = reconcile_matrix_inputs(source_inputs, matrix)
+    matrix_path_status = matrix_path_coverage(matrix)
     deferred = deferred_classification(matrix_coverage)
     alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
     candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
@@ -646,6 +674,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "service_contracts": catalog_contract,
         "canonical_path_coverage": canonical_path_coverage,
         "mapping_matrix": matrix,
+        "matrix_path_coverage": matrix_path_status,
         "matrix_coverage": matrix_coverage,
         "deferred_classification": deferred,
         "legacy_alias_classification": alias_classification,
