@@ -239,6 +239,7 @@ def _normalize_caddy_extra_vhosts(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         raise DiscoveryError("bounded Ansible caddy_extra_vhosts must be a list")
     normalized: list[dict[str, Any]] = []
+    seen_names: set[str] = set()
     for item in value:
         if not isinstance(item, dict) or set(item) not in ({"server_name", "upstream"}, {"server_names", "upstream"}):
             raise DiscoveryError("bounded Ansible caddy_extra_vhosts must use server_name(s) and upstream")
@@ -247,9 +248,15 @@ def _normalize_caddy_extra_vhosts(value: Any) -> list[dict[str, Any]]:
             names = [names]
         if not isinstance(names, list) or not names or not all(isinstance(name, str) and name.strip() for name in names):
             raise DiscoveryError("bounded Ansible caddy_extra_vhosts server_names must be a non-empty string list")
+        normalized_names = [name.lower().rstrip(".") for name in names]
+        if any(not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", name) for name in normalized_names):
+            raise DiscoveryError("bounded Ansible caddy_extra_vhosts server_names must be hostnames")
+        if seen_names & set(normalized_names):
+            raise DiscoveryError("bounded Ansible caddy_extra_vhosts server_names must be unique")
+        seen_names.update(normalized_names)
         normalized.append(
             {
-                "server_names": [name.lower().rstrip(".") for name in names],
+                "server_names": normalized_names,
                 "upstream": _normalize_caddy_upstream(item["upstream"]),
             }
         )
