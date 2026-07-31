@@ -24,11 +24,13 @@ python scripts/settings.py summary
 
 generated_tmp=""
 generated_backup=""
+generated_verified=false
 cleanup_generated_tmp() {
   if [[ -n "${generated_tmp}" && -d "${generated_tmp}" ]]; then
     rm -rf "${generated_tmp}"
   fi
-  if [[ -n "${generated_backup}" && ! -e "${generated_dir}" && -e "${generated_backup}" ]]; then
+  if [[ -n "${generated_backup}" && ! "${generated_verified}" == true && -e "${generated_backup}" ]]; then
+    rm -rf "${generated_dir}" 2>/dev/null || true
     mv "${generated_backup}" "${generated_dir}" || printf "Unable to restore prior canonical projections.\\n" >&2
   fi
   if [[ -n "${equivalence_after_json}" ]]; then
@@ -58,6 +60,7 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   python scripts/verify-projections.py \
     --site-file "${INFRA_VALUES_DIR}/site.yaml" \
     --generated-dir "${generated_dir}"
+  generated_verified=true
   if [[ -n "${generated_backup}" ]]; then
     rm -rf "${generated_backup}"
     generated_backup=""

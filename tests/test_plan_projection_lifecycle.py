@@ -25,7 +25,10 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertIn('if ! mv "${generated_tmp}" "${generated_dir}"; then', content)
         self.assertIn('python scripts/verify-projections.py', content)
         self.assertIn('--generated-dir "${generated_dir}"', content)
-        self.assertIn('if [[ -n "${generated_backup}" && ! -e "${generated_dir}" && -e "${generated_backup}" ]]; then', content)
+        self.assertIn('if [[ -n "${generated_backup}" && ! "${generated_verified}" == true && -e "${generated_backup}" ]]; then', content)
+        self.assertIn('generated_verified=false', content)
+        self.assertIn('generated_verified=true', content)
+        self.assertIn('rm -rf "${generated_dir}" 2>/dev/null || true', content)
         self.assertIn('trap cleanup_generated_tmp EXIT', content)
         self.assertIn('-var-file=../../${INFRA_VALUES_DIR}/terraform.tfvars', content)
         self.assertIn('ansible/inventory/local.yml', content)
@@ -36,7 +39,7 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertIn('rm -f "${equivalence_after_json}"', content)
         self.assertNotIn('cleanup_equivalence_json', content)
         self.assertEqual(content.count('trap cleanup_generated_tmp EXIT'), 1)
-        self.assertNotIn('rm -rf "${generated_dir}"', content)
+        self.assertNotIn('rm -rf "${generated_dir}"\n', content)
 
 
 if __name__ == "__main__":
