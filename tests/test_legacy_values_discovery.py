@@ -1329,6 +1329,35 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "non-empty version"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_rejects_invalid_hermes_dashboard_metadata(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_dashboard_enabled: yes\n"
+                "    hermes_dashboard_port: 65536\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "between 1 and 65535"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
+    def test_bounded_ansible_importer_rejects_blank_hermes_dashboard_host(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    hermes_dashboard_host: '   '\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "non-empty string"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_forgejo_runner_labels(self) -> None:
         temp, values = self.make_values()
         with temp:

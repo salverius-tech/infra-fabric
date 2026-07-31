@@ -638,6 +638,15 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             parsed = urlsplit(value)
             if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
                 raise DiscoveryError(f"bounded Ansible {key} must be an HTTP(S) URL without credentials")
+        elif key == "hermes_dashboard_enabled":
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+        elif key == "hermes_dashboard_port":
+            if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 65535:
+                raise DiscoveryError(f"bounded Ansible {key} must be between 1 and 65535")
+        elif key in {"hermes_dashboard_host", "hermes_dashboard_basic_auth_username"}:
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
         elif key == "hermes_node_version":
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty version")
