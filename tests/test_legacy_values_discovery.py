@@ -1010,6 +1010,17 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertTrue(any(item.classification == "secret" for item in report.observations))
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_report_requires_manual_review_for_canonical_conflicts(self) -> None:
+        migration = legacy_values_discovery._load_migration_module()
+        report = legacy_values_discovery.DiscoveryReport("/tmp/values")
+        legacy_values_discovery._observe("env", "SERVER_NAME", "dns-a.example.internal", report, migration)
+        legacy_values_discovery._observe("inventory", "server_name", "dns-b.example.internal", report, migration)
+        self.assertEqual(2, len(report.observations))
+        self.assertEqual("services.technitium.endpoints.public_names", report.observations[0].proposed_path)
+        self.assertEqual("manual review required", report.conflicts[0]["disposition"])
+        self.assertFalse(report.mapping_ready)
+        self.assertFalse(report.candidate_ready)
+
     def test_bounded_ansible_importer_rejects_invalid_caddy_email(self) -> None:
         temp, values = self.make_values()
         with temp:
