@@ -2467,6 +2467,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]),
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"),
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.runtime", "dict", {"type": "lxc"}),
+                legacy_values_discovery.FieldObservation("inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106),
             ]
         )
         admission = legacy_values_discovery.runtime_importer_admission(complete)
@@ -2486,6 +2487,19 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertFalse(admission["admitted"])
         self.assertIn("runtime selector must be exactly {type: lxc|vm}", {item["reason"] for item in admission["invalid"]})
 
+        invalid_vmid = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        invalid_vmid.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation("inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]),
+                legacy_values_discovery.FieldObservation("inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"),
+                legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.runtime", "dict", {"type": "lxc"}),
+                legacy_values_discovery.FieldObservation("inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 0),
+            ]
+        )
+        admission = legacy_values_discovery.runtime_importer_admission(invalid_vmid)
+        self.assertFalse(admission["admitted"])
+        self.assertIn("Technitium VMID must be a positive integer", {item["reason"] for item in admission["invalid"]})
+
         blocked = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
         blocked.observations.append(
             legacy_values_discovery.FieldObservation("inventory", "forgejo_domain", "unsupported", None, "dynamic-expression", None)
@@ -2494,7 +2508,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         admission = legacy_values_discovery.runtime_importer_admission(blocked)
         self.assertFalse(admission["admitted"])
         self.assertEqual(admission["status"], "blocked")
-        self.assertEqual(admission["missing"], ["forgejo_root_url", "forgejo_runtime"])
+        self.assertEqual(admission["missing"], ["forgejo_root_url", "forgejo_runtime", "technitium_vmid"])
         self.assertEqual(admission["conflicts"], ["services.forgejo.endpoints.public_url"])
 
         report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")

@@ -1128,6 +1128,7 @@ RUNTIME_IMPORTER_SCOPE = {
     "forgejo_domain": "services.forgejo.endpoints.public_names",
     "forgejo_root_url": "services.forgejo.endpoints.public_url",
     "forgejo_runtime": "resources.guests.forgejo.runtime",
+    "technitium_vmid": "resources.guests.technitium.identity.vmid",
 }
 
 
@@ -1148,6 +1149,10 @@ def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
                 value = item.value
                 if not isinstance(value, dict) or set(value) != {"type"} or value.get("type") not in {"lxc", "vm"}:
                     invalid.append({"key": key, "reason": "runtime selector must be exactly {type: lxc|vm}"})
+        if key == "technitium_vmid" and items:
+            for item in items:
+                if not isinstance(item.value, int) or isinstance(item.value, bool) or item.value <= 0:
+                    invalid.append({"key": key, "reason": "Technitium VMID must be a positive integer"})
     conflict_paths = {
         conflict["canonical_path"]
         for conflict in report.conflicts
