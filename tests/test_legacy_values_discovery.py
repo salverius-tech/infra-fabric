@@ -1019,6 +1019,17 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "escapes"):
                 legacy_values_discovery._artifact_relative(root, outside)
 
+    def test_artifact_symlinks_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "values"
+            outside = Path(temp_dir) / "outside.txt"
+            root.mkdir()
+            outside.write_text("outside", encoding="utf-8")
+            link = root / "linked.txt"
+            link.symlink_to(outside)
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "symlinks"):
+                legacy_values_discovery._artifact_relative(root, link)
+
     def test_bounded_report_requires_manual_review_for_canonical_conflicts(self) -> None:
         migration = legacy_values_discovery._load_migration_module()
         report = legacy_values_discovery.DiscoveryReport("/tmp/values")
