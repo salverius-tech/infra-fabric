@@ -496,7 +496,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         )
         self.assertFalse(report.candidate_ready)
 
-    def test_bounded_ansible_importer_rejects_singular_caddy_extra_vhost(self) -> None:
+    def test_bounded_ansible_importer_normalizes_singular_caddy_extra_vhost(self) -> None:
         temp, values = self.make_values()
         with temp:
             repo = Path(temp.name) / "repo"
@@ -505,12 +505,54 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             inventory.write_text(
                 "all:\n  vars:\n"
                 "    caddy_extra_vhosts:\n"
-                "      - server_name: app.example.internal\n"
+                "      - server_name: App.Example.Internal.\n"
                 "        upstream: 127.0.0.1:9000\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "server_names and upstream"):
-                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("caddy_extra_vhosts", "mapped")].value,
+            [{"server_names": ["app.example.internal"], "upstream": {"host": "127.0.0.1", "port": 9000}}],
+        )
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_reconciles_caddy_name_aliases(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    caddy_server_name: DNS.Example.Internal.\n"
+                "    caddy_server_names:\n"
+                "      - dns.example.internal\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(observations[("caddy_server_name", "mapped")].value, ["dns.example.internal"])
+        self.assertEqual(observations[("caddy_server_names", "mapped")].value, ["dns.example.internal"])
+        self.assertFalse(report.conflicts)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_divergent_caddy_name_aliases(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    caddy_server_name: dns.example.internal\n"
+                "    caddy_server_names:\n"
+                "      - other.example.internal\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        self.assertTrue(any(conflict["canonical_path"] == "services.technitium.configuration.caddy.server_names" for conflict in report.conflicts))
+        self.assertFalse(report.candidate_ready)
 
     def test_bounded_ansible_importer_admits_caddy_upstream(self) -> None:
         temp, values = self.make_values()

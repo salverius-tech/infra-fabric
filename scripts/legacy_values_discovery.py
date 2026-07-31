@@ -112,6 +112,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_actions_enabled": "services.forgejo.configuration.actions_enabled",
         "FORGEJO_ACTIONS_DEFAULT_URL": "services.forgejo.configuration.actions_default_url",
         "caddy_email": "platform.ingress.acme.email",
+        "caddy_server_name": "services.technitium.configuration.caddy.server_names",
         "caddy_server_names": "services.technitium.configuration.caddy.server_names",
         "caddy_upstream": "services.technitium.configuration.caddy.upstream",
         "caddy_extra_vhosts": "services.technitium.configuration.caddy.extra_vhosts",
@@ -236,9 +237,11 @@ def _normalize_caddy_extra_vhosts(value: Any) -> list[dict[str, Any]]:
         raise DiscoveryError("bounded Ansible caddy_extra_vhosts must be a list")
     normalized: list[dict[str, Any]] = []
     for item in value:
-        if not isinstance(item, dict) or set(item) != {"server_names", "upstream"}:
-            raise DiscoveryError("bounded Ansible caddy_extra_vhosts must use server_names and upstream")
-        names = item["server_names"]
+        if not isinstance(item, dict) or set(item) not in ({"server_name", "upstream"}, {"server_names", "upstream"}):
+            raise DiscoveryError("bounded Ansible caddy_extra_vhosts must use server_name(s) and upstream")
+        names = item.get("server_names", item.get("server_name"))
+        if isinstance(names, str):
+            names = [names]
         if not isinstance(names, list) or not names or not all(isinstance(name, str) and name.strip() for name in names):
             raise DiscoveryError("bounded Ansible caddy_extra_vhosts server_names must be a non-empty string list")
         normalized.append(
@@ -296,6 +299,7 @@ def _observe(
         "services.infisical.endpoints.public_names",
         "services.forgejo.endpoints.public_names",
         "services.hermes.endpoints.public_names",
+        "services.technitium.configuration.caddy.server_names",
     }:
         public = _normalize_public_name(public)
     value_type = type(value).__name__
@@ -463,6 +467,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "searxng_public_url",
         "searxng_container_image",
         "caddy_email",
+        "caddy_server_name",
         "caddy_server_names",
         "caddy_upstream",
         "caddy_extra_vhosts",
