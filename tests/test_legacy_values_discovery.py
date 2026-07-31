@@ -2279,6 +2279,38 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             rendered = json.dumps(legacy_values_discovery.render_migration_report(report))
         self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", rendered)
 
+    def test_rendered_report_exposes_complete_secret_contract_without_values(self) -> None:
+        temp = tempfile.TemporaryDirectory()
+        values = Path(temp.name) / "values"
+        values.mkdir()
+        (values / ".env").write_text(
+            "TECHNITIUM_API_TOKEN=SECRET_SENTINEL_DO_NOT_PRINT\n",
+            encoding="utf-8",
+        )
+        repo = Path(temp.name) / "repo"
+        inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+        inventory.parent.mkdir(parents=True)
+        inventory.write_text(
+            "all:\n  vars:\n"
+            "    CF_DNS_API_TOKEN: PROVIDER_SECRET_SENTINEL_DO_NOT_PRINT\n"
+            "    CF_API_EMAIL: operator@example.internal\n",
+            encoding="utf-8",
+        )
+        with temp:
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+            rendered = legacy_values_discovery.render_migration_report(report)
+            serialized = json.dumps(rendered)
+        contract = rendered["secret_contract"]
+        self.assertEqual(contract["secret_count"], 2)
+        self.assertEqual(contract["protected_count"], 1)
+        self.assertEqual(contract["redacted_count"], 3)
+        self.assertEqual(contract["proposed_path_count"], 0)
+        self.assertFalse(contract["candidate_generation_allowed"])
+        self.assertEqual(contract["status"], "complete")
+        self.assertFalse(rendered["candidate_ready"])
+        self.assertNotIn("SECRET_SENTINEL_DO_NOT_PRINT", serialized)
+        self.assertNotIn("PROVIDER_SECRET_SENTINEL_DO_NOT_PRINT", serialized)
+
     def test_cli_writes_redacted_report_with_restricted_mode(self) -> None:
         temp, values = self.make_values()
         with temp:

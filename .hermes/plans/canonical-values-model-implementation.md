@@ -696,3 +696,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-31 — Added the complete Infisical service boundary wave: absolute data paths, PostgreSQL identifiers, public hostname, and release metadata; VMID and candidate/cutover gates remain unchanged.
 - 2026-07-31 — Added the Tailscale client policy boundary wave: strict policy booleans, non-empty backup metadata, and string-list `tailscale up` arguments; VMID, secrets, and cutover remain deferred.
 - 2026-07-31 — Added the onramp host access/policy boundary wave: strict host security booleans, deploy/runtime identity metadata, CIDR validation, and non-empty SSH keys; credentials and cutover remain deferred.
+- 2026-07-31 — Added a rendered secret-contract summary for report-only discovery: documented provider and protected observations are counted, redacted, pathless, and candidate-blocking; secret delivery and cutover remain deferred.
