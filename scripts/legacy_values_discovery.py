@@ -637,12 +637,13 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                 dynamic_resolution = "provider"
             secret = key.upper() in migration.SECRET_KEYS or key.upper() in migration.GENERATED_SECRET_KEYS
             classification = "secret" if secret else "provider" if provider_reference else "unsupported"
+            proposed_path = None if secret else _classification(key, migration)[1]
             report.observations.append(
                 FieldObservation(
                     source,
                     key,
                     classification,
-                    None,
+                    proposed_path,
                     "dynamic-expression",
                     "<redacted>" if secret else None,
                     dynamic_reference,
