@@ -116,6 +116,34 @@ class SiteMigrationTests(unittest.TestCase):
             with self.assertRaises(migration.SiteMigrationError):
                 migration.migrate(values, values.parent, "../prod", "production", "persistent", True, False, False)
 
+    def test_existing_compatible_site_is_a_dry_run_noop(self) -> None:
+        temp, values = self.make_legacy_values()
+        with temp:
+            target = values / "sites" / "dev"
+            target.mkdir(parents=True)
+            metadata = migration.site_metadata(values.parent, "dev", "development", "disposable", True, True)
+            (target / "site.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (target / "migration-manifest.json").write_text(
+                json.dumps({"canonical_destination": "sites/dev", "secret_values_included": False}),
+                encoding="utf-8",
+            )
+            actions = migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, False)
+            self.assertEqual(actions[1], "no-op: site migration is already complete")
+            self.assertTrue((values / ".env").exists())
+
+    def test_existing_site_metadata_conflict_fails_closed_in_dry_run(self) -> None:
+        temp, values = self.make_legacy_values()
+        with temp:
+            target = values / "sites" / "dev"
+            target.mkdir(parents=True)
+            (target / "site.json").write_text("{\"name\": \"other\"}", encoding="utf-8")
+            (target / "migration-manifest.json").write_text(
+                json.dumps({"canonical_destination": "sites/dev", "secret_values_included": False}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(migration.SiteMigrationError, "metadata conflicts"):
+                migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, False)
+
     def test_existing_site_is_never_overwritten(self) -> None:
         temp, values = self.make_legacy_values()
         with temp:

@@ -107,6 +107,21 @@ def migration_items(values_root: Path, target: Path) -> list[tuple[Path, Path]]:
     return items
 
 
+def inspect_existing_site(target: Path, site: str, metadata: dict[str, Any]) -> list[str]:
+    site_json = target / "site.json"
+    manifest_json = target / "migration-manifest.json"
+    if not site_json.is_file() or not manifest_json.is_file():
+        raise SiteMigrationError(f"existing site target is incomplete: {target}")
+    try:
+        existing_metadata = json.loads(site_json.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SiteMigrationError(f"existing site target metadata is invalid: {target}") from error
+    if existing_metadata != metadata:
+        raise SiteMigrationError(f"existing site target metadata conflicts: {target}")
+    if manifest.get("canonical_destination") != f"sites/{site}" or manifest.get("secret_values_included") is not False:
+        raise SiteMigrationError(f"existing site target manifest conflicts: {target}")
+    return [f"existing site target verified: {target}", "no-op: site migration is already complete"]
 def validate_request(values_root: Path, site: str, metadata: dict[str, Any]) -> tuple[Path, list[tuple[Path, Path]]]:
     if not SITE_NAME_RE.fullmatch(site) or ".." in site:
         raise SiteMigrationError("site must be a simple site identifier")
@@ -199,6 +214,11 @@ def migrate(
     canonical_base: Path | None = None,
 ) -> list[str]:
     metadata = site_metadata(repo, site, site_class, lifecycle, allow_apply, allow_destroy)
+    target = values_root / "sites" / site
+    if target.exists() and not apply:
+        if not SITE_NAME_RE.fullmatch(site) or ".." in site:
+            raise SiteMigrationError("site must be a simple site identifier")
+        return inspect_existing_site(target, site, metadata)
     target, items = validate_request(values_root, site, metadata)
     settings_path = repo / "settings.local.json"
     original_settings = settings_path.read_bytes() if settings_path.is_file() else None
