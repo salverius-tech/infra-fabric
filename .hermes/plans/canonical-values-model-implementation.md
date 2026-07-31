@@ -763,4 +763,7 @@ Update this table with real command output, fixture names, or review links. Do n
 
 - 2026-08-01 — Completed compatibility-window/stale-plan tracker reconciliation: `site-context.sh` emits an explicit legacy warning, `test_compatibility_boundary.py` covers canonical/default/opt-in behavior, and `tfplan-metadata.py` rejects changed site/model/secret/projection/input/tool identities; semantic pre/post plan equivalence remains open.
 
+- 2026-08-01 — Added report-only refresh normalization to semantic plan comparison: equivalent `read`/`no-op` provider refresh actions are ignored, while resource addresses, create/delete/replace actions, and infrastructure values remain significant. Focused equivalence tests and raw-plan CLI probes passed; migration plan-equivalence gating remains open.
+
 - 2026-08-01 — Completed final integration acceptance: full backend suite passes (567 tests), public safety and OpenTofu/Ansible validation pass, and ShellCheck warnings were removed. `just validate` reaches the final private-values prerequisite and stops because this checkout has no configured values workspace (`Run just setup or just setup <remote>`).
+

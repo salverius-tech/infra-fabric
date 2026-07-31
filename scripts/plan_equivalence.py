@@ -55,6 +55,11 @@ def _resources(plan: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     return result
 
 
+def _actions_equivalent(before: list[str], after: list[str]) -> bool:
+    refresh_only = {"read", "no-op"}
+    return before == after or (set(before) <= refresh_only and set(after) <= refresh_only)
+
+
 def compare_plans(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]:
     """Return a redacted structural equivalence report for normalized plans."""
     if not isinstance(before, Mapping) or not isinstance(after, Mapping):
@@ -71,7 +76,7 @@ def compare_plans(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[s
             continue
         before_resource = before_resources[address]
         after_resource = after_resources[address]
-        if before_resource["actions"] != after_resource["actions"]:
+        if not _actions_equivalent(before_resource["actions"], after_resource["actions"]):
             differences.append({"address": address, "kind": "actions_changed"})
         if before_resource["values"] != after_resource["values"]:
             differences.append({"address": address, "kind": "values_changed"})

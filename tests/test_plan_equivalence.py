@@ -54,6 +54,11 @@ class PlanEquivalenceTests(unittest.TestCase):
         self.assertFalse(result["equivalent"])
         self.assertEqual({item["kind"] for item in result["differences"]}, {"resource_added", "resource_removed"})
 
+    def test_refresh_only_read_and_noop_actions_are_equivalent(self) -> None:
+        before = plan({"address": "data.remote", "actions": ["read"], "values": {"id": "same"}})
+        after = plan({"address": "data.remote", "actions": ["no-op"], "values": {"id": "same"}})
+        self.assertEqual(compare_plans(before, after), {"equivalent": True, "differences": []})
+
     def test_actions_and_infrastructure_values_are_significant(self) -> None:
         result = compare_plans(
             plan({"address": "service.forgejo", "actions": ["update"], "values": {"runtime": "lxc", "vmid": 101}}),
