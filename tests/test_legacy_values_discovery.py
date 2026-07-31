@@ -469,6 +469,49 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_caddy_extra_vhosts(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    caddy_extra_vhosts:\n"
+                "      - server_names:\n"
+                "          - app.example.internal\n"
+                "        upstream: 127.0.0.1:9000\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        observation = observations[("caddy_extra_vhosts", "mapped")]
+        self.assertEqual(
+            observation.proposed_path,
+            "services.technitium.configuration.caddy.extra_vhosts",
+        )
+        self.assertEqual(
+            observation.value,
+            [{"server_names": ["app.example.internal"], "upstream": {"host": "127.0.0.1", "port": 9000}}],
+        )
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_singular_caddy_extra_vhost(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    caddy_extra_vhosts:\n"
+                "      - server_name: app.example.internal\n"
+                "        upstream: 127.0.0.1:9000\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "server_names and upstream"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_caddy_upstream(self) -> None:
         temp, values = self.make_values()
         with temp:

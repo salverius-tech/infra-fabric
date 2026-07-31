@@ -114,6 +114,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "caddy_email": "platform.ingress.acme.email",
         "caddy_server_names": "services.technitium.configuration.caddy.server_names",
         "caddy_upstream": "services.technitium.configuration.caddy.upstream",
+        "caddy_extra_vhosts": "services.technitium.configuration.caddy.extra_vhosts",
         "forgejo_actions_default_url": "services.forgejo.configuration.actions_default_url",
         "FORGEJO_SSH_PORT": "services.forgejo.endpoints.ports.ssh",
         "forgejo_ssh_port": "services.forgejo.endpoints.ports.ssh",
@@ -194,6 +195,15 @@ def _public_value(value: Any) -> Any:
         for item in value
     ):
         return value
+    if isinstance(value, list) and all(
+        isinstance(item, dict)
+        and set(item) == {"server_names", "upstream"}
+        and isinstance(item["server_names"], list)
+        and isinstance(item["upstream"], dict)
+        and set(item["upstream"]) == {"host", "port"}
+        for item in value
+    ):
+        return value
     if isinstance(value, dict) and set(value) <= {"type", "managed", "host", "port", "name", "user", "ssl_mode"}:
         return value
     if isinstance(value, dict) and set(value) == {"host", "port"}:
@@ -219,6 +229,25 @@ def _normalize_caddy_upstream(value: Any) -> dict[str, Any]:
             raise DiscoveryError("bounded Ansible caddy_upstream host must be an IP address or hostname")
         host = normalized
     return {"host": host, "port": port}
+
+
+def _normalize_caddy_extra_vhosts(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise DiscoveryError("bounded Ansible caddy_extra_vhosts must be a list")
+    normalized: list[dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict) or set(item) != {"server_names", "upstream"}:
+            raise DiscoveryError("bounded Ansible caddy_extra_vhosts must use server_names and upstream")
+        names = item["server_names"]
+        if not isinstance(names, list) or not names or not all(isinstance(name, str) and name.strip() for name in names):
+            raise DiscoveryError("bounded Ansible caddy_extra_vhosts server_names must be a non-empty string list")
+        normalized.append(
+            {
+                "server_names": [name.lower().rstrip(".") for name in names],
+                "upstream": _normalize_caddy_upstream(item["upstream"]),
+            }
+        )
+    return normalized
 
 
 def _normalize_public_name(value: Any) -> Any:
@@ -272,6 +301,8 @@ def _observe(
     value_type = type(value).__name__
     if proposed_path == "services.technitium.configuration.caddy.upstream":
         public = _normalize_caddy_upstream(value)
+    if proposed_path == "services.technitium.configuration.caddy.extra_vhosts":
+        public = _normalize_caddy_extra_vhosts(value)
     if proposed_path in {
         "services.forgejo.endpoints.public_url",
         "services.technitium.configuration.api_url",
@@ -434,6 +465,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "caddy_email",
         "caddy_server_names",
         "caddy_upstream",
+        "caddy_extra_vhosts",
         "forgejo_configure_system_ssh",
         "forgejo_domain",
         "forgejo_enable_caddy",
@@ -526,6 +558,8 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of name/address objects")
         elif key == "caddy_upstream":
             _normalize_caddy_upstream(value)
+        elif key == "caddy_extra_vhosts":
+            _normalize_caddy_extra_vhosts(value)
         elif key == "forgejo_database":
             allowed = {"type", "managed", "host", "port", "name", "user", "ssl_mode"}
             valid = isinstance(value, dict) and set(value) <= allowed
