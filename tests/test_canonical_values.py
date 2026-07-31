@@ -104,6 +104,19 @@ class CanonicalValuesTests(unittest.TestCase):
                 with self.assertRaises(ValidationError):
                     model.model_validate({"unknown_field": True})
 
+    def test_service_configuration_contract_covers_entire_catalog(self) -> None:
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        contract = canonical_values.service_configuration_contract(set(catalog.names))
+        self.assertEqual(set(contract), set(catalog.names))
+        self.assertEqual(contract["infisical_onramp"]["kind"], "resource-owned")
+        self.assertEqual(contract["infisical_onramp"]["owner"], "resources.shared_hosts.onramp_host")
+        self.assertEqual(contract["onramp_host"]["kind"], "resource-owned")
+        self.assertEqual(contract["forgejo"]["kind"], "typed-model")
+        with self.assertRaises(CanonicalValuesError):
+            canonical_values.service_configuration_contract(set(catalog.names) | {"new_service"})
+        with self.assertRaises(CanonicalValuesError):
+            canonical_values.service_configuration_contract(set(catalog.names) - {"technitium"})
+
     def test_ssh_protocol_materializes_default_port(self) -> None:
         endpoints = ServiceEndpoints.model_validate({"protocols": ["https", "ssh"]})
         self.assertEqual(endpoints.ports["ssh"], 22)
@@ -260,6 +273,14 @@ class CanonicalValuesTests(unittest.TestCase):
         )
         self.assertEqual(configuration.data_dir, "/var/lib/infisical")
         self.assertEqual(configuration.postgres_user, "infisical")
+
+    def test_resource_owned_service_configuration_is_rejected(self) -> None:
+        content = VALID_SITE.replace(
+            "services:\n  forgejo:",
+            "services:\n  onramp_host:\n    enabled: false\n    configuration:\n      unsafe: true\n  forgejo:",
+        )
+        with self.assertRaises(CanonicalValuesError):
+            load_site(self.write_site(content))
 
     def test_forgejo_database_is_typed_and_projected(self) -> None:
         content = VALID_SITE.replace(

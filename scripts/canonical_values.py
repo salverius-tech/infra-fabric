@@ -955,6 +955,40 @@ SERVICE_CONFIGURATION_MODELS: dict[str, type[StrictModel]] = {
     "tailscale_client": TailscaleConfiguration,
     "technitium": TechnitiumConfiguration,
 }
+SERVICE_CONFIGURATION_EXEMPTIONS = {
+    "infisical_onramp": {
+        "owner": "resources.shared_hosts.onramp_host",
+        "reason": "onramp deployment boundary owns runtime configuration",
+    },
+    "onramp_host": {
+        "owner": "resources.shared_hosts.onramp_host",
+        "reason": "shared-host resource owns security and runtime configuration",
+    },
+}
+
+
+def service_configuration_contract(catalog_services: set[str]) -> dict[str, dict[str, str]]:
+    """Return typed or explicitly resource-owned configuration contracts."""
+    known = set(SERVICE_CONFIGURATION_MODELS) | set(SERVICE_CONFIGURATION_EXEMPTIONS)
+    missing = sorted(catalog_services - known)
+    unexpected = sorted(known - catalog_services)
+    if missing or unexpected:
+        details = []
+        if missing:
+            details.append(f"missing services: {', '.join(missing)}")
+        if unexpected:
+            details.append(f"unknown services: {', '.join(unexpected)}")
+        raise CanonicalValuesError("service configuration contract mismatch: " + "; ".join(details))
+    return {
+        **{
+            name: {"kind": "typed-model", "model": model.__name__}
+            for name, model in sorted(SERVICE_CONFIGURATION_MODELS.items())
+        },
+        **{
+            name: {"kind": "resource-owned", **contract}
+            for name, contract in sorted(SERVICE_CONFIGURATION_EXEMPTIONS.items())
+        },
+    }
 
 
 class Service(StrictModel):
@@ -1039,6 +1073,12 @@ class CanonicalSite(StrictModel):
             except ValidationError as error:
                 details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
                 raise ValueError(f"services.forgejo.configuration: {details}") from error
+        for name, contract in SERVICE_CONFIGURATION_EXEMPTIONS.items():
+            service = self.services.get(name)
+            if service is not None and service.configuration:
+                raise ValueError(
+                    f"services.{name}.configuration is resource-owned by {contract['owner']}"
+                )
         for _, resource in (*self.resources.guests.items(), *self.resources.shared_hosts.items()):
             network = resource.network
             if network.bridge is None:
@@ -1101,6 +1141,7 @@ def load_site(
     if catalog_path is not None:
         try:
             catalog = load_catalog(catalog_path)
+            service_configuration_contract(set(catalog.names))
             catalog.validate_model_services(model.services, model.resources)
             catalog.validate_selection({name for name, service in model.services.items() if service.enabled})
         except ServiceCatalogError as error:
