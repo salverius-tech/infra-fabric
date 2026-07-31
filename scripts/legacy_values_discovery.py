@@ -561,9 +561,23 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
-        if key in {"tailscale_client_up_args", "forgejo_runner_labels", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers", "caddy_server_names"}:
+        if key in {"tailscale_client_up_args", "onramp_host_allowed_ssh_cidrs", "onramp_host_ssh_public_keys", "hermes_ssh_public_keys", "forgejo_runner_dns_servers", "caddy_server_names"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
+        elif key == "forgejo_runner_url":
+            from urllib.parse import urlsplit
+
+            if not isinstance(value, str):
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
+        elif key in {"forgejo_runner_version", "forgejo_runner_name", "forgejo_runner_scope", "forgejo_runner_label"}:
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
+        elif key == "forgejo_runner_labels":
+            if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty list of strings")
         elif key == "forgejo_runner_hosts":
             if not isinstance(value, list) or not all(
                 isinstance(item, dict)
