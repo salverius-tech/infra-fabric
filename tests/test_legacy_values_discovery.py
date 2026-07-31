@@ -983,6 +983,22 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "unique"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_importer_redacts_every_documented_secret_key(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            migration = legacy_values_discovery._load_migration_module()
+            report = legacy_values_discovery.DiscoveryReport(str(values))
+            secret_keys = sorted(migration.SECRET_KEYS)
+            for key in secret_keys:
+                legacy_values_discovery._observe("fixture", key, "[REDACTED]", report, migration)
+            observations = {item.key: item for item in report.observations}
+            self.assertEqual(set(secret_keys), set(observations))
+            for key in secret_keys:
+                self.assertEqual("secret", observations[key].classification)
+                self.assertIsNone(observations[key].proposed_path)
+                self.assertEqual("<redacted>", observations[key].value)
+            self.assertFalse(report.candidate_ready)
+
     def test_bounded_ansible_importer_rejects_invalid_caddy_email(self) -> None:
         temp, values = self.make_values()
         with temp:
