@@ -16,6 +16,7 @@ class ServiceCatalogError(ValueError):
 _LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "generated"]
 _SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))  # public-safety: allow-secret
+_SCHEMA_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,127}$")
 
 
 def _path_value(value: Any, path: str) -> Any:
@@ -31,6 +32,7 @@ def _path_value(value: Any, path: str) -> Any:
 class ServiceCapability:
     name: str
     state_capable: bool
+    configuration_schema: str | None
     dependencies: tuple[str, ...]
     required_secrets: tuple[str, ...]
     secret_classifications: dict[str, SecretClassification]
@@ -245,9 +247,13 @@ def load_catalog(path: Path) -> ServiceCatalog:
         inventory = raw.get("inventory", {})
         if not isinstance(inventory, dict):
             raise ServiceCatalogError(f"service {name} inventory metadata must be an object")
+        configuration_schema = raw.get("configuration_schema")
+        if configuration_schema is not None and (not isinstance(configuration_schema, str) or not _SCHEMA_RE.fullmatch(configuration_schema)):
+            raise ServiceCatalogError(f"service {name} configuration_schema must be a model identifier or null")
         capabilities[name] = ServiceCapability(
             name=name,
             state_capable=raw.get("state_capable") is True,
+            configuration_schema=configuration_schema,
             dependencies=tuple(dependencies),
             required_secrets=tuple(required_secrets),
             secret_classifications=dict(secret_classifications),

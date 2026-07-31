@@ -111,7 +111,7 @@ The implementation is complete when all of the following are true:
 
 **Goal:** Add a strict, platform-neutral model without changing OpenTofu or Ansible consumers.
 
-- [~] Add strict Pydantic models for `schema_version`, `site`, `platform`, `resources`, and `services`. Initial public model exists; service-specific schemas remain.
+- [~] Add strict Pydantic models for `schema_version`, `site`, `platform`, `resources`, and `services`. Initial public model and catalog-linked configuration schema identities exist; service-specific schemas remain.
 - [~] Add typed LXC, VM, shared-host, storage, network, image/template, runtime, endpoint, release, state, configuration, and override models. Initial common models exist; complete catalog coverage remains.
 - [x] Reject unknown fields, duplicate YAML keys, unsafe aliases/anchors, invalid types, unsupported schema versions, and path traversal at the canonical loader boundary.
 - [x] Implement defaults and one-way platform → resource merge semantics for network and root storage fields.
@@ -145,7 +145,7 @@ The implementation is complete when all of the following are true:
 
 **Goal:** Make service capability and legacy translation explicit and testable.
 
-- [ ] Extend or formalize `infra/services.json` as the capability/schema registry.
+- [~] Extend or formalize `infra/services.json` as the capability/schema registry. All nine catalog entries now declare and validate their typed configuration schema identity or explicit resource-owned `null` boundary; broader capability metadata remains.
 - [ ] Add required canonical fields, required logical secret paths, configuration schema identifiers, supported release forms, and allowed consumer overrides.
 - [ ] Add the versioned mapping matrix covering Terraform, Ansible, inventory, DNS, dotenv, migration scripts, scaffold, and current service inputs.
 - [~] Define normalization for HCL quoting, CIDR/bare addresses, `null`, `dhcp`, booleans, lists, checksums, hostnames, generated names, and derived DNS records. Forgejo public-name aliases now normalize scalar hostnames to canonical lowercase lists; broader normalization remains open.
@@ -706,3 +706,4 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-07-31 — Added the full-catalog integration fixture and end-to-end canonical-site gate: all nine services load together with the resource-runtime corpus, catalog dependencies and resource ownership validate, and the canonical model accepts the composed site without weakening service-specific contracts.
 - 2026-07-31 — Added a full-catalog cross-field failure matrix covering stateful disable-policy requirements, enabled-service resource requirements, unknown resource references, stateless-service state claims, and missing service dependencies; each remains fail-closed through the canonical model or catalog boundary.
 - 2026-07-31 — Tightened `ServiceState` semantics at the model boundary: state-capable services require a disable policy, stateless services reject disable policies and backup metadata, and standalone state validation now matches full-site behavior.
+- 2026-07-31 — Formalized catalog configuration-schema ownership: all nine services now declare typed model identities or explicit resource-owned nulls in `infra/services.json`, and the canonical loader rejects catalog/model schema drift before service validation.

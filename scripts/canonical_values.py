@@ -977,7 +977,10 @@ SERVICE_CONFIGURATION_EXEMPTIONS = {
 }
 
 
-def service_configuration_contract(catalog_services: set[str]) -> dict[str, dict[str, str]]:
+def service_configuration_contract(
+    catalog_services: set[str],
+    catalog_schemas: Mapping[str, str | None] | None = None,
+) -> dict[str, dict[str, str]]:
     """Return typed or explicitly resource-owned configuration contracts."""
     known = set(SERVICE_CONFIGURATION_MODELS) | set(SERVICE_CONFIGURATION_EXEMPTIONS)
     missing = sorted(catalog_services - known)
@@ -989,7 +992,7 @@ def service_configuration_contract(catalog_services: set[str]) -> dict[str, dict
         if unexpected:
             details.append(f"unknown services: {', '.join(unexpected)}")
         raise CanonicalValuesError("service configuration contract mismatch: " + "; ".join(details))
-    return {
+    contract = {
         **{
             name: {"kind": "typed-model", "model": model.__name__}
             for name, model in sorted(SERVICE_CONFIGURATION_MODELS.items())
@@ -999,6 +1002,17 @@ def service_configuration_contract(catalog_services: set[str]) -> dict[str, dict
             for name, contract in sorted(SERVICE_CONFIGURATION_EXEMPTIONS.items())
         },
     }
+    if catalog_schemas is not None:
+        mismatches = sorted(
+            name
+            for name, expected in ((name, entry.get("model")) for name, entry in contract.items())
+            if catalog_schemas.get(name) != expected
+        )
+        if mismatches:
+            raise CanonicalValuesError(
+                "service configuration schema metadata mismatch: " + ", ".join(mismatches)
+            )
+    return contract
 
 
 class Service(StrictModel):
@@ -1151,7 +1165,10 @@ def load_site(
     if catalog_path is not None:
         try:
             catalog = load_catalog(catalog_path)
-            service_configuration_contract(set(catalog.names))
+            service_configuration_contract(
+                set(catalog.names),
+                {name: catalog.get(name).configuration_schema for name in catalog.names},
+            )
             catalog.validate_model_services(model.services, model.resources)
             catalog.validate_selection({name for name, service in model.services.items() if service.enabled})
         except ServiceCatalogError as error:

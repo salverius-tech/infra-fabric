@@ -106,7 +106,10 @@ class CanonicalValuesTests(unittest.TestCase):
 
     def test_service_configuration_contract_covers_entire_catalog(self) -> None:
         catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
-        contract = canonical_values.service_configuration_contract(set(catalog.names))
+        contract = canonical_values.service_configuration_contract(
+            set(catalog.names),
+            {name: catalog.get(name).configuration_schema for name in catalog.names},
+        )
         self.assertEqual(set(contract), set(catalog.names))
         self.assertEqual(contract["infisical_onramp"]["kind"], "resource-owned")
         self.assertEqual(contract["infisical_onramp"]["owner"], "resources.shared_hosts.onramp_host")
