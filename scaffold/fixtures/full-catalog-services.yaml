@@ -4,6 +4,10 @@ services:
   technitium:
     enabled: true
     resource: example-lxc
+    release:
+      source: package
+      version: 15.2.0
+      checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     state:
       capable: true
       disable_policy: retain
@@ -25,6 +29,10 @@ services:
   forgejo_runner:
     enabled: true
     resource: example-lxc
+    configuration:
+      url: https://git.example.internal
+      scope: example
+      label: forgejo-runner
     dependencies:
       - forgejo
   infisical:

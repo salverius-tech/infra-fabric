@@ -215,8 +215,9 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
         self.assertEqual(canonical.services["forgejo"].release.source, "package")
         self.assertEqual(canonical.services["forgejo"].overrides["ansible"]["forgejo_domain"], "git.example.internal")
-        self.assertEqual(catalog.get("forgejo").required_fields, ("resource", "state.capable"))
-        self.assertEqual(catalog.get("tailscale_client").required_fields, ("resource",))
+        self.assertEqual(catalog.get("forgejo").required_fields, ("resource", "state.capable", "release.version"))
+        self.assertEqual(catalog.get("technitium").required_fields, ("resource", "state.capable", "release.version", "release.checksum"))
+        self.assertEqual(catalog.get("forgejo_runner").required_fields, ("resource", "configuration.url", "configuration.scope", "configuration.label"))
         self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
 
     def test_full_catalog_cross_field_failure_matrix(self) -> None:
@@ -228,6 +229,8 @@ class CanonicalValuesTests(unittest.TestCase):
             ),
             "enabled_service_missing_resource": lambda site: site["services"]["forgejo"].update({"resource": None}),
             "stateful_service_missing_state_capability": lambda site: site["services"]["forgejo"].update({"state": {"capable": False}}),
+            "service_missing_release_version": lambda site: site["services"]["forgejo"]["release"].update({"version": None}),
+            "runner_missing_registration_url": lambda site: site["services"]["forgejo_runner"]["configuration"].update({"url": None}),
             "unknown_service_resource": lambda site: site["services"]["forgejo"].update({"resource": "missing"}),
             "stateless_service_claims_state": lambda site: site["services"]["tailscale_client"].update(
                 {"state": {"capable": True, "disable_policy": "retain"}}

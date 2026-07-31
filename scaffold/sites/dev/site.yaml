@@ -91,6 +91,10 @@ services:
   technitium:
     enabled: true
     resource: technitium
+    release:
+      source: package
+      version: 15.2.0
+      checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     state:
       capable: true
       disable_policy: retain

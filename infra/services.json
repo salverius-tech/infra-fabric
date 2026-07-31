@@ -9,7 +9,7 @@
       "configuration_schema": "TechnitiumConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
-      "required_fields": ["resource", "state.capable"],
+      "required_fields": ["resource", "state.capable", "release.version", "release.checksum"],
       "state_order": 3,
       "terraform_addresses": [
         "module.technitium_dns[",
@@ -44,7 +44,7 @@
       "configuration_schema": "ForgejoConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
-      "required_fields": ["resource", "state.capable"],
+      "required_fields": ["resource", "state.capable", "release.version"],
       "state_order": 2,
       "terraform_addresses": [
         "module.forgejo[",
@@ -131,7 +131,7 @@
       "configuration_schema": "ForgejoRunnerConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
-      "required_fields": ["resource"],
+      "required_fields": ["resource", "configuration.url", "configuration.scope", "configuration.label"],
       "terraform_addresses": [
         "module.forgejo_runner[",
         "module.forgejo_runner_vm["

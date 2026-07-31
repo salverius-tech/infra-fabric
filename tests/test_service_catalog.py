@@ -37,6 +37,7 @@ class ServiceCatalogTests(unittest.TestCase):
             enabled=True,
             resource="forgejo",
             state=SimpleNamespace(capable=True),
+            release=SimpleNamespace(version="1.0.0"),
         )
         tailscale = SimpleNamespace(enabled=True, resource="tailscale")
         report = catalog.required_field_report_for_model({"tailscale_client": tailscale, "forgejo": forgejo})
@@ -45,6 +46,7 @@ class ServiceCatalogTests(unittest.TestCase):
             (
                 {"service": "forgejo", "field": "resource", "required": True, "present": True},
                 {"service": "forgejo", "field": "state.capable", "required": True, "present": True},
+                {"service": "forgejo", "field": "release.version", "required": True, "present": True},
                 {"service": "tailscale_client", "field": "resource", "required": True, "present": True},
             ),
         )
