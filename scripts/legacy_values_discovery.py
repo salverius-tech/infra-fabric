@@ -600,6 +600,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key == "searxng_enable_public_url":
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+        elif key in {"tailscale_client_enable_ip_forwarding", "tailscale_client_restore_backup"}:
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
         elif not isinstance(value, (str, bool, int, float)):
             raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
         if isinstance(value, str) and not value.strip():

@@ -469,6 +469,46 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_tailscale_configuration_wave(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    tailscale_client_enable_ip_forwarding: true\n"
+                "    tailscale_client_restore_backup: false\n"
+                "    tailscale_client_backup_archive: /var/lib/tailscale/backup.json\n"
+                "    tailscale_client_up_args:\n"
+                "      - --accept-dns=false\n"
+                "      - --ssh\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "tailscale_client_enable_ip_forwarding": ("services.tailscale_client.configuration.enable_ip_forwarding", True),
+            "tailscale_client_restore_backup": ("services.tailscale_client.configuration.restore_backup", False),
+            "tailscale_client_backup_archive": ("services.tailscale_client.configuration.backup_archive", "/var/lib/tailscale/backup.json"),
+            "tailscale_client_up_args": ("services.tailscale_client.configuration.up_args", ["--accept-dns=false", "--ssh"]),
+        }
+        for key, (path, value) in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, path)
+                self.assertEqual(observations[(key, "mapped")].value, value)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_non_boolean_tailscale_flag(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text("all:\n  vars:\n    tailscale_client_restore_backup: \"yes\"\n", encoding="utf-8")
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "must be boolean"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_searxng_configuration_wave(self) -> None:
         temp, values = self.make_values()
         with temp:
