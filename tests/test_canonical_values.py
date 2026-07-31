@@ -139,6 +139,7 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(contract["infisical_onramp"]["kind"], "typed-model")
         self.assertEqual(contract["infisical_onramp"]["model"], "InfisicalOnrampConfiguration")
         self.assertEqual(contract["onramp_host"]["kind"], "resource-owned")
+        self.assertEqual(contract["onramp_host"]["schema"], "ResourceOwnedConfiguration")
         self.assertEqual(contract["forgejo"]["kind"], "typed-model")
         with self.assertRaises(CanonicalValuesError):
             canonical_values.service_configuration_contract(set(catalog.names) | {"new_service"})

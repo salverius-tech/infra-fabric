@@ -319,7 +319,7 @@
     },
     "onramp_host": {
       "state_capable": true,
-      "configuration_schema": null,
+      "configuration_schema": "ResourceOwnedConfiguration",
       "release_sources": [],
       "allowed_override_namespaces": [],
       "required_fields": ["resource"],

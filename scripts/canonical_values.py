@@ -665,6 +665,10 @@ class TailscaleConfiguration(StrictModel):
     up_args: list[StrictStr] | None = None
 
 
+class ResourceOwnedConfiguration(StrictModel):
+    """Explicit empty service configuration for resource-owned boundaries."""
+
+
 class InfisicalConfiguration(StrictModel):
     """Typed non-secret Infisical storage and database identity settings."""
 
@@ -1037,6 +1041,7 @@ SERVICE_CONFIGURATION_MODELS: dict[str, type[StrictModel]] = {
 }
 SERVICE_CONFIGURATION_EXEMPTIONS = {
     "onramp_host": {
+        "schema": "ResourceOwnedConfiguration",
         "owner": "resources.shared_hosts.onramp_host",
         "reason": "shared-host resource owns security and runtime configuration",
     },
@@ -1071,7 +1076,7 @@ def service_configuration_contract(
     if catalog_schemas is not None:
         mismatches = sorted(
             name
-            for name, expected in ((name, entry.get("model")) for name, entry in contract.items())
+            for name, expected in ((name, entry.get("model") or entry.get("schema")) for name, entry in contract.items())
             if catalog_schemas.get(name) != expected
         )
         if mismatches:
