@@ -600,6 +600,17 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key == "searxng_enable_public_url":
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+        elif key == "forgejo_actions_enabled":
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+        elif key == "forgejo_actions_default_url":
+            from urllib.parse import urlsplit
+
+            if not isinstance(value, str):
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise DiscoveryError(f"bounded Ansible {key} must be an HTTPS URL without credentials")
         elif key in {"tailscale_client_enable_ip_forwarding", "tailscale_client_restore_backup"}:
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")

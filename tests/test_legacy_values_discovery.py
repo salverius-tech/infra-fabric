@@ -469,6 +469,40 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_forgejo_actions_wave(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_actions_enabled: true\n"
+                "    forgejo_actions_default_url: https://data.forgejo.org\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertTrue(observations[("forgejo_actions_enabled", "mapped")].value)
+        self.assertEqual(
+            observations[("forgejo_actions_default_url", "mapped")].value,
+            "https://data.forgejo.org",
+        )
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_insecure_forgejo_actions_url(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    forgejo_actions_default_url: http://data.forgejo.org\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTPS URL"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_tailscale_configuration_wave(self) -> None:
         temp, values = self.make_values()
         with temp:
