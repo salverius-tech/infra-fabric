@@ -524,6 +524,14 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "forgejo_domain",
         "FORGEJO_DOMAIN",
         "forgejo_runtime",
+        "forgejo_secret_key",
+        "forgejo_internal_token",
+        "forgejo_oauth2_jwt_secret",
+        "forgejo_lfs_jwt_secret",
+        "forgejo_postgres_password",
+        "forgejo_bootstrap_admin_password",
+        "forgejo_bootstrap_owner_password",
+        "forgejo_runner_registration_secret",
         "forgejo_enable_caddy",
         "FORGEJO_ENABLE_CADDY",
         "forgejo_root_url",
@@ -617,14 +625,15 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         if isinstance(value, str) and ("{{" in value or "{%" in value):
             dynamic_reference = _ansible_dynamic_reference(value)
             dynamic_chain, dynamic_resolution = _resolve_ansible_dynamic_reference(key, variables)
+            secret = key.upper() in migration.SECRET_KEYS or key.upper() in migration.GENERATED_SECRET_KEYS
             report.observations.append(
                 FieldObservation(
                     source,
                     key,
-                    "unsupported",
+                    "secret" if secret else "unsupported",
                     None,
                     "dynamic-expression",
-                    None,
+                    "<redacted>" if secret else None,
                     dynamic_reference,
                     dynamic_reference in variables if dynamic_reference else None,
                     dynamic_chain,

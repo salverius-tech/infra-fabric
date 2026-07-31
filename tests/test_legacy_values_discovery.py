@@ -63,6 +63,12 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         runtime = next(item for item in report.observations if item.key == "forgejo_runtime")
         self.assertEqual(runtime.classification, "mapped")
         self.assertEqual(runtime.proposed_path, "resources.guests.forgejo.runtime")
+        dynamic_secrets = {item.key for item in report.observations if item.key in {"forgejo_secret_key", "forgejo_internal_token", "forgejo_postgres_password"}}
+        self.assertEqual(dynamic_secrets, {"forgejo_secret_key", "forgejo_internal_token", "forgejo_postgres_password"})
+        for item in report.observations:
+            if item.key in dynamic_secrets:
+                self.assertEqual(item.classification, "secret")
+                self.assertEqual(item.value, "<redacted>")
 
     def test_bounded_public_ansible_importer_admits_forgejo_domain_only(self) -> None:
         temp, values = self.make_values()
