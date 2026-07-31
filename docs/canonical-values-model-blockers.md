@@ -11,7 +11,7 @@ Regenerate the value-free inventory with:
 python3 scripts/canonical-mapping-inventory.py
 ```
 
-**Current baseline: 307 mapping rows, 368 token-level matched eligible inputs, 0 unmatched eligible inputs, 10 excluded non-canonical identities, and 0 ambiguous eligible matches.** The same live report says `semantic_mapping_status: incomplete`, `canonical_projection_authoritative: false`, and `consumer_cutover_status: deferred`. The inventory's `deferred_classification.items` is the authoritative identity-level list for that report; this document records the remaining semantic/runtime/importer and cutover blockers.
+**Current baseline: 307 mapping rows, 368 token-level matched eligible inputs, 0 unmatched eligible inputs, 10 excluded non-canonical identities, and 0 ambiguous eligible matches.** The live report now marks semantic mapping `semantic-coverage-complete`, canonical consumer authority `canonical-site-authoritative-with-legacy-compatibility`, and the runtime importer contract `implemented`. Candidate generation remains blocked only when selected-source admission has conflicts or unresolved protected inputs. The inventory's `deferred_classification.items` remains the authoritative identity-level list for source dispositions.
 
 ## Secret or protected inputs
 
@@ -90,4 +90,4 @@ The exact identities are preserved in `deferred_classification.items` in the mac
 
 
 
-Token-level source reconciliation is complete for the current report. Semantic mapping, runtime importer support, protected delivery, and complete projection/consumer integration are not complete. The canonical projection remains non-authoritative, and existing legacy OpenTofu and Ansible consumers remain active during this compatibility window. See `docs/canonical-values-implementation-audit-2026-07-30.md` for the evidence reconciliation.
+Token-level source reconciliation, semantic mapping, typed ownership, runtime importer scope, and selected-site consumer cutover are complete for the current report. Remaining blockers are protected delivery decisions, genuine source conflicts, candidate-generation admission for each selected source, and final integration acceptance. Existing legacy consumers remain available only through the explicit compatibility override. See `docs/canonical-values-implementation-audit-2026-07-30.md` for the evidence reconciliation.

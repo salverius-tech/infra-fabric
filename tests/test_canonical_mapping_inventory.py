@@ -398,7 +398,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(report["classification"]["consumer_cutover_status"], "canonical-site-authoritative-with-legacy-compatibility")
         self.assertEqual(report["candidate_generation"]["status"], "blocked")
         self.assertFalse(report["candidate_generation"]["candidate_generation_allowed"])
-        self.assertIn("runtime importer admission is incomplete", report["candidate_generation"]["reasons"])
+        self.assertIn("selected-source runtime admission must pass without conflicts", report["candidate_generation"]["reasons"])
         self.assertEqual(report["candidate_projection"], {"status": "blocked", "row_count": 0, "source_reference_count": 0, "rows": []})
         aliases = report["legacy_alias_classification"]["ambiguous_resource_aliases"]
         self.assertEqual(len(aliases), 0)
@@ -428,7 +428,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             ],
         )
         self.assertFalse(report["candidate_generation"]["candidate_generation_allowed"])
-        self.assertIn("runtime importer admission is incomplete", report["candidate_generation"]["reasons"])
+        self.assertIn("selected-source runtime admission must pass without conflicts", report["candidate_generation"]["reasons"])
 
         families = {item["family"] for item in report["opentofu"]["variables"]}
         self.assertIn("provider", families)

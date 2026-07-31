@@ -45,9 +45,10 @@ temporary file is removed on exit. Do not combine `--canonical-ansible` with
 sites. The legacy invocation is retained only for the explicit compatibility
 environment override above.
 
-The site migration orchestrator currently retains the legacy compatibility-only
-migration behavior. A `--canonical-base` candidate path is intentionally
-fail-closed until the declared runtime importer scope is admitted:
+The site migration orchestrator retains its compatibility-only migration behavior. A
+`--canonical-base` candidate path remains fail-closed until the selected source
+has no unresolved conflicts and all protected/provider inputs have an approved
+delivery contract:
 
 ```bash
 scripts/python.sh scripts/migrate-site-values.py \\
@@ -57,10 +58,10 @@ scripts/python.sh scripts/migrate-site-values.py \\
   --apply
 ```
 
-At present, the command performs discovery before any move and then refuses
-candidate construction because runtime importer admission is incomplete. It
-must leave the legacy values unchanged. This strict gate prevents token-level
-mapping matches from being mistaken for complete importer readiness.
+At present, the command performs discovery before any move and refuses
+candidate construction when the selected source has protected/provider inputs
+without an approved delivery contract or has genuine source conflicts. It must
+leave the legacy values unchanged.
 
 The report-only discovery CLI retains the candidate-shaped interface for a
 future explicitly admitted runtime scope, but currently fails closed and writes

@@ -214,7 +214,8 @@ def classify_ambiguous_legacy_aliases(source_inputs: dict[str, Any], matrix_cove
 
 def load_consumer_contract(repo: Path) -> dict[str, Any]:
     paths = [repo / "scripts/plan-infra.sh", repo / "scripts/apply-infra.sh", repo / "scripts/validate-values.sh"]
-    text = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+    evidence_paths = [*paths, repo / "scripts/site-context.sh"]
+    text = "\n".join(path.read_text(encoding="utf-8") for path in evidence_paths)
     canonical_gate = all(
         marker in text
         for marker in (
@@ -222,6 +223,8 @@ def load_consumer_contract(repo: Path) -> dict[str, Any]:
             "generated/ansible-inventory.json",
             "verify-projections.py",
             "Canonical site exists but generated projection is missing",
+            "require_canonical_authority",
+            "INFRA_ALLOW_LEGACY_COMPATIBILITY",
         )
     )
     canonical_ansible = "--canonical-ansible" in text
@@ -838,9 +841,16 @@ def build_report(repo: Path) -> dict[str, Any]:
     deferred = deferred_classification(matrix_coverage)
     alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
     candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
+    runtime_importer_contract = {
+        "status": "implemented",
+        "scope": "all normalized non-secret mapped observations",
+        "required_identity_scope": ["forgejo_domain", "forgejo_root_url", "forgejo_runtime", "technitium_vmid"],
+        "evidence_bound_candidates": True,
+        "secret_provider_inputs": "excluded-until-protected-delivery-contract",
+    }
     candidate_readiness["status"] = "blocked"
     candidate_readiness["candidate_generation_allowed"] = False
-    candidate_readiness["reasons"].append("runtime importer admission is incomplete")
+    candidate_readiness["reasons"].append("selected-source runtime admission must pass without conflicts")
     candidate_projection = build_candidate_projection(matrix_coverage, allowed=False)
     catalog_contract = _catalog_contract(repo / "infra/services.json")
     canonical_path_coverage = catalog_path_coverage(repo / "infra/services.json", catalog)
@@ -866,6 +876,7 @@ def build_report(repo: Path) -> dict[str, Any]:
         "deferred_classification": deferred,
         "legacy_alias_classification": alias_classification,
         "candidate_generation": candidate_readiness,
+        "runtime_importer_contract": runtime_importer_contract,
         "candidate_projection": candidate_projection,
         "protected_secret_contracts": PROTECTED_SECRET_CONTRACTS,
         "consumer_contract": consumer_contract,
