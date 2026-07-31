@@ -104,6 +104,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observation.classification, "unsupported")
         self.assertEqual(observation.value_type, "dynamic-expression")
         self.assertEqual(observation.dynamic_reference, "inventory_hostname")
+        self.assertFalse(observation.dynamic_reference_available)
         self.assertIsNone(observation.value)
         self.assertFalse(report.candidate_ready)
 

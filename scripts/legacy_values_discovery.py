@@ -28,6 +28,7 @@ class FieldObservation:
     value_type: str
     value: Any = None
     dynamic_reference: str | None = None
+    dynamic_reference_available: bool | None = None
 
 
 @dataclass
@@ -589,6 +590,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
         if isinstance(value, str) and ("{{" in value or "{%" in value):
+            dynamic_reference = _ansible_dynamic_reference(value)
             report.observations.append(
                 FieldObservation(
                     source,
@@ -597,7 +599,8 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                     None,
                     "dynamic-expression",
                     None,
-                    _ansible_dynamic_reference(value),
+                    dynamic_reference,
+                    dynamic_reference in variables if dynamic_reference else None,
                 )
             )
             continue
