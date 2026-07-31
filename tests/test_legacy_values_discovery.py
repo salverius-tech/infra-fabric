@@ -1550,6 +1550,54 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "HTTPS URL without credentials"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_admits_tailscale_policy_boundary(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    tailscale_client_enabled: true\n"
+                "    tailscale_client_restore_backup: false\n"
+                "    tailscale_client_backup_archive: /var/backups/tailscale.tar\n"
+                "    tailscale_client_enable_ip_forwarding: true\n"
+                "    tailscale_client_up_args: [--advertise-tags=tag:server, --ssh]\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "tailscale_client_enabled": "services.tailscale_client.enabled",
+            "tailscale_client_restore_backup": "services.tailscale_client.configuration.restore_backup",
+            "tailscale_client_backup_archive": "services.tailscale_client.configuration.backup_archive",
+            "tailscale_client_enable_ip_forwarding": "services.tailscale_client.configuration.enable_ip_forwarding",
+            "tailscale_client_up_args": "services.tailscale_client.configuration.up_args",
+        }
+        for key, canonical_path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, canonical_path)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_invalid_tailscale_policy(self) -> None:
+        invalid_values = {
+            "tailscale_client_enabled": "yes",
+            "tailscale_client_restore_backup": 1,
+            "tailscale_client_enable_ip_forwarding": "true",
+            "tailscale_client_backup_archive": "",
+        }
+        for key, invalid_value in invalid_values.items():
+            with self.subTest(key=key):
+                temp, values = self.make_values()
+                with temp:
+                    repo = Path(temp.name) / "repo"
+                    inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+                    inventory.parent.mkdir(parents=True)
+                    rendered = repr(invalid_value) if isinstance(invalid_value, str) else str(invalid_value).lower()
+                    inventory.write_text(f"all:\n  vars:\n    {key}: {rendered}\n", encoding="utf-8")
+                    with self.assertRaises(legacy_values_discovery.DiscoveryError):
+                        legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_rejects_invalid_infisical_metadata(self) -> None:
         invalid_values = {
             "infisical_data_dir": "../var/lib/infisical",
