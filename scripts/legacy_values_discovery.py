@@ -634,6 +634,32 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             _normalize_caddy_upstream(value)
         elif key == "caddy_extra_vhosts":
             _normalize_caddy_extra_vhosts(value)
+        elif key == "forgejo_domain":
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
+                raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
+        elif key == "forgejo_version":
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
+        elif key in {"forgejo_enable_caddy", "forgejo_configure_system_ssh", "forgejo_write_initial_config", "forgejo_bootstrap_enabled"}:
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
+        elif key in {"forgejo_bootstrap_admin_username", "forgejo_bootstrap_admin_email", "forgejo_bootstrap_owner_email"}:
+            if not isinstance(value, str) or not value.strip():
+                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
+        elif key == "forgejo_database":
+            allowed = {"type", "managed", "host", "port", "name", "user", "ssl_mode"}
+            valid = isinstance(value, dict) and set(value) <= allowed
+            if valid:
+                valid = all(
+                    (field == "type" and item in {"sqlite", "postgres"})
+                    or (field == "managed" and isinstance(item, bool))
+                    or (field == "port" and isinstance(item, int) and not isinstance(item, bool) and 1 <= item <= 65535)
+                    or (field in {"host", "ssl_mode"} and isinstance(item, str) and item.strip())
+                    or (field in {"name", "user"} and isinstance(item, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item))
+                    for field, item in value.items()
+                )
+            if not valid:
+                raise DiscoveryError(f"bounded Ansible {key} must be valid database metadata")
         elif key in {"forgejo_root_url", "FORGEJO_ROOT_URL"}:
             from urllib.parse import urlsplit
 
