@@ -80,7 +80,9 @@ class TfplanMetadataTests(unittest.TestCase):
         generated = site / "generated"
         generated.mkdir(mode=0o700)
         for name, value in projections.items():
-            (generated / name).write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
+            path = generated / name
+            path.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
+            path.chmod(0o600)
         manifest = build_manifest(
             site="dev",
             schema_version=model.schema_version,
@@ -90,7 +92,9 @@ class TfplanMetadataTests(unittest.TestCase):
             renderer_version="test-renderer",
             source_commit="test-source",
         )
-        (generated / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+        manifest_path = generated / "manifest.json"
+        manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+        manifest_path.chmod(0o600)
 
     def test_canonical_identity_is_recorded_and_verified(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 from datetime import datetime, timezone
 from typing import Any
 
@@ -86,4 +87,12 @@ def verify_manifest(
             raise ManifestError(f"projection is stale or altered: {name}")
 
 
-__all__ = ["ManifestError", "build_manifest", "content_digest", "verify_manifest"]
+def verify_projection_permissions(directory: Any) -> None:
+    if directory.is_symlink() or stat.S_IMODE(directory.stat().st_mode) != 0o700:
+        raise ManifestError("generated projection directory must be mode 0700")
+    for path in directory.iterdir():
+        if path.is_symlink() or not path.is_file() or stat.S_IMODE(path.stat().st_mode) != 0o600:
+            raise ManifestError(f"generated projection file must be a regular mode-0600 file: {path.name}")
+
+
+__all__ = ["ManifestError", "build_manifest", "content_digest", "verify_manifest", "verify_projection_permissions"]

@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import stat
 import sys
 from pathlib import Path
 
 from canonical_values import CanonicalValuesError, load_site, model_digest
-from projection_manifest import ManifestError, verify_manifest
+from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
 from service_catalog import ServiceCatalogError, load_catalog
 
 PROJECTION_FILES = (
@@ -18,14 +17,6 @@ PROJECTION_FILES = (
     "ansible-vars.json",
     "dns-records.json",
 )
-
-
-def verify_permissions(directory: Path) -> None:
-    if directory.is_symlink() or stat.S_IMODE(directory.stat().st_mode) != 0o700:
-        raise ManifestError("generated projection directory must be mode 0700")
-    for path in directory.iterdir():
-        if path.is_symlink() or not path.is_file() or stat.S_IMODE(path.stat().st_mode) != 0o600:
-            raise ManifestError(f"generated projection file must be a regular mode-0600 file: {path.name}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -37,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         model = load_site(args.site_file, catalog_path=args.catalog)
         load_catalog(args.catalog)
-        verify_permissions(args.generated_dir)
+        verify_projection_permissions(args.generated_dir)
         manifest = json.loads((args.generated_dir / "manifest.json").read_text(encoding="utf-8"))
         projections = {
             name: json.loads((args.generated_dir / name).read_text(encoding="utf-8"))

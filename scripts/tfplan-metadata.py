@@ -20,11 +20,11 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
 
 try:
     from canonical_values import load_site, model_digest
-    from projection_manifest import ManifestError, verify_manifest
+    from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from canonical_values import load_site, model_digest
-    from projection_manifest import ManifestError, verify_manifest
+    from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
 
 SCHEMA_VERSION = 5
 DEFAULT_MAX_AGE_HOURS = 24
@@ -276,6 +276,7 @@ def canonical_identity(repo: Path) -> dict[str, Any] | None:
     try:
         model = load_site(site_file, expected_site=context.site, catalog_path=catalog_path)
         manifest_path = context.projection_manifest_path
+        verify_projection_permissions(manifest_path.parent)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         entries = manifest.get("projections")
         if not isinstance(entries, dict) or not entries:
