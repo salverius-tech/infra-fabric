@@ -60,6 +60,9 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(admission["missing"], [])
         self.assertEqual(admission["invalid"], [])
         self.assertEqual(admission["conflicts"], [])
+        runtime = next(item for item in report.observations if item.key == "forgejo_runtime")
+        self.assertEqual(runtime.classification, "mapped")
+        self.assertEqual(runtime.proposed_path, "resources.guests.forgejo.runtime")
 
     def test_bounded_public_ansible_importer_admits_forgejo_domain_only(self) -> None:
         temp, values = self.make_values()

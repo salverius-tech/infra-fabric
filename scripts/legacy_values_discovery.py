@@ -101,6 +101,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_database": "services.forgejo.configuration.database",
         "technitium_vmid": "resources.guests.technitium.identity.vmid",
         "forgejo_vmid": "resources.guests.forgejo.identity.vmid",
+        "forgejo_runtime": "resources.guests.forgejo.runtime",
         "tailscale_client_vmid": "resources.guests.tailscale_client.identity.vmid",
         "onramp_host_password_authentication": "resources.shared_hosts.onramp_host.security.password_authentication",
         "onramp_host_permit_root_login": "resources.shared_hosts.onramp_host.security.permit_root_login",
@@ -522,6 +523,7 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         "FORGEJO_CONFIGURE_SYSTEM_SSH",
         "forgejo_domain",
         "FORGEJO_DOMAIN",
+        "forgejo_runtime",
         "forgejo_enable_caddy",
         "FORGEJO_ENABLE_CADDY",
         "forgejo_root_url",
@@ -702,6 +704,9 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             _normalize_caddy_upstream(value)
         elif key == "caddy_extra_vhosts":
             _normalize_caddy_extra_vhosts(value)
+        elif key == "forgejo_runtime":
+            if not isinstance(value, dict) or set(value) != {"type"} or value["type"] not in {"lxc", "vm"}:
+                raise DiscoveryError(f"bounded Ansible {key} must contain only type=lxc or type=vm")
         elif key in {"forgejo_domain", "FORGEJO_DOMAIN"}:
             if not isinstance(value, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", value.lower().rstrip(".")):
                 raise DiscoveryError(f"bounded Ansible {key} must be a hostname")
