@@ -31,6 +31,24 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(searxng.raw["release"]["legacy_image_var"], "searxng_container_image")
         self.assertEqual(searxng.raw["release"]["canonical_fields"], ["release.image", "release.digest"])
 
+    def test_required_field_report_is_value_free_and_ordered(self) -> None:
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        forgejo = SimpleNamespace(
+            enabled=True,
+            resource="forgejo",
+            state=SimpleNamespace(capable=True),
+        )
+        tailscale = SimpleNamespace(enabled=True, resource="tailscale")
+        report = catalog.required_field_report_for_model({"tailscale_client": tailscale, "forgejo": forgejo})
+        self.assertEqual(
+            report,
+            (
+                {"service": "forgejo", "field": "resource", "required": True, "present": True},
+                {"service": "forgejo", "field": "state.capable", "required": True, "present": True},
+                {"service": "tailscale_client", "field": "resource", "required": True, "present": True},
+            ),
+        )
+
     def test_required_secret_paths_follow_enabled_services(self) -> None:
         catalog = load_catalog(
             self.write_catalog(

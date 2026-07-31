@@ -167,11 +167,37 @@ class ServiceCatalog:
                 report.append(entry)
         return tuple(report)
 
+    def required_field_report_for_model(
+        self,
+        services: Mapping[str, object],
+        resources: Any | None = None,
+    ) -> tuple[dict[str, object], ...]:
+        """Return value-free required-field evidence for enabled catalog services."""
+        self.validate_selection(set(services))
+        report: list[dict[str, object]] = []
+        for name in sorted(services):
+            service = services[name]
+            if not getattr(service, "enabled", False):
+                continue
+            capability = self.get(name)
+            for field in capability.required_fields:
+                value = _path_value(service, field)
+                report.append(
+                    {
+                        "service": name,
+                        "field": field,
+                        "required": True,
+                        "present": not _required_field_missing(field, value),
+                    }
+                )
+        return tuple(report)
+
     def validate_model_services(self, services: Mapping[str, object], resources: Any | None = None) -> None:
         """Validate canonical service ownership and catalog-derived resource compatibility."""
         unknown = sorted(set(services) - self.names)
         if unknown:
             raise ServiceCatalogError(f"canonical services are not in catalog: {', '.join(unknown)}")
+        required_report = self.required_field_report_for_model(services, resources)
         for name, service in services.items():
             declared = tuple(getattr(service, "dependencies", ()))
             expected = self.get(name).dependencies
@@ -195,9 +221,9 @@ class ServiceCatalog:
                 )
             if resources is not None and getattr(service, "enabled", False):
                 missing_fields = [
-                    field
-                    for field in self.get(name).required_fields
-                    if _required_field_missing(field, _path_value(service, field))
+                    str(entry["field"])
+                    for entry in required_report
+                    if entry["service"] == name and not entry["present"]
                 ]
                 if missing_fields:
                     raise ServiceCatalogError(
