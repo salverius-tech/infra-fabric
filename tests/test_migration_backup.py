@@ -104,6 +104,18 @@ class MigrationBackupTests(unittest.TestCase):
             self.assertEqual(json.loads(output.read_text(encoding="utf-8")), manifest)
             self.assertTrue((root / paths[1]).is_file())
 
+    def test_restore_backup_verifies_and_restores_selected_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = self.make_tree(root)
+            backup = root / "backup"
+            from migration_backup import create_backup, restore_backup
+
+            create_backup(root, paths, backup)
+            (root / "site" / "terraform.tfvars").write_text("changed\n", encoding="utf-8")
+            restore_backup(backup, root)
+            self.assertEqual((root / "site" / "terraform.tfvars").read_text(encoding="utf-8"), "address = 192.0.2.10\n")
+
     def test_recursive_expansion_is_sorted_posix_ignores_empty_dirs_and_deduplicates(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -115,6 +127,7 @@ class MigrationBackupTests(unittest.TestCase):
                 expand_backup_paths(root, ["service-backups", "service-backups/a/first.tar"]),
                 ["service-backups/a/first.tar", "service-backups/z/later.tar"],
             )
+
 
     def test_recursive_expansion_rejects_nested_symlinks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

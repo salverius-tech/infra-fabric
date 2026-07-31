@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from envfile import EnvEntry, EnvFileError, parse_env_lines as parse_envfile_lines, parse_scalar as envfile_parse_scalar, read_lines, remove_env, set_env, write_lines
+from migration_backup import BackupManifestError, create_backup, restore_backup
 try:
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
@@ -1013,6 +1014,38 @@ def migrate(values_dir: Path) -> list[str]:
     return changes
 
 
+def migrate_transactional(values_dir: Path, backup_dir: Path) -> list[str]:
+    """Back up selected mutable inputs, migrate, and restore on any failure."""
+    relative_paths = [
+        relative
+        for relative in (
+            ".env",
+            "terraform.tfvars",
+            "ansible/inventory/local.yml",
+            "dns-records.local.json",
+            "site.yaml",
+            "secrets.sops.yaml",
+        )
+        if (values_dir / relative).is_file()
+    ]
+    if not relative_paths:
+        raise MigrationError("no migratable values files were found")
+    try:
+        create_backup(values_dir, relative_paths, backup_dir)
+    except BackupManifestError as error:
+        raise MigrationError("could not create migration backup") from error
+    try:
+        return migrate(values_dir)
+    except Exception as error:
+        try:
+            restore_backup(backup_dir, values_dir)
+        except (BackupManifestError, OSError) as restore_error:
+            raise MigrationError("migration failed and rollback could not be verified") from restore_error
+        if isinstance(error, MigrationError):
+            raise
+        raise MigrationError("migration failed; original values were restored") from error
+
+
 def redact_change(change: str) -> str:
     for key in SECRET_KEYS:
         change = change.replace(key, key)
@@ -1022,11 +1055,18 @@ def redact_change(change: str) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--values-dir", type=Path, default=None)
+    parser.add_argument("--transactional", action="store_true", help="create a verified backup and roll back on failure")
+    parser.add_argument("--backup-dir", type=Path, default=None, help="new private backup directory for --transactional")
     args = parser.parse_args(argv)
 
     try:
         values_dir = args.values_dir or from_environment().values_dir
-        changes = migrate(values_dir)
+        if args.transactional:
+            if args.backup_dir is None:
+                raise MigrationError("--transactional requires --backup-dir")
+            changes = migrate_transactional(values_dir, args.backup_dir)
+        else:
+            changes = migrate(values_dir)
     except MigrationError as error:
         print(f"values migration failed: {error}", file=sys.stderr)
         return 1

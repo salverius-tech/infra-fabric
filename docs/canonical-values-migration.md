@@ -132,6 +132,12 @@ conflict, unknown, unsupported, or non-concrete observation keep candidate
 generation fail-closed. Secret bundle generation remains a separate SOPS/age
 operation and is not performed by the public candidate command.
 
+The migration entry point also supports an explicit transactional mode:
+`--transactional --backup-dir <private-directory>`. This creates an exclusive,
+verified backup of mutable legacy inputs before migration and restores it if
+migration fails. The ordinary compatibility mode remains available, but
+operational migration should use the transactional mode.
+
 ## Source-of-truth boundary
 
 Until a separately reviewed cutover is complete:

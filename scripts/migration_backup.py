@@ -110,6 +110,37 @@ def verify_manifest(root: Path, manifest: dict[str, Any]) -> None:
         raise BackupManifestError("backup tree contains unexpected files")
 
 
+def restore_backup(backup: Path, destination: Path) -> dict[str, Any]:
+    """Verify a private backup tree and restore its regular files safely."""
+    if not backup.is_dir() or backup.is_symlink():
+        raise BackupManifestError("backup directory is unavailable")
+    tree = backup / "tree"
+    manifest_path = backup / "manifest.json"
+    if not tree.is_dir() or not manifest_path.is_file():
+        raise BackupManifestError("backup tree or manifest is unavailable")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise BackupManifestError("backup manifest is invalid") from error
+    verify_manifest(tree, manifest)
+    if not destination.is_dir() or destination.is_symlink():
+        raise BackupManifestError("restore destination must be a directory")
+    for entry in manifest["entries"]:
+        relative = _relative_path(entry["path"])
+        source = tree / relative
+        target = destination / relative
+        try:
+            target.resolve().relative_to(destination.resolve())
+        except ValueError as error:
+            raise BackupManifestError("restore path escapes destination") from error
+        target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if target.exists() and target.is_symlink():
+            raise BackupManifestError("restore target must not be a symlink")
+        shutil.copyfile(source, target)
+        target.chmod(0o600)
+    return manifest
+
+
 def _stage_selected_files(root: Path, relative_paths: list[str], staging: Path) -> None:
     """Copy selected regular files into a disposable tree."""
     if not root.is_dir() or root.is_symlink():

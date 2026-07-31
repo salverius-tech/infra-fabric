@@ -443,6 +443,28 @@ class MigrateValuesTests(unittest.TestCase):
 
             self.assertIn("added debian_template_checksum", migrate_values.migrate(values))
             self.assertEqual(migrate_values.migrate(values), [])
+    def test_transactional_migration_restores_original_files_on_failure(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text("ORIGINAL=1\n", encoding="utf-8")
+            (values / "terraform.tfvars").write_text("address = \"192.0.2.10\"\n", encoding="utf-8")
+            backup = Path(temp.name) / "migration-backup"
+            original_env = (values / ".env").read_text(encoding="utf-8")
+            original_tfvars = (values / "terraform.tfvars").read_text(encoding="utf-8")
+            original_migrate = migrate_values.migrate
+            try:
+                def fail(_: Path) -> list[str]:
+                    (values / ".env").write_text("MUTATED=1\n", encoding="utf-8")
+                    raise RuntimeError("synthetic migration failure")
+
+                migrate_values.migrate = fail
+                with self.assertRaises(migrate_values.MigrationError):
+                    migrate_values.migrate_transactional(values, backup)
+            finally:
+                migrate_values.migrate = original_migrate
+            self.assertEqual((values / ".env").read_text(encoding="utf-8"), original_env)
+            self.assertEqual((values / "terraform.tfvars").read_text(encoding="utf-8"), original_tfvars)
+            self.assertTrue((backup / "manifest.json").is_file())
 
 
 if __name__ == "__main__":
