@@ -652,9 +652,12 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
         elif key in {"forgejo_enable_caddy", "FORGEJO_ENABLE_CADDY", "forgejo_configure_system_ssh", "FORGEJO_CONFIGURE_SYSTEM_SSH", "forgejo_write_initial_config", "FORGEJO_WRITE_INITIAL_CONFIG", "forgejo_bootstrap_enabled", "FORGEJO_BOOTSTRAP_ENABLED"}:
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
-        elif key in {"forgejo_bootstrap_admin_username", "forgejo_bootstrap_admin_email", "forgejo_bootstrap_owner_email"}:
-            if not isinstance(value, str) or not value.strip():
-                raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
+        elif key in {"forgejo_bootstrap_admin_username"}:
+            if not isinstance(value, str) or not re.fullmatch(r"[a-z_][a-z0-9_-]{0,31}", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a Linux user identifier")
+        elif key in {"forgejo_bootstrap_admin_email", "forgejo_bootstrap_owner_email"}:
+            if not isinstance(value, str) or not re.fullmatch(r"[^@\\s]+@[^@\\s]+", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be an email address")
         elif key == "forgejo_database":
             allowed = {"type", "managed", "host", "port", "name", "user", "ssl_mode"}
             valid = isinstance(value, dict) and set(value) <= allowed

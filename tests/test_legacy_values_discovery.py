@@ -1033,6 +1033,23 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "valid database metadata"):
                     legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
 
+    def test_bounded_ansible_importer_rejects_invalid_forgejo_bootstrap_identity(self) -> None:
+        invalid_values = {
+            "forgejo_bootstrap_admin_username": "Admin.User",
+            "forgejo_bootstrap_admin_email": "admin.example.com",
+            "forgejo_bootstrap_owner_email": "owner@",
+        }
+        for key, value in invalid_values.items():
+            with self.subTest(key=key):
+                temp, values = self.make_values()
+                with temp:
+                    repo = Path(temp.name) / "repo"
+                    inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+                    inventory.parent.mkdir(parents=True)
+                    inventory.write_text(f"all:\n  vars:\n    {key}: {value}\n", encoding="utf-8")
+                    with self.assertRaises(legacy_values_discovery.DiscoveryError):
+                        legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_service_resource_vmids(self) -> None:
         temp, values = self.make_values()
         with temp:
