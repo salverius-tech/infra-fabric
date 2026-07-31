@@ -395,7 +395,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertTrue(report["consumer_contract"]["legacy_static_inventory_present"])
         self.assertEqual(report["classification"]["inventory_status"], "complete")
         self.assertEqual(report["classification"]["semantic_mapping_status"], "semantic-coverage-complete")
-        self.assertEqual(report["classification"]["consumer_cutover_status"], "deferred")
+        self.assertEqual(report["classification"]["consumer_cutover_status"], "canonical-site-authoritative-with-legacy-compatibility")
         self.assertEqual(report["candidate_generation"]["status"], "blocked")
         self.assertFalse(report["candidate_generation"]["candidate_generation_allowed"])
         self.assertIn("runtime importer admission is incomplete", report["candidate_generation"]["reasons"])
@@ -435,13 +435,13 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertIn("shared_onramp_resource", families)
         self.assertIn("searxng_service", families)
 
-    def test_consumer_cutover_remains_deferred_after_semantic_equivalence_is_ready(self) -> None:
+    def test_consumer_cutover_is_canonical_for_selected_sites_with_legacy_compatibility(self) -> None:
         report = MODULE.build_report(ROOT)
         self.assertEqual(report["classification"]["semantic_mapping_status"], "semantic-coverage-complete")
-        self.assertEqual(report["consumer_contract"]["cutover_status"], "deferred")
+        self.assertEqual(report["consumer_contract"]["cutover_status"], "canonical-site-authoritative-with-legacy-compatibility")
         self.assertTrue(report["consumer_contract"]["legacy_terraform_input_present"])
         self.assertTrue(report["consumer_contract"]["legacy_static_inventory_present"])
-        self.assertFalse(report["consumer_contract"]["canonical_projection_authoritative"])
+        self.assertTrue(report["consumer_contract"]["canonical_projection_authoritative"])
         self.assertFalse(report["matrix_coverage"]["unmatched"])
         self.assertEqual(report["matrix_coverage"]["unmatched_count"], 0)
 

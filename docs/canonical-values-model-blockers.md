@@ -1,6 +1,6 @@
 # Canonical Values Model — Deferred Input Register
 
-**Status:** Source inventory/classification complete within scope; semantic mapping and complete importer authorization remain incomplete; bounded public candidate generation exists, but consumer cutover remains deferred.
+**Status:** Source inventory/classification is complete within scope; semantic mapping and complete importer authorization remain incomplete. Canonical consumer cutover is complete for selected sites with verified generated projections, while legacy compatibility remains for workspaces without `site.yaml`.
 **Scope:** Every unmatched identity in the current public-safe source inventory is classified here or by the machine-readable inventory report. No values are read or retained by this register.
 
 The current source inventory contains 378 identities. Of these, 368 are mapping-eligible for token-level reconciliation; 10 are explicitly excluded as generated projections, operational artifacts, or retired inputs. All eligible identities currently match one matrix token, but the live report still marks semantic mapping `incomplete`, and the runtime importer does not consume every source family through a field-level adapter. Candidate generation is limited to the bounded public overlay path over an approved canonical base; it is not authorization for complete legacy import or consumer cutover.

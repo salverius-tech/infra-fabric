@@ -213,14 +213,25 @@ def classify_ambiguous_legacy_aliases(source_inputs: dict[str, Any], matrix_cove
 
 
 def load_consumer_contract(repo: Path) -> dict[str, Any]:
-    paths = [repo / "scripts/plan-infra.sh", repo / "scripts/apply-infra.sh"]
+    paths = [repo / "scripts/plan-infra.sh", repo / "scripts/apply-infra.sh", repo / "scripts/validate-values.sh"]
     text = "\n".join(path.read_text(encoding="utf-8") for path in paths)
+    canonical_gate = all(
+        marker in text
+        for marker in (
+            "generated/terraform.auto.tfvars.json",
+            "generated/ansible-inventory.json",
+            "verify-projections.py",
+            "Canonical site exists but generated projection is missing",
+        )
+    )
+    canonical_ansible = "--canonical-ansible" in text
     return {
         "paths": [str(path.relative_to(repo)) for path in paths],
         "legacy_terraform_input_present": "terraform.tfvars" in text,
         "legacy_static_inventory_present": "ansible/inventory/local.yml" in text,
-        "canonical_projection_authoritative": False,
-        "cutover_status": "deferred",
+        "canonical_projection_authoritative": canonical_gate and canonical_ansible,
+        "cutover_status": "canonical-site-authoritative-with-legacy-compatibility" if canonical_gate and canonical_ansible else "deferred",
+        "legacy_compatibility_scope": "selected workspaces without site.yaml" if canonical_gate else "unbounded",
     }
 
 
