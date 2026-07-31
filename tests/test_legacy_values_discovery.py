@@ -89,6 +89,23 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertFalse(report.mapping_ready)
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_records_admitted_dynamic_values_without_evaluating(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n    forgejo_domain: '{{ inventory_hostname }}'\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observation = next(item for item in report.observations if item.key == "forgejo_domain")
+        self.assertEqual(observation.classification, "unsupported")
+        self.assertEqual(observation.value_type, "dynamic-expression")
+        self.assertIsNone(observation.value)
+        self.assertFalse(report.candidate_ready)
+
     def test_bounded_ansible_importer_admits_technitium_release_fields(self) -> None:
         temp, values = self.make_values()
         with temp:

@@ -580,6 +580,11 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
     source = path.as_posix()
     for key in sorted(set(variables) & allowed_keys):
         value = variables[key]
+        if isinstance(value, str) and ("{{" in value or "{%" in value):
+            report.observations.append(
+                FieldObservation(source, key, "unsupported", None, "dynamic-expression", None)
+            )
+            continue
         if key in {"onramp_host_password_authentication", "onramp_host_permit_root_login", "onramp_host_allow_passwordless_sudo"}:
             if not isinstance(value, bool):
                 raise DiscoveryError(f"bounded Ansible {key} must be boolean")
