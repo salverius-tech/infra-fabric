@@ -469,6 +469,44 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_domain", "mapped")].value, ["hermes.example.internal"])
         self.assertFalse(report.candidate_ready)
 
+    def test_bounded_ansible_importer_admits_searxng_configuration_wave(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    searxng_container_port: 8080\n"
+                "    searxng_bind_address: 127.0.0.1\n"
+                "    searxng_instance_name: public-search\n"
+                "    searxng_enable_public_url: true\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        expected = {
+            "searxng_container_port": ("services.searxng_onramp.configuration.container_port", 8080),
+            "searxng_bind_address": ("services.searxng_onramp.configuration.bind_address", "127.0.0.1"),
+            "searxng_instance_name": ("services.searxng_onramp.configuration.instance_name", "public-search"),
+            "searxng_enable_public_url": ("services.searxng_onramp.configuration.enable_public_url", True),
+        }
+        for key, (path, value) in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(observations[(key, "mapped")].proposed_path, path)
+                self.assertEqual(observations[(key, "mapped")].value, value)
+        self.assertFalse(report.candidate_ready)
+
+    def test_bounded_ansible_importer_rejects_non_loopback_searxng_bind(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text("all:\n  vars:\n    searxng_bind_address: 0.0.0.0\n", encoding="utf-8")
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "loopback IP"):
+                legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
     def test_bounded_ansible_importer_admits_caddy_extra_vhosts(self) -> None:
         temp, values = self.make_values()
         with temp:

@@ -585,6 +585,21 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
                 raise DiscoveryError(
                     f"bounded Ansible {key} must be an immutable repository@sha256:digest reference"
                 )
+        elif key == "searxng_container_port":
+            if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 65535:
+                raise DiscoveryError(f"bounded Ansible {key} must be between 1 and 65535")
+        elif key == "searxng_bind_address":
+            if not isinstance(value, str):
+                raise DiscoveryError(f"bounded Ansible {key} must be a loopback IP address")
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError as error:
+                raise DiscoveryError(f"bounded Ansible {key} must be a loopback IP address") from error
+            if not address.is_loopback:
+                raise DiscoveryError(f"bounded Ansible {key} must be a loopback IP address")
+        elif key == "searxng_enable_public_url":
+            if not isinstance(value, bool):
+                raise DiscoveryError(f"bounded Ansible {key} must be boolean")
         elif not isinstance(value, (str, bool, int, float)):
             raise DiscoveryError(f"bounded Ansible {key} must be a scalar")
         if isinstance(value, str) and not value.strip():
