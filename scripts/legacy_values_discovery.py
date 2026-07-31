@@ -599,16 +599,29 @@ def _read_ansible_bounded_slice(path: Path, report: DiscoveryReport, migration: 
             if key == "technitium_api_url"
             else None,
         )
+    protected_provider_keys = {"CF_API_EMAIL"}
+    secret_provider_keys = {"caddy_cloudflare_api_token", "CF_DNS_API_TOKEN"}
     for key in sorted(set(variables) - allowed_keys):
         classification, _ = _classification(key, migration)
+        if key in protected_provider_keys:
+            classification = "protected"
+        elif key in secret_provider_keys:
+            classification = "secret"
+        observation_classification = (
+            "secret"
+            if classification == "secret"
+            else "protected"
+            if classification == "protected"
+            else "unsupported"
+        )
         report.observations.append(
             FieldObservation(
                 source,
                 key,
-                "secret" if classification == "secret" else "unsupported",
+                observation_classification,
                 None,
                 _ansible_value_type(variables[key]),
-                "<redacted>" if classification == "secret" else None,
+                "<redacted>" if classification in {"secret", "protected"} else None,
             )
         )
 

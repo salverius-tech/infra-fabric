@@ -622,7 +622,9 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             inventory.write_text(
                 "all:\n  vars:\n"
                 "    caddy_email: admin@example.internal\n"
-                "    CF_DNS_API_TOKEN: SECRET_SENTINEL_DO_NOT_PRINT\n",
+                "    caddy_cloudflare_api_token: SECRET_SENTINEL_DO_NOT_PRINT\n"
+                "    CF_DNS_API_TOKEN: SECRET_SENTINEL_DO_NOT_PRINT_2\n"
+                "    CF_API_EMAIL: provider@example.internal\n",
                 encoding="utf-8",
             )
             report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
@@ -634,6 +636,14 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("caddy_email", "mapped")].value, "admin@example.internal")
         self.assertEqual(
             observations[("CF_DNS_API_TOKEN", "secret")].value,
+            "<redacted>",
+        )
+        self.assertEqual(
+            observations[("caddy_cloudflare_api_token", "secret")].value,
+            "<redacted>",
+        )
+        self.assertEqual(
+            observations[("CF_API_EMAIL", "protected")].value,
             "<redacted>",
         )
         self.assertFalse(report.candidate_ready)
