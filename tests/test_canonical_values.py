@@ -23,6 +23,7 @@ from canonical_projections import (
     render_dns_records,
     render_opentofu_variables,
 )
+from canonical_mapping import MappingContractError, MappingEntry, validate_mapping_matrix
 from service_catalog import ServiceCatalogError, load_catalog
 
 
@@ -184,6 +185,7 @@ class CanonicalValuesTests(unittest.TestCase):
         enabled = set(canonical.services)
         catalog.validate_selection(enabled)
         catalog.validate_model_services(canonical.services, canonical.resources)
+        validate_mapping_matrix(canonical)
         self.assertEqual(enabled, set(catalog.names))
         self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
         self.assertEqual(canonical.services["forgejo"].release.source, "package")
@@ -227,6 +229,15 @@ class CanonicalValuesTests(unittest.TestCase):
         canonical.services["forgejo"].resource = None
         with self.assertRaises(ServiceCatalogError):
             catalog.validate_model_services(canonical.services, canonical.resources)
+
+    def test_mapping_matrix_required_paths_fail_closed(self) -> None:
+        canonical = canonical_values.CanonicalSite.model_validate(self._full_catalog_site_document())
+        canonical.services["forgejo"].resource = None
+        with self.assertRaises(MappingContractError):
+            validate_mapping_matrix(
+                canonical,
+                (MappingEntry("services.forgejo.resource", ("opentofu",), "derived", required=True),),
+            )
 
     def test_ssh_port_requires_ssh_protocol(self) -> None:
         with self.assertRaises(ValidationError):
