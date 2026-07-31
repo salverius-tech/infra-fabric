@@ -235,7 +235,7 @@ The implementation is complete when all of the following are true:
 - [~] Record `schema_version`, loader/renderer version, source commit, selected site, `model_digest`, secret identity, ciphertext hash, projection digest, enabled services, ownership, and tool versions in plan metadata. Canonical model/projection identity recording and verification now exist for sites with persistent generated manifests; plan-path rendering and consumer integration remain.
 - [~] Verify site/model/secret/projection identity before OpenTofu and again before Ansible. Existing metadata verification runs before OpenTofu and is repeated after OpenTofu before Ansible; secret-bearing and full consumer wiring remain.
 - [ ] Ensure Ansible uses the same normalized snapshot or an identity-verified re-render.
-- [ ] Reject stale plans after relevant source, secret, renderer, projection, or tool changes.
+- [x] Reject stale plans after relevant source, secret, renderer, projection, or tool changes.
 - [ ] Implement semantic plan-equivalence comparison for pre/post migration plans.
 - [ ] Ignore only formatting/path/key-order/comments, refresh-only provider differences, and semantically equal computed values.
 - [ ] Flag creates, destroys, replacements, address/VMID/runtime/storage changes, service placement changes, DNS target changes, and secret-dependent changes.
@@ -251,7 +251,7 @@ The implementation is complete when all of the following are true:
 - [ ] Keep public `just` command names stable unless an explicit decision changes them.
 - [ ] Make `VALUES_SITE` mandatory for site-scoped operations and preserve existing site-context safety checks.
 - [ ] Update backup/restore and state paths to site-local state, generated artifacts, and encrypted backups.
-- [ ] Emit documented warnings for direct legacy-file use during the compatibility window.
+- [x] Emit documented warnings for direct legacy-file use during the compatibility window.
 - [ ] Make canonical files the only documented operator-edited configuration inputs.
 - [ ] Add selected-site, separate-dev/prod, direct-service-health, backup/restore, and repeat-plan operational checks.
 - [ ] Update README, AGENTS, scaffold docs/site fixture, migration plan, development docs, setup help, and private values contract tests.
@@ -760,5 +760,7 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-08-01 — Completed compatibility removal for operational consumers: `plan`, `apply`, and `validate` now require canonical `site.yaml` by default; legacy-only execution requires the explicit `INFRA_ALLOW_LEGACY_COMPATIBILITY=true` opt-in, with a shared shell gate, regression tests, and updated migration documentation.
 
 - 2026-08-01 — Reconciled documentation and report contracts: the inventory now scans the shared canonical-authority gate, exposes the implemented runtime-importer contract, reports selected-source admission conflicts precisely, and the migration/blocker documents no longer claim deferred cutover or an unimplemented importer.
+
+- 2026-08-01 — Completed compatibility-window/stale-plan tracker reconciliation: `site-context.sh` emits an explicit legacy warning, `test_compatibility_boundary.py` covers canonical/default/opt-in behavior, and `tfplan-metadata.py` rejects changed site/model/secret/projection/input/tool identities; semantic pre/post plan equivalence remains open.
 
 - 2026-08-01 — Completed final integration acceptance: full backend suite passes (567 tests), public safety and OpenTofu/Ansible validation pass, and ShellCheck warnings were removed. `just validate` reaches the final private-values prerequisite and stops because this checkout has no configured values workspace (`Run just setup or just setup <remote>`).
