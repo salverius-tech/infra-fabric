@@ -190,11 +190,11 @@ The implementation is complete when all of the following are true:
 - [~] Detect and report conflicts after semantic normalization; narrow mapped dotenv/tfvars conflict detection is covered, while the complete matrix remains open.
 - [ ] Generate missing persistent secrets idempotently through an explicit policy, without logging values.
 - [~] Preserve unknown values and source paths in a migration report; unsupported keys retain source/type metadata, dynamic expressions are marked for review, and value contents remain omitted.
-- [ ] Create and verify a backup before mutation; record source/destination hashes, schema/renderer versions, site, decisions, generated-secret actions, and backup ID in a manifest.
-- [ ] Support explicit apply only, refuse overwrite without explicit migration mode, and roll back completed moves if later work fails.
+- [~] Create and verify a backup before mutation; source/destination hashes, site, migration decisions, and backup ID are recorded in a manifest; schema/renderer identity and generated-secret action metadata remain open.
+- [~] Support explicit apply only, refuse overwrite without explicit migration mode, and roll back completed moves if later work fails; broader interruption and backup-restore rehearsal remains open.
 - [ ] Preserve or deliberately migrate state, known hosts, plans, backups, and private artifact references.
 - [ ] Prevent production credentials/state/backups from being copied into development sites.
-- [ ] Add idempotence, conflict, dry-run, backup, rollback, and both-layout fixtures/tests.
+- [~] Add idempotence, conflict, dry-run, backup, rollback, and root-layout fixtures/tests; full site-aware layout and production-data separation fixtures remain open.
 
 **Exit gate:** Both legacy layouts migrate in disposable fixtures with verified backup/restore, idempotent rerun, conflict failure, and no secret leakage.
 

@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from values_context import SITE_NAME_RE
 from migration_backup import BackupManifestError, build_manifest, create_backup, expand_backup_paths
 from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, runtime_importer_admission
+from canonical_values import CanonicalValuesError, load_site
 
 
 class SiteMigrationError(ValueError):
@@ -177,6 +178,16 @@ def inspect_existing_site(target: Path, site: str, metadata: dict[str, Any]) -> 
         raise SiteMigrationError(f"existing site target metadata conflicts: {target}")
     if manifest.get("canonical_destination") != f"sites/{site}" or manifest.get("secret_values_included") is not False:
         raise SiteMigrationError(f"existing site target manifest conflicts: {target}")
+    canonical_path = target / "site.yaml"
+    if canonical_path.is_file():
+        try:
+            load_site(
+                canonical_path,
+                expected_site=site,
+                catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json",
+            )
+        except CanonicalValuesError as error:
+            raise SiteMigrationError(f"existing canonical site is invalid: {error}") from error
     artifacts = site_artifact_inventory(target)
     return [
         f"existing site target verified: {target}",
@@ -245,6 +256,22 @@ def _write_candidate(path: Path, candidate: dict[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _validate_candidate(candidate: dict[str, Any], site: str) -> None:
+    """Validate a generated candidate against the canonical model and catalog."""
+    with tempfile.TemporaryDirectory(prefix=".canonical-candidate-") as temporary:
+        candidate_path = Path(temporary) / site / "site.yaml"
+        candidate_path.parent.mkdir()
+        _write_candidate(candidate_path, candidate)
+        try:
+            load_site(
+                candidate_path,
+                expected_site=site,
+                catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json",
+            )
+        except CanonicalValuesError as error:
+            raise SiteMigrationError(f"generated canonical candidate is invalid: {error}") from error
+
+
 def rollback_migration(
     target: Path,
     moved: list[tuple[Path, Path]],
@@ -309,6 +336,7 @@ def migrate(
                 site_name=site,
                 runtime_importer_admission=runtime_importer_admission(report),
             )
+            _validate_candidate(candidate, site)
         except (DiscoveryError, OSError, SiteMigrationError) as error:
             raise SiteMigrationError(f"canonical candidate generation blocked: {error}") from error
         actions.append(f"create {target}/site.yaml")

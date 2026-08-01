@@ -140,6 +140,26 @@ class SiteMigrationTests(unittest.TestCase):
             self.assertTrue((values / ".env").exists())
             self.assertFalse((values / "sites" / "dev").exists())
 
+    def test_generated_candidate_is_validated_before_migration(self) -> None:
+        invalid = {"schema_version": 1, "site": {"name": "dev"}}
+        with self.assertRaisesRegex(migration.SiteMigrationError, "generated canonical candidate is invalid"):
+            migration._validate_candidate(invalid, "dev")
+
+    def test_existing_canonical_site_is_validated_during_dry_run(self) -> None:
+        temp, values = self.make_legacy_values()
+        with temp:
+            target = values / "sites" / "dev"
+            target.mkdir(parents=True)
+            metadata = migration.site_metadata(values.parent, "dev", "development", "disposable", True, True)
+            (target / "site.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (target / "migration-manifest.json").write_text(
+                json.dumps({"canonical_destination": "sites/dev", "secret_values_included": False}),
+                encoding="utf-8",
+            )
+            (target / "site.yaml").write_text("schema_version: 1\nsite: {}\n", encoding="utf-8")
+            with self.assertRaisesRegex(migration.SiteMigrationError, "invalid canonical site model"):
+                migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, False)
+
     def test_site_identifier_rejects_path_traversal(self) -> None:
         temp, values = self.make_legacy_values()
         with temp:
