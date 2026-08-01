@@ -153,7 +153,7 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(hostvars["ansible_user"], "root")
         self.assertNotIn("ansible_become", hostvars)
 
-    def test_hermes_ssh_keys_are_promoted_from_lxc_keys(self) -> None:
+    def test_hermes_ssh_keys_are_not_promoted_from_retired_lxc_keys(self) -> None:
         keys = [
             "ssh-ed25519 AAAAhermes-test-ed25519",
             "ssh-rsa AAAAhermes-test-rsa",
@@ -168,11 +168,8 @@ class TfvarsInventoryTests(unittest.TestCase):
             ["hermes"],
         )
 
-        self.assertEqual(inventory["all"]["vars"]["hermes_ssh_public_keys"], keys)
-        self.assertEqual(
-            inventory["_meta"]["hostvars"]["hermes_lxc"]["hermes_ssh_public_keys"],
-            keys,
-        )
+        self.assertNotIn("hermes_ssh_public_keys", inventory["all"]["vars"])
+        self.assertNotIn("hermes_ssh_public_keys", inventory["_meta"]["hostvars"]["hermes_lxc"])
 
     def test_conflicting_canonical_and_legacy_runtime_fails_closed(self) -> None:
         with self.assertRaisesRegex(tfvars_inventory.InventoryError, "conflicting canonical and legacy runtime"):

@@ -37,10 +37,21 @@ class DeliveredSecret:
 # Environment names are explicit policy, never inferred from logical paths.
 DEFAULT_REQUIREMENTS: tuple[SecretRequirement, ...] = (
     SecretRequirement(
-        "secrets.bootstrap.technitium.root_password",
+        "secrets.bootstrap.root_password",
         "bootstrap",
         frozenset({"ansible-bootstrap"}),
-        "TF_VAR_container_root_password",
+        "INFRA_BOOTSTRAP_ROOT_PASSWORD",
+        state_exposure="forbidden",
+    ),
+)
+
+
+OPERATOR_REQUIREMENTS: tuple[SecretRequirement, ...] = (
+    SecretRequirement(
+        "secrets.operator.systemboss_password",
+        "operator",
+        frozenset({"ansible-host-identity"}),
+        "INFRA_SYSTEMBOSS_PASSWORD",
         state_exposure="forbidden",
     ),
 )
@@ -78,7 +89,41 @@ SERVICE_REQUIREMENTS: tuple[SecretRequirement, ...] = (
     _service_requirement("caddy", "cloudflare_api_token", "CLOUDFLARE_API_TOKEN"),
 )
 
-ALL_REQUIREMENTS = DEFAULT_REQUIREMENTS + SERVICE_REQUIREMENTS
+ALL_REQUIREMENTS = DEFAULT_REQUIREMENTS + OPERATOR_REQUIREMENTS + SERVICE_REQUIREMENTS
+
+
+def operator_password_requirements() -> tuple[SecretRequirement, ...]:
+    """Return the protected site-wide operator-password delivery contract."""
+    return OPERATOR_REQUIREMENTS
+
+
+def root_password_secret_path(
+    resource_id: str,
+    *,
+    default_secret: str = "secrets.bootstrap.root_password",
+    host_overrides: Mapping[str, str] | None = None,
+) -> str:
+    """Resolve a host root-password secret, preferring an explicit override."""
+    overrides = host_overrides or {}
+    return overrides.get(resource_id, default_secret)
+
+
+def root_password_requirements(
+    resource_ids: list[str] | tuple[str, ...],
+    *,
+    default_secret: str = "secrets.bootstrap.root_password",
+    host_overrides: Mapping[str, str] | None = None,
+    consumer: str = "ansible-bootstrap",
+) -> tuple[SecretRequirement, ...]:
+    """Build bootstrap delivery requirements for canonical resource IDs."""
+    paths = {
+        root_password_secret_path(resource_id, default_secret=default_secret, host_overrides=host_overrides)
+        for resource_id in resource_ids
+    }
+    return tuple(
+        SecretRequirement(path, "bootstrap", frozenset({consumer}), "INFRA_BOOTSTRAP_ROOT_PASSWORD")
+        for path in sorted(paths)
+    )
 
 
 def requirements_for_services(services: list[str] | tuple[str, ...]) -> tuple[SecretRequirement, ...]:
@@ -141,9 +186,14 @@ def deliver_environment(
     return environment
 
 
-def deliver_services_environment(provider: SecretProvider, services: list[str] | tuple[str, ...]) -> dict[str, str]:
+def deliver_services_environment(
+    provider: SecretProvider,
+    services: list[str] | tuple[str, ...],
+    *,
+    bootstrap_requirements: tuple[SecretRequirement, ...] = DEFAULT_REQUIREMENTS,
+) -> dict[str, str]:
     """Resolve bootstrap plus only the runtime secrets required by selected services."""
-    environment = deliver_environment(provider, consumer="ansible-bootstrap", requirements=DEFAULT_REQUIREMENTS)
+    environment = deliver_environment(provider, consumer="ansible-bootstrap", requirements=bootstrap_requirements)
     for service in services:
         delivered = deliver_environment(
             provider,
@@ -172,5 +222,7 @@ __all__ = [
     "deliver_services_environment",
     "redact_environment",
     "requirement_index",
+    "root_password_requirements",
+    "root_password_secret_path",
     "requirements_for_services",
 ]

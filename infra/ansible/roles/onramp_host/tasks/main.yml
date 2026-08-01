@@ -40,13 +40,18 @@
     group: "{{ onramp_host_deploy_user }}"
     mode: "0700"
 
+- name: Render onramp-host deploy authorized keys
+  ansible.builtin.set_fact:
+    onramp_host_authorized_keys: "{{ onramp_host_bootstrap_ssh_public_keys | default([]) | join('\\n') }}"
+  no_log: true
+
 - name: Install onramp-host deploy authorized keys
   ansible.builtin.copy:
     dest: "/home/{{ onramp_host_deploy_user }}/.ssh/authorized_keys"
     owner: "{{ onramp_host_deploy_user }}"
     group: "{{ onramp_host_deploy_user }}"
     mode: "0600"
-    content: "{{ (onramp_host_ssh_public_keys | default([])) | join('\n') }}{{ '\n' if (onramp_host_ssh_public_keys | default([]) | length) > 0 else '' }}"
+    content: "{{ onramp_host_authorized_keys }}"
   no_log: true
 
 - name: Harden onramp-host SSH daemon policy

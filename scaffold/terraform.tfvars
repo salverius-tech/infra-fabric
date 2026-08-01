@@ -1,18 +1,12 @@
 # Copy to values/terraform.tfvars and fill in local values.
 
-# Prefer values/.env for secrets:
-#   PROXMOX_VE_API_TOKEN
-#   TF_VAR_lxc_root_password
-#   TF_VAR_lxc_ssh_public_keys
+# Prefer values/.env for provider credentials. Bootstrap SSH keys are defined
+# in sites/<site>/site.yaml and projected by the canonical workflow.
 
 # Proxmox connection
 proxmox_endpoint  = "https://proxmox.example.internal:8006/"
 proxmox_insecure  = true
 proxmox_node_name = "pve"
-
-# Shared LXC credentials
-lxc_root_password   = "REPLACE_WITH_A_LONG_RANDOM_PASSWORD"
-lxc_ssh_public_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA_REPLACE_ME user@host"]
 
 # Shared storage and template settings
 rootfs_datastore_id                   = "local-lvm"
@@ -185,15 +179,15 @@ onramp_host_cores                    = 2
 onramp_host_memory_mb                = 4096
 onramp_host_disk_gb                  = 32
 onramp_host_cloud_init_user          = "anvil"
-onramp_host_ssh_public_keys          = []
-onramp_host_password_authentication  = false
-onramp_host_permit_root_login        = false
-onramp_host_deploy_user              = "anvil"
-onramp_host_deploy_dir               = "/srv/onramp"
-onramp_host_allow_passwordless_sudo  = true
-onramp_host_allowed_ssh_cidrs        = ["192.0.2.0/24"]
-onramp_host_started                  = true
-onramp_host_start_on_boot            = true
+
+onramp_host_password_authentication = false
+onramp_host_permit_root_login       = false
+onramp_host_deploy_user             = "anvil"
+onramp_host_deploy_dir              = "/srv/onramp"
+onramp_host_allow_passwordless_sudo = true
+onramp_host_allowed_ssh_cidrs       = ["192.0.2.0/24"]
+onramp_host_started                 = true
+onramp_host_start_on_boot           = true
 
 # SearXNG workload on the onramp host
 searxng_server_name       = "searxng.apps.example.net"

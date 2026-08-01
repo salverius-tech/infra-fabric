@@ -159,11 +159,21 @@ class MigrateValuesTests(unittest.TestCase):
             self.assertNotIn("dns_records_file", tfvars_text)
             self.assertTrue(changes)
 
-    def test_rejects_unscoped_secret_aliases(self) -> None:
+    def test_accepts_root_password_alias_as_site_default_compatibility_input(self) -> None:
         temp, values = self.make_values()
         with temp:
             (values / ".env").write_text(
                 "export TF_VAR_container_root_password='REPLACE_PASSWORD'\n",
+                encoding="utf-8",
+            )
+            changes = migrate_values.migrate(values)
+            self.assertIsInstance(changes, list)
+
+    def test_rejects_unscoped_ssh_key_alias(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / ".env").write_text(
+                "export TF_VAR_container_ssh_public_keys='ssh-ed25519 [REDACTED]'\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(migrate_values.MigrationError, "unscoped container secret aliases"):

@@ -114,15 +114,14 @@ variable "ipv4_gateway" {
   type        = string
 }
 
-variable "root_password" {
-  description = "Root password for the LXC."
-  type        = string
-  sensitive   = true
-}
-
 variable "ssh_public_keys" {
   description = "SSH public keys installed for root."
   type        = list(string)
+
+  validation {
+    condition     = length(var.ssh_public_keys) > 0
+    error_message = "At least one canonical bootstrap SSH public key is required."
+  }
 }
 
 variable "network" {

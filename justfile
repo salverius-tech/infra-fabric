@@ -56,8 +56,11 @@ validate-public: validate-public-safety
 validate-values: migrate-values
     scripts/validate-values.sh
 
-# Validate public source and private values wiring
-validate: validate-public validate-values
+# Validate the selected canonical site: public source plus site-local private wiring
+validate:
+    scripts/require-site-context.sh
+    just validate-public
+    just validate-values
 
 # Check upstream releases and update eligible pinned versions after the safety hold period
 update:
@@ -66,26 +69,31 @@ update:
 # Show recent Forgejo Actions runs for the private values repo
 [private]
 actions-status limit="10":
+    scripts/require-site-context.sh
     INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh python scripts/forgejo-actions-monitor.py status --limit "{{limit}}"
 
 # Watch a Forgejo Actions run until it reaches a terminal state
 [private]
 actions-watch run="latest":
+    scripts/require-site-context.sh
     INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh python scripts/forgejo-actions-monitor.py watch "{{run}}"
 
 # Show redacted logs for a Forgejo Actions run
 [private]
 actions-logs run="latest" tail="200":
+    scripts/require-site-context.sh
     INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh python scripts/forgejo-actions-monitor.py logs "{{run}}" --tail "{{tail}}"
 
 # Show Forgejo Actions runner registration and service status
 [private]
 actions-runners:
+    scripts/require-site-context.sh
     INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh python scripts/forgejo-actions-monitor.py runners
 
 # Remove saved plan artifacts
 [private]
 clean-plans:
+    scripts/require-site-context.sh
     source scripts/site-context.sh; values_dir="$(site_values_dir)"; rm -f "${values_dir}/tfplan" "${values_dir}/tfplan.meta.json" "${values_dir}"/*.tfplan "${values_dir}"/*.tfplan.meta.json
 
 # Review infrastructure changes using private values; writes tfplan for `just apply`

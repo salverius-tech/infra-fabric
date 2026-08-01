@@ -22,6 +22,15 @@ locals {
   hermes_runtime           = lookup(var.service_runtime, "hermes", { type = "lxc", cloud_init_user = null })
   onramp_host_runtime      = lookup(var.service_runtime, "onramp_host", { type = "vm", cloud_init_user = null })
 
+  canonical_operator_access = {
+    user        = var.operator_user
+    public_keys = var.operator_ssh_public_keys
+    dotfiles    = var.operator_dotfiles_repository
+    revision    = var.operator_dotfiles_revision
+    chezmoi     = var.operator_chezmoi_version
+    checksum    = var.operator_chezmoi_sha256
+  }
+
   technitium_runtime_type       = local.technitium_runtime.type
   tailscale_client_runtime_type = local.tailscale_client_runtime.type
   forgejo_runner_runtime_type   = local.forgejo_runner_runtime.type
@@ -40,7 +49,10 @@ locals {
 }
 
 resource "terraform_data" "enabled_services_validation" {
-  input = local.enabled_services
+  input = {
+    enabled_services = local.enabled_services
+    operator_access  = local.canonical_operator_access
+  }
 
   lifecycle {
     precondition {

@@ -37,13 +37,13 @@ VALID_DISPOSITIONS = {
 NON_CANONICAL_MAPPING_DISPOSITIONS = {"generated-projection", "operational-artifact", "retired-input"}
 PROTECTED_CONTRACTS = [
     {
-        "canonical_path": "secrets.bootstrap.technitium.root_password",
-        "owner": "resources.guests.technitium",
+        "canonical_path": "secrets.bootstrap.root_password",
+        "owner": "bootstrap.root_password",
         "provider": "sops-age",
         "delivery": "ansible-bootstrap-memory",
         "state_exposure": "forbidden",
         "public_projection": "forbidden",
-        "legacy_alias_policy": "reject-unscoped",
+        "legacy_alias_policy": "retired-root-password-aliases; reject-unscoped-ssh",
     }
 ]
 MATRIX_HEADERS = (
@@ -71,6 +71,7 @@ VALID_MATRIX_CLASSES = {
 }
 VALID_SECRET_CLASSES = {
     "public",
+    "public/bootstrap",
     "runtime",
     "secret",
     "provider",
@@ -88,7 +89,9 @@ class InventoryError(ValueError):
 FAMILY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("selection", ("enabled_services", "service_runtime", "forgejo_runtime")),
     ("service_compatibility", ("service_storage",)),
-    ("provider", ("proxmox_", "lxc_root_password", "lxc_ssh_public_keys")),
+    ("canonical_bootstrap_access", ("bootstrap_ssh_user", "bootstrap_ssh_public_keys")),
+    ("canonical_operator_access", ("operator_user", "operator_ssh_public_keys", "operator_dotfiles_", "operator_chezmoi_")),
+    ("provider", ("proxmox_",)),
     ("platform_storage_image", ("rootfs_datastore_id", "template_datastore_id", "debian_template_", "guest_vm_", "forgejo_vm_", "lxc_template_download_timeout_seconds")),
     ("technitium_resource", ("technitium_container_",)),
     ("forgejo_resource_or_service", ("forgejo_container_", "forgejo_lan_ip", "forgejo_server_name", "forgejo_database", "forgejo_storage", "forgejo_startup_")),

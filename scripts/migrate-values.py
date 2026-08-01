@@ -45,8 +45,6 @@ SECRET_KEYS = {
     "PROXMOX_VE_PASSWORD",
     "TECHNITIUM_API_TOKEN",
     "TF_VAR_technitium_api_token",
-    "TF_VAR_container_root_password",
-    "TF_VAR_lxc_root_password",
     "CF_DNS_API_TOKEN",
     "FORGEJO_SECRET_KEY",
     "FORGEJO_INTERNAL_TOKEN",
@@ -78,7 +76,6 @@ ENV_TO_INVENTORY = {
 }
 HISTORICAL_ENV_KEYS = ("FORGEJO_SERVER_NAME", "FORGEJO_UPSTREAM")
 UNSCOPED_ENV_KEYS = (
-    "TF_VAR_container_root_password",
     "TF_VAR_container_ssh_public_keys",
 )
 
@@ -607,7 +604,6 @@ def ensure_optional_service_tfvars(tfvars_lines: list[str], optional_services: s
             "onramp_host_memory_mb": "4096",
             "onramp_host_disk_gb": "32",
             "onramp_host_cloud_init_user": hcl_quote("onramp"),
-            "onramp_host_ssh_public_keys": "[]",
             "onramp_host_password_authentication": "false",
             "onramp_host_permit_root_login": "false",
             "onramp_host_deploy_user": hcl_quote("onramp"),
@@ -849,7 +845,7 @@ def enabled_optional_services(values_dir: Path) -> set[str]:
 
 def reject_unscoped_secret_aliases(env_entries: dict[str, EnvEntry], tfvars_lines: list[str]) -> None:
     present = [key for key in UNSCOPED_ENV_KEYS if key in env_entries]
-    for key in ("container_root_password", "container_ssh_public_keys"):
+    for key in ("container_ssh_public_keys",):
         for line in tfvars_lines:
             match = TFVARS_LINE_RE.match(line)
             if match and match.group("key") == key:

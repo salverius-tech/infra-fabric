@@ -85,6 +85,11 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   canonical_site=true
 fi
 
+ansible_inventory_args=("-i" "${ansible_inventory}")
+if [[ "${canonical_site}" != true ]]; then
+  ansible_inventory_args+=("-i" "infra/ansible/inventory/tfvars.py")
+fi
+
 storage_vars_args=()
 if [[ -n "${1:-}" ]]; then
   storage_vars_args+=(--service "${1}")
@@ -94,8 +99,7 @@ python scripts/guest-mount-feature-vars.py --summary
 
 guest_mount_feature_vars="$(python scripts/guest-mount-feature-vars.py)"
 ansible-playbook \
-  -i "${ansible_inventory}" \
-  -i infra/ansible/inventory/tfvars.py \
+  "${ansible_inventory_args[@]}" \
   -e "${guest_mount_feature_vars}" \
   infra/ansible/playbooks/guest-mount-feature-preflight.yml
 

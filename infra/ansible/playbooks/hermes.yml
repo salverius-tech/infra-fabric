@@ -14,11 +14,13 @@
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: hermes
+- name: Converge canonical host identities for Hermes
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: hermes
 - name: Configure Hermes management service directly
   hosts: hermes
   gather_facts: true
   become: true
   roles:
-    - role: lxc_credentials
-      when: hermes_runtime.type | default('lxc') == 'lxc'
     - hermes

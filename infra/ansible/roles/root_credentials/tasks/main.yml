@@ -1,0 +1,22 @@
+---
+- name: Require exactly one host for root-password bootstrap
+  ansible.builtin.assert:
+    that:
+      - ansible_play_hosts | length == 1
+    fail_msg: Root-password bootstrap must be limited to exactly one canonical host.
+  no_log: true
+
+- name: Validate managed host root password
+  ansible.builtin.assert:
+    that:
+      - lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | length >= 8
+      - lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') is not search('REPLACE_WITH_')
+    fail_msg: INFRA_BOOTSTRAP_ROOT_PASSWORD must contain the private managed host root password.
+  no_log: true
+
+- name: Rotate managed host root password
+  ansible.builtin.user:
+    name: root
+    password: "{{ lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | password_hash('sha512', root_credentials_root_password_hash_salt) }}"
+    update_password: always
+  no_log: true

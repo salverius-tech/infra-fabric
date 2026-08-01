@@ -39,6 +39,9 @@ _HERMES_TAG_RE = re.compile(r"^v[0-9]{4}\.[0-9]+\.[0-9]+(?:\.[0-9]+)?$")
 _HERMES_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _HERMES_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _HERMES_USER_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
+_SSH_PUBLIC_KEY_RE = re.compile(r"^(?:ssh-(?:ed25519|rsa)|ecdsa-sha2-nistp(?:256|384|521))\s+\S+(?:\s+.*)?$")
+_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 def normalize_container_image_reference(reference: str) -> tuple[str, str]:
@@ -1097,15 +1100,157 @@ class Service(StrictModel):
     overrides: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
+class RootPasswordBootstrapPolicy(StrictModel):
+    inheritance: Literal["automatic"] = "automatic"
+    default_secret: StrictStr = "secrets.bootstrap.root_password"
+    host_overrides: dict[StrictStr, StrictStr] = Field(default_factory=dict)
+
+    @field_validator("default_secret")
+    @classmethod
+    def validate_default_secret(cls, value: str) -> str:
+        if not value.startswith("secrets.") or value.endswith("."):
+            raise ValueError("bootstrap.root_password.default_secret must be a logical secret path")
+        return value
+
+    @field_validator("host_overrides")
+    @classmethod
+    def validate_host_overrides(cls, value: dict[str, str]) -> dict[str, str]:
+        for host, secret in value.items():
+            if not _IDENTIFIER_RE.fullmatch(host):
+                raise ValueError("bootstrap.root_password.host_overrides keys must be canonical resource IDs")
+            if not secret.startswith("secrets.") or secret.endswith("."):
+                raise ValueError(f"bootstrap.root_password.host_overrides.{host} must be a logical secret path")
+        return value
+
+
+class BootstrapSshPolicy(StrictModel):
+    user: StrictStr = "infra"
+    public_keys: list[StrictStr] = Field(default_factory=list)
+    host_additional_keys: dict[StrictStr, list[StrictStr]] = Field(default_factory=dict)
+
+    @field_validator("user")
+    @classmethod
+    def validate_user(cls, value: str) -> str:
+        if not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("bootstrap.ssh.user must be a valid Linux user identifier")
+        return value
+
+    @field_validator("public_keys")
+    @classmethod
+    def validate_public_keys(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("bootstrap.ssh.public_keys must not contain duplicates")
+        for key in value:
+            if not _SSH_PUBLIC_KEY_RE.fullmatch(key):
+                raise ValueError("bootstrap.ssh.public_keys must contain valid SSH public keys")
+        return value
+
+    @field_validator("host_additional_keys")
+    @classmethod
+    def validate_host_keys(cls, value: dict[str, list[str]]) -> dict[str, list[str]]:
+        for host, keys in value.items():
+            if not _IDENTIFIER_RE.fullmatch(host):
+                raise ValueError("bootstrap.ssh.host_additional_keys keys must be canonical resource IDs")
+            if len(keys) != len(set(keys)):
+                raise ValueError(f"bootstrap.ssh.host_additional_keys.{host} must not contain duplicates")
+            for key in keys:
+                if not _SSH_PUBLIC_KEY_RE.fullmatch(key):
+                    raise ValueError(f"bootstrap.ssh.host_additional_keys.{host} must contain valid SSH public keys")
+        return value
+
+
+class OperatorSshPolicy(BootstrapSshPolicy):
+    """SSH access policy for the human operator account."""
+
+
+class ChezmoiPolicy(StrictModel):
+    version: StrictStr = "v2.71.1"
+    sha256: StrictStr = "e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed"
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str) -> str:
+        if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", value):
+            raise ValueError("operator.dotfiles.chezmoi.version must be a pinned semantic release")
+        return value
+
+    @field_validator("sha256")
+    @classmethod
+    def validate_sha256(cls, value: str) -> str:
+        if not _SHA256_HEX_RE.fullmatch(value):
+            raise ValueError("operator.dotfiles.chezmoi.sha256 must be a lowercase SHA-256 digest")
+        return value
+
+
+class OperatorDotfilesPolicy(StrictModel):
+    repository: StrictStr = "https://github.com/salverius-tech/dotfiles"
+    revision: StrictStr = "4aeeadd928b0d03090e5aa973d10d989e846cf15"
+    chezmoi: ChezmoiPolicy = Field(default_factory=ChezmoiPolicy)
+
+    @field_validator("repository")
+    @classmethod
+    def validate_repository(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("operator.dotfiles.repository must be an HTTPS URL without credentials or fragments")
+        return value.rstrip("/")
+
+    @field_validator("revision")
+    @classmethod
+    def validate_revision(cls, value: str) -> str:
+        if not _GIT_COMMIT_RE.fullmatch(value):
+            raise ValueError("operator.dotfiles.revision must be a 40-character lowercase Git commit")
+        return value
+
+
+class OperatorPolicy(StrictModel):
+    user: StrictStr = "systemboss"
+    ssh: OperatorSshPolicy = Field(default_factory=OperatorSshPolicy)
+    dotfiles: OperatorDotfilesPolicy = Field(default_factory=OperatorDotfilesPolicy)
+
+    @field_validator("user")
+    @classmethod
+    def validate_user(cls, value: str) -> str:
+        if not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("operator.user must be a valid Linux user identifier")
+        return value
+
+
+class BootstrapPolicy(StrictModel):
+    root_password: RootPasswordBootstrapPolicy = Field(default_factory=RootPasswordBootstrapPolicy)
+    ssh: BootstrapSshPolicy = Field(default_factory=BootstrapSshPolicy)
+
+
 class CanonicalSite(StrictModel):
     schema_version: Literal[1]
     site: SiteMetadata
     platform: Platform
     resources: Resources
     services: dict[str, Service]
+    bootstrap: BootstrapPolicy = Field(default_factory=BootstrapPolicy)
+    operator: OperatorPolicy = Field(default_factory=OperatorPolicy)
 
     @model_validator(mode="after")
     def validate_service_ownership(self) -> "CanonicalSite":
+        resource_ids = set(self.resources.guests) | set(self.resources.shared_hosts)
+        unknown_overrides = sorted(set(self.bootstrap.root_password.host_overrides) - resource_ids)
+        if unknown_overrides:
+            raise ValueError(
+                "bootstrap.root_password.host_overrides reference unknown resources: "
+                + ", ".join(unknown_overrides)
+            )
+        unknown_ssh_hosts = sorted(set(self.bootstrap.ssh.host_additional_keys) - resource_ids)
+        if unknown_ssh_hosts:
+            raise ValueError(
+                "bootstrap.ssh.host_additional_keys reference unknown resources: "
+                + ", ".join(unknown_ssh_hosts)
+            )
+        unknown_operator_ssh_hosts = sorted(set(self.operator.ssh.host_additional_keys) - resource_ids)
+        if unknown_operator_ssh_hosts:
+            raise ValueError(
+                "operator.ssh.host_additional_keys reference unknown resources: "
+                + ", ".join(unknown_operator_ssh_hosts)
+            )
         hermes = self.services.get("hermes")
         if hermes is not None:
             try:

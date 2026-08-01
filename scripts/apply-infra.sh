@@ -73,6 +73,11 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   canonical_ansible_args=(--canonical-ansible)
 fi
 
+ansible_inventory_args=("-i" "${ansible_inventory}")
+if [[ "${#canonical_ansible_args[@]}" -eq 0 ]]; then
+  ansible_inventory_args+=("-i" "infra/ansible/inventory/tfvars.py")
+fi
+
 storage_vars_args=()
 if [[ -n "${target_service}" ]]; then
   storage_vars_args+=(--service "${target_service}")
@@ -82,8 +87,7 @@ python scripts/guest-mount-feature-vars.py --summary
 
 guest_mount_feature_vars="$(python scripts/guest-mount-feature-vars.py)"
 ansible-playbook \
-  -i "${ansible_inventory}" \
-  -i infra/ansible/inventory/tfvars.py \
+  "${ansible_inventory_args[@]}" \
   -e "${guest_mount_feature_vars}" \
   infra/ansible/playbooks/guest-mount-feature-preflight.yml
 
@@ -96,8 +100,7 @@ trap cleanup_plan_artifacts EXIT
 storage_vars="$(python scripts/storage-vars.py "${storage_vars_args[@]}")"
 if python -c "import json, sys; raise SystemExit(0 if json.loads(sys.argv[1]).get(\"storage_bind_mounts\") else 1)" "${storage_vars}"; then
   ansible-playbook \
-    -i "${ansible_inventory}" \
-    -i infra/ansible/inventory/tfvars.py \
+    "${ansible_inventory_args[@]}" \
     -e "${storage_vars}" \
     infra/ansible/playbooks/storage-prep.yml
 fi

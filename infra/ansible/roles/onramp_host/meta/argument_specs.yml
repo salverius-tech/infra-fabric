@@ -31,10 +31,10 @@ argument_specs:
         type: str
         required: true
         description: "Cloudflare DNS API token used by shared onramp Caddy DNS-01 challenges."
-      onramp_host_ssh_public_keys:
+      onramp_host_bootstrap_ssh_public_keys:
         type: list
         required: false
-        description: "Authorized key entries installed for the deploy user (default: [])."
+        description: "Canonical bootstrap key entries installed for the deploy user (default: [])."
       onramp_host_podman_packages:
         type: list
         required: false

@@ -61,8 +61,8 @@ resource "proxmox_virtual_environment_vm" "onramp_host" {
     }
 
     user_account {
-      username = var.onramp_host_cloud_init_user
-      keys     = length(var.onramp_host_ssh_public_keys) > 0 ? var.onramp_host_ssh_public_keys : var.lxc_ssh_public_keys
+      username = var.bootstrap_ssh_user
+      keys     = lookup(var.bootstrap_ssh_public_keys, "onramp_host", [])
     }
   }
 

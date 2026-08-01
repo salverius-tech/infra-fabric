@@ -100,7 +100,11 @@ variable "cloud_init_user" {
 variable "ssh_public_keys" {
   description = "SSH public keys installed for the cloud-init user."
   type        = list(string)
-  default     = []
+
+  validation {
+    condition     = length(var.ssh_public_keys) > 0
+    error_message = "At least one canonical bootstrap SSH public key is required."
+  }
 }
 
 variable "network" {

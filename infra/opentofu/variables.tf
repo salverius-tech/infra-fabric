@@ -159,16 +159,57 @@ variable "lxc_template_download_timeout_seconds" {
   default     = 1800
 }
 
-variable "lxc_root_password" {
-  description = "Initial and Ansible-managed root password for LXCs. Store only in terraform.tfvars or environment injection."
+variable "bootstrap_ssh_user" {
+  description = "Canonical SSH/bootstrap user for managed resources."
   type        = string
-  sensitive   = true
+  default     = "infra"
+
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.bootstrap_ssh_user))
+    error_message = "bootstrap_ssh_user must be a valid Linux user name."
+  }
 }
 
-variable "lxc_ssh_public_keys" {
-  description = "SSH public keys to install for root in the LXC."
-  type        = list(string)
-  default     = []
+variable "bootstrap_ssh_public_keys" {
+  description = "Canonical SSH public keys by managed resource ID."
+  type        = map(list(string))
+  default     = {}
+}
+
+variable "operator_user" {
+  description = "Canonical operator account converged by Ansible on managed resources."
+  type        = string
+  default     = "systemboss"
+}
+
+variable "operator_ssh_public_keys" {
+  description = "Canonical operator SSH public keys by managed resource ID."
+  type        = map(list(string))
+  default     = {}
+}
+
+variable "operator_dotfiles_repository" {
+  description = "Pinned public operator dotfiles repository URL."
+  type        = string
+  default     = "https://github.com/salverius-tech/dotfiles"
+}
+
+variable "operator_dotfiles_revision" {
+  description = "Immutable operator dotfiles Git revision."
+  type        = string
+  default     = "4aeeadd928b0d03090e5aa973d10d989e846cf15"
+}
+
+variable "operator_chezmoi_version" {
+  description = "Pinned chezmoi release used by Ansible."
+  type        = string
+  default     = "v2.71.1"
+}
+
+variable "operator_chezmoi_sha256" {
+  description = "Verified SHA-256 for the pinned chezmoi Linux AMD64 archive."
+  type        = string
+  default     = "e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed"
 }
 
 variable "technitium_container_cores" {
@@ -356,17 +397,6 @@ variable "guest_vm_image_checksum" {
   }
 }
 
-variable "guest_vm_cloud_init_user" {
-  description = "Default cloud-init SSH/bootstrap user for service VMs unless service_runtime.<service>.cloud_init_user overrides it."
-  type        = string
-  default     = "root"
-
-  validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.guest_vm_cloud_init_user))
-    error_message = "guest_vm_cloud_init_user must be a valid Linux user name."
-  }
-}
-
 variable "forgejo_runtime" {
   description = "Deprecated Forgejo-specific runtime compatibility alias. Prefer service_runtime.forgejo."
   type = object({
@@ -407,17 +437,6 @@ variable "forgejo_vm_image_file_name" {
   validation {
     condition     = can(regex("^[A-Za-z0-9._-]+\\.qcow2$", var.forgejo_vm_image_file_name))
     error_message = "forgejo_vm_image_file_name must be a qcow2 file name."
-  }
-}
-
-variable "forgejo_vm_cloud_init_user" {
-  description = "Cloud-init SSH/bootstrap user when Forgejo runs as a VM."
-  type        = string
-  default     = "root"
-
-  validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.forgejo_vm_cloud_init_user))
-    error_message = "forgejo_vm_cloud_init_user must be a valid Linux user name."
   }
 }
 
@@ -1184,23 +1203,6 @@ variable "onramp_host_disk_gb" {
   description = "Root disk size in GB for the onramp-host VM."
   type        = number
   default     = 32
-}
-
-variable "onramp_host_cloud_init_user" {
-  description = "Initial non-root cloud-init user for SSH/bootstrap on the onramp-host VM."
-  type        = string
-  default     = "anvil"
-
-  validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.onramp_host_cloud_init_user))
-    error_message = "onramp_host_cloud_init_user must be a valid Linux user name."
-  }
-}
-
-variable "onramp_host_ssh_public_keys" {
-  description = "SSH public keys authorized for the onramp-host cloud-init user. Store real keys in private values. Falls back to lxc_ssh_public_keys when empty."
-  type        = list(string)
-  default     = []
 }
 
 variable "onramp_host_password_authentication" {

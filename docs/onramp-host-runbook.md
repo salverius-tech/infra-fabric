@@ -18,7 +18,8 @@ Removing `onramp_host` can cause OpenTofu to plan VM changes or destroy actions.
 
 - VMID, hostname, pinned Debian 13 genericcloud image URL/file name, checksum algorithm/checksum, datastore, CPU, memory, disk
 - static IPv4/CIDR, gateway, DNS servers, search domain, bridge, optional VLAN
-- cloud-init/bootstrap user, SSH public keys, deploy user, deploy directory, SSH policy, and firewall source CIDRs. New scaffold values use `anvil` for both the cloud-init and deploy user, and the cloud-init keys fall back to `lxc_ssh_public_keys` when `onramp_host_ssh_public_keys` is empty.
+- canonical bootstrap public keys, installed for the deploy user from the role-scoped `onramp_host_bootstrap_ssh_public_keys` projection;
+- deploy user, deploy directory, SSH policy, and firewall source CIDRs. New scaffold values use `anvil` for both the cloud-init and deploy user.
 
 Tracked scaffold values use only placeholders such as `onramp-host.example.internal`, `searxng.apps.example.net`, and `192.0.2.0/24`. The onramp-host VM must be built from a clean cloud image; do not point it at a mutable VM template with existing cloud-init state.
 

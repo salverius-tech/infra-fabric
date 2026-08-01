@@ -1,0 +1,18 @@
+---
+# Canonical host identity defaults. Secret values are intentionally undefined.
+host_identity_enabled: false
+host_identity_provisioning_user: infra
+host_identity_operator_user: systemboss
+host_identity_provisioning_keys: []
+host_identity_operator_keys: []
+host_identity_operator_password: ""
+host_identity_operator_home: /home/systemboss
+host_identity_provisioning_home: /home/infra
+host_identity_shell: /bin/bash
+host_identity_chezmoi_version: v2.71.1
+host_identity_chezmoi_sha256: e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed
+host_identity_dotfiles_repository: https://github.com/salverius-tech/dotfiles
+host_identity_dotfiles_revision: 4aeeadd928b0d03090e5aa973d10d989e846cf15
+host_identity_dotfiles_enabled: true
+host_identity_root_password_hash_salt: infraFabricRoot
+host_identity_root_recovery_enabled: true

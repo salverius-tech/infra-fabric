@@ -7,6 +7,24 @@ site:
   allow_apply: true
   allow_destroy: true
 
+bootstrap:
+  ssh:
+    user: infra
+    public_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIpublicsafeexample public@example.invalid
+
+operator:
+  user: systemboss
+  ssh:
+    public_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIpublicsafeexample operator@example.invalid
+  dotfiles:
+    repository: https://github.com/salverius-tech/dotfiles
+    revision: 4aeeadd928b0d03090e5aa973d10d989e846cf15
+    chezmoi:
+      version: v2.71.1
+      sha256: e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed
+
 platform:
   proxmox:
     endpoint: https://proxmox.example.internal:8006/

@@ -283,8 +283,7 @@
         "tf_domain": "hermes_server_name",
         "tf_user": "hermes_ansible_user",
         "extra_play_vars": {
-          "hermes_runtime_user": "hermes_runtime_user",
-          "hermes_ssh_public_keys": "lxc_ssh_public_keys"
+          "hermes_runtime_user": "hermes_runtime_user"
         },
         "canonical_play_vars": {
           "hermes_runtime_user": "configuration.runtime_user",
@@ -352,7 +351,6 @@
         "extra_play_vars": {
           "onramp_host_cloud_init_user": "onramp_host_cloud_init_user",
           "onramp_host_deploy_dir": "onramp_host_deploy_dir",
-          "onramp_host_ssh_public_keys": "onramp_host_ssh_public_keys",
           "onramp_host_password_authentication": "onramp_host_password_authentication",
           "onramp_host_permit_root_login": "onramp_host_permit_root_login",
           "onramp_host_allow_passwordless_sudo": "onramp_host_allow_passwordless_sudo",

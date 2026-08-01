@@ -1,0 +1,201 @@
+---
+- name: Require the canonical host identity contract
+  ansible.builtin.assert:
+    that:
+      - host_identity_provisioning_user == 'infra'
+      - host_identity_operator_user == 'systemboss'
+      - host_identity_provisioning_keys | length > 0
+      - host_identity_operator_keys | length > 0
+      - host_identity_operator_password | length > 0
+      - not host_identity_root_recovery_enabled | bool or lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | length >= 8
+      - not host_identity_root_recovery_enabled | bool or lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') is not search('REPLACE_WITH_')
+      - host_identity_chezmoi_version is match('^v[0-9]+\\.[0-9]+\\.[0-9]+$')
+      - host_identity_chezmoi_sha256 is match('^[0-9a-f]{64}$')
+    fail_msg: Canonical host identity inputs are incomplete or invalid.
+  no_log: true
+
+- name: Converge the automation account
+  become: true
+  ansible.builtin.user:
+    name: "{{ host_identity_provisioning_user }}"
+    home: "{{ host_identity_provisioning_home }}"
+    shell: "{{ host_identity_shell }}"
+    groups: sudo
+    append: false
+    password_lock: true
+    create_home: true
+    state: present
+
+- name: Create provisioning SSH directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ host_identity_provisioning_home }}/.ssh"
+    state: directory
+    owner: "{{ host_identity_provisioning_user }}"
+    group: "{{ host_identity_provisioning_user }}"
+    mode: '0700'
+
+- name: Replace provisioning authorized keys
+  become: true
+  ansible.builtin.copy:
+    dest: "{{ host_identity_provisioning_home }}/.ssh/authorized_keys"
+    content: "{{ host_identity_provisioning_keys | join('\n') }}\n"
+    owner: "{{ host_identity_provisioning_user }}"
+    group: "{{ host_identity_provisioning_user }}"
+    mode: '0600'
+
+- name: Converge the operator account
+  become: true
+  ansible.builtin.user:
+    name: "{{ host_identity_operator_user }}"
+    home: "{{ host_identity_operator_home }}"
+    shell: "{{ host_identity_shell }}"
+    groups: sudo
+    append: false
+    create_home: true
+    state: present
+
+- name: Set the protected operator sudo password
+  become: true
+  ansible.builtin.user:
+    name: "{{ host_identity_operator_user }}"
+    password: "{{ host_identity_operator_password | password_hash('sha512') }}"
+    update_password: always
+  no_log: true
+
+- name: Create operator SSH directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ host_identity_operator_home }}/.ssh"
+    state: directory
+    owner: "{{ host_identity_operator_user }}"
+    group: "{{ host_identity_operator_user }}"
+    mode: '0700'
+
+- name: Replace operator authorized keys
+  become: true
+  ansible.builtin.copy:
+    dest: "{{ host_identity_operator_home }}/.ssh/authorized_keys"
+    content: "{{ host_identity_operator_keys | join('\n') }}\n"
+    owner: "{{ host_identity_operator_user }}"
+    group: "{{ host_identity_operator_user }}"
+    mode: '0600'
+
+- name: Install passwordless sudo policy for automation
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/infra
+    content: "{{ host_identity_provisioning_user }} ALL=(ALL:ALL) NOPASSWD: ALL\n"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Install authenticated full sudo policy for operator
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/systemboss
+    content: "{{ host_identity_operator_user }} ALL=(ALL:ALL) ALL\n"
+    owner: root
+    group: root
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Create temporary chezmoi workspace
+  become: true
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: host-identity-chezmoi-
+  register: host_identity_workspace
+  when: host_identity_dotfiles_enabled | bool
+
+- name: Download pinned chezmoi archive
+  become: true
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/twpayne/chezmoi/releases/download/{{ host_identity_chezmoi_version }}/chezmoi_{{
+      host_identity_chezmoi_version | regex_replace('^v', '') }}_linux_amd64.tar.gz
+    dest: "{{ host_identity_workspace.path }}/chezmoi.tar.gz"
+    checksum: "sha256:{{ host_identity_chezmoi_sha256 }}"
+    mode: '0600'
+  when: host_identity_dotfiles_enabled | bool
+
+- name: Extract pinned chezmoi archive
+  become: true
+  ansible.builtin.unarchive:
+    src: "{{ host_identity_workspace.path }}/chezmoi.tar.gz"
+    dest: "{{ host_identity_workspace.path }}"
+    remote_src: true
+  when: host_identity_dotfiles_enabled | bool
+
+- name: Install pinned chezmoi binary
+  become: true
+  ansible.builtin.copy:
+    src: "{{ host_identity_workspace.path }}/chezmoi"
+    dest: /usr/local/bin/chezmoi
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
+  when: host_identity_dotfiles_enabled | bool
+
+- name: Clone pinned operator dotfiles revision
+  become: true
+  ansible.builtin.git:
+    repo: "{{ host_identity_dotfiles_repository }}"
+    dest: "{{ host_identity_workspace.path }}/dotfiles"
+    version: "{{ host_identity_dotfiles_revision }}"
+    depth: 1
+    single_branch: true
+  when: host_identity_dotfiles_enabled | bool
+
+- name: Apply pinned operator dotfiles as systemboss
+  become: true
+  become_user: "{{ host_identity_operator_user }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/chezmoi
+      - init
+      - --apply
+      - --source
+      - "{{ host_identity_workspace.path }}/dotfiles"
+  environment:
+    HOME: "{{ host_identity_operator_home }}"
+  changed_when: true
+  when: host_identity_dotfiles_enabled | bool
+
+- name: Remove temporary chezmoi workspace
+  become: true
+  ansible.builtin.file:
+    path: "{{ host_identity_workspace.path }}"
+    state: absent
+  when: host_identity_dotfiles_enabled | bool
+
+- name: Set the protected root console recovery password
+  become: true
+  ansible.builtin.user:
+    name: root
+    password: "{{ lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | password_hash('sha512', host_identity_root_password_hash_salt) }}"
+    update_password: always
+  no_log: true
+  when: host_identity_root_recovery_enabled | bool
+
+- name: Remove temporary root SSH keys
+  become: true
+  ansible.builtin.file:
+    path: /root/.ssh/authorized_keys
+    state: absent
+  when: host_identity_root_recovery_enabled | bool
+
+- name: Disable root SSH while retaining console recovery
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-infra-fabric-root-recovery.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload SSH
+  when: host_identity_root_recovery_enabled | bool

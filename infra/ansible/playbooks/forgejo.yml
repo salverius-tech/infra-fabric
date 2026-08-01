@@ -14,11 +14,13 @@
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: forgejo
-- name: Configure Forgejo service directly
+- name: Converge canonical host identities for Forgejo
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: forgejo
+- name: Configure Forgejo directly
   hosts: forgejo
   gather_facts: false
   become: true
   roles:
-    - role: lxc_credentials
-      when: forgejo_runtime.type | default('lxc') == 'lxc'
     - forgejo

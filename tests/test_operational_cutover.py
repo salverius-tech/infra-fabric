@@ -28,6 +28,14 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertIn('--canonical-ansible', apply)
         self.assertIn('generated/ansible-inventory.json', apply)
 
+    def test_operator_site_actions_require_selected_site_context(self) -> None:
+        justfile = (ROOT / "justfile").read_text(encoding="utf-8")
+        for recipe in ("actions-status", "actions-watch", "actions-logs", "actions-runners", "clean-plans"):
+            start = justfile.index(f"{recipe}")
+            next_recipe = justfile.find("\n# ", start + 1)
+            block = justfile[start:] if next_recipe < 0 else justfile[start:next_recipe]
+            self.assertIn("scripts/require-site-context.sh", block, recipe)
+
 
 if __name__ == "__main__":
     unittest.main()

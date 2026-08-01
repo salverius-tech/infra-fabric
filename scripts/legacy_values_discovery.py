@@ -68,6 +68,8 @@ def _load_migration_module() -> Any:
 def _classification(key: str, migration: Any) -> tuple[str, str | None]:
     if key in {"infisical_encryption_key"}:
         return "secret", None
+    if key in {"container_root_password", "lxc_root_password"}:
+        return "secret", None
     if key in {"hermes_control_source_url", "hermes_control_source_ref"}:
         return "provider", {
             "hermes_control_source_url": "services.hermes.configuration.control.source_url",

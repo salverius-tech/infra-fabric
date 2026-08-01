@@ -95,6 +95,113 @@ services:
 
 
 class CanonicalValuesTests(unittest.TestCase):
+    def test_bootstrap_ssh_policy_accepts_site_and_host_keys(self) -> None:
+        site = canonical_values.YAML(typ="safe").load(VALID_SITE)
+        site["bootstrap"] = {
+            "ssh": {
+                "user": "infra",
+                "public_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsite site@example"],
+                "host_additional_keys": {
+                    "forgejo": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIhost host@example"],
+                },
+            }
+        }
+
+        model = canonical_values.CanonicalSite.model_validate(site)
+
+        self.assertEqual(model.bootstrap.ssh.user, "infra")
+        self.assertEqual(model.bootstrap.ssh.public_keys[0].split()[0], "ssh-ed25519")
+        self.assertIn("forgejo", model.bootstrap.ssh.host_additional_keys)
+
+    def test_bootstrap_ssh_keys_project_by_canonical_resource(self) -> None:
+        site = canonical_values.YAML(typ="safe").load(VALID_SITE)
+        site["bootstrap"] = {
+            "ssh": {
+                "user": "infra",
+                "public_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsite site@example"],
+                "host_additional_keys": {
+                    "forgejo": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIhost host@example"],
+                },
+            }
+        }
+        model = canonical_values.CanonicalSite.model_validate(site)
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+
+        tofu = render_opentofu_variables(model)
+        inventory = render_ansible_inventory(model, catalog)
+
+        self.assertEqual(tofu["bootstrap_ssh_user"], "infra")
+        self.assertEqual(len(tofu["bootstrap_ssh_public_keys"]["forgejo"]), 2)
+        hostvars = inventory["_meta"]["hostvars"][catalog.get("forgejo").inventory["host"]]
+        self.assertEqual(hostvars["ansible_user"], "infra")
+        self.assertEqual(hostvars["bootstrap_ssh_public_keys"], tofu["bootstrap_ssh_public_keys"]["forgejo"])
+
+    def test_operator_policy_projects_separate_keys_and_pinned_dotfiles(self) -> None:
+        site = canonical_values.YAML(typ="safe").load(VALID_SITE)
+        site["operator"] = {
+            "user": "systemboss",
+            "ssh": {
+                "public_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIoperator operator@example"],
+                "host_additional_keys": {
+                    "forgejo": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIoperatorhost host@example"],
+                },
+            },
+            "dotfiles": {
+                "repository": "https://github.com/salverius-tech/dotfiles",
+                "revision": "4aeeadd928b0d03090e5aa973d10d989e846cf15",
+                "chezmoi": {
+                    "version": "v2.71.1",
+                    "sha256": "e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed",
+                },
+            },
+        }
+        model = canonical_values.CanonicalSite.model_validate(site)
+        tofu = render_opentofu_variables(model)
+        self.assertEqual(tofu["operator_user"], "systemboss")
+        self.assertEqual(len(tofu["operator_ssh_public_keys"]["forgejo"]), 2)
+        self.assertEqual(tofu["operator_dotfiles_revision"], "4aeeadd928b0d03090e5aa973d10d989e846cf15")
+        self.assertEqual(tofu["operator_chezmoi_version"], "v2.71.1")
+
+    def test_root_password_policy_defaults_to_automatic_site_inheritance(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir) / "dev"
+            site_dir.mkdir()
+            path = site_dir / "site.yaml"
+            path.write_text(VALID_SITE, encoding="utf-8")
+            model = load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        self.assertEqual(model.bootstrap.root_password.inheritance, "automatic")
+        self.assertEqual(model.bootstrap.root_password.default_secret, "secrets.bootstrap.root_password")
+        self.assertEqual(model.bootstrap.root_password.host_overrides, {})
+
+    def test_root_password_policy_accepts_existing_resource_override(self) -> None:
+        document = VALID_SITE.replace(
+            "services:\n",
+            "bootstrap:\n  root_password:\n    host_overrides:\n      forgejo: secrets.bootstrap.hosts.forgejo.root_password\nservices:\n",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir) / "dev"
+            site_dir.mkdir()
+            path = site_dir / "site.yaml"
+            path.write_text(document, encoding="utf-8")
+            model = load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        self.assertEqual(
+            model.bootstrap.root_password.host_overrides["forgejo"],
+            "secrets.bootstrap.hosts.forgejo.root_password",
+        )
+
+    def test_root_password_policy_rejects_unknown_resource_override(self) -> None:
+        document = VALID_SITE.replace(
+            "services:\n",
+            "bootstrap:\n  root_password:\n    host_overrides:\n      missing: secrets.bootstrap.hosts.missing.root_password\nservices:\n",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            site_dir = Path(temp_dir) / "dev"
+            site_dir.mkdir()
+            path = site_dir / "site.yaml"
+            path.write_text(document, encoding="utf-8")
+            with self.assertRaises(CanonicalValuesError):
+                load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+
     def test_service_configuration_registry_covers_typed_services(self) -> None:
         self.assertEqual(
             set(canonical_values.SERVICE_CONFIGURATION_MODELS),

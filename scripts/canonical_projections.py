@@ -142,6 +142,28 @@ def _resource_variables(name: str, resource: Any) -> dict[str, Any]:
     return values
 
 
+def _bootstrap_ssh_keys(model: CanonicalSite, resource_id: str) -> list[str]:
+    policy = model.bootstrap.ssh
+    keys = list(policy.public_keys)
+    for key in policy.host_additional_keys.get(resource_id, []):
+        if key not in keys:
+            keys.append(key)
+    return keys
+
+
+def _operator_ssh_keys(model: CanonicalSite, resource_id: str) -> list[str]:
+    policy = model.operator.ssh
+    keys = list(policy.public_keys)
+    for key in policy.host_additional_keys.get(resource_id, []):
+        if key not in keys:
+            keys.append(key)
+    return keys
+
+
+def _bootstrap_ssh_user(model: CanonicalSite, resource: Any) -> str:
+    return resource.runtime.cloud_init_user or model.bootstrap.ssh.user
+
+
 def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
     """Render existing OpenTofu variable names without secret material."""
     _validate_non_secret_inputs(model)
@@ -152,6 +174,20 @@ def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
         "proxmox_insecure": model.platform.proxmox.insecure,
         "rootfs_datastore_id": model.platform.storage.rootfs_datastore,
         "template_datastore_id": model.platform.storage.template_datastore,
+        "bootstrap_ssh_user": model.bootstrap.ssh.user,
+        "bootstrap_ssh_public_keys": {
+            resource_id: _bootstrap_ssh_keys(model, resource_id)
+            for resource_id in (*model.resources.guests, *model.resources.shared_hosts)
+        },
+        "operator_user": model.operator.user,
+        "operator_ssh_public_keys": {
+            resource_id: _operator_ssh_keys(model, resource_id)
+            for resource_id in (*model.resources.guests, *model.resources.shared_hosts)
+        },
+        "operator_dotfiles_repository": model.operator.dotfiles.repository,
+        "operator_dotfiles_revision": model.operator.dotfiles.revision,
+        "operator_chezmoi_version": model.operator.dotfiles.chezmoi.version,
+        "operator_chezmoi_sha256": model.operator.dotfiles.chezmoi.sha256,
     }
     if model.platform.vm_cloud_init_user is not None:
         values["guest_vm_cloud_init_user"] = model.platform.vm_cloud_init_user
@@ -230,6 +266,10 @@ def render_ansible_inventory(model: CanonicalSite, catalog: ServiceCatalog) -> d
             "canonical_resource": service.resource,
             "canonical_service": name,
             "ansible_host": _address(resource),
+            "ansible_user": _bootstrap_ssh_user(model, resource),
+            "bootstrap_ssh_public_keys": _bootstrap_ssh_keys(model, service.resource or ""),
+            "operator_user": model.operator.user,
+            "operator_ssh_public_keys": _operator_ssh_keys(model, service.resource or ""),
             "service_runtime_current": {"type": resource.type},
         }
         hosts[host] = {**hosts.get(host, {}), **hostvars}
@@ -298,6 +338,8 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                         "caddy_extra_vhosts": list(caddy.get("extra_vhosts", [])),
                     }
                 )
+        if name == "onramp_host":
+            legacy_vars["onramp_host_bootstrap_ssh_public_keys"] = _bootstrap_ssh_keys(model, service.resource or "")
         if legacy_vars:
             service_vars["legacy_vars"] = legacy_vars
         services[name] = service_vars

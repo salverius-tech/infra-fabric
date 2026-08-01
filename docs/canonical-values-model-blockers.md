@@ -15,11 +15,11 @@ python3 scripts/canonical-mapping-inventory.py
 
 ## Secret or protected inputs
 
-**Source identities:** secret/password/token/API-key/auth-key/SSH-key names from `scaffold/terraform.tfvars`, `scaffold/ansible/inventory/local.yml`, `scripts/migrate-values.py`, and `scripts/parse-env.py`; provider/external-system identities such as Proxmox and edge-router credentials; the generic `container_root_password` and `container_ssh_public_keys` migration aliases.
+**Source identities:** secret/password/token/API-key/auth-key/SSH-key names from `scaffold/terraform.tfvars`, `scaffold/ansible/inventory/local.yml`, `scripts/migrate-values.py`, and `scripts/parse-env.py`; provider/external-system identities such as Proxmox and edge-router credentials. The former generic `container_root_password`, `lxc_root_password`, and `container_ssh_public_keys` names are retired-input diagnostics only.
 
 **Candidate owners:** `secrets.sops.yaml` logical paths, provider-secret transport, or task-specific protected runtime inputs.
 
-**Why the boundary remains protected:** named service/provider secrets now have logical namespaces, consumer-delivery classes, and fail-closed state-exposure rules. Generic SSH-key aliases and unscoped `container_*` secret aliases remain rejected by migration preflight rather than promoted or silently renamed. Private recipient/key provisioning and selected-site operational delivery evidence are still required.
+**Why the boundary remains protected:** named service/provider secrets now have logical namespaces, consumer-delivery classes, and fail-closed state-exposure rules. Root-password aliases resolve only to the site-wide default and host-specific overrides require canonical resource IDs. Canonical Ansible delivery now resolves and injects one host credential at a time through a transient, host-limited bootstrap process. Generic SSH-key aliases remain rejected by migration preflight rather than promoted or silently renamed. Private recipient/key provisioning and selected-site operational delivery evidence are still required.
 
 **Affected consumers:** OpenTofu provider authentication, LXC/VM bootstrap, Ansible service roles, Caddy/DNS credentials, Forgejo/Infisical/Tailscale/Hermes runtime tasks, and recovery workflows.
 
@@ -28,6 +28,12 @@ python3 scripts/canonical-mapping-inventory.py
 **Exact decision needed:** approve a logical secret schema and consumer delivery matrix, including provider/bootstrap/runtime/recovery classification, state exposure policy, and resource-scoped replacement for generic aliases.
 
 **Safe interim disposition:** retain value-free metadata and deliver secrets only through the permitted protected consumer boundary. Never include them in public candidates, non-secret projections, logs, command-line arguments, or OpenTofu state. Candidate generation remains blocked when selected-source protected admission is unresolved.
+
+### OpenTofu initial-provisioning state gap
+
+The clean cutover removes the initial root-password path from OpenTofu resource creation. VM resources can initialize `infra` directly. LXC resources temporarily receive root key access using the canonical `infra` provisioning key set because the installed Proxmox provider has no non-root LXC initialization username field. A host-limited Ansible handoff creates/converges `infra` and `systemboss`, verifies `infra`, sets the protected root console-recovery password, removes root authorized keys, and disables root SSH. The root password remains transient and is not an OpenTofu input or projection.
+
+The remaining operational gate is live acceptance: verify the canonical SSH key reaches each newly created LXC/VM, verify the one-host LXC root-to-`infra` handoff, verify Proxmox GUI/console root recovery, and only then rebuild hosts under the approved cutover sequence.
 
 ## Behavior or configuration without a typed owner
 
@@ -83,7 +89,7 @@ The eligible remainder was audited against the current typed model, matrix rows,
 
 | Classification | Count | Decision |
 | --- | ---: | --- |
-| `secret-or-protected` | 0 | Resolved: `TF_VAR_container_root_password` maps to `secrets.bootstrap.technitium.root_password`; migration still rejects unscoped aliases, and protected delivery forbids public projections and OpenTofu state exposure. |
+| `secret-or-protected` | 0 | Resolved: root-password aliases map to `secrets.bootstrap.root_password`; host overrides are resource-scoped, while SSH aliases remain blocked until protected delivery is defined. |
 
 
 The exact identities are preserved in `deferred_classification.items` in the machine-readable report. The current public matrix has no unmatched eligible identity; the remaining register entries describe protected, operational, dynamic, or migration-only boundaries rather than missing token matches. Promoting any such input still requires the explicit contract recorded in its blocker category; adding generic or guessed rows would make the matrix less trustworthy.

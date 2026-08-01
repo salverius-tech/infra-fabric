@@ -3,6 +3,10 @@
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: onramp_host
+- name: Converge canonical host identities for Onramp host
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: onramp_host
 
 - name: Prepare Debian Podman onramp host for Onramp
   hosts: onramp_host

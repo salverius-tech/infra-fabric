@@ -14,11 +14,13 @@
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: infisical
-- name: Configure Infisical service directly
+- name: Converge canonical host identities for Infisical
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: infisical
+- name: Configure Infisical directly
   hosts: infisical
   gather_facts: false
   become: true
   roles:
-    - role: lxc_credentials
-      when: infisical_runtime.type | default('lxc') == 'lxc'
     - infisical

@@ -14,11 +14,13 @@
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: tailscale_client
+- name: Converge canonical host identities for Tailscale client
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: tailscale_client
 - name: Configure Tailscale client directly
   hosts: tailscale_client
   gather_facts: false
   become: true
   roles:
-    - role: lxc_credentials
-      when: tailscale_client_runtime.type | default('lxc') == 'lxc'
     - tailscale_client

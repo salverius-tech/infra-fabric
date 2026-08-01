@@ -1,0 +1,16 @@
+---
+- name: Converge canonical host identities
+  hosts: "{{ host_identity_hosts | default('all') }}"
+  gather_facts: true
+  become: true
+  roles:
+    - role: host_identity
+      when: host_identity_enabled | default(false) | bool
+  vars:
+    host_identity_provisioning_keys: "{{ bootstrap_ssh_public_keys | default([]) }}"
+    host_identity_operator_keys: "{{ operator_ssh_public_keys | default([]) }}"
+    host_identity_operator_password: "{{ lookup('env', 'INFRA_SYSTEMBOSS_PASSWORD') }}"
+    host_identity_dotfiles_repository: "{{ operator_dotfiles_repository | default(host_identity_dotfiles_repository) }}"
+    host_identity_dotfiles_revision: "{{ operator_dotfiles_revision | default(host_identity_dotfiles_revision) }}"
+    host_identity_chezmoi_version: "{{ operator_chezmoi_version | default(host_identity_chezmoi_version) }}"
+    host_identity_chezmoi_sha256: "{{ operator_chezmoi_sha256 | default(host_identity_chezmoi_sha256) }}"

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 source scripts/site-context.sh
+require_site_context
 require_canonical_authority
 
 # shellcheck disable=SC2016
@@ -11,6 +12,7 @@ python scripts/settings.py validate >/dev/null
 python infra/ansible/scripts/apply-technitium-dns.py --check "${INFRA_VALUES_DIR}/dns-records.local.json"
 
 ansible_inventory="${INFRA_VALUES_DIR}/ansible/inventory/local.yml"
+canonical_site=false
 if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
     if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
@@ -22,12 +24,18 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
   tofu_vars_file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"
   canonical_ansible=true
+  canonical_site=true
 fi
 
-ansible-inventory -i "${ansible_inventory}" -i infra/ansible/inventory/tfvars.py --list >/dev/null
+ansible_inventory_args=("-i" "${ansible_inventory}")
+if [[ "${canonical_site}" != true ]]; then
+  ansible_inventory_args+=("-i" "infra/ansible/inventory/tfvars.py")
+fi
+
+ansible-inventory "${ansible_inventory_args[@]}" --list >/dev/null
 
 mapfile -t playbooks < <(python scripts/settings.py ansible-playbooks)
-ansible-playbook -i "${ansible_inventory}" -i infra/ansible/inventory/tfvars.py --syntax-check \
+ansible-playbook "${ansible_inventory_args[@]}" --syntax-check \
   infra/ansible/playbooks/storage-prep.yml \
   infra/ansible/playbooks/guest-mount-feature-preflight.yml \
   "${playbooks[@]}"

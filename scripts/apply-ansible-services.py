@@ -25,7 +25,7 @@ try:
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver_services_environment
+    from secret_delivery import deliver, operator_password_requirements, root_password_requirements
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -34,7 +34,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver_services_environment
+    from secret_delivery import deliver, operator_password_requirements, root_password_requirements
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -107,22 +107,6 @@ def refresh_env_from_file(env_file: Path, env: dict[str, str]) -> None:
     env.update(load_env_file(env_file))
 
 
-def refresh_root_password_from_tfvars(tfvars_file: Path, env: dict[str, str]) -> None:
-    if not tfvars_file.exists():
-        return
-    try:
-        import hcl2
-    except ModuleNotFoundError:
-        return
-    with tfvars_file.open(encoding="utf-8") as handle:
-        values = hcl2.load(handle)
-    password = values.get("lxc_root_password")
-    if isinstance(password, str) and password:
-        if len(password) >= 2 and password[0] == password[-1] == '"':
-            password = password[1:-1]
-        env["TF_VAR_lxc_root_password"] = password
-
-
 def canonical_dns_environment(context: object) -> dict[str, str]:
     """Return a verified canonical DNS projection transport when available."""
     site_file = getattr(context, "canonical_site_path", None)
@@ -171,16 +155,138 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     return {"DNS_RECORDS_FILE": str(dns_path)}
 
 
-def canonical_secret_environment(context: object, services: list[str] | tuple[str, ...] = ()) -> dict[str, str]:
-    """Resolve only the selected services' explicitly contracted secrets."""
+def canonical_bootstrap_targets(context: object) -> tuple[tuple[str, str], ...]:
+    """Return unique canonical resource IDs and inventory hosts for enabled services."""
+    site_file = getattr(context, "canonical_site_path", None)
+    if site_file is None:
+        raise RuntimeError("canonical bootstrap requires a selected canonical site")
+    catalog_path = REPO / "infra" / "services.json"
+    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=catalog_path)
+    catalog = load_catalog(catalog_path)
+    targets: dict[str, str] = {}
+    for service_name, service in model.services.items():
+        if not service.enabled or service.resource is None:
+            continue
+        host = str(catalog.get(service_name).inventory.get("host", service.resource))
+        existing = targets.get(service.resource)
+        if existing is not None and existing != host:
+            raise RuntimeError(f"canonical resource maps to multiple bootstrap hosts: {service.resource}")
+        targets[service.resource] = host
+    return tuple(sorted(targets.items()))
+
+
+def run_canonical_bootstrap(
+    context: object,
+    inventories: tuple[str, ...],
+    log_dir: Path,
+    base_env: dict[str, str],
+    extra_args: tuple[str, ...] = (),
+    runner: RunCommand | None = None,
+) -> int:
+    """Deliver and rotate one host credential at a time for canonical execution."""
     try:
         bundle_path = getattr(context, "path")("secrets.sops.yaml")
     except (AttributeError, TypeError, ValueError) as error:
         raise RuntimeError("canonical secret bundle path is unavailable") from error
     if not bundle_path.is_file():
-        return {}
+        raise RuntimeError("canonical bootstrap secret bundle is unavailable")
     provider = SopsAgeProvider(bundle_path)
-    return deliver_services_environment(provider, services)
+    site_file = getattr(context, "canonical_site_path", None)
+    if site_file is None:
+        raise RuntimeError("canonical bootstrap requires a selected canonical site")
+    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
+    policy = model.bootstrap.root_password
+    runner = runner or default_runner
+    for resource_id, host in canonical_bootstrap_targets(context):
+        requirements = root_password_requirements(
+            [resource_id],
+            default_secret=policy.default_secret,
+            host_overrides=policy.host_overrides,
+        )
+        delivered = deliver(provider, path=requirements[0].path, consumer="ansible-bootstrap", requirements=requirements)
+        rc = run_bootstrap_host(
+            host,
+            inventories,
+            log_dir,
+            base_env,
+            {delivered.environment_name: delivered.value},
+            runner,
+            extra_args,
+        )
+        if rc != 0:
+            return rc
+    return 0
+
+
+def run_canonical_host_identity(
+    context: object,
+    inventories: tuple[str, ...],
+    log_dir: Path,
+    base_env: dict[str, str],
+    extra_args: tuple[str, ...] = (),
+    runner: RunCommand | None = None,
+) -> int:
+    """Converge canonical accounts before any service role executes."""
+    try:
+        bundle_path = getattr(context, "path")("secrets.sops.yaml")
+    except (AttributeError, TypeError, ValueError) as error:
+        raise RuntimeError("canonical host identity secret bundle path is unavailable") from error
+    if not bundle_path.is_file():
+        raise RuntimeError("canonical host identity secret bundle is unavailable")
+    provider = SopsAgeProvider(bundle_path)
+    runner = runner or default_runner
+    operator_requirement = operator_password_requirements()[0]
+    site_file = getattr(context, "canonical_site_path")
+    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
+    resources = {**model.resources.guests, **model.resources.shared_hosts}
+    for resource_id, host in canonical_bootstrap_targets(context):
+        resource = resources[resource_id]
+        root_requirements = root_password_requirements(
+            [resource_id],
+            default_secret=model.bootstrap.root_password.default_secret,
+            host_overrides=model.bootstrap.root_password.host_overrides,
+            consumer="ansible-host-identity",
+        )
+        operator_delivered = deliver(
+            provider,
+            path=operator_requirement.path,
+            consumer="ansible-host-identity",
+            requirements=(operator_requirement,),
+        )
+        root_delivered = deliver(
+            provider,
+            path=root_requirements[0].path,
+            consumer="ansible-host-identity",
+            requirements=root_requirements,
+        )
+        phases = (("root", False), ("infra", True)) if resource.type == "lxc" else (("infra", True),)
+        for connection_user, cleanup_root in phases:
+            env = dict(base_env)
+            env[operator_delivered.environment_name] = operator_delivered.value
+            if cleanup_root:
+                env[root_delivered.environment_name] = root_delivered.value
+            command = [
+                "ansible-playbook",
+                *inventory_args(inventories),
+                *extra_args,
+                "-e",
+                "host_identity_enabled=true",
+                "-e",
+                f"host_identity_root_recovery_enabled={'true' if cleanup_root else 'false'}",
+                "-e",
+                f"ansible_user={connection_user}",
+                "--limit",
+                host,
+                "infra/ansible/playbooks/host-identity.yml",
+            ]
+            try:
+                rc = runner(command, log_dir / f"host-identity-{host}-{connection_user}.log", env)
+            finally:
+                env.pop(operator_delivered.environment_name, None)
+                env.pop(root_delivered.environment_name, None)
+            if rc != 0:
+                return rc
+    return 0
 
 
 def canonical_ansible_transport(context: object, log_dir: Path, services: list[str] | tuple[str, ...]) -> CanonicalAnsibleTransport | None:
@@ -188,7 +294,6 @@ def canonical_ansible_transport(context: object, log_dir: Path, services: list[s
     if getattr(context, "canonical_site_path", None) is None:
         return None
     environment = canonical_dns_environment(context)
-    environment.update(canonical_secret_environment(context, services))
     generated_path = getattr(context, "generated_path")
     inventory_path = generated_path("ansible-inventory.json")
     vars_projection_path = generated_path("ansible-vars.json")
@@ -252,6 +357,33 @@ def default_runner(command: list[str], log_path: Path, env: dict[str, str]) -> i
         process = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=env, check=False)
         log.write((f"\nexit_code={process.returncode}\n").encode("utf-8"))
         return process.returncode
+
+
+def run_bootstrap_host(
+    host: str,
+    inventories: tuple[str, ...],
+    log_dir: Path,
+    base_env: dict[str, str],
+    bootstrap_env: dict[str, str],
+    runner: RunCommand = default_runner,
+    extra_args: tuple[str, ...] = (),
+) -> int:
+    """Run one host bootstrap with a transient, host-scoped secret environment."""
+    env = dict(base_env)
+    env.update(bootstrap_env)
+    command = [
+        "ansible-playbook",
+        *inventory_args(inventories),
+        *extra_args,
+        "--limit",
+        host,
+        "infra/ansible/playbooks/bootstrap-root-password.yml",
+    ]
+    try:
+        return runner(command, log_dir / f"bootstrap-{host}.log", env)
+    finally:
+        for name in bootstrap_env:
+            env.pop(name, None)
 
 
 def run_service(
@@ -381,7 +513,6 @@ def main(argv: list[str] | None = None) -> int:
     log_dir.mkdir(parents=True, exist_ok=True)
     print(f"Ansible service apply mode: {args.mode}; started {timestamp}; logs: {log_dir}", flush=True)
     base_env = dict(os.environ)
-    refresh_root_password_from_tfvars(context.path("terraform.tfvars"), base_env)
     transport: CanonicalAnsibleTransport | None = None
     try:
         if args.canonical_ansible:
@@ -394,10 +525,21 @@ def main(argv: list[str] | None = None) -> int:
         else:
             base_env.update(canonical_dns_environment(context))
             extra_args = ()
+        if args.canonical_ansible:
+            host_identity_rc = run_canonical_host_identity(context, inventories, log_dir, base_env, extra_args=extra_args)
+            if host_identity_rc != 0:
+                print(f"canonical host identity convergence failed with exit code {host_identity_rc}", file=sys.stderr)
+                return 1
         if args.mode == "sequential":
             results = run_sequential(services, inventories, log_dir, env_file, base_env, extra_args=extra_args)
         else:
             results = run_parallel(services, inventories, log_dir, env_file, base_env, max(1, args.max_workers), extra_args=extra_args)
+        if args.canonical_ansible:
+            print("==> canonical host bootstrap", flush=True)
+            bootstrap_rc = run_canonical_bootstrap(context, inventories, log_dir, base_env, extra_args=extra_args)
+            if bootstrap_rc != 0:
+                print(f"canonical host bootstrap failed with exit code {bootstrap_rc}", file=sys.stderr)
+                return 1
     except (OSError, ValueError, RuntimeError) as error:
         print(f"canonical Ansible projection verification failed: {error}", file=sys.stderr)
         return 1

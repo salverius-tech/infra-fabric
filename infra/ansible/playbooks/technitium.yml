@@ -14,11 +14,13 @@
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: technitium
+- name: Converge canonical host identities for Technitium DNS
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: technitium
 - name: Configure Technitium DNS service directly
   hosts: technitium
   gather_facts: false
   become: true
   roles:
-    - role: lxc_credentials
-      when: technitium_runtime.type | default('lxc') == 'lxc'
     - technitium

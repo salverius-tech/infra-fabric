@@ -32,8 +32,8 @@ class OnrampHostContractTests(unittest.TestCase):
             "onramp_host_ipv4_gateway",
             "onramp_host_dns_servers",
             "onramp_host_vlan_id",
-            "onramp_host_cloud_init_user",
-            "onramp_host_ssh_public_keys",
+            "bootstrap_ssh_public_keys",
+            "operator_ssh_public_keys",
             "onramp_host_deploy_user",
             "onramp_host_deploy_dir",
             "onramp_host_allowed_ssh_cidrs",
@@ -49,6 +49,8 @@ class OnrampHostContractTests(unittest.TestCase):
 
     def test_onramp_host_role_declares_hardening_and_no_host_published_ports_contract(self) -> None:
         text = ONRAMP_HOST_TASKS.read_text(encoding="utf-8")
+        self.assertIn("onramp_host_bootstrap_ssh_public_keys", text)
+        self.assertNotIn("onramp_host_ssh_public_keys", text)
         self.assertIn("PasswordAuthentication", text)
         self.assertIn("PermitRootLogin", text)
         self.assertIn("default-deny onramp-host firewall", text)
