@@ -31,6 +31,12 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(searxng.raw["release"]["legacy_image_var"], "searxng_container_image")
         self.assertEqual(searxng.raw["release"]["canonical_fields"], ["release.image", "release.digest"])
 
+    def test_runtime_ownership_is_catalog_driven(self) -> None:
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        self.assertEqual(catalog.get("forgejo").runtime_owner, "guest")
+        self.assertEqual(catalog.get("onramp_host").runtime_owner, "shared_host")
+        self.assertEqual(catalog.get("searxng_onramp").runtime_owner, "none")
+
     def test_required_field_report_is_value_free_and_ordered(self) -> None:
         catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
         forgejo = SimpleNamespace(

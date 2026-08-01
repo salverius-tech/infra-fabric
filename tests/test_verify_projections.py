@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from canonical_projections import ProjectionError
+from canonical_projections import ProjectionError, _assert_non_secret
 
 _SPEC = importlib.util.spec_from_file_location(
     "verify_projections", Path(__file__).resolve().parents[1] / "scripts" / "verify-projections.py"
@@ -23,6 +23,11 @@ _SPEC.loader.exec_module(verify_projections)
 
 
 class VerifyProjectionsTests(unittest.TestCase):
+    def test_security_policy_booleans_are_not_secret_values(self) -> None:
+        _assert_non_secret({"allow_passwordless_sudo": True, "password_authentication": False})
+        with self.assertRaisesRegex(ProjectionError, "api_token"):
+            _assert_non_secret({"api_token": "sentinel"})
+
     def test_projection_identity_failure_is_reported_without_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

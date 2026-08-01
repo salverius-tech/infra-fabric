@@ -55,14 +55,15 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 ansible_inventory=Path(__file__).resolve().parents[1] / "scaffold/ansible/inventory/local.yml",
             )
         admission = legacy_values_discovery.runtime_importer_admission(report)
-        self.assertFalse(admission["admitted"])
-        self.assertEqual(admission["status"], "blocked")
+        self.assertTrue(admission["admitted"])
+        self.assertEqual(admission["status"], "complete")
         self.assertEqual(admission["missing"], [])
         self.assertEqual(admission["invalid"], [])
-        self.assertEqual(admission["conflicts"], ["services.technitium.configuration.caddy.server_names"])
+        self.assertEqual(admission["conflicts"], [])
         runtime = next(item for item in report.observations if item.key == "forgejo_runtime")
         self.assertEqual(runtime.classification, "mapped")
-        self.assertEqual(runtime.proposed_path, "resources.guests.forgejo.runtime")
+        self.assertEqual(runtime.proposed_path, "resources.guests.forgejo.type")
+        self.assertEqual(runtime.value, "lxc")
         dynamic_secrets = {item.key for item in report.observations if item.key in {"forgejo_secret_key", "forgejo_internal_token", "forgejo_postgres_password"}}
         self.assertEqual(dynamic_secrets, {"forgejo_secret_key", "forgejo_internal_token", "forgejo_postgres_password"})
         for item in report.observations:
@@ -78,6 +79,203 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         reference = next(item for item in rendered["provider_references"] if item["key"] == "forgejo_bootstrap_admin_email")
         self.assertEqual(reference["provider"], "FORGEJO_ADMIN_EMAIL")
         self.assertIsNone(reference["value"])
+
+    def test_lowercase_proxmox_terraform_credentials_are_redacted(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "terraform.tfvars").write_text(
+                'proxmox_api_token = "SECRET_SENTINEL_DO_NOT_PRINT"\n'
+                'proxmox_password = "SECRET_SENTINEL_DO_NOT_PRINT"\n',
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+
+        observations = {item.key: item for item in report.observations}
+        for key in ("proxmox_api_token", "proxmox_password"):
+            self.assertEqual(observations[key].classification, "secret")
+            self.assertEqual(observations[key].proposed_path, None)
+            self.assertEqual(observations[key].value, "<redacted>")
+
+    def test_dns_json_is_normalized_to_canonical_shapes(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "dns-records.local.json").write_text(
+                json.dumps(
+                    {
+                        "settings": {
+                            "forwarders": ["1.1.1.1"],
+                            "forwarderProtocol": "Udp",
+                            "concurrentForwarding": True,
+                            "dnssecValidation": True,
+                            "preferIPv6": False,
+                        },
+                        "zones": {"Example.Internal.": ["1.1.1.1"]},
+                        "a_records": {"Host.Example.Internal.": "192.0.2.53"},
+                        "cname_records": {"Alias.Example.Internal.": "Host.Example.Internal."},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+
+        observations = {item.key: item for item in report.observations}
+        self.assertEqual(
+            observations["settings"].value,
+            {
+                "forwarders": ["1.1.1.1"],
+                "forwarder_protocol": "Udp",
+                "concurrent_forwarding": True,
+                "dnssec_validation": True,
+                "prefer_ipv6": False,
+            },
+        )
+        self.assertEqual(observations["zones"].value, {"example.internal": ["1.1.1.1"]})
+        self.assertEqual(observations["a_records"].value, {"host.example.internal": "192.0.2.53"})
+        self.assertEqual(observations["cname_records"].value, {"alias.example.internal": "host.example.internal"})
+
+    def test_malformed_dns_settings_fail_closed(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "dns-records.local.json").write_text(
+                json.dumps({"settings": {"forwarders": ["1.1.1.1"]}}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "DNS settings"):
+                legacy_values_discovery.discover_legacy(values)
+
+    def test_dns_candidate_derives_enabled_flag(self) -> None:
+        report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        report.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation(
+                    "dns", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "dns", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "dns", "forgejo_runtime", "mapped", "resources.guests.forgejo.type", "str", "lxc"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "dns", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "dns", "settings", "mapped", "platform.dns.settings", "dict", {
+                        "forwarders": ["1.1.1.1"],
+                        "forwarder_protocol": "Udp",
+                        "concurrent_forwarding": True,
+                        "dnssec_validation": True,
+                        "prefer_ipv6": False,
+                    }
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "dns", "zones", "mapped", "platform.dns.zones", "dict", {"example.internal": ["1.1.1.1"]}
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "dns", "a_records", "mapped", "platform.dns.a_records", "dict", {"dns.example.internal": "192.0.2.53"}
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "dns", "cname_records", "mapped", "platform.dns.cname_records", "dict", {}
+                ),
+            ]
+        )
+        from ruamel.yaml import YAML
+
+        base = YAML(typ="safe").load(
+            (Path(__file__).resolve().parents[1] / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8")
+        )
+        candidate = legacy_values_discovery.build_candidate_site(
+            report,
+            base_document=base,
+            runtime_importer_admission=legacy_values_discovery.runtime_importer_admission(report),
+        )
+        self.assertTrue(candidate["platform"]["dns"]["enabled"])
+
+    def test_image_candidate_derives_family_type(self) -> None:
+        report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        report.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "forgejo_runtime", "mapped", "resources.guests.forgejo.type", "str", "lxc"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "guest_vm_image_url", "mapped", "platform.images.vm.guest.url", "str", "https://images.example.internal/guest.qcow2"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "guest_vm_image_file_name", "mapped", "platform.images.vm.guest.file_name", "str", "guest.qcow2"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "guest_vm_image_checksum_algorithm", "mapped", "platform.images.vm.guest.checksum.algorithm", "str", "sha512"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "guest_vm_image_checksum", "mapped", "platform.images.vm.guest.checksum.value", "str", "a" * 128
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "guest_vm_image_datastore_id", "mapped", "platform.images.vm.guest.datastore_id", "str", "local"
+                ),
+            ]
+        )
+        from ruamel.yaml import YAML
+
+        base = YAML(typ="safe").load(
+            (Path(__file__).resolve().parents[1] / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8")
+        )
+        candidate = legacy_values_discovery.build_candidate_site(
+            report,
+            base_document=base,
+            runtime_importer_admission=legacy_values_discovery.runtime_importer_admission(report),
+        )
+        self.assertEqual(candidate["platform"]["images"]["vm"]["guest"]["type"], "vm_image")
+
+    def test_remaining_prod_legacy_fields_map_to_canonical_owners(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "terraform.tfvars").write_text(
+                'forgejo_vm_cloud_init_user = "forgejo-admin"\n'
+                'forgejo_vm_image_datastore_id = "local"\n',
+                encoding="utf-8",
+            )
+            (values / "ansible" / "inventory" / "local.yml").write_text(
+                "all:\n  vars:\n    hermes_compose_version: 2.40.3\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+        observations = {(item.key, item.classification): item for item in report.observations}
+        self.assertEqual(
+            observations[("hermes_compose_version", "mapped")].proposed_path,
+            "services.hermes.configuration.compose_version",
+        )
+        self.assertEqual(
+            observations[("forgejo_vm_cloud_init_user", "mapped")].proposed_path,
+            "resources.guests.forgejo.runtime.cloud_init_user",
+        )
+        self.assertEqual(
+            observations[("forgejo_vm_image_datastore_id", "mapped")].proposed_path,
+            "platform.images.vm.guest.datastore_id",
+        )
+
+    def test_generic_lxc_ssh_alias_is_redacted(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "terraform.tfvars").write_text(
+                'lxc_ssh_public_keys = ["ssh-ed25519 AAAA SECRET_SENTINEL_DO_NOT_PRINT"]\n',
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+
+        observation = next(item for item in report.observations if item.key == "lxc_ssh_public_keys")
+        self.assertEqual(observation.classification, "secret")
+        self.assertIsNone(observation.proposed_path)
+        self.assertEqual(observation.value, "<redacted>")
 
     def test_bounded_public_ansible_importer_admits_forgejo_domain_only(self) -> None:
         temp, values = self.make_values()
@@ -730,15 +928,44 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 "all:\n  vars:\n"
                 "    caddy_server_name: DNS.Example.Internal.\n"
                 "    caddy_server_names:\n"
-                "      - dns.example.internal\n",
+                "      - dns.example.internal\n"
+                "      - alias.example.internal\n",
                 encoding="utf-8",
             )
             report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
         observations = {(item.key, item.classification): item for item in report.observations}
-        self.assertEqual(observations[("caddy_server_name", "mapped")].value, ["dns.example.internal"])
-        self.assertEqual(observations[("caddy_server_names", "mapped")].value, ["dns.example.internal"])
+        self.assertEqual(
+            observations[("caddy_server_name", "mapped")].value,
+            ["dns.example.internal", "alias.example.internal"],
+        )
+        self.assertEqual(
+            observations[("caddy_server_names", "mapped")].value,
+            ["dns.example.internal", "alias.example.internal"],
+        )
         self.assertFalse(report.conflicts)
         self.assertFalse(report.candidate_ready)
+
+    def test_terraform_forgejo_runner_dns_servers_override_inventory_duplicate(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            (values / "terraform.tfvars").write_text(
+                'forgejo_runner_dns_servers = ["192.0.2.53"]\n',
+                encoding="utf-8",
+            )
+            inventory = values / "ansible" / "inventory" / "local.yml"
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_dns_servers:\n"
+                "      - 192.0.2.54\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values)
+        observations = [
+            item for item in report.observations if item.key == "forgejo_runner_dns_servers"
+        ]
+        self.assertEqual(len(observations), 2)
+        self.assertEqual([item.value for item in observations], [["192.0.2.53"], ["192.0.2.53"]])
+        self.assertFalse(any(conflict["canonical_path"] == "resources.guests.forgejo_runner.network.dns_servers" for conflict in report.conflicts))
 
     def test_bounded_ansible_importer_rejects_divergent_caddy_name_aliases(self) -> None:
         temp, values = self.make_values()
@@ -904,7 +1131,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         expected = {
             "tailscale_client_enabled": "services.tailscale_client.enabled",
             "hermes_ssh_public_keys": "resources.guests.hermes.security.ssh_public_keys",
-            "searxng_server_name": "services.searxng_onramp.endpoints.public_names.0",
+            "searxng_server_name": "services.searxng_onramp.endpoints.public_names",
             "searxng_public_url": "services.searxng_onramp.endpoints.public_url",
         }
         for key, canonical_path in expected.items():
@@ -930,21 +1157,38 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             observations[("searxng_container_image", "mapped")].proposed_path,
             "services.searxng_onramp.release",
         )
-        self.assertEqual(observations[("searxng_container_image", "mapped")].value, image)
+        self.assertEqual(
+            observations[("searxng_container_image", "mapped")].value,
+            {"image": "docker.io/searxng/searxng", "digest": "sha256:" + "a" * 64, "source": "container"},
+        )
         self.assertFalse(report.candidate_ready)
 
-    def test_bounded_ansible_importer_rejects_mutable_searxng_image(self) -> None:
+    def test_bounded_ansible_importer_rejects_unparseable_searxng_image(self) -> None:
         temp, values = self.make_values()
         with temp:
             repo = Path(temp.name) / "repo"
             inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
             inventory.write_text(
-                "all:\n  vars:\n    searxng_container_image: docker.io/searxng/searxng:latest\n",
+                "all:\n  vars:\n    searxng_container_image: docker.io/searxng/searxng\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "immutable"):
+            with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "immutable or tagged"):
                 legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+
+    def test_tagged_searxng_image_is_resolved_into_canonical_release(self) -> None:
+        normalized = legacy_values_discovery._normalize_searxng_container_image(
+            "docker.io/searxng/searxng:latest",
+            resolve_digest=lambda reference: "sha256:" + "a" * 64,
+        )
+        self.assertEqual(
+            normalized,
+            {
+                "image": "docker.io/searxng/searxng",
+                "digest": "sha256:" + "a" * 64,
+                "source": "container",
+            },
+        )
 
     def test_bounded_ansible_importer_rejects_non_string_hermes_ssh_keys(self) -> None:
         temp, values = self.make_values()
@@ -1851,7 +2095,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
         observations = {(item.key, item.classification): item for item in report.observations}
         expected = {
-            "searxng_server_name": "services.searxng_onramp.endpoints.public_names.0",
+            "searxng_server_name": "services.searxng_onramp.endpoints.public_names",
             "searxng_public_url": "services.searxng_onramp.endpoints.public_url",
             "searxng_container_image": "services.searxng_onramp.release",
             "searxng_container_port": "services.searxng_onramp.configuration.container_port",
@@ -2352,6 +2596,69 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                     base_document={"schema_version": 1},
                 )
 
+    def test_invalid_canonical_candidate_is_rejected_before_write(self) -> None:
+        report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        report.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.type", "str", "lxc"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106
+                ),
+            ]
+        )
+
+        with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "canonical candidate failed validation"):
+            legacy_values_discovery.build_candidate_site(
+                report,
+                base_document={
+                    "schema_version": 1,
+                    "site": {"name": "dev"},
+                    "resources": {"guests": {"forgejo": {}, "technitium": {}}},
+                },
+                runtime_importer_admission=legacy_values_discovery.runtime_importer_admission(report),
+            )
+
+    def test_undeclared_resource_overlay_is_rejected(self) -> None:
+        report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        report.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.type", "str", "lxc"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "infisical_vmid", "mapped", "resources.guests.infisical.identity.vmid", "int", 108
+                ),
+            ]
+        )
+
+        with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "resource infisical is not declared"):
+            legacy_values_discovery.build_candidate_site(
+                report,
+                base_document={
+                    "schema_version": 1,
+                    "site": {"name": "dev"},
+                    "resources": {"guests": {"forgejo": {}, "technitium": {}}},
+                },
+                runtime_importer_admission=legacy_values_discovery.runtime_importer_admission(report),
+            )
+
     def test_secret_only_report_remains_fail_closed(self) -> None:
         temp = tempfile.TemporaryDirectory()
         values = Path(temp.name) / "values"
@@ -2521,7 +2828,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             [
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]),
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"),
-                legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.runtime", "dict", {"type": "lxc"}),
+                legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.type", "str", "lxc"),
                 legacy_values_discovery.FieldObservation("inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106),
                 legacy_values_discovery.FieldObservation("inventory", "hermes_domain", "mapped", "services.hermes.endpoints.public_names", "str", "hermes.example.internal"),
             ]
@@ -2538,19 +2845,19 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
             [
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]),
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"),
-                legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.runtime", "dict", {"type": "container"}),
+                legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.type", "str", "container"),
             ]
         )
         admission = legacy_values_discovery.runtime_importer_admission(invalid_runtime)
         self.assertFalse(admission["admitted"])
-        self.assertIn("runtime selector must be exactly {type: lxc|vm}", {item["reason"] for item in admission["invalid"]})
+        self.assertIn("runtime selector must normalize to lxc or vm", {item["reason"] for item in admission["invalid"]})
 
         invalid_vmid = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
         invalid_vmid.observations.extend(
             [
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_domain", "mapped", "services.forgejo.endpoints.public_names", "list", ["git.example.internal"]),
                 legacy_values_discovery.FieldObservation("inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"),
-                legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.runtime", "dict", {"type": "lxc"}),
+                legacy_values_discovery.FieldObservation("inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.type", "str", "lxc"),
                 legacy_values_discovery.FieldObservation("inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 0),
             ]
         )
@@ -2579,7 +2886,7 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                     "inventory", "forgejo_root_url", "mapped", "services.forgejo.endpoints.public_url", "str", "https://git.example.internal/"
                 ),
                 legacy_values_discovery.FieldObservation(
-                    "inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.runtime", "dict", {"type": "lxc"}
+                    "inventory", "forgejo_runtime", "mapped", "resources.guests.forgejo.type", "str", "lxc"
                 ),
                 legacy_values_discovery.FieldObservation(
                     "inventory", "technitium_vmid", "mapped", "resources.guests.technitium.identity.vmid", "int", 106
@@ -2592,7 +2899,11 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 ),
             ]
         )
-        base = {"schema_version": 1, "site": {"name": "old"}, "services": {"technitium": {"enabled": True}}}
+        from ruamel.yaml import YAML
+
+        base = YAML(typ="safe").load(
+            (Path(__file__).resolve().parents[1] / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8")
+        )
         admission = legacy_values_discovery.runtime_importer_admission(report)
 
         candidate = legacy_values_discovery.build_candidate_site(

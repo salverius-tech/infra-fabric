@@ -107,6 +107,40 @@ class WorkspacePreflightTests(unittest.TestCase):
         check.assert_called_once_with(
             site / "secrets.sops.yaml",
             environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
+            expected_recipients=None,
+        )
+
+    def test_canonical_secret_check_passes_private_policy_inputs_without_exposing_recipients(self) -> None:
+        temp, root = self.make_repo()
+        source_root = Path(__file__).resolve().parents[1]
+        site = root / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        (site / "secrets.sops.yaml").write_text("encrypted\n", encoding="utf-8")
+        policy = root / "private.sops.yaml"
+        policy.write_text("private-policy-metadata\n", encoding="utf-8")
+        with temp, patch.dict(
+            os.environ,
+            {
+                "VALUES_DIR": str(root / "values"),
+                "VALUES_SITE": "dev",
+                "INFRA_SOPS_POLICY_PATH": str(policy),
+                "INFRA_SOPS_AGE_RECIPIENTS": "age1example, age1other",
+            },
+            clear=True,
+        ), patch.object(workspace_preflight, "inspect_sops_policy", return_value={"recipient_policy": "verified"}) as inspect, patch.object(
+            workspace_preflight,
+            "check_sops_age_availability",
+            return_value={"provider": "sops-age", "recipient_policy": "verified"},
+        ) as check:
+            result = workspace_preflight.check_canonical_secret_availability(root)
+
+        self.assertEqual(result["recipient_policy"], "verified")
+        inspect.assert_called_once_with(policy, site="dev", expected_recipients={"age1example", "age1other"})
+        check.assert_called_once_with(
+            site / "secrets.sops.yaml",
+            environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
+            expected_recipients={"age1example", "age1other"},
         )
 
     def test_canonical_secret_check_sanitizes_provider_failure(self) -> None:

@@ -6,6 +6,7 @@
   "services": {
     "technitium": {
       "state_capable": true,
+      "runtime_owner": "guest",
       "configuration_schema": "TechnitiumConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
@@ -41,6 +42,7 @@
     },
     "forgejo": {
       "state_capable": true,
+      "runtime_owner": "guest",
       "configuration_schema": "ForgejoConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
@@ -93,6 +95,7 @@
     },
     "tailscale_client": {
       "state_capable": false,
+      "runtime_owner": "guest",
       "configuration_schema": "TailscaleConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
@@ -128,6 +131,7 @@
     },
     "forgejo_runner": {
       "state_capable": false,
+      "runtime_owner": "guest",
       "configuration_schema": "ForgejoRunnerConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
@@ -165,6 +169,7 @@
     },
     "infisical": {
       "state_capable": true,
+      "runtime_owner": "guest",
       "configuration_schema": "InfisicalConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
@@ -201,6 +206,7 @@
     },
     "infisical_onramp": {
       "state_capable": true,
+      "runtime_owner": "none",
       "configuration_schema": "InfisicalOnrampConfiguration",
       "release_sources": [],
       "allowed_override_namespaces": [],
@@ -234,6 +240,7 @@
     },
     "hermes": {
       "state_capable": true,
+      "runtime_owner": "guest",
       "configuration_schema": "HermesConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
@@ -318,6 +325,7 @@
     },
     "onramp_host": {
       "state_capable": true,
+      "runtime_owner": "shared_host",
       "configuration_schema": "ResourceOwnedConfiguration",
       "release_sources": [],
       "allowed_override_namespaces": [],
@@ -360,6 +368,7 @@
     },
     "searxng_onramp": {
       "state_capable": true,
+      "runtime_owner": "none",
       "configuration_schema": "SearxngConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],

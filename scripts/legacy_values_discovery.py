@@ -7,13 +7,26 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import importlib
 import importlib.util
 import ipaddress
 import json
 import re
-from dataclasses import dataclass, field
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+
+_CONTAINER_IMAGE_REGISTRY = r"[a-z0-9.-]+(?:" + re.escape(":") + r"[0-9]+)?"
+_TAGGED_CONTAINER_IMAGE_RE = re.compile(
+    rf"(?:(?P<registry>{_CONTAINER_IMAGE_REGISTRY})/)?"
+    rf"(?P<repository>[a-z0-9][a-z0-9./_-]*):"
+    rf"(?P<tag>[A-Za-z0-9][A-Za-z0-9._-]{{0,127}})"
+)
 
 
 class DiscoveryError(ValueError):
@@ -80,6 +93,10 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "lxc_root_password",
     }:
         return "secret", None
+    if key.lower() in {"proxmox_api_token", "proxmox_password"}:
+        return "secret", None
+    if key in {"lxc_ssh_public_keys", "container_ssh_public_keys"}:
+        return "secret", None
     if key == "DNS_RECORDS_FILE":
         return "operational", None
     if key in {"service_runtime", "service_storage"}:
@@ -118,7 +135,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "forgejo_database": "services.forgejo.configuration.database",
         "technitium_vmid": "resources.guests.technitium.identity.vmid",
         "forgejo_vmid": "resources.guests.forgejo.identity.vmid",
-        "forgejo_runtime": "resources.guests.forgejo.runtime",
+        "forgejo_runtime": "resources.guests.forgejo.type",
         "tailscale_client_vmid": "resources.guests.tailscale_client.identity.vmid",
         "onramp_host_password_authentication": "resources.shared_hosts.onramp_host.security.password_authentication",
         "onramp_host_permit_root_login": "resources.shared_hosts.onramp_host.security.permit_root_login",
@@ -130,7 +147,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "onramp_host_ssh_public_keys": "resources.shared_hosts.onramp_host.security.ssh_public_keys",
         "tailscale_client_enabled": "services.tailscale_client.enabled",
         "hermes_ssh_public_keys": "resources.guests.hermes.security.ssh_public_keys",
-        "searxng_server_name": "services.searxng_onramp.endpoints.public_names.0",
+        "searxng_server_name": "services.searxng_onramp.endpoints.public_names",
         "searxng_public_url": "services.searxng_onramp.endpoints.public_url",
         "searxng_container_image": "services.searxng_onramp.release",
         "FORGEJO_ACTIONS_ENABLED": "services.forgejo.configuration.actions_enabled",
@@ -172,6 +189,7 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "hermes_domain": "services.hermes.endpoints.public_names",
         "hermes_runtime_user": "services.hermes.configuration.runtime_user",
         "hermes_repo_path": "services.hermes.configuration.repository_path",
+        "hermes_compose_version": "services.hermes.configuration.compose_version",
         "hermes_vmid": "resources.guests.hermes.identity.vmid",
         "HERMES_CONTROL_SOURCE_URL": "services.hermes.configuration.control.source_url",
         "HERMES_CONTROL_SOURCE_REF": "services.hermes.configuration.control.source_ref",
@@ -234,6 +252,8 @@ def _derived_canonical_path(key: str) -> str | None:
         "hermes_started": "resources.guests.hermes.runtime.started",
         "hermes_start_on_boot": "resources.guests.hermes.runtime.start_on_boot",
         "guest_vm_cloud_init_user": "platform.vm_cloud_init_user",
+        "forgejo_vm_cloud_init_user": "resources.guests.forgejo.runtime.cloud_init_user",
+        "forgejo_vm_image_datastore_id": "platform.images.vm.guest.datastore_id",
     }
     if key in direct:
         return direct[key]
@@ -388,6 +408,147 @@ def _normalize_public_name(value: Any) -> Any:
     return value
 
 
+def _normalize_dns_hostname(value: Any, field: str) -> str:
+    if not isinstance(value, str):
+        raise DiscoveryError(f"DNS {field} names must be strings")
+    normalized = value.strip().lower().rstrip(".")
+    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?", normalized):
+        raise DiscoveryError(f"DNS {field} names must be valid hostnames")
+    return normalized
+
+
+def _normalize_dns_settings(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise DiscoveryError("DNS settings must be a mapping")
+    names = {
+        "forwarders": "forwarders",
+        "forwarderProtocol": "forwarder_protocol",
+        "concurrentForwarding": "concurrent_forwarding",
+        "dnssecValidation": "dnssec_validation",
+        "preferIPv6": "prefer_ipv6",
+    }
+    if set(value) != set(names):
+        raise DiscoveryError("DNS settings must contain exactly the supported Technitium settings")
+    forwarders = value["forwarders"]
+    if not isinstance(forwarders, list) or not forwarders or not all(isinstance(item, str) and item.strip() for item in forwarders):
+        raise DiscoveryError("DNS settings forwarders must be a non-empty string list")
+    protocol = value["forwarderProtocol"]
+    if protocol not in {"Udp", "Tcp", "Tls", "Https"}:
+        raise DiscoveryError("DNS settings forwarderProtocol is unsupported")
+    booleans = ("concurrentForwarding", "dnssecValidation", "preferIPv6")
+    if any(not isinstance(value[key], bool) for key in booleans):
+        raise DiscoveryError("DNS settings boolean fields must be booleans")
+    return {names[key]: value[key] for key in names}
+
+
+def _normalize_dns_zones(value: Any) -> dict[str, list[str]]:
+    if not isinstance(value, dict):
+        raise DiscoveryError("DNS zones must be a mapping")
+    normalized: dict[str, list[str]] = {}
+    for zone, forwarders in value.items():
+        name = _normalize_dns_hostname(zone, "zone")
+        if name in normalized:
+            raise DiscoveryError(f"DNS zones contain duplicate normalized name: {name}")
+        if not isinstance(forwarders, list) or not forwarders or not all(isinstance(item, str) and item.strip() for item in forwarders):
+            raise DiscoveryError("DNS zone forwarders must be non-empty string lists")
+        normalized[name] = list(forwarders)
+    return normalized
+
+
+def _normalize_dns_records(value: Any, record_type: str) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise DiscoveryError(f"DNS {record_type} records must be a mapping")
+    normalized: dict[str, str] = {}
+    for record, target in value.items():
+        name = _normalize_dns_hostname(record, record_type)
+        if name in normalized:
+            raise DiscoveryError(f"DNS {record_type} records contain duplicate normalized name: {name}")
+        if not isinstance(target, str) or not target.strip():
+            raise DiscoveryError(f"DNS {record_type} record targets must be non-empty strings")
+        if record_type == "A":
+            try:
+                target = str(ipaddress.IPv4Address(target))
+            except ipaddress.AddressValueError as error:
+                raise DiscoveryError("DNS A record targets must be IPv4 addresses") from error
+        else:
+            target = _normalize_dns_hostname(target, "CNAME target")
+        normalized[name] = target
+    return normalized
+
+
+def _split_container_image_reference(reference: str) -> tuple[str, str, str]:
+    if not isinstance(reference, str) or reference != reference.strip():
+        raise DiscoveryError("SearXNG container image must be a non-empty reference")
+    match = _TAGGED_CONTAINER_IMAGE_RE.fullmatch(reference)
+    if match is None:
+        raise DiscoveryError("SearXNG container image must be a tagged repository reference")
+    registry = match.group("registry") or "docker.io"
+    repository = match.group("repository")
+    if registry == "docker.io" and "/" not in repository:
+        repository = f"library/{repository}"
+    return registry, repository, match.group("tag")
+
+
+def _resolve_container_image_digest(reference: str) -> str:
+    registry, repository, tag = _split_container_image_reference(reference)
+    registry_host = "registry-1.docker.io" if registry == "docker.io" else registry
+    headers = {
+        "Accept": ", ".join(
+            (
+                "application/vnd.oci.image.index.v1+json",
+                "application/vnd.docker.distribution.manifest.list.v2+json",
+                "application/vnd.oci.image.manifest.v1+json",
+                "application/vnd.docker.distribution.manifest.v2+json",
+            )
+        )
+    }
+    if registry == "docker.io":
+        token_url = "https://auth.docker.io/token?" + urllib.parse.urlencode(
+            {"service": "registry.docker.io", "scope": f"repository:{repository}:pull"}
+        )
+        try:
+            with urllib.request.urlopen(
+                urllib.request.Request(token_url, headers={"Accept": "application/json"}), timeout=15
+            ) as response:
+                token_payload = json.loads(response.read().decode("utf-8"))
+            token = token_payload.get("token")
+            if not isinstance(token, str) or not token:
+                raise DiscoveryError("registry resolver returned no anonymous pull token")
+            headers["Authorization"] = f"Bearer {token}"
+        except (OSError, ValueError, KeyError, json.JSONDecodeError) as error:
+            raise DiscoveryError("unable to obtain an anonymous container registry token") from error
+    manifest_url = f"https://{registry_host}/v2/{repository}/manifests/{urllib.parse.quote(tag, safe='._-')}"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(manifest_url, headers=headers), timeout=15) as response:
+            digest = response.headers.get("Docker-Content-Digest")
+    except (OSError, urllib.error.URLError) as error:
+        raise DiscoveryError("unable to resolve the tagged SearXNG container image") from error
+    if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+        raise DiscoveryError("container registry returned no valid SHA-256 manifest digest")
+    return digest
+
+
+def _normalize_searxng_container_image(
+    value: Any,
+    *,
+    resolve_digest: Any = _resolve_container_image_digest,
+) -> dict[str, str]:
+    if not isinstance(value, str) or not value.strip():
+        raise DiscoveryError("SearXNG container image must be a non-empty reference")
+    immutable = re.fullmatch(r"([a-z0-9][a-z0-9./_-]*)@(sha256:[0-9a-f]{64})", value)
+    if immutable is not None:
+        image, digest = immutable.groups()
+    else:
+        registry, repository, _tag = _split_container_image_reference(value)
+        image = f"{registry}/{repository}"
+        if registry == "docker.io" and repository.startswith("library/") and "/" not in value.split(":", 1)[0]:
+            image = f"docker.io/{repository.removeprefix('library/')}"
+        digest = resolve_digest(value)
+        if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+            raise DiscoveryError("container image resolver returned an invalid SHA-256 digest")
+    return {"image": image, "digest": digest, "source": "container"}
+
+
 def _normalize_public_url(value: Any) -> Any:
     if not isinstance(value, str):
         return value
@@ -400,9 +561,39 @@ def _normalize_public_url(value: Any) -> Any:
     return urlunsplit((parsed.scheme.lower(), parsed.netloc.lower(), path, "", ""))
 
 
+def _normalize_image_url(value: Any) -> Any:
+    if not isinstance(value, str):
+        return value
+    from urllib.parse import urlsplit, urlunsplit
+
+    parsed = urlsplit(value.strip())
+    if parsed.scheme == "http" and parsed.netloc and not parsed.username and not parsed.password and not parsed.query and not parsed.fragment:
+        return urlunsplit(("https", parsed.netloc, parsed.path, "", ""))
+    return value
+
+
 def _normalize_port(value: Any) -> Any:
     if isinstance(value, str) and value.isdecimal():
         return int(value)
+    return value
+
+
+def _normalize_optional_legacy_value(proposed_path: str | None, value: Any) -> Any:
+    if proposed_path is None:
+        return value
+    if isinstance(value, str) and not value.strip() and any(
+        proposed_path.endswith(suffix)
+        for suffix in (".network.gateway", ".network.vlan_id", ".network.search_domain", ".runtime.cloud_init_user")
+    ):
+        return None
+    if proposed_path.endswith(".network.vlan_id") and isinstance(value, str) and value.isdecimal():
+        return int(value)
+    return value
+
+
+def _normalize_forgejo_database(value: Any) -> Any:
+    if isinstance(value, str) and value in {"sqlite", "postgres"}:
+        return {"type": value}
     return value
 
 
@@ -429,11 +620,25 @@ def _normalize_tfvars_value(raw_value: str, parsed_value: Any) -> Any:
 def _equivalent_alias_values(previous: FieldObservation, value: Any) -> bool:
     left = previous.value
     right = value
-    if isinstance(left, list) and len(left) == 1 and not isinstance(right, list):
-        return left[0] == right
-    if isinstance(right, list) and len(right) == 1 and not isinstance(left, list):
-        return right[0] == left
+    if isinstance(left, list) and isinstance(right, list):
+        return set(left) == set(right) or set(left).issubset(right) or set(right).issubset(left)
+    if isinstance(left, list) and not isinstance(right, list):
+        return right in left
+    if isinstance(right, list) and not isinstance(left, list):
+        return left in right
     return left == right
+
+
+def _merge_alias_values(left: Any, right: Any) -> Any:
+    if not isinstance(left, list) or not isinstance(right, list):
+        return None
+    if not (set(left).issubset(right) or set(right).issubset(left)):
+        return None
+    return list(dict.fromkeys([*left, *right]))
+
+
+def _is_terraform_source(source: str) -> bool:
+    return source.endswith("terraform.tfvars")
 
 
 def _observe(
@@ -457,8 +662,23 @@ def _observe(
         "services.forgejo.endpoints.public_names",
         "services.hermes.endpoints.public_names",
         "services.technitium.configuration.caddy.server_names",
+        "services.searxng_onramp.endpoints.public_names",
     }:
         public = _normalize_public_name(public)
+    if proposed_path == "services.searxng_onramp.endpoints.public_names.0":
+        proposed_path = "services.searxng_onramp.endpoints.public_names"
+        public = _normalize_public_name(public)
+    if proposed_path == "platform.dns.settings":
+        public = _normalize_dns_settings(value)
+    elif proposed_path == "platform.dns.zones":
+        public = _normalize_dns_zones(value)
+    elif proposed_path == "platform.dns.a_records":
+        public = _normalize_dns_records(value, "A")
+    elif proposed_path == "platform.dns.cname_records":
+        public = _normalize_dns_records(value, "CNAME")
+    if key == "forgejo_runtime":
+        proposed_path = "resources.guests.forgejo.type"
+        public = value.get("type") if isinstance(value, dict) else None
     value_type = type(value).__name__
     if proposed_path == "services.technitium.configuration.caddy.upstream":
         public = _normalize_caddy_upstream(value)
@@ -471,13 +691,33 @@ def _observe(
         public = _normalize_public_url(public)
     if proposed_path == "services.forgejo.endpoints.ports.ssh":
         public = _normalize_port(public)
+    if proposed_path == "services.searxng_onramp.release":
+        public = _normalize_searxng_container_image(value)
+    if proposed_path == "services.forgejo.configuration.database":
+        public = _normalize_forgejo_database(public)
+    if proposed_path == "platform.images.lxc.debian.url":
+        public = _normalize_image_url(public)
+    public = _normalize_optional_legacy_value(proposed_path, public)
     if classification == "unknown":
         public = None
-    observation = FieldObservation(source, key, classification, proposed_path, value_type, public)
-    for previous in report.observations:
+    for index, previous in enumerate(report.observations):
         if previous.proposed_path == proposed_path and proposed_path is not None and previous.value != public:
             same_source_alias = previous.source == source and {previous.key, key} <= {"caddy_server_name", "caddy_server_names"}
-            if same_source_alias and _equivalent_alias_values(previous, public):
+            if same_source_alias:
+                merged = _merge_alias_values(previous.value, public)
+                if merged is not None and _equivalent_alias_values(previous, public):
+                    report.observations[index] = replace(previous, value=merged)
+                    public = merged
+                    continue
+            if (
+                key == "forgejo_runner_dns_servers"
+                and previous.key == key
+                and _is_terraform_source(previous.source) != _is_terraform_source(source)
+            ):
+                if _is_terraform_source(previous.source):
+                    public = previous.value
+                else:
+                    report.observations[index] = replace(previous, value=public)
                 continue
             report.conflicts.append(
                 {
@@ -487,7 +727,7 @@ def _observe(
                     "disposition": "manual review required",
                 }
             )
-    report.observations.append(observation)
+    report.observations.append(FieldObservation(source, key, classification, proposed_path, value_type, public))
 
 
 def _read_env(path: Path, report: DiscoveryReport, migration: Any) -> None:
@@ -499,7 +739,18 @@ def _read_env(path: Path, report: DiscoveryReport, migration: Any) -> None:
 
 def _read_tfvars(path: Path, report: DiscoveryReport, migration: Any) -> None:
     lines = path.read_text(encoding="utf-8").splitlines()
+    structured_values: dict[str, Any] = {}
+    try:
+        hcl2 = importlib.import_module("hcl2")
+
+        with path.open("r", encoding="utf-8") as stream:
+            parsed = hcl2.load(stream)
+        if isinstance(parsed, dict):
+            structured_values = parsed
+    except (ImportError, OSError, ValueError):
+        structured_values = {}
     for key, (_line, value) in migration.parse_tfvars(lines, path).items():
+        value = structured_values.get(key, value)
         _observe(path.relative_to(path.parents[1]).as_posix(), key, value, report, migration)
     pattern = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=")
     known = set(migration.parse_tfvars(lines, path))
@@ -518,6 +769,8 @@ def _read_tfvars(path: Path, report: DiscoveryReport, migration: Any) -> None:
                 if classification == "mapped"
                 else None
             )
+            if key in structured_values:
+                value = structured_values[key]
             _observe(path.relative_to(path.parents[1]).as_posix(), key, value, report, migration)
 
 
@@ -736,6 +989,7 @@ def _read_ansible_bounded_slice(
         "hermes_domain",
         "hermes_runtime_user",
         "hermes_repo_path",
+        "hermes_compose_version",
         "hermes_vmid",
         "technitium_api_url",
         "technitium_admin_user",
@@ -864,6 +1118,9 @@ def _read_ansible_bounded_slice(
         elif key == "hermes_ssh_public_keys":
             if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings with non-empty items")
+        elif key == "hermes_compose_version":
+            if not isinstance(value, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", value):
+                raise DiscoveryError(f"bounded Ansible {key} must be a semantic version")
         elif key in {"tailscale_client_up_args", "forgejo_runner_dns_servers"}:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise DiscoveryError(f"bounded Ansible {key} must be a list of strings")
@@ -982,11 +1239,12 @@ def _read_ansible_bounded_slice(
             if not isinstance(value, str) or not value.strip():
                 raise DiscoveryError(f"bounded Ansible {key} must be a non-empty string")
         elif key == "searxng_container_image":
-            if not isinstance(value, str) or not re.fullmatch(
-                r"[a-z0-9][a-z0-9./_-]*@sha256:[0-9a-f]{64}", value
+            if not isinstance(value, str) or not (
+                re.fullmatch(r"[a-z0-9][a-z0-9./_-]*@sha256:[0-9a-f]{64}", value)
+                or _TAGGED_CONTAINER_IMAGE_RE.fullmatch(value)
             ):
                 raise DiscoveryError(
-                    f"bounded Ansible {key} must be an immutable repository@sha256:digest reference"
+                    f"bounded Ansible {key} must be an immutable or tagged container image reference"
                 )
         elif key == "searxng_container_port":
             if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 65535:
@@ -1282,7 +1540,7 @@ def discover_legacy(
 RUNTIME_IMPORTER_SCOPE = {
     "forgejo_domain": "services.forgejo.endpoints.public_names",
     "forgejo_root_url": "services.forgejo.endpoints.public_url",
-    "forgejo_runtime": "resources.guests.forgejo.runtime",
+    "forgejo_runtime": "resources.guests.forgejo.type",
     "technitium_vmid": "resources.guests.technitium.identity.vmid",
 }
 
@@ -1330,8 +1588,8 @@ def runtime_importer_admission(report: DiscoveryReport) -> dict[str, Any]:
         if key == "forgejo_runtime" and items:
             for item in items:
                 value = item.value
-                if not isinstance(value, dict) or set(value) != {"type"} or value.get("type") not in {"lxc", "vm"}:
-                    invalid.append({"key": key, "reason": "runtime selector must be exactly {type: lxc|vm}"})
+                if value not in {"lxc", "vm"}:
+                    invalid.append({"key": key, "reason": "runtime selector must normalize to lxc or vm"})
         if key == "technitium_vmid" and items:
             for item in items:
                 if not isinstance(item.value, int) or isinstance(item.value, bool) or item.value <= 0:
@@ -1474,6 +1732,57 @@ def _set_dotted_path(document: dict[str, Any], path: str, value: Any) -> None:
     current[parts[-1]] = copy.deepcopy(value)
 
 
+def _validate_canonical_candidate(candidate: dict[str, Any]) -> None:
+    try:
+        script_dir = str(Path(__file__).resolve().parent)
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+        from canonical_values import CanonicalSite
+        from pydantic import ValidationError
+    except ImportError as error:
+        raise DiscoveryError(f"canonical candidate validation is unavailable: {error}") from error
+
+    try:
+        CanonicalSite.model_validate(candidate)
+    except ValidationError as error:
+        issues = []
+        for detail in error.errors():
+            location = ".".join(str(part) for part in detail.get("loc", ())) or "document"
+            issues.append(f"{location}: {detail.get('msg', 'invalid value')}")
+        raise DiscoveryError("canonical candidate failed validation: " + "; ".join(issues)) from error
+
+
+def _validate_resource_overlay_target(base_document: dict[str, Any], path: str) -> None:
+    parts = path.split(".")
+    if len(parts) < 4 or parts[0] != "resources" or parts[1] not in {"guests", "shared_hosts"}:
+        return
+    resources = base_document.get("resources")
+    declared = resources.get(parts[1], {}) if isinstance(resources, dict) else {}
+    if not isinstance(declared, dict) or parts[2] not in declared:
+        raise DiscoveryError(f"candidate resource {parts[2]} is not declared in the approved base document")
+
+
+def _derive_image_family_types(candidate: dict[str, Any], report: DiscoveryReport) -> None:
+    expected_types = {"lxc": "lxc_template", "vm": "vm_image"}
+    for observation in report.observations:
+        path = observation.proposed_path
+        if observation.classification != "mapped" or path is None:
+            continue
+        parts = path.split(".")
+        if len(parts) < 5 or parts[:2] != ["platform", "images"] or parts[2] not in expected_types:
+            continue
+        family, name = parts[2], parts[3]
+        images = candidate.setdefault("platform", {}).setdefault("images", {})
+        definitions = images.setdefault(family, {})
+        definition = definitions.setdefault(name, {})
+        if not isinstance(definition, dict):
+            raise DiscoveryError(f"candidate image definition {family}.{name} must be a mapping")
+        expected = expected_types[family]
+        if "type" in definition and definition["type"] != expected:
+            raise DiscoveryError(f"candidate image definition {family}.{name} type conflicts with its image family")
+        definition["type"] = expected
+
+
 def build_candidate_site(
     report: DiscoveryReport,
     *,
@@ -1497,10 +1806,54 @@ def build_candidate_site(
         if not isinstance(site, dict):
             raise DiscoveryError("candidate base site section must be a mapping")
         site["name"] = site_name
+    if any(
+        observation.classification == "mapped"
+        and observation.proposed_path is not None
+        and observation.proposed_path.startswith("platform.dns.")
+        for observation in report.observations
+    ):
+        platform = candidate.setdefault("platform", {})
+        if not isinstance(platform, dict):
+            raise DiscoveryError("candidate base platform section must be a mapping")
+        dns = platform.setdefault("dns", {})
+        if not isinstance(dns, dict):
+            raise DiscoveryError("candidate base platform.dns section must be a mapping")
+        dns["enabled"] = True
+    _derive_image_family_types(candidate, report)
+    observed_values = {
+        observation.proposed_path: observation.value
+        for observation in report.observations
+        if observation.classification == "mapped" and observation.proposed_path is not None
+    }
+    for resource_path, resource in (
+        [(f"resources.guests.{name}", item) for name, item in candidate.get("resources", {}).get("guests", {}).items()]
+        + [(f"resources.shared_hosts.{name}", item) for name, item in candidate.get("resources", {}).get("shared_hosts", {}).items()]
+    ):
+        size_path = f"{resource_path}.storage.root.size_gb"
+        if size_path not in observed_values:
+            continue
+        storage = resource.setdefault("storage", {})
+        root = storage.setdefault("root", {})
+        root.setdefault("type", "proxmox_volume")
+        root.setdefault("target", "/")
+        root.setdefault("storage_id", candidate.get("platform", {}).get("storage", {}).get("rootfs_datastore"))
+    static_expected_addresses = {
+        path
+        for path, value in observed_values.items()
+        if path.endswith(".network.expected_address")
+        and observed_values.get(path.removesuffix(".network.expected_address") + ".network.address") not in {None, "dhcp"}
+    }
+    for path in static_expected_addresses:
+        parts = path.split(".")
+        candidate[parts[0]][parts[1]][parts[2]].get("network", {}).pop("expected_address", None)
     for observation in report.observations:
         if observation.classification in {"secret", "provider", "operational"}:
             continue
         if observation.classification != "mapped" or observation.proposed_path is None:
             raise DiscoveryError(f"candidate observation is not safely mapped: {observation.key}")
+        if observation.proposed_path in static_expected_addresses:
+            continue
+        _validate_resource_overlay_target(candidate, observation.proposed_path)
         _set_dotted_path(candidate, observation.proposed_path, observation.value)
+    _validate_canonical_candidate(candidate)
     return candidate

@@ -36,6 +36,21 @@ policy until the private workflow supplies the real recipient.
 4. Verify the ciphertext hash and a value-free required-secret report. Never use a
    secret value or sentinel as an identity check.
 
+For a private deployment policy, preflight can receive the policy metadata through
+the operator environment without committing it to this repository:
+
+```bash
+export INFRA_SOPS_POLICY_PATH=<private-policy-root>/.sops.yaml
+export INFRA_SOPS_AGE_RECIPIENTS='age1site...,age1recovery...'
+```
+
+The recipient list is metadata, not secret material, but it must still remain out
+of tracked public files when it identifies private operational policy. Preflight
+passes the expected set to both the policy-rule check and encrypted-bundle metadata
+check. A mismatch fails closed before required-secret resolution or consumer
+delivery. Omit these variables only for public scaffold validation where the
+placeholder policy is intentionally reported as not configured.
+
 ## Rotation and revocation
 
 Rotation is an explicit, reversible operation:
@@ -54,6 +69,29 @@ Rotation is an explicit, reversible operation:
 A revoked recipient must not remain an accepted delivery path. If rotation fails,
 restore the prior ciphertext and private-key reference from the approved backup
 without changing ordinary consumer inputs.
+
+## Logical-path migration
+
+The operator password contract is identity-neutral:
+`secrets.operator.password`, delivered transiently as `INFRA_OPERATOR_PASSWORD`.
+Older private bundles may contain `secrets.operator.systemboss_password`. Migrate
+those bundles with the repository helper from the repository root:
+
+```bash
+bash scripts/python.sh scripts/migrate-secret-bundle.py \
+  values/sites/<site>/secrets.sops.yaml
+```
+
+The command is dry-run by default. It decrypts only in memory, reports metadata,
+and does not modify the ciphertext. Review the result, then repeat with `--apply`
+to write a re-encrypted bundle. Apply mode creates the ciphertext backup
+`secrets.sops.yaml.pre-migration` beside the bundle and refuses to overwrite an
+existing migration backup. Do not delete that backup until the migrated bundle has
+passed recipient-policy and required-path validation.
+
+The migration fails closed if both old and new paths exist with different values.
+It never prints decrypted values, writes plaintext outside a restricted temporary
+directory, or changes any other logical secret path.
 
 ## Backup and recovery
 
@@ -102,8 +140,9 @@ workflow and separate approval.
 
 The repository currently supports structural bundle validation, logical-path
 resolution, secret/ciphertext identities, metadata-only SOPS/age checks, required
-secret evaluation, protected temporary material helpers, and explicit transient
-consumer delivery for the canonical Ansible bootstrap boundary. It does **not** yet
+secret evaluation, protected temporary material helpers, identity-neutral operator
+path migration, and explicit transient consumer delivery for the canonical Ansible
+bootstrap boundary. It does **not** yet
 make provider, runtime, recovery, or generated secrets authoritative for all live
 consumers. Legacy consumer inputs and broader consumer cutover therefore remain
 unchanged and deferred.

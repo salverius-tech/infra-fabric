@@ -2,8 +2,11 @@
 - name: Require the canonical host identity contract
   ansible.builtin.assert:
     that:
-      - host_identity_provisioning_user == 'infra'
-      - host_identity_operator_user == 'systemboss'
+      - host_identity_provisioning_user | length > 0
+      - host_identity_operator_user | length > 0
+      - host_identity_provisioning_user != 'root'
+      - host_identity_operator_user != 'root'
+      - host_identity_provisioning_user != host_identity_operator_user
       - host_identity_provisioning_keys | length > 0
       - host_identity_operator_keys | length > 0
       - host_identity_operator_password | length > 0

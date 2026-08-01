@@ -48,10 +48,10 @@ DEFAULT_REQUIREMENTS: tuple[SecretRequirement, ...] = (
 
 OPERATOR_REQUIREMENTS: tuple[SecretRequirement, ...] = (
     SecretRequirement(
-        "secrets.operator.systemboss_password",
+        "secrets.operator.password",
         "operator",
         frozenset({"ansible-host-identity"}),
-        "INFRA_SYSTEMBOSS_PASSWORD",
+        "INFRA_OPERATOR_PASSWORD",
         state_exposure="forbidden",
     ),
 )
@@ -175,6 +175,9 @@ def deliver_environment(
     requirements: tuple[SecretRequirement, ...] = DEFAULT_REQUIREMENTS,
 ) -> dict[str, str]:
     """Return a transient environment mapping for one approved consumer."""
+    approved_consumers = {consumer_name for requirement in requirements for consumer_name in requirement.consumers}
+    if consumer not in approved_consumers:
+        raise SecretDeliveryError("consumer has no approved secret contract")
     environment: dict[str, str] = {}
     for requirement in requirements:
         if consumer not in requirement.consumers:
@@ -195,10 +198,13 @@ def deliver_services_environment(
     """Resolve bootstrap plus only the runtime secrets required by selected services."""
     environment = deliver_environment(provider, consumer="ansible-bootstrap", requirements=bootstrap_requirements)
     for service in services:
+        service_requirements = requirements_for_services([service])
+        if not any(requirement.service == service for requirement in service_requirements):
+            continue
         delivered = deliver_environment(
             provider,
             consumer=f"ansible-service:{service}",
-            requirements=requirements_for_services([service]),
+            requirements=service_requirements,
         )
         for name, value in delivered.items():
             if name in environment and environment[name] != value:

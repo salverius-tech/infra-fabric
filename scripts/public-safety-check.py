@@ -155,6 +155,10 @@ def scan_secrets(path: str, line_number: int, line: str) -> list[Finding]:
         findings.append(Finding(path, line_number, "token-like literal"))
     for match in SECRET_ASSIGN_RE.finditer(line):
         key, value = match.groups()
+        if key == "NOPASSWD":
+            # Sudoers uses NOPASSWD: as a policy tag, not as a credential
+            # assignment. Keep the generic secret detector strict elsewhere.
+            continue
         if key.upper().endswith("_RE") or key.lower().startswith("old_"):
             continue
         normalized_value = value.strip().strip('"\') ,:')

@@ -22,7 +22,14 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
 
     def test_inventory_has_consistent_catalog_owned_enabled_service_hosts(self) -> None:
         inventory = render_ansible_inventory(self.model, self.catalog)
-        hostvars = inventory["_meta"]["hostvars"]
+        hostvars = {
+            host: values
+            for group in inventory.values()
+            if isinstance(group, dict) and isinstance(group.get("hosts"), dict)
+            for host, values in group["hosts"].items()
+        }
+        self.assertNotIn("_meta", inventory)
+        self.assertIsInstance(inventory["all"]["children"], dict)
         enabled = {name for name, service in self.model.services.items() if service.enabled}
         self.assertEqual(set(inventory["all"]["children"]), {self.catalog.get(name).inventory["group"] for name in enabled})
         for name in enabled:
@@ -190,7 +197,12 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
     def test_inventory_and_vars_projections_share_service_identity(self) -> None:
         inventory = render_ansible_inventory(self.model, self.catalog)
         variables = render_ansible_vars(self.model, self.catalog)
-        hostvars = inventory["_meta"]["hostvars"]
+        hostvars = {
+            host: values
+            for group in inventory.values()
+            if isinstance(group, dict) and isinstance(group.get("hosts"), dict)
+            for host, values in group["hosts"].items()
+        }
         for name, service_vars in variables["services"].items():
             capability = self.catalog.get(name)
             host = capability.inventory["host"]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -15,7 +16,7 @@ try:
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
-    from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy
+    from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy, validate_sops_age_recipients
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
@@ -23,7 +24,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
-    from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy
+    from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy, validate_sops_age_recipients
 
 
 class PreflightError(RuntimeError):
@@ -94,6 +95,18 @@ def _write_projection(path: Path, value: object) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _sops_policy_inputs(repo: Path) -> tuple[Path, set[str] | None]:
+    """Read private policy metadata inputs without exposing key material."""
+    policy = Path(os.environ.get("INFRA_SOPS_POLICY_PATH", str(repo / ".sops.yaml"))).expanduser()
+    raw_recipients = os.environ.get("INFRA_SOPS_AGE_RECIPIENTS", "")
+    if not raw_recipients:
+        return policy, None
+    recipients = {item.strip() for item in raw_recipients.split(",") if item.strip()}
+    if not recipients:
+        raise SecretProviderError("SOPS recipient policy is invalid")
+    return policy, recipients
+
+
 def check_canonical_secret_availability(repo: Path) -> dict[str, str] | None:
     """Check canonical encrypted-bundle prerequisites without decryption."""
     context = from_environment(repo)
@@ -105,11 +118,16 @@ def check_canonical_secret_availability(repo: Path) -> dict[str, str] | None:
     if not bundle.is_file():
         return
     try:
-        policy = repo / ".sops.yaml"
-        policy_metadata = inspect_sops_policy(policy, site=context.site) if policy.is_file() else {"recipient_policy": "unavailable"}
+        policy, expected_recipients = _sops_policy_inputs(repo)
+        policy_metadata = (
+            inspect_sops_policy(policy, site=context.site, expected_recipients=expected_recipients)
+            if policy.is_file()
+            else {"recipient_policy": "unavailable"}
+        )
         availability = check_sops_age_availability(
             bundle,
             environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
+            expected_recipients=expected_recipients,
         )
         return {**policy_metadata, **availability}
     except SecretProviderError as error:
@@ -172,6 +190,12 @@ def check_canonical_required_secrets(repo: Path, *, require_secrets: bool) -> tu
     bundle = context.values_dir / "secrets.sops.yaml"
     if not bundle.is_file():
         raise PreflightError("required canonical secrets bundle is missing")
+    _, expected_recipients = _sops_policy_inputs(repo)
+    if expected_recipients is not None:
+        try:
+            validate_sops_age_recipients(bundle, expected_recipients)
+        except SecretProviderError as error:
+            raise PreflightError("canonical secret recipient policy preflight failed") from error
     provider = SopsAgeProvider(
         bundle,
         environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},

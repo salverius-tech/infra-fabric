@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from pathlib import Path
 from typing import Any, Mapping
 
 from canonical_values import CanonicalSite
-from service_catalog import ServiceCatalog
+from service_catalog import ServiceCatalog, load_catalog
 
 
 class ProjectionError(ValueError):
@@ -17,10 +18,16 @@ class ProjectionError(ValueError):
 _SENSITIVE_KEY = re.compile(r"(?:password|passphrase|secret|token|private[_-]?key|api[_-]?key|credential)", re.IGNORECASE)
 
 
+def _is_sensitive_key(key: str, value: Any) -> bool:
+    if isinstance(value, bool) and (key.endswith("passwordless_sudo") or key.endswith("password_authentication")):
+        return False
+    return bool(_SENSITIVE_KEY.search(key))
+
+
 def _assert_non_secret(value: Any, path: str = "projection") -> None:
     if isinstance(value, dict):
         for key, child in value.items():
-            if isinstance(key, str) and _SENSITIVE_KEY.search(key):
+            if isinstance(key, str) and _is_sensitive_key(key, child):
                 raise ProjectionError(f"non-secret projection contains sensitive field: {path}.{key}")
             _assert_non_secret(child, f"{path}.{key}")
     elif isinstance(value, (list, tuple)):
@@ -161,12 +168,14 @@ def _operator_ssh_keys(model: CanonicalSite, resource_id: str) -> list[str]:
 
 
 def _bootstrap_ssh_user(model: CanonicalSite, resource: Any) -> str:
-    return resource.runtime.cloud_init_user or model.bootstrap.ssh.user
+    del resource
+    return model.bootstrap.ssh.user
 
 
-def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
+def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | None = None) -> dict[str, Any]:
     """Render existing OpenTofu variable names without secret material."""
     _validate_non_secret_inputs(model)
+    catalog = catalog or load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
     values: dict[str, Any] = {
         "enabled_services": sorted(name for name, service in model.services.items() if service.enabled),
         "proxmox_endpoint": model.platform.proxmox.endpoint,
@@ -195,9 +204,12 @@ def render_opentofu_variables(model: CanonicalSite) -> dict[str, Any]:
         values["lxc_template_download_timeout_seconds"] = model.platform.lxc_template_download_timeout_seconds
     for name, resource in (*model.resources.guests.items(), *model.resources.shared_hosts.items()):
         values.update(_resource_variables(name, resource))
+    forgejo = model.resources.guests.get("forgejo")
+    if forgejo is not None:
+        values["forgejo_lan_ip"] = _address(forgejo)
     runtimes: dict[str, dict[str, Any]] = {}
     for name, service in model.services.items():
-        if service.enabled:
+        if service.enabled and catalog.get(name).runtime_owner in {"guest", "shared_host"}:
             resource = _resource(model, service.resource or "")
             runtimes[name] = {"type": resource.type}
             if resource.runtime.cloud_init_user is not None:
@@ -253,7 +265,7 @@ def render_ansible_inventory(model: CanonicalSite, catalog: ServiceCatalog) -> d
             "ansible_host": management.host,
             "ansible_user": management.user,
         }
-        groups["proxmox"] = {"hosts": ["pve"]}
+        groups["proxmox"] = {"hosts": {"pve": {}}}
     for name, service in model.services.items():
         if not service.enabled:
             continue
@@ -267,18 +279,27 @@ def render_ansible_inventory(model: CanonicalSite, catalog: ServiceCatalog) -> d
             "canonical_service": name,
             "ansible_host": _address(resource),
             "ansible_user": _bootstrap_ssh_user(model, resource),
+            "bootstrap_ssh_user": model.bootstrap.ssh.user,
             "bootstrap_ssh_public_keys": _bootstrap_ssh_keys(model, service.resource or ""),
             "operator_user": model.operator.user,
             "operator_ssh_public_keys": _operator_ssh_keys(model, service.resource or ""),
             "service_runtime_current": {"type": resource.type},
         }
-        hosts[host] = {**hosts.get(host, {}), **hostvars}
-        groups.setdefault(group, {"hosts": []})["hosts"].append(host)
+        if host in hosts:
+            existing = hosts[host]
+            services_for_host = existing.setdefault("canonical_services", [existing["canonical_service"]])
+            services_for_host.append(name)
+        else:
+            hosts[host] = {**hostvars, "canonical_services": [name]}
+        groups.setdefault(group, {"hosts": {}})["hosts"][host] = {}
     for group in groups.values():
-        group["hosts"] = sorted(set(group["hosts"]))
+        for host in group["hosts"]:
+            group["hosts"][host] = hosts[host]
     result = {
-        "_meta": {"hostvars": hosts},
-        "all": {"children": sorted(groups), "vars": {"canonical_site": model.site.name}},
+        "all": {
+            "children": {group: {} for group in sorted(groups)},
+            "vars": {"canonical_site": model.site.name},
+        },
         **groups,
     }
     _assert_non_secret(result, "inventory")
@@ -398,15 +419,23 @@ def verify_cross_projection_identity(
     vars_site = ansible_vars.get("canonical_site")
     if inventory_site != site or vars_site != site:
         raise ProjectionError("generated projections disagree with the selected site")
-    hosts = inventory.get("_meta", {}).get("hostvars", {})
+    hosts: dict[str, Mapping[str, Any]] = {}
+    legacy_meta = inventory.get("_meta", {}).get("hostvars", {})
+    if isinstance(legacy_meta, Mapping):
+        hosts.update({name: values for name, values in legacy_meta.items() if isinstance(values, Mapping)})
+    for group in inventory.values():
+        if isinstance(group, Mapping) and isinstance(group.get("hosts"), Mapping):
+            hosts.update({name: values for name, values in group["hosts"].items() if isinstance(values, Mapping)})
     services = ansible_vars.get("services")
     runtimes = opentofu.get("service_runtime")
     if not isinstance(hosts, Mapping) or not isinstance(services, Mapping) or not isinstance(runtimes, Mapping):
         raise ProjectionError("generated projections have an invalid identity shape")
-    if set(services) != set(runtimes):
+    runtime_services = set(runtimes)
+    if not runtime_services <= set(services):
         raise ProjectionError("service identity sets disagree across projections")
     identities: dict[str, dict[str, str]] = {}
-    for name, values in services.items():
+    for name in runtime_services:
+        values = services[name]
         if not isinstance(values, Mapping):
             raise ProjectionError(f"Ansible vars identity is invalid: {name}")
         resource = values.get("resource")
@@ -419,7 +448,11 @@ def verify_cross_projection_identity(
         matching_hosts = [
             hostvars
             for hostvars in hosts.values()
-            if isinstance(hostvars, Mapping) and hostvars.get("canonical_service") == name
+            if isinstance(hostvars, Mapping)
+            and (
+                hostvars.get("canonical_service") == name
+                or name in hostvars.get("canonical_services", [])
+            )
         ]
         if len(matching_hosts) != 1 or matching_hosts[0].get("canonical_resource") != resource:
             raise ProjectionError(f"resource identity disagrees across projections: {name}")

@@ -49,6 +49,33 @@ class CrossProjectionIdentityTests(unittest.TestCase):
             verify_cross_projection_identity(
                 site="dev", opentofu=opentofu, inventory=inventory, ansible_vars=ansible_vars
             )
+    def test_multiple_services_may_share_one_inventory_host(self) -> None:
+        opentofu = {"service_runtime": {"onramp_host": {"type": "lxc"}}}
+        inventory = {
+            "_meta": {
+                "hostvars": {
+                    "onramp_host_vm": {
+                        "canonical_service": "onramp_host",
+                        "canonical_services": ["onramp_host", "searxng_onramp"],
+                        "canonical_resource": "onramp_host",
+                    }
+                }
+            },
+            "all": {"vars": {"canonical_site": "dev"}},
+        }
+        ansible_vars = {
+            "canonical_site": "dev",
+            "services": {
+                "onramp_host": {"resource": "onramp_host", "resource_type": "lxc"},
+                "searxng_onramp": {"resource": "onramp_host", "resource_type": "lxc"},
+            },
+        }
+        self.assertEqual(
+            verify_cross_projection_identity(
+                site="dev", opentofu=opentofu, inventory=inventory, ansible_vars=ansible_vars
+            )["status"],
+            "verified",
+        )
 
 
 if __name__ == "__main__":

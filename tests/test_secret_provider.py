@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+import signal
 import stat
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Callable, cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -155,6 +157,18 @@ class SecretProviderTests(unittest.TestCase):
             self.assertEqual(material.stat().st_mode & 0o777, 0o600)
             self.assertTrue(material.is_file())
         self.assertFalse(directory.exists())
+
+    def test_secret_material_directory_cleans_up_on_sigterm(self) -> None:
+        directory_path: Path | None = None
+        with self.assertRaises(SystemExit) as raised:
+            with secret_material_directory(self.root) as directory_path:
+                material = write_secret_material(directory_path, "runtime.env", "SECRET=placeholder-secret\n")
+                self.assertTrue(material.is_file())
+                handler = cast(Callable[[int, object], object], signal.getsignal(signal.SIGTERM))
+                handler(signal.SIGTERM, None)
+        self.assertEqual(raised.exception.code, 128 + signal.SIGTERM)
+        assert directory_path is not None
+        self.assertFalse(directory_path.exists())
 
     def test_sops_age_recipient_policy_matches_public_metadata(self) -> None:
         encrypted = self.root / "encrypted.sops.yaml"

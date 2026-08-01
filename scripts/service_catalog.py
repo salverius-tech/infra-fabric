@@ -15,7 +15,9 @@ class ServiceCatalogError(ValueError):
 
 _LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "generated"]
+RuntimeOwner = Literal["guest", "shared_host", "none"]
 _SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))  # public-safety: allow-secret
+_RUNTIME_OWNERS = frozenset(("guest", "shared_host", "none"))
 _SCHEMA_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,127}$")
 _RELEASE_SOURCES = frozenset(("package", "container", "binary", "image"))
 _OVERRIDE_NAMESPACES = frozenset(("ansible", "opentofu"))
@@ -56,6 +58,7 @@ def _required_field_missing(field: str, value: object) -> bool:
 class ServiceCapability:
     name: str
     state_capable: bool
+    runtime_owner: RuntimeOwner
     configuration_schema: str | None
     release_sources: tuple[str, ...]
     allowed_override_namespaces: tuple[str, ...]
@@ -88,6 +91,7 @@ class ServiceCatalog:
             "release_sources",
             "allowed_override_namespaces",
             "required_fields",
+            "runtime_owner",
         }
         for name, capability in self._capabilities.items():
             missing = sorted(required_keys - capability.raw.keys())
@@ -361,9 +365,13 @@ def load_catalog(path: Path) -> ServiceCatalog:
             for field in required_fields
         ) or len(required_fields) != len(set(required_fields)):
             raise ServiceCatalogError(f"service {name} required_fields must contain unique logical field paths")
+        runtime_owner = raw.get("runtime_owner", "guest")
+        if runtime_owner not in _RUNTIME_OWNERS:
+            raise ServiceCatalogError(f"service {name} runtime_owner must be one of: {', '.join(sorted(_RUNTIME_OWNERS))}")
         capabilities[name] = ServiceCapability(
             name=name,
             state_capable=raw.get("state_capable") is True,
+            runtime_owner=runtime_owner,
             configuration_schema=configuration_schema,
             release_sources=tuple(release_sources),
             allowed_override_namespaces=tuple(allowed_override_namespaces),

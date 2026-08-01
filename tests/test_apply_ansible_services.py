@@ -189,8 +189,8 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             delivered_paths.append(path)
             return SimpleNamespace(
                 environment_name=(
-                    "INFRA_SYSTEMBOSS_PASSWORD"
-                    if path == "secrets.operator.systemboss_password"
+                    "INFRA_OPERATOR_PASSWORD"
+                    if path == "secrets.operator.password"
                     else "INFRA_BOOTSTRAP_ROOT_PASSWORD"
                 ),
                 value=f"value-for-{path}",
@@ -228,12 +228,12 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertNotIn("host_identity_root_recovery_enabled=true", commands[0])
         self.assertIn("host_identity_root_recovery_enabled=true", commands[1])
         self.assertNotIn("INFRA_BOOTSTRAP_ROOT_PASSWORD", environments[0])
-        self.assertEqual(environments[1]["INFRA_SYSTEMBOSS_PASSWORD"], "value-for-secrets.operator.systemboss_password")
+        self.assertEqual(environments[1]["INFRA_OPERATOR_PASSWORD"], "value-for-secrets.operator.password")
         self.assertEqual(environments[1]["INFRA_BOOTSTRAP_ROOT_PASSWORD"], "value-for-secrets.bootstrap.root_password")
         self.assertEqual(
             delivered_paths,
             [
-                "secrets.operator.systemboss_password",
+                "secrets.operator.password",
                 "secrets.bootstrap.root_password",
             ],
         )

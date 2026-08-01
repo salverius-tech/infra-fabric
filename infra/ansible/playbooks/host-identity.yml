@@ -7,9 +7,13 @@
     - role: host_identity
       when: host_identity_enabled | default(false) | bool
   vars:
+    host_identity_provisioning_user: "{{ bootstrap_ssh_user }}"
+    host_identity_operator_user: "{{ operator_user }}"
+    host_identity_provisioning_home: "/home/{{ bootstrap_ssh_user }}"
+    host_identity_operator_home: "/home/{{ operator_user }}"
     host_identity_provisioning_keys: "{{ bootstrap_ssh_public_keys | default([]) }}"
     host_identity_operator_keys: "{{ operator_ssh_public_keys | default([]) }}"
-    host_identity_operator_password: "{{ lookup('env', 'INFRA_SYSTEMBOSS_PASSWORD') }}"
+    host_identity_operator_password: "{{ lookup('env', 'INFRA_OPERATOR_PASSWORD') }}"
     host_identity_dotfiles_repository: "{{ operator_dotfiles_repository | default(host_identity_dotfiles_repository) }}"
     host_identity_dotfiles_revision: "{{ operator_dotfiles_revision | default(host_identity_dotfiles_revision) }}"
     host_identity_chezmoi_version: "{{ operator_chezmoi_version | default(host_identity_chezmoi_version) }}"

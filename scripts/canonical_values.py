@@ -29,6 +29,7 @@ class CanonicalValuesError(ValueError):
 
 
 _IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
+_IMAGE_IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 _HOSTNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?$")
 _PORT_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 _CIDR_RE = re.compile(r"^(?:dhcp|(?:[0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2})$")
@@ -269,7 +270,7 @@ class PlatformImages(StrictModel):
             ("vm", self.vm, "vm_image"),
         ):
             for name, definition in definitions.items():
-                if not _IDENTIFIER_RE.fullmatch(name):
+                if not _IMAGE_IDENTIFIER_RE.fullmatch(name):
                     raise ValueError(f"platform.images.{family} keys must be lowercase identifiers")
                 if definition.type != expected_type:
                     raise ValueError(f"platform.images.{family}.{name} type does not match its image family")
@@ -481,22 +482,20 @@ class Resources(StrictModel):
         hostnames = [resource.identity.hostname for _, resource in all_items]
         if len(hostnames) != len(set(hostnames)):
             raise ValueError("resource hostnames must be unique")
-        networks = []
+        addresses = []
         for name, resource in all_items:
             if resource.network.address == "dhcp":
                 continue
             try:
-                network = ipaddress.ip_network(resource.network.address, strict=False)
+                interface = ipaddress.ip_interface(resource.network.address)
             except ValueError as error:
                 raise ValueError(f"resources.{name}.network.address must be a valid IPv4 CIDR") from error
-            if network.version != 4:
+            if interface.version != 4:
                 raise ValueError(f"resources.{name}.network.address must be an IPv4 CIDR")
-            for other_name, other_network in networks:
-                if network.overlaps(other_network):
-                    raise ValueError(
-                        f"resource network ranges overlap: {name} ({network}) and {other_name} ({other_network})"
-                    )
-            networks.append((name, network))
+            for other_name, other_address in addresses:
+                if interface.ip == other_address:
+                    raise ValueError(f"resource network addresses duplicate: {name} ({interface.ip}) and {other_name} ({other_address})")
+            addresses.append((name, interface.ip))
         return self
 
 
@@ -1008,6 +1007,7 @@ class HermesConfiguration(StrictModel):
     runtime_user: StrictStr | None = None
     repository_path: StrictStr | None = None
     allow_legacy_runtime: StrictBool | None = None
+    compose_version: StrictStr | None = None
     tuning: HermesTuning = Field(default_factory=HermesTuning)
     node: HermesRuntimeNode = Field(default_factory=HermesRuntimeNode)
     dashboard: HermesDashboard = Field(default_factory=HermesDashboard)
@@ -1029,6 +1029,13 @@ class HermesConfiguration(StrictModel):
         path = PurePosixPath(value)
         if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
             raise ValueError("Hermes repository_path must be a normalized absolute POSIX path")
+        return value
+
+    @field_validator("compose_version")
+    @classmethod
+    def validate_compose_version(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_VERSION_RE.fullmatch(value):
+            raise ValueError("Hermes compose_version must be a strict semantic version")
         return value
 
 
@@ -1131,8 +1138,8 @@ class BootstrapSshPolicy(StrictModel):
     @field_validator("user")
     @classmethod
     def validate_user(cls, value: str) -> str:
-        if not _HERMES_USER_RE.fullmatch(value):
-            raise ValueError("bootstrap.ssh.user must be a valid Linux user identifier")
+        if value == "root" or not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("bootstrap.ssh.user must be a non-root Linux user identifier")
         return value
 
     @field_validator("public_keys")
@@ -1211,8 +1218,8 @@ class OperatorPolicy(StrictModel):
     @field_validator("user")
     @classmethod
     def validate_user(cls, value: str) -> str:
-        if not _HERMES_USER_RE.fullmatch(value):
-            raise ValueError("operator.user must be a valid Linux user identifier")
+        if value == "root" or not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("operator.user must be a non-root Linux user identifier")
         return value
 
 
@@ -1232,6 +1239,8 @@ class CanonicalSite(StrictModel):
 
     @model_validator(mode="after")
     def validate_service_ownership(self) -> "CanonicalSite":
+        if self.bootstrap.ssh.user == self.operator.user:
+            raise ValueError("bootstrap.ssh.user and operator.user must be distinct")
         resource_ids = set(self.resources.guests) | set(self.resources.shared_hosts)
         unknown_overrides = sorted(set(self.bootstrap.root_password.host_overrides) - resource_ids)
         if unknown_overrides:

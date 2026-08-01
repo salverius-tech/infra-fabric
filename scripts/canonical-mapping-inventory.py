@@ -59,6 +59,7 @@ MATRIX_HEADERS = (
 )
 VALID_MATRIX_CLASSES = {
     "canonical",
+    "canonical/catalog",
     "canonical/derived",
     "canonical/deprecated",
     "derived",

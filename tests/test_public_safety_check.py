@@ -43,6 +43,17 @@ class PublicSafetyScanTests(unittest.TestCase):
             findings = public_safety.scan_ips("tasks/main.yml", 1, line)
             self.assertEqual(findings, [], line)
 
+    def test_sudoers_nopasswd_policy_is_not_a_secret_assignment(self) -> None:
+        findings = public_safety.scan_secrets(
+            "tasks/main.yml", 1, 'content: "{{ user }} ALL=(ALL:ALL) NOPASSWD: ALL\\n"'
+        )
+        self.assertEqual(findings, [])
+
+    def test_password_assignment_remains_rejected(self) -> None:
+        key = "PASS" + "WORD"
+        findings = public_safety.scan_secrets("tasks/main.yml", 1, f"{key}: actual-value")
+        self.assertEqual(len(findings), 1)
+
     def test_allow_comment_skips_ip_scan(self) -> None:
         findings = public_safety.scan_ips(
             "README.md", 1, "host 192.168.1.10 # public-safety: allow-ip"

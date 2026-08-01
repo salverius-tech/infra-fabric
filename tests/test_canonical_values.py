@@ -132,7 +132,7 @@ class CanonicalValuesTests(unittest.TestCase):
 
         self.assertEqual(tofu["bootstrap_ssh_user"], "infra")
         self.assertEqual(len(tofu["bootstrap_ssh_public_keys"]["forgejo"]), 2)
-        hostvars = inventory["_meta"]["hostvars"][catalog.get("forgejo").inventory["host"]]
+        hostvars = inventory[catalog.get("forgejo").inventory["group"]]["hosts"][catalog.get("forgejo").inventory["host"]]
         self.assertEqual(hostvars["ansible_user"], "infra")
         self.assertEqual(hostvars["bootstrap_ssh_public_keys"], tofu["bootstrap_ssh_public_keys"]["forgejo"])
 
@@ -161,6 +161,32 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(len(tofu["operator_ssh_public_keys"]["forgejo"]), 2)
         self.assertEqual(tofu["operator_dotfiles_revision"], "4aeeadd928b0d03090e5aa973d10d989e846cf15")
         self.assertEqual(tofu["operator_chezmoi_version"], "v2.71.1")
+
+    def test_host_identity_names_are_site_owned_and_projected(self) -> None:
+        site = canonical_values.YAML(typ="safe").load(VALID_SITE)
+        site.setdefault("bootstrap", {}).setdefault("ssh", {})["user"] = "infra-dev"
+        site.setdefault("operator", {})["user"] = "anviluser"
+        model = canonical_values.CanonicalSite.model_validate(site)
+        tofu = render_opentofu_variables(model)
+        self.assertEqual(tofu["bootstrap_ssh_user"], "infra-dev")
+        self.assertEqual(tofu["operator_user"], "anviluser")
+        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        inventory = render_ansible_inventory(model, catalog)
+        group = catalog.get("forgejo").inventory["group"]
+        host_name = catalog.get("forgejo").inventory["host"]
+        host = inventory[group]["hosts"][host_name]
+        self.assertEqual(host["ansible_user"], "infra-dev")
+        self.assertEqual(host["bootstrap_ssh_user"], "infra-dev")
+        self.assertEqual(host["operator_user"], "anviluser")
+
+    def test_host_identity_names_must_be_valid_and_distinct(self) -> None:
+        for bootstrap_user, operator_user in (("root", "anviluser"), ("infra-dev", "infra-dev")):
+            site = canonical_values.YAML(typ="safe").load(VALID_SITE)
+            site.setdefault("bootstrap", {}).setdefault("ssh", {})["user"] = bootstrap_user
+            site.setdefault("operator", {})["user"] = operator_user
+            with self.subTest(bootstrap_user=bootstrap_user, operator_user=operator_user):
+                with self.assertRaises((CanonicalValuesError, ValidationError)):
+                    canonical_values.CanonicalSite.model_validate(site)
 
     def test_root_password_policy_defaults_to_automatic_site_inheritance(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -454,6 +480,12 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             HermesConfiguration.model_validate({"control": {"plugin_socket": "/run/../tmp.sock"}})
 
+    def test_hermes_compose_version_is_a_managed_semantic_version(self) -> None:
+        configuration = HermesConfiguration.model_validate({"compose_version": "2.40.3"})
+        self.assertEqual(configuration.compose_version, "2.40.3")
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"compose_version": "latest"})
+
     def test_hermes_release_metadata_validates_managed_pins(self) -> None:
         release = ServiceRelease(
             source="binary",
@@ -661,10 +693,10 @@ class CanonicalValuesTests(unittest.TestCase):
     def test_resource_network_overlaps_are_rejected(self) -> None:
         content = VALID_SITE.replace(
             "services:\n",
-            "    other:\n      type: lxc\n      identity:\n        vmid: 108\n        hostname: other\n      network:\n        address: 192.0.2.0/25\n      compute:\n        cores: 1\n        memory_mb: 512\n      storage:\n        root:\n          type: directory\n          target: /\n      runtime: {}\nservices:\n",
+            "    other:\n      type: lxc\n      identity:\n        vmid: 108\n        hostname: other\n      network:\n        address: 192.0.2.64/25\n      compute:\n        cores: 1\n        memory_mb: 512\n      storage:\n        root:\n          type: directory\n          target: /\n      runtime: {}\nservices:\n",
             1,
         ).replace("address: dhcp", "address: 192.0.2.64/26", 1).replace("        expected_address: 192.0.2.62\n", "")
-        with self.assertRaisesRegex(CanonicalValuesError, "network ranges overlap"):
+        with self.assertRaisesRegex(CanonicalValuesError, "network addresses duplicate"):
             load_site(self.write_site(content))
 
     def test_invalid_ipv4_octets_are_rejected(self) -> None:
@@ -909,7 +941,8 @@ class CanonicalValuesTests(unittest.TestCase):
         dns = render_dns_records(model)
         self.assertEqual(tofu["forgejo_container_vmid"], 107)
         self.assertEqual(tofu["forgejo_server_name"], "git.example.internal")
-        self.assertEqual(inventory["forgejo"]["hosts"], ["forgejo_lxc"])
+        self.assertEqual(set(inventory["forgejo"]["hosts"]), {"forgejo_lxc"})
+        self.assertEqual(inventory["forgejo"]["hosts"]["forgejo_lxc"]["canonical_service"], "forgejo")
         self.assertEqual(ansible_vars["canonical_site"], "dev")
         self.assertEqual(ansible_vars["services"]["forgejo"]["resource"], "forgejo")
         self.assertEqual(

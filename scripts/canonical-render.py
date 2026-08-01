@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
         model = load_site(args.site_file, catalog_path=args.catalog)
         catalog = load_catalog(args.catalog)
         projections = {
-            "terraform.auto.tfvars.json": render_opentofu_variables(model),
+            "terraform.auto.tfvars.json": render_opentofu_variables(model, catalog),
             "ansible-inventory.json": render_ansible_inventory(model, catalog),
             "ansible-vars.json": render_ansible_vars(model, catalog),
             "dns-records.json": render_dns_records(model),

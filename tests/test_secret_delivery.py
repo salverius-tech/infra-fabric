@@ -111,6 +111,11 @@ class SecretDeliveryTests(unittest.TestCase):
         with self.assertRaises(secret_delivery.SecretDeliveryError):
             secret_delivery.deliver_services_environment(provider, ["forgejo"])
 
+    def test_service_without_runtime_secrets_keeps_bootstrap_only(self) -> None:
+        provider = FakeProvider({"secrets.bootstrap.root_password": "ROOT"})
+        environment = secret_delivery.deliver_services_environment(provider, ["technitium"])
+        self.assertEqual(environment, {"INFRA_BOOTSTRAP_ROOT_PASSWORD": "ROOT"})
+
     def test_all_contract_secrets_forbid_state_exposure(self) -> None:
         self.assertTrue(secret_delivery.ALL_REQUIREMENTS)
         self.assertTrue(all(requirement.state_exposure == "forbidden" for requirement in secret_delivery.ALL_REQUIREMENTS))
@@ -141,6 +146,11 @@ class SecretDeliveryTests(unittest.TestCase):
             secret_delivery.redact_environment(environment, set(environment)),
             {"INFRA_BOOTSTRAP_ROOT_PASSWORD": "<redacted>"},
         )
+
+    def test_environment_delivery_rejects_unknown_consumer(self) -> None:
+        provider = FakeProvider({"secrets.bootstrap.root_password": "SENTINEL"})
+        with self.assertRaisesRegex(secret_delivery.SecretDeliveryError, "consumer has no approved secret contract"):
+            secret_delivery.deliver_environment(provider, consumer="unknown-consumer")
 
 
 if __name__ == "__main__":

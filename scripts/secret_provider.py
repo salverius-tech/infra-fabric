@@ -6,9 +6,11 @@ import hashlib
 import json
 import os
 import re
+import signal
 import shutil
 import subprocess
 import tempfile
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -296,10 +298,29 @@ def secret_material_directory(parent: Path | None = None) -> Iterator[Path]:
     """Create a private temporary directory and remove it on every exit path."""
     directory = Path(tempfile.mkdtemp(prefix="canonical-secrets-", dir=parent))
     directory.chmod(0o700)
+    previous_handlers: dict[int, Any] = {}
+
+    def cleanup() -> None:
+        shutil.rmtree(directory, ignore_errors=True)
+
+    def handle_signal(signum: int, _frame: Any) -> None:
+        cleanup()
+        if signum == signal.SIGINT:
+            raise KeyboardInterrupt
+        raise SystemExit(128 + signum)
+
+    install_handlers = threading.current_thread() is threading.main_thread()
     try:
+        if install_handlers:
+            for signum in (signal.SIGINT, signal.SIGTERM):
+                previous_handlers[signum] = signal.getsignal(signum)
+                signal.signal(signum, handle_signal)
         yield directory
     finally:
-        shutil.rmtree(directory, ignore_errors=True)
+        cleanup()
+        if install_handlers:
+            for signum, handler in previous_handlers.items():
+                signal.signal(signum, handler)
 
 
 def write_secret_material(directory: Path, name: str, content: str) -> Path:

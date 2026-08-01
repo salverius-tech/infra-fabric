@@ -29,22 +29,22 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(report["canonical_path_coverage"]["valid_count"], 71)
         self.assertEqual(report["canonical_path_coverage"]["invalid_count"], 0)
         self.assertEqual(report["canonical_path_coverage"]["status"], "complete")
-        self.assertEqual(report["matrix_path_coverage"]["checked_count"], 247)
-        self.assertEqual(report["matrix_path_coverage"]["valid_count"], 247)
+        self.assertEqual(report["matrix_path_coverage"]["checked_count"], 248)
+        self.assertEqual(report["matrix_path_coverage"]["valid_count"], 248)
         self.assertEqual(report["matrix_path_coverage"]["invalid_count"], 0)
-        self.assertEqual(report["matrix_path_coverage"]["excluded_count"], 59)
+        self.assertEqual(report["matrix_path_coverage"]["excluded_count"], 61)
         self.assertEqual(report["matrix_path_coverage"]["status"], "complete")
-        self.assertEqual(report["matrix_classification_coverage"]["checked_count"], 306)
-        self.assertEqual(report["matrix_classification_coverage"]["valid_count"], 306)
+        self.assertEqual(report["matrix_classification_coverage"]["checked_count"], 309)
+        self.assertEqual(report["matrix_classification_coverage"]["valid_count"], 309)
         self.assertEqual(report["matrix_classification_coverage"]["invalid_count"], 0)
         self.assertEqual(report["matrix_classification_coverage"]["status"], "complete")
-        self.assertEqual(report["consumer_evidence"]["token_count"], 245)
-        self.assertEqual(report["consumer_evidence"]["exact_evidence_count"], 196)
-        self.assertEqual(report["consumer_evidence"]["dynamic_evidence_count"], 49)
+        self.assertEqual(report["consumer_evidence"]["token_count"], 251)
+        self.assertEqual(report["consumer_evidence"]["exact_evidence_count"], 203)
+        self.assertEqual(report["consumer_evidence"]["dynamic_evidence_count"], 48)
         self.assertEqual(report["consumer_evidence"]["missing_exact_evidence_count"], 0)
         self.assertEqual(report["consumer_evidence"]["status"], "complete")
-        self.assertEqual(report["consumer_evidence"]["row_count"], 243)
-        self.assertEqual(report["consumer_evidence"]["evidenced_row_count"], 243)
+        self.assertEqual(report["consumer_evidence"]["row_count"], 246)
+        self.assertEqual(report["consumer_evidence"]["evidenced_row_count"], 246)
         self.assertEqual(report["consumer_evidence"]["rows_without_evidence"], [])
         self.assertEqual(report["consumer_evidence"]["semantic_status"], "complete")
         first_evidence = report["consumer_evidence"]["row_evidence"][0]
@@ -70,7 +70,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             {"ansible-only", "deprecated", "generated-projection", "operational-artifact", "retired-input", "unsupported"},
         )
         self.assertEqual(report["source_inputs"]["status"], "classification-complete-with-review-dispositions")
-        self.assertEqual(report["mapping_matrix"]["row_count"], 306)
+        self.assertEqual(report["mapping_matrix"]["row_count"], 309)
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-complete")
         self.assertEqual(report["matrix_coverage"]["input_count"], 361)
         self.assertEqual(report["matrix_coverage"]["source_input_count"], 374)
@@ -122,7 +122,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             ("scaffold/terraform.tfvars", "lxc_template_download_timeout_seconds", "platform.lxc_template_download_timeout_seconds"),
             ("scaffold/terraform.tfvars", "guest_vm_cloud_init_user", "platform.vm_cloud_init_user"),
             ("scaffold/terraform.tfvars", "onramp_host_cloud_init_user", "resources.shared_hosts.onramp_host.runtime.cloud_init_user"),
-            ("scaffold/ansible/inventory/local.yml", "forgejo_runtime", "resources.guests.forgejo.runtime"),
+            ("scaffold/ansible/inventory/local.yml", "forgejo_runtime", "resources.guests.forgejo.type"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_enable_caddy", "services.forgejo.configuration.enable_caddy"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_configure_system_ssh", "services.forgejo.configuration.configure_system_ssh"),
             ("scaffold/ansible/inventory/local.yml", "forgejo_write_initial_config", "services.forgejo.configuration.write_initial_config"),
