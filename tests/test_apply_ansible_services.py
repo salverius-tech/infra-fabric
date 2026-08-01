@@ -170,6 +170,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
     def test_canonical_host_identity_uses_root_only_for_lxc_and_delivers_both_passwords(self) -> None:
         commands: list[list[str]] = []
         environments: list[dict[str, str]] = []
+        delivered_paths: list[str] = []
         model = SimpleNamespace(
             resources=SimpleNamespace(
                 guests={"technitium": SimpleNamespace(type="lxc")},
@@ -182,8 +183,10 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 )
             ),
         )
+        delivered_paths: list[str] = []
 
         def fake_deliver(provider: object, *, path: str, consumer: str, requirements: object) -> SimpleNamespace:
+            delivered_paths.append(path)
             return SimpleNamespace(
                 environment_name=(
                     "INFRA_SYSTEMBOSS_PASSWORD"
@@ -227,6 +230,13 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertNotIn("INFRA_BOOTSTRAP_ROOT_PASSWORD", environments[0])
         self.assertEqual(environments[1]["INFRA_SYSTEMBOSS_PASSWORD"], "value-for-secrets.operator.systemboss_password")
         self.assertEqual(environments[1]["INFRA_BOOTSTRAP_ROOT_PASSWORD"], "value-for-secrets.bootstrap.root_password")
+        self.assertEqual(
+            delivered_paths,
+            [
+                "secrets.operator.systemboss_password",
+                "secrets.bootstrap.root_password",
+            ],
+        )
 
     def test_run_service_adds_paired_canonical_extra_args(self) -> None:
         commands: list[list[str]] = []

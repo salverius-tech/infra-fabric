@@ -253,17 +253,19 @@ def run_canonical_host_identity(
             consumer="ansible-host-identity",
             requirements=(operator_requirement,),
         )
-        root_delivered = deliver(
-            provider,
-            path=root_requirements[0].path,
-            consumer="ansible-host-identity",
-            requirements=root_requirements,
-        )
         phases = (("root", False), ("infra", True)) if resource.type == "lxc" else (("infra", True),)
         for connection_user, cleanup_root in phases:
             env = dict(base_env)
+            root_environment_name: str | None = None
             env[operator_delivered.environment_name] = operator_delivered.value
             if cleanup_root:
+                root_delivered = deliver(
+                    provider,
+                    path=root_requirements[0].path,
+                    consumer="ansible-host-identity",
+                    requirements=root_requirements,
+                )
+                root_environment_name = root_delivered.environment_name
                 env[root_delivered.environment_name] = root_delivered.value
             command = [
                 "ansible-playbook",
@@ -283,7 +285,8 @@ def run_canonical_host_identity(
                 rc = runner(command, log_dir / f"host-identity-{host}-{connection_user}.log", env)
             finally:
                 env.pop(operator_delivered.environment_name, None)
-                env.pop(root_delivered.environment_name, None)
+                if root_environment_name is not None:
+                    env.pop(root_environment_name, None)
             if rc != 0:
                 return rc
     return 0
