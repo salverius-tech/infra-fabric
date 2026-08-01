@@ -1054,9 +1054,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--transactional", action="store_true", help="create a verified backup and roll back on failure")
     parser.add_argument("--backup-dir", type=Path, default=None, help="new private backup directory for --transactional")
     args = parser.parse_args(argv)
-
     try:
         values_dir = args.values_dir or from_environment().values_dir
+        if (values_dir / "site.yaml").is_file():
+            print(f"canonical site selected; legacy values migration skipped: {values_dir}")
+            return 0
         if args.transactional:
             if args.backup_dir is None:
                 raise MigrationError("--transactional requires --backup-dir")

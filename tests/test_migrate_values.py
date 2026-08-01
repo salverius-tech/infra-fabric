@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "migrate-values.py"
 spec = importlib.util.spec_from_file_location("migrate_values", SCRIPT)
@@ -16,6 +18,16 @@ spec.loader.exec_module(migrate_values)
 
 
 class MigrateValuesTests(unittest.TestCase):
+    def test_main_skips_legacy_mutation_for_canonical_site(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            values = Path(temp)
+            (values / "site.yaml").write_text("schema_version: 1\n", encoding="utf-8")
+            with patch.dict(os.environ, {}, clear=True):
+                result = migrate_values.main(["--values-dir", str(values)])
+            self.assertEqual(result, 0)
+            self.assertFalse((values / ".env").exists())
+            self.assertFalse((values / "terraform.tfvars").exists())
+
     def test_site_metadata_controls_enabled_services(self) -> None:
         temp, values = self.make_values()
         with temp:
