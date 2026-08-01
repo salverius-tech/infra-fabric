@@ -80,6 +80,8 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         return "secret", None
     if key == "DNS_RECORDS_FILE":
         return "operational", None
+    if key in {"service_runtime", "service_storage"}:
+        return "operational", None
     derived_path = _derived_canonical_path(key)
     if derived_path is not None:
         return "mapped", derived_path
@@ -229,9 +231,32 @@ def _derived_canonical_path(key: str) -> str | None:
         "infisical_start_on_boot": "resources.guests.infisical.runtime.start_on_boot",
         "hermes_started": "resources.guests.hermes.runtime.started",
         "hermes_start_on_boot": "resources.guests.hermes.runtime.start_on_boot",
+        "guest_vm_cloud_init_user": "platform.vm_cloud_init_user",
     }
     if key in direct:
         return direct[key]
+    image_prefixes = {
+        "debian_template": "platform.images.lxc.debian",
+        "guest_vm_image": "platform.images.vm.guest",
+        "onramp_host_image": "platform.images.vm.onramp_host",
+    }
+    image_suffixes = {
+        "url": "url",
+        "file_name": "file_name",
+        "checksum_algorithm": "checksum.algorithm",
+        "checksum": "checksum.value",
+        "datastore_id": "datastore_id",
+    }
+    for prefix, base in image_prefixes.items():
+        marker = f"{prefix}_"
+        if key.startswith(marker):
+            suffix = key.removeprefix(marker)
+            path = image_suffixes.get(suffix)
+            if path is not None:
+                if prefix == "debian_template" and suffix == "datastore_id":
+                    return None
+                return f"{base}.{path}"
+            return None
     resource_prefixes = {
         "technitium_container": "resources.guests.technitium",
         "forgejo_container": "resources.guests.forgejo",
