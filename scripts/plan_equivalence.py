@@ -21,6 +21,8 @@ def _load_document(value: Mapping[str, Any] | Path) -> Mapping[str, Any]:
     entries = value.get("resource_changes", value.get("resources", []))
     if not isinstance(entries, list):
         raise PlanEquivalenceError("plan resource_changes must be a list")
+    if "resources" in value and value.get("schema_version") != 1:
+        raise PlanEquivalenceError("normalized plan schema_version must be 1")
     return value
 
 
@@ -82,6 +84,10 @@ def _semantic_changes(plan: Mapping[str, Any]) -> dict[str, Any]:
             actions = raw_change.get("actions")
             if not isinstance(actions, list) or not all(isinstance(action, str) for action in actions):
                 raise PlanEquivalenceError(f"plan resource actions are malformed: {address}")
+            if not actions or any(action not in {"create", "read", "update", "delete", "no-op"} for action in actions):
+                raise PlanEquivalenceError(f"plan resource actions are invalid: {address}")
+            if "values" not in raw_change:
+                raise PlanEquivalenceError(f"plan resource values are missing: {address}")
             semantic = None if actions in (["no-op"], ["read"]) else {
                 "actions": actions,
                 "before": None,
@@ -104,14 +110,16 @@ def compare_plans(before: Mapping[str, Any] | Path, after: Mapping[str, Any] | P
     after_resources = after_semantic["resources"]
     for address in sorted(set(before_resources) | set(after_resources)):
         if address not in before_resources:
-            differences.append({"kind": "new-resource-change", "address": address, "after": after_resources[address]})
+            differences.append({"kind": "resource_added", "address": address})
         elif address not in after_resources:
-            differences.append({"kind": "removed-resource-change", "address": address, "before": before_resources[address]})
-        elif before_resources[address] != after_resources[address]:
+            differences.append({"kind": "resource_removed", "address": address})
+        else:
             before_actions = before_resources[address]["actions"]
             after_actions = after_resources[address]["actions"]
-            kind = "replacement" if "delete" in after_actions and "create" in after_actions else "resource-change"
-            differences.append({"kind": "values_changed" if kind == "resource-change" else kind, "address": address})
+            if before_actions != after_actions:
+                differences.append({"kind": "actions_changed", "address": address})
+            if before_resources[address]["after"] != after_resources[address]["after"]:
+                differences.append({"kind": "values_changed", "address": address})
     before_outputs = before_semantic["outputs"]
     after_outputs = after_semantic["outputs"]
     for name in sorted(set(before_outputs) | set(after_outputs)):
