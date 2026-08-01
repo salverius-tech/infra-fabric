@@ -265,14 +265,14 @@ The implementation is complete when all of the following are true:
 
 **Goal:** Make canonical files the normal workflow while retaining safe compatibility support.
 
-- [ ] Route `setup`, `validate`, `plan`, `apply`, `backup`, `restore`, `update`, and operator tooling through the canonical loader.
+- [~] Route `validate`, `plan`, `apply`, `update`, service backup/restore, and operator tooling through selected-site canonical context; setup and complete canonical loader routing remain open.
 - [ ] Keep public `just` command names stable unless an explicit decision changes them.
 - [ ] Make `VALUES_SITE` mandatory for site-scoped operations and preserve existing site-context safety checks.
-- [ ] Update backup/restore and state paths to site-local state, generated artifacts, and encrypted backups.
+- [~] Update service backup/restore and state paths to selected-site generated inventory and site-local backup roots; full encrypted backup/restore orchestration remains open.
 - [x] Emit documented warnings for direct legacy-file use during the compatibility window.
 - [ ] Make canonical files the only documented operator-edited configuration inputs.
 - [ ] Add selected-site, separate-dev/prod, direct-service-health, backup/restore, and repeat-plan operational checks.
-- [ ] Update README, AGENTS, scaffold docs/site fixture, migration plan, development docs, setup help, and private values contract tests.
+- [~] Update README and migration documentation for canonical operator inputs; scaffold/setup help and private values contract tests remain open.
 
 **Exit gate:** A representative site can validate, plan, apply (only with explicit approval), backup, restore, and repeat-plan using canonical inputs with identity checks and no unexpected changes.
 
