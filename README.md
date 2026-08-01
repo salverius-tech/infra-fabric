@@ -65,14 +65,18 @@ You can also pass the values repo URL directly:
 just setup git@git.example.internal:owner/homelab-infra-values.git
 ```
 
-Then edit the remaining private files:
+Then select a site explicitly and edit the canonical site document and encrypted secret bundle:
 
 ```text
-values/.env
-values/terraform.tfvars
-values/dns-records.local.json
-values/ansible/inventory/local.yml
+VALUES_SITE=dev
+values/sites/dev/site.yaml
+values/sites/dev/secrets.sops.yaml
 ```
+
+Generated projections under `values/sites/<site>/generated/` are disposable
+consumer inputs. Do not edit them or treat legacy `.env`, `terraform.tfvars`,
+static inventory, or DNS JSON files as canonical inputs. The legacy migration
+command remains available for reviewed, explicit imports only.
 
 If you skipped the Proxmox token wizard or need to rotate the token later, run:
 
@@ -91,18 +95,18 @@ scripts/python.sh scripts/bootstrap-domain.py --force
 Validate public source and private values wiring:
 
 ```bash
-just validate
+VALUES_SITE=dev just validate
 ```
 
-`just validate` runs source checks, linting, tests, and private `values/` wiring checks. Use it as the normal validation entry point.
+`VALUES_SITE` is mandatory for site-scoped operations. `just validate` runs source checks, linting, tests, canonical model/projection checks, and private values wiring checks. Use it as the normal validation entry point.
 
 Check for eligible pinned version updates without applying infrastructure changes:
 
 ```bash
-just update
+VALUES_SITE=dev just update
 ```
 
-`just update` checks known upstream releases and only updates pins for releases at least 48 hours old. It currently manages tool pins such as OpenTofu/TFLint and service pins such as Forgejo and Forgejo runner where the repo has a deterministic update target. Review the resulting diff before continuing with validation and planning.
+`just update` checks known upstream releases and only updates pins for releases at least 48 hours old. In canonical mode it refuses to mutate legacy service inventory; canonical service-release changes must be made in `site.yaml` or by the reviewed migration workflow. Review the resulting diff before continuing with validation and planning.
 
 Technitium is managed by Ansible using a versioned portable archive, a private SHA256 pin, an installed-version marker, activation health checks, and rollback handling. An optional controller-side cache can be configured with `technitium_artifact_path` under private values. Technitium is not yet automatically discovered or updated by `just update`; review and change its private version/checksum pins explicitly before running `just validate`, `just plan`, and approved `just apply`. Do not rerun the upstream installer as a routine update mechanism.
 

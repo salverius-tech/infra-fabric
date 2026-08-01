@@ -43,6 +43,13 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertNotIn("ansible/inventory/local.yml", script)
         self.assertNotIn("infra/ansible/inventory/tfvars.py", script)
 
+    def test_update_requires_selected_canonical_context(self) -> None:
+        justfile = (ROOT / "justfile").read_text(encoding="utf-8")
+        start = justfile.index("update:")
+        block = justfile[start:justfile.index("\n# ", start + 1)]
+        self.assertIn("scripts/require-site-context.sh", block)
+        self.assertIn("require_canonical_authority", block)
+
 
 if __name__ == "__main__":
     unittest.main()

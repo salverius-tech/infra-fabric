@@ -64,6 +64,8 @@ validate:
 
 # Check upstream releases and update eligible pinned versions after the safety hold period
 update:
+    scripts/require-site-context.sh
+    source scripts/site-context.sh; require_canonical_authority
     scripts/python.sh scripts/update.py
 
 # Show recent Forgejo Actions runs for the private values repo

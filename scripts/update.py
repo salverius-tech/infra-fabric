@@ -330,7 +330,22 @@ def run(
         )
         for target in TARGETS
     )
-    return [process_target(target, root, now, min_age, opener) for target in targets]
+    results: list[UpdateResult] = []
+    for target in targets:
+        if context.canonical_site_path is not None and target.path == inventory_path:
+            results.append(
+                UpdateResult(
+                    target.name,
+                    target.path,
+                    None,
+                    None,
+                    "skip",
+                    "canonical service release updates require canonical model mutation; legacy inventory is not authoritative",
+                )
+            )
+            continue
+        results.append(process_target(target, root, now, min_age, opener))
+    return results
 
 
 def print_results(results: list[UpdateResult]) -> None:

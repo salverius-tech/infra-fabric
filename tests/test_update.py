@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "update.py"
 spec = importlib.util.spec_from_file_location("update_script", SCRIPT)
@@ -102,6 +104,22 @@ class UpdateTests(unittest.TestCase):
 
             self.assertEqual(result.status, "skip")
             self.assertEqual(result.detail, "file not present")
+
+    def test_canonical_site_does_not_mutate_legacy_service_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            site = root / "values" / "sites" / "dev"
+            inventory = site / "ansible" / "inventory"
+            inventory.mkdir(parents=True)
+            (site / "site.yaml").write_text("schema_version: 1\nsite:\n  name: dev\n", encoding="utf-8")
+            (inventory / "local.yml").write_text('forgejo_version: "12.0.4"\n', encoding="utf-8")
+            environment = {"VALUES_SITE": "dev", "VALUES_DIR": str(root / "values")}
+            with patch.dict(os.environ, environment, clear=False):
+                results = update_script.run(root, 48, lambda _url: self.fail("legacy release lookup must not run"))
+            forgejo = next(result for result in results if result.name == "Forgejo")
+            self.assertEqual(forgejo.status, "skip")
+            self.assertIn("not authoritative", forgejo.detail)
+            self.assertEqual((inventory / "local.yml").read_text(encoding="utf-8"), 'forgejo_version: "12.0.4"\n')
 
 
 if __name__ == "__main__":
