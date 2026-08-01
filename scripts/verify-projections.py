@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
             secret_digest=None,
             projections=projections,
         )
-    except (CanonicalValuesError, ServiceCatalogError, ManifestError, OSError, json.JSONDecodeError) as error:
+    except (CanonicalValuesError, ProjectionError, ServiceCatalogError, ManifestError, OSError, json.JSONDecodeError) as error:
         print(f"canonical projection verification failed: {error}", file=sys.stderr)
         return 1
     print(f"verified canonical projections for {model.site.name} in {args.generated_dir}")

@@ -42,6 +42,13 @@ class CrossProjectionIdentityTests(unittest.TestCase):
             verify_cross_projection_identity(
                 site="dev", opentofu=opentofu, inventory=inventory, ansible_vars=ansible_vars
             )
+    def test_extra_runtime_service_is_rejected(self) -> None:
+        opentofu, inventory, ansible_vars = self.projections()
+        opentofu["service_runtime"]["technitium"] = {"type": "lxc"}
+        with self.assertRaisesRegex(ProjectionError, "service identity sets"):
+            verify_cross_projection_identity(
+                site="dev", opentofu=opentofu, inventory=inventory, ansible_vars=ansible_vars
+            )
 
 
 if __name__ == "__main__":

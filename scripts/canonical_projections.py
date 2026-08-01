@@ -403,6 +403,8 @@ def verify_cross_projection_identity(
     runtimes = opentofu.get("service_runtime")
     if not isinstance(hosts, Mapping) or not isinstance(services, Mapping) or not isinstance(runtimes, Mapping):
         raise ProjectionError("generated projections have an invalid identity shape")
+    if set(services) != set(runtimes):
+        raise ProjectionError("service identity sets disagree across projections")
     identities: dict[str, dict[str, str]] = {}
     for name, values in services.items():
         if not isinstance(values, Mapping):
