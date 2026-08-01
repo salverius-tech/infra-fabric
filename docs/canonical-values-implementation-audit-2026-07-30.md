@@ -6,6 +6,20 @@
 **Scope:** Original Canonical Site Values Model PRD, implementation tracker, current implementation/tests/evidence, and relevant Hermes skills/instruction sets.
 **Change boundary:** This audit report and the implementation/deferred-register documentation only. No source, test, skill, or internal instruction file was modified.
 
+## Status reconciliation note
+
+This document is a historical audit baseline, not the current implementation
+status. Subsequent commits completed the field-level Ansible inventory parser,
+semantic mapping gates, normalized non-secret runtime importer admission,
+protected secret delivery, canonical-first operational consumer gating, and
+catalog dependency closure. The remaining live boundary is intentionally
+narrower: candidate generation still requires selected-source admission without
+conflicts, migration and backup/restore acceptance still require private-site
+evidence, and semantic pre/post plan equivalence remains report-only. The
+current code and focused tests supersede the historical findings below where
+they conflict; the PRD acceptance criteria and private-site operational evidence
+still supersede both.
+
 ## Executive conclusion
 
 The project is **not complete** against the PRD. The current repository contains substantial, tested foundations, but the previous completion framing was not justified because three different evidence layers were treated as equivalent:

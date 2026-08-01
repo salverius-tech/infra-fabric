@@ -78,6 +78,11 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
         "lxc_root_password",
     }:
         return "secret", None
+    if key == "DNS_RECORDS_FILE":
+        return "operational", None
+    derived_path = _derived_canonical_path(key)
+    if derived_path is not None:
+        return "mapped", derived_path
     paths = {
         "PROXMOX_VE_API_URL": "platform.proxmox.endpoint",
         "PROXMOX_VE_ENDPOINT": "platform.proxmox.endpoint",
@@ -200,6 +205,76 @@ def _classification(key: str, migration: Any) -> tuple[str, str | None]:
     return "unknown", None
 
 
+def _derived_canonical_path(key: str) -> str | None:
+    """Map unambiguous resource/platform legacy names to typed schema paths."""
+    direct = {
+        "proxmox_endpoint": "platform.proxmox.endpoint",
+        "proxmox_insecure": "platform.proxmox.insecure",
+        "proxmox_node_name": "platform.proxmox.node",
+        "rootfs_datastore_id": "platform.storage.rootfs_datastore",
+        "template_datastore_id": "platform.storage.template_datastore",
+        "lxc_template_download_timeout_seconds": "platform.lxc_template_download_timeout_seconds",
+        "settings": "platform.dns.settings",
+        "zones": "platform.dns.zones",
+        "a_records": "platform.dns.a_records",
+        "cname_records": "platform.dns.cname_records",
+        "forgejo_lan_ip": "resources.guests.forgejo.network.expected_address",
+        "infisical_lan_ip": "resources.guests.infisical.network.expected_address",
+        "hermes_lan_ip": "resources.guests.hermes.network.expected_address",
+        "hermes_server_name": "services.hermes.endpoints.public_names",
+        "FORGEJO_ADMIN_USERNAME": "services.forgejo.configuration.bootstrap_admin_username",
+        "FORGEJO_ADMIN_EMAIL": "services.forgejo.configuration.bootstrap_admin_email",
+        "FORGEJO_REPO_OWNER_EMAIL": "services.forgejo.configuration.bootstrap_owner_email",
+        "infisical_started": "resources.guests.infisical.runtime.started",
+        "infisical_start_on_boot": "resources.guests.infisical.runtime.start_on_boot",
+        "hermes_started": "resources.guests.hermes.runtime.started",
+        "hermes_start_on_boot": "resources.guests.hermes.runtime.start_on_boot",
+    }
+    if key in direct:
+        return direct[key]
+    resource_prefixes = {
+        "technitium_container": "resources.guests.technitium",
+        "forgejo_container": "resources.guests.forgejo",
+        "forgejo_runner": "resources.guests.forgejo_runner",
+        "infisical_container": "resources.guests.infisical",
+        "hermes_container": "resources.guests.hermes",
+        "tailscale_client": "resources.guests.tailscale_client",
+        "onramp_host": "resources.shared_hosts.onramp_host",
+    }
+    suffixes = {
+        "vmid": "identity.vmid",
+        "hostname": "identity.hostname",
+        "description": "identity.description",
+        "ipv4_address": "network.address",
+        "ipv4_gateway": "network.gateway",
+        "mac_address": "network.mac_address",
+        "dns_servers": "network.dns_servers",
+        "search_domain": "network.search_domain",
+        "bridge": "network.bridge",
+        "vlan_id": "network.vlan_id",
+        "cores": "compute.cores",
+        "memory_mb": "compute.memory_mb",
+        "swap_mb": "compute.swap_mb",
+        "started": "runtime.started",
+        "start_on_boot": "runtime.start_on_boot",
+    }
+    for prefix, base in resource_prefixes.items():
+        marker = f"{prefix}_"
+        if not key.startswith(marker):
+            continue
+        suffix = key.removeprefix(marker)
+        if suffix in suffixes:
+            return f"{base}.{suffixes[suffix]}"
+        if suffix.endswith("_lan_ip"):
+            return f"{base}.network.expected_address"
+        if suffix == "datastore_id" and prefix == "onramp_host":
+            return f"{base}.storage.root.storage_id"
+        if suffix == "disk_gb":
+            return f"{base}.storage.root.size_gb"
+        return None
+    return None
+
+
 def _public_value(value: Any) -> Any:
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
@@ -304,6 +379,26 @@ def _normalize_port(value: Any) -> Any:
     return value
 
 
+def _normalize_tfvars_value(raw_value: str, parsed_value: Any) -> Any:
+    """Preserve native Terraform scalar/list types during legacy reconciliation."""
+    raw = raw_value.strip()
+    if raw == "true":
+        return True
+    if raw == "false":
+        return False
+    if re.fullmatch(r"-?\d+", raw):
+        try:
+            return int(raw)
+        except ValueError:
+            return parsed_value
+    if raw.startswith(("[", "{")):
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return parsed_value
+    return parsed_value
+
+
 def _equivalent_alias_values(previous: FieldObservation, value: Any) -> bool:
     left = previous.value
     right = value
@@ -382,11 +477,20 @@ def _read_tfvars(path: Path, report: DiscoveryReport, migration: Any) -> None:
     pattern = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=")
     known = set(migration.parse_tfvars(lines, path))
     for line in lines:
+        if line[:1].isspace():
+            continue
         match = pattern.match(line)
         if match and match.group(1) not in known:
             key = match.group(1)
             classification, _ = _classification(key, migration)
-            value = migration.tfvars_scalar_value(lines, key) if classification == "mapped" else None
+            value = (
+                _normalize_tfvars_value(
+                    migration.tfvars_raw_value(lines, key),
+                    migration.tfvars_scalar_value(lines, key),
+                )
+                if classification == "mapped"
+                else None
+            )
             _observe(path.relative_to(path.parents[1]).as_posix(), key, value, report, migration)
 
 
@@ -628,6 +732,8 @@ def _read_ansible_bounded_slice(
         "hermes_control_enabled",
         "HERMES_CONTROL_SOURCE_URL",
         "HERMES_CONTROL_SOURCE_REF",
+        "hermes_control_source_url",
+        "hermes_control_source_ref",
         "hermes_control_domain",
         "hermes_control_api_host",
         "hermes_control_api_port",
@@ -1365,7 +1471,7 @@ def build_candidate_site(
             raise DiscoveryError("candidate base site section must be a mapping")
         site["name"] = site_name
     for observation in report.observations:
-        if observation.classification in {"secret", "provider"}:
+        if observation.classification in {"secret", "provider", "operational"}:
             continue
         if observation.classification != "mapped" or observation.proposed_path is None:
             raise DiscoveryError(f"candidate observation is not safely mapped: {observation.key}")

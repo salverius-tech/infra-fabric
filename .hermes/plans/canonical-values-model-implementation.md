@@ -1,6 +1,6 @@
 # Canonical Site Values Model — Implementation Plan
 
-**Status:** Packages 1–7 implemented and verified on `feat/canonical-values-model`; remaining work is limited to the explicitly gated migration/projection parity, private-values setup, full secret execution-boundary wiring, plan/apply equivalence, rollback, and production cutover stages.
+**Status:** Canonical schema/catalog, semantic mapping, normalized non-secret importer admission, protected delivery boundary, canonical-first operational gating, and catalog dependency closure are implemented and focused-test verified on `feat/canonical-values-model`. Remaining work is limited to selected-source candidate/migration acceptance, private-values setup, representative secret execution evidence, projection/consumer parity, semantic plan/apply equivalence, backup/restore rehearsal, operational cutover evidence, and compatibility removal.
 **Branch:** `feat/canonical-values-model`
 **PRD:** [`canonical-values-model-prd.md`](./canonical-values-model-prd.md)
 **Repository:** `infra-fabric`
@@ -147,7 +147,7 @@ The implementation is complete when all of the following are true:
 
 - [~] Extend or formalize `infra/services.json` as the capability/schema registry. All nine catalog entries now declare and validate configuration schema identity, release forms, override namespaces, and required fields; canonical site loading rejects incomplete registry metadata.
 - [~] Add required canonical fields, required logical secret paths, configuration schema identifiers, supported release forms, and allowed consumer overrides. Configuration schema identities, supported release-source metadata, `ansible`/`opentofu` override namespaces, and enabled-service `resource` requirements are now catalog-linked and enforced; broader required-field and per-namespace override inventories remain.
-- [~] Add the versioned mapping matrix covering Terraform, Ansible, inventory, DNS, dotenv, migration scripts, scaffold, and current service inputs. The source inventory accounts for all 378 discovered identities, matches all 368 eligible inputs, and now derives semantic-coverage completion from path/classification/consumer evidence; consumer cutover remains deferred.
+- [x] Add the versioned mapping matrix covering Terraform, Ansible, inventory, DNS, dotenv, migration scripts, scaffold, and current service inputs. The source inventory accounts for all 378 discovered identities, matches all 368 eligible inputs, and derives semantic-coverage completion from path/classification/consumer evidence. Selected-site canonical authority is implemented; compatibility remains explicit for legacy-only workspaces.
 - [~] Define normalization for HCL quoting, CIDR/bare addresses, `null`, `dhcp`, booleans, lists, checksums, hostnames, generated names, and derived DNS records. Forgejo public-name aliases now normalize scalar hostnames to canonical lowercase lists; broader normalization remains open.
 - [ ] Classify every current input as canonical, derived, Ansible-only, OpenTofu-only, deprecated, or unsupported.
 - [ ] Define conflict/default/destructive-impact behavior for every mapping row.

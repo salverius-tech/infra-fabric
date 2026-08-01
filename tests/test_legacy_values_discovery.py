@@ -1453,6 +1453,61 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
         self.assertEqual(observations[("hermes_vmid", "mapped")].value, 111)
         self.assertFalse(report.candidate_ready)
 
+    def test_tfvars_mapped_values_keep_native_types_for_reconciliation(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text(
+                "all:\n  vars:\n"
+                "    forgejo_runner_vmid: 110\n"
+                "    tailscale_client_enabled: false\n"
+                "    forgejo_runner_dns_servers:\n"
+                "      - 192.0.2.53\n",
+                encoding="utf-8",
+            )
+            (values / "terraform.tfvars").write_text(
+                'forgejo_runner_vmid = 110\n'
+                'tailscale_client_enabled = false\n'
+                'forgejo_runner_dns_servers = ["192.0.2.53"]\n',
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        self.assertFalse(report.conflicts)
+
+    def test_tfvars_nested_object_members_are_not_top_level_unknowns(self) -> None:
+        temp, values = self.make_values()
+        with temp:
+            repo = Path(temp.name) / "repo"
+            inventory = repo / "scaffold" / "ansible" / "inventory" / "local.yml"
+            inventory.parent.mkdir(parents=True)
+            inventory.write_text("all:\n  vars: {}\n", encoding="utf-8")
+            (values / "terraform.tfvars").write_text(
+                "service_runtime = {\n"
+                '  type = "lxc"\n'
+                '  storage_id = "local-lvm"\n'
+                "}\n",
+                encoding="utf-8",
+            )
+            report = legacy_values_discovery.discover_legacy(values, repo=repo, ansible_inventory=inventory)
+        unknown_keys = {item.key for item in report.observations if item.classification == "unknown"}
+        self.assertNotIn("type", unknown_keys)
+        self.assertNotIn("storage_id", unknown_keys)
+
+    def test_derived_resource_and_dns_paths_have_typed_owners(self) -> None:
+        expected = {
+            "proxmox_endpoint": "platform.proxmox.endpoint",
+            "rootfs_datastore_id": "platform.storage.rootfs_datastore",
+            "technitium_container_memory_mb": "resources.guests.technitium.compute.memory_mb",
+            "forgejo_lan_ip": "resources.guests.forgejo.network.expected_address",
+            "settings": "platform.dns.settings",
+            "cname_records": "platform.dns.cname_records",
+        }
+        for key, path in expected.items():
+            with self.subTest(key=key):
+                self.assertEqual(legacy_values_discovery._derived_canonical_path(key), path)
+
     def test_bounded_ansible_importer_rejects_invalid_service_vmid(self) -> None:
         temp, values = self.make_values()
         with temp:

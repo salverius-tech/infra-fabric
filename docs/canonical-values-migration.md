@@ -77,8 +77,8 @@ scripts/legacy-values-discovery.py \\
 
 No `site.yaml` or `secrets.sops.yaml` is fabricated by these blocked paths.
 
-The first report-only Ansible semantic discovery slice can inspect the public
-inventory and static consumer references without executing Ansible:
+The Ansible semantic discovery and normalized importer boundary can inspect the
+public inventory and static consumer references without executing Ansible:
 
 ```bash
 scripts/python.sh scripts/ansible_semantic_discovery.py \\
@@ -87,11 +87,12 @@ scripts/python.sh scripts/ansible_semantic_discovery.py \\
 ```
 
 The report records exact inventory identities, supported consumer references,
-value-free secret/provider classification, and operational/lifecycle review
-dispositions. It never retains inventory values, generates candidates, decrypts
-secrets, mutates legacy inputs, or enables consumer cutover. Dynamic Ansible
-resolution, cross-source correlation, and runtime importer admission remain
-review-required.
+value-free secret/provider classification, operational/lifecycle dispositions,
+and bounded dynamic-reference metadata. It never evaluates arbitrary Jinja,
+retains secret values, mutates legacy inputs, or decrypts secrets. Normalized
+non-secret mapped observations can now be admitted through the runtime importer;
+unresolved dynamic expressions, protected/provider inputs, and selected-source
+conflicts remain outside candidate generation.
 
 Review legacy inputs separately with the read-only discovery command:
 
@@ -114,13 +115,13 @@ scripts/python.sh scripts/legacy-values-discovery.py \
   --output /tmp/legacy-values-ansible-review.json
 ```
 
-That opt-in admits the non-secret Forgejo fields `all.vars.forgejo_domain`,
-`all.vars.forgejo_version`, `all.vars.forgejo_ssh_port`, `all.vars.forgejo_enable_caddy`,
-`all.vars.forgejo_configure_system_ssh`, `all.vars.forgejo_write_initial_config`,
-`all.vars.forgejo_bootstrap_enabled`, `all.vars.forgejo_actions_enabled`, and
-`all.vars.forgejo_actions_default_url`; the remaining inventory is
-reported as unsupported. It performs normalization and conflict detection but
-still cannot generate a candidate or enable consumer cutover.
+That opt-in exercises the bounded non-secret importer and its typed owners,
+including the documented Forgejo, Technitium, Infisical, Hermes, SearXNG,
+Tailscale, Caddy, and resource-identity fields. It performs normalization,
+conflict detection, and value-free residual reporting. Unsupported/dynamic
+inventory, protected/provider inputs, or selected-source conflicts still block
+candidate generation; canonical consumer authority is established separately
+by verified projections and the operational compatibility gate.
 
 The report records mapped fields, conflicts, and each unsupported inventory key
 with its source path and type; dynamic Jinja-style expressions are marked as
