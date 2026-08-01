@@ -43,6 +43,7 @@ class ServiceStateCliTests(unittest.TestCase):
                 '"allow_apply":true,"allow_destroy":true,"services":["hermes"]}\n',
                 encoding="utf-8",
             )
+            (site_values / "site.yaml").write_text("schema_version: 1\nsite:\n  name: dev\n", encoding="utf-8")
             archive = site_values / "service-backups" / "hermes" / "state.tar.gz"
             archive.parent.mkdir(parents=True)
             archive.touch()

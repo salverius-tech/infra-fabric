@@ -36,6 +36,13 @@ class OperationalCutoverTests(unittest.TestCase):
             block = justfile[start:] if next_recipe < 0 else justfile[start:next_recipe]
             self.assertIn("scripts/require-site-context.sh", block, recipe)
 
+    def test_service_state_uses_selected_canonical_inventory(self) -> None:
+        script = (ROOT / "scripts" / "service-state.sh").read_text(encoding="utf-8")
+        self.assertIn("require_canonical_authority", script)
+        self.assertIn('generated/ansible-inventory.json', script)
+        self.assertNotIn("ansible/inventory/local.yml", script)
+        self.assertNotIn("infra/ansible/inventory/tfvars.py", script)
+
 
 if __name__ == "__main__":
     unittest.main()

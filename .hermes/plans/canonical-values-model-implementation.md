@@ -254,10 +254,10 @@ The implementation is complete when all of the following are true:
 - [~] Verify site/model/secret/projection identity before OpenTofu and again before Ansible. Existing metadata verification runs before OpenTofu and is repeated after OpenTofu before Ansible; secret-bearing and full consumer wiring remain.
 - [ ] Ensure Ansible uses the same normalized snapshot or an identity-verified re-render.
 - [x] Reject stale plans after relevant source, secret, renderer, projection, or tool changes.
-- [ ] Implement semantic plan-equivalence comparison for pre/post migration plans.
-- [ ] Ignore only formatting/path/key-order/comments, refresh-only provider differences, and semantically equal computed values.
-- [ ] Flag creates, destroys, replacements, address/VMID/runtime/storage changes, service placement changes, DNS target changes, and secret-dependent changes.
-- [ ] Add wrong-site, stale-plan, changed-secret, altered-projection, and plan-equivalence failure tests.
+- [~] Implement semantic plan-equivalence comparison for pre/post migration plans; the public comparator and restricted CLI now compare JSON plan semantics.
+- [~] Ignore formatting/key order, no-op/read refresh entries, and computed-unknown metadata; path/comment normalization and provider-specific equivalence remain bounded by the JSON plan contract.
+- [~] Flag new/removed resource changes, replacements, material resource updates, and output changes; field-specific impact classification and secret-dependent plan evidence remain open.
+- [~] Add plan-equivalence failure coverage; wrong-site, stale-plan, changed-secret, and altered-projection identity tests are covered at their existing metadata/projection boundaries, while end-to-end plan wiring remains open.
 
 **Exit gate:** A reviewed plan cannot be applied against a different site/model/secret/projection, and representative legacy-to-canonical plans meet the PRD equivalence criteria.
 

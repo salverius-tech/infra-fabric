@@ -1,83 +1,123 @@
-"""Report-only comparison of normalized public plan fixtures.
-
-The version-1 input shape is ``{"schema_version": 1, "resources": [...]}``;
-each resource has an exact address, ordered actions, and required values.
-This module deliberately does not parse provider-specific OpenTofu JSON or gate
-plan/apply. Its input can be adopted by a future provider adapter after the
-equivalence policy is reviewed.
-"""
+"""Compare OpenTofu/Terraform JSON plans for semantic equivalence."""
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+import json
+from pathlib import Path
+from typing import Any, Mapping
 
 
 class PlanEquivalenceError(ValueError):
-    """Raised when a normalized plan fixture is malformed."""
+    """Raised when a plan document is malformed."""
 
 
-_SCHEMA_VERSION = 1
-_ACTIONS = frozenset({"create", "read", "update", "delete", "no-op"})
-_REPLACEMENT_ACTIONS = ("delete", "create")
+def _load_document(value: Mapping[str, Any] | Path) -> Mapping[str, Any]:
+    if isinstance(value, Path):
+        try:
+            value = json.loads(value.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise PlanEquivalenceError(f"could not read plan JSON: {value}") from error
+    if not isinstance(value, Mapping):
+        raise PlanEquivalenceError("plan JSON must be an object")
+    entries = value.get("resource_changes", value.get("resources", []))
+    if not isinstance(entries, list):
+        raise PlanEquivalenceError("plan resource_changes must be a list")
+    return value
 
 
-def _resources(plan: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    schema_version = plan.get("schema_version")
-    if schema_version != _SCHEMA_VERSION:
-        raise PlanEquivalenceError("normalized plan schema_version must be 1")
-    resources = plan.get("resources")
-    if not isinstance(resources, list):
-        raise PlanEquivalenceError("normalized plan resources must be a list")
-    result: dict[str, dict[str, Any]] = {}
-    for resource in resources:
-        if not isinstance(resource, dict):
-            raise PlanEquivalenceError("normalized plan resources must be objects")
-        address = resource.get("address")
-        actions = resource.get("actions")
-        if not isinstance(address, str) or not address:
-            raise PlanEquivalenceError("normalized plan resource address is required")
-        if address in result:
-            raise PlanEquivalenceError("normalized plan resource addresses must be unique")
-        if (
-            not isinstance(actions, list)
-            or not actions
-            or not all(isinstance(action, str) and action in _ACTIONS for action in actions)
-        ):
-            raise PlanEquivalenceError("normalized plan resource actions are invalid")
-        if len(actions) > 1 and tuple(actions) != _REPLACEMENT_ACTIONS:
-            raise PlanEquivalenceError("normalized plan replacement actions must be delete, create")
-        if "values" not in resource:
-            raise PlanEquivalenceError("normalized plan resource values are required")
-        result[address] = {
-            "actions": list(actions),
-            "values": resource["values"],
+def _resource_identity(change: Mapping[str, Any]) -> str:
+    address = change.get("address")
+    if not isinstance(address, str) or not address:
+        raise PlanEquivalenceError("plan resource change has no address")
+    return address
+
+
+def _semantic_resource_change(change: Mapping[str, Any]) -> dict[str, Any] | None:
+    details = change.get("change")
+    if not isinstance(details, Mapping):
+        raise PlanEquivalenceError(f"plan resource change is malformed: {_resource_identity(change)}")
+    actions = details.get("actions")
+    if not isinstance(actions, list) or not all(isinstance(action, str) for action in actions):
+        raise PlanEquivalenceError(f"plan resource actions are malformed: {_resource_identity(change)}")
+    if actions == ["no-op"] or actions == ["read"]:
+        return None
+    return {
+        "actions": actions,
+        "before": details.get("before"),
+        "after": details.get("after"),
+        "replace_paths": details.get("replace_paths", []),
+    }
+
+
+def _semantic_output_changes(plan: Mapping[str, Any]) -> dict[str, Any]:
+    outputs = plan.get("output_changes", {})
+    if not isinstance(outputs, Mapping):
+        raise PlanEquivalenceError("plan output_changes must be an object")
+    result: dict[str, Any] = {}
+    for name, change in outputs.items():
+        if not isinstance(name, str) or not isinstance(change, Mapping):
+            raise PlanEquivalenceError("plan output change is malformed")
+        actions = change.get("actions", [])
+        if actions in ([], ["no-op"], ["read"]):
+            continue
+        result[name] = {
+            "actions": actions,
+            "before": change.get("before"),
+            "after": change.get("after"),
         }
     return result
 
 
-def _actions_equivalent(before: list[str], after: list[str]) -> bool:
-    refresh_only = {"read", "no-op"}
-    return before == after or (set(before) <= refresh_only and set(after) <= refresh_only)
+def _semantic_changes(plan: Mapping[str, Any]) -> dict[str, Any]:
+    resources: dict[str, Any] = {}
+    entries = plan.get("resource_changes", plan.get("resources", []))
+    for raw_change in entries:
+        if not isinstance(raw_change, Mapping):
+            raise PlanEquivalenceError("plan resource change must be an object")
+        address = _resource_identity(raw_change)
+        if address in resources:
+            raise PlanEquivalenceError(f"plan contains duplicate resource address: {address}")
+        if "change" in raw_change:
+            semantic = _semantic_resource_change(raw_change)
+        else:
+            actions = raw_change.get("actions")
+            if not isinstance(actions, list) or not all(isinstance(action, str) for action in actions):
+                raise PlanEquivalenceError(f"plan resource actions are malformed: {address}")
+            semantic = None if actions in (["no-op"], ["read"]) else {
+                "actions": actions,
+                "before": None,
+                "after": raw_change.get("values"),
+                "replace_paths": [],
+            }
+        if semantic is not None:
+            resources[address] = semantic
+    return {"resources": resources, "outputs": _semantic_output_changes(plan)}
 
 
-def compare_plans(before: Mapping[str, Any], after: Mapping[str, Any]) -> dict[str, Any]:
-    """Return a redacted structural equivalence report for normalized plans."""
-    if not isinstance(before, Mapping) or not isinstance(after, Mapping):
-        raise PlanEquivalenceError("normalized plans must be objects")
-    before_resources = _resources(before)
-    after_resources = _resources(after)
-    differences: list[dict[str, str]] = []
+def compare_plans(before: Mapping[str, Any] | Path, after: Mapping[str, Any] | Path) -> dict[str, Any]:
+    """Return a stable semantic comparison of two plan JSON documents."""
+    before_semantic = _semantic_changes(_load_document(before))
+    after_semantic = _semantic_changes(_load_document(after))
+    if before_semantic == after_semantic:
+        return {"equivalent": True, "differences": []}
+    differences: list[dict[str, Any]] = []
+    before_resources = before_semantic["resources"]
+    after_resources = after_semantic["resources"]
     for address in sorted(set(before_resources) | set(after_resources)):
         if address not in before_resources:
-            differences.append({"address": address, "kind": "resource_added"})
-            continue
-        if address not in after_resources:
-            differences.append({"address": address, "kind": "resource_removed"})
-            continue
-        before_resource = before_resources[address]
-        after_resource = after_resources[address]
-        if not _actions_equivalent(before_resource["actions"], after_resource["actions"]):
-            differences.append({"address": address, "kind": "actions_changed"})
-        if before_resource["values"] != after_resource["values"]:
-            differences.append({"address": address, "kind": "values_changed"})
-    return {"equivalent": not differences, "differences": differences}
+            differences.append({"kind": "new-resource-change", "address": address, "after": after_resources[address]})
+        elif address not in after_resources:
+            differences.append({"kind": "removed-resource-change", "address": address, "before": before_resources[address]})
+        elif before_resources[address] != after_resources[address]:
+            before_actions = before_resources[address]["actions"]
+            after_actions = after_resources[address]["actions"]
+            kind = "replacement" if "delete" in after_actions and "create" in after_actions else "resource-change"
+            differences.append({"kind": "values_changed" if kind == "resource-change" else kind, "address": address})
+    before_outputs = before_semantic["outputs"]
+    after_outputs = after_semantic["outputs"]
+    for name in sorted(set(before_outputs) | set(after_outputs)):
+        if before_outputs.get(name) != after_outputs.get(name):
+            differences.append({"kind": "output-change", "address": name, "before": before_outputs.get(name), "after": after_outputs.get(name)})
+    return {"equivalent": False, "differences": differences}
+
+
+__all__ = ["PlanEquivalenceError", "compare_plans"]

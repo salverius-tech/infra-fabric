@@ -112,6 +112,7 @@ run_playbook() {
   local service="$2"
   local group
   group="$(service_group "${service}")"
+  local inventory="/workspace/${site_values_dir}/generated/ansible-inventory.json"
 
   local msys_env_conv_excl="${MSYS2_ENV_CONV_EXCL:-}"
   if [[ -n "${msys_env_conv_excl}" ]]; then
@@ -124,14 +125,14 @@ run_playbook() {
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i \${INFRA_VALUES_DIR}/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml"
+      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i ${inventory@Q} -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml"
   else
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       SERVICE_STATE_RESTORE_FILE="${restore_file}" \
       scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i \${INFRA_VALUES_DIR}/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml"
+      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i ${inventory@Q} -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml"
   fi
 }
 
@@ -154,6 +155,7 @@ case "${command_name}" in
     ;;
   backup)
     require_site_context
+    require_canonical_authority
     if [[ $# -ne 1 ]]; then
       usage
       exit 2
@@ -179,6 +181,7 @@ case "${command_name}" in
     ;;
   restore)
     require_site_context
+    require_canonical_authority
     if [[ $# -ne 2 ]]; then
       usage
       exit 2
@@ -194,6 +197,7 @@ case "${command_name}" in
     ;;
   restore-if-present)
     require_site_context
+    require_canonical_authority
     if [[ $# -lt 1 || $# -gt 2 ]]; then
       usage
       exit 2
