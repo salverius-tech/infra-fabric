@@ -289,7 +289,15 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     global INVENTORY
-    INVENTORY = str(from_environment(REPO).path("ansible/inventory/local.yml"))
+    context = from_environment(REPO)
+    if context.site is None:
+        raise MonitorError("VALUES_SITE is required for Forgejo Actions monitoring")
+    if context.canonical_site_path is None:
+        raise MonitorError(f"canonical site.yaml is required: {context.values_dir / 'site.yaml'}")
+    inventory = context.generated_path("ansible-inventory.json")
+    if not inventory.is_file():
+        raise MonitorError(f"canonical generated inventory is missing: {inventory}")
+    INVENTORY = str(inventory)
     try:
         if args.command == "status":
             print_status(args.limit, args.json)
