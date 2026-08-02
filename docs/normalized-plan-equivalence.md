@@ -1,10 +1,10 @@
 # Normalized OpenTofu plan-equivalence contract
 
-**Status:** report-only provider adapter implemented; optional report-only plan gate wired, consumer cutover deferred
+**Status:** provider adapter implemented; optional and explicitly enforceable plan gate wired, provider-backed acceptance remains site-specific
 
 The report-only boundary is `scripts/report-plan-equivalence.py`. It accepts two saved `tofu show -json` documents, emits only `address`/difference-kind metadata, returns 0 for equivalence, 1 for a semantic difference, and 2 for invalid input. It never invokes OpenTofu, writes plans, or applies infrastructure.
 
-When an operator has a saved prior plan, setting `INFRA_EQUIVALENCE_BEFORE_JSON` while running the existing plan workflow enables the optional gate. The current plan is exported to a disposable private-values file, compared, and removed by the existing EXIT cleanup path. A difference stops the workflow with a redacted report; without the variable, plan behavior is unchanged.
+When an operator has a saved prior plan, setting `INFRA_EQUIVALENCE_BEFORE_JSON` while running the existing plan workflow enables the comparison. The current plan is exported to a disposable private-values file, compared, and removed by the existing EXIT cleanup path. A difference stops the workflow with a redacted report. For a canonical site, setting `INFRA_REQUIRE_EQUIVALENCE=true` makes the before-plan artifact mandatory and fails closed when it is absent; leaving that variable unset preserves the ordinary optional review mode.
 
 ## Version 1 shape
 
@@ -68,4 +68,4 @@ invented. A later integration slice needs provider-backed fixtures and tests for
 refresh-only differences, exact `resource_changes` mapping, and an approved
 report/plan invocation boundary.
 
-This contract is optionally wired into `plan-infra.sh` through `INFRA_EQUIVALENCE_BEFORE_JSON`. The gate exports the current plan to a disposable private-values file, compares it, and removes it through the shared projection cleanup trap. It is not wired into `verify_metadata()` or apply, and it does not prove consumer cutover or resource behavior equivalence.
+This contract is wired into `plan-infra.sh` through `INFRA_EQUIVALENCE_BEFORE_JSON`; `INFRA_REQUIRE_EQUIVALENCE=true` turns the comparison into a required canonical-site planning gate. The gate exports the current plan to a disposable private-values file, compares it, and removes it through the shared projection cleanup trap. It is not wired into `verify_metadata()` or apply, and it does not prove consumer cutover or resource behavior equivalence. A real provider-backed before/after run remains a private-site acceptance step and must use reviewed plan artifacts; it is not fabricated in public fixtures.

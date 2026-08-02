@@ -225,6 +225,22 @@ class SecretProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(SecretProviderError, "does not match"):
             inspect_sops_policy(policy, site="dev", expected_recipients={"age1other"})
 
+    def test_sops_policy_supports_site_and_recovery_recipients(self) -> None:
+        policy = self.root / ".sops.yaml"
+        policy.write_text(
+            "creation_rules:\n  - path_regex: '^values/sites/[^/]+/secrets\\.sops\\.yaml$'\n"
+            "    age:\n      - age1site\n      - age1recovery\n",
+            encoding="utf-8",
+        )
+        result = inspect_sops_policy(
+            policy,
+            site="dev",
+            expected_recipients={"age1site", "age1recovery"},
+        )
+        self.assertEqual(result["recipient_policy"], "verified")
+        with self.assertRaisesRegex(SecretProviderError, "does not match"):
+            inspect_sops_policy(policy, site="dev", expected_recipients={"age1site"})
+
 
 if __name__ == "__main__":
     unittest.main()

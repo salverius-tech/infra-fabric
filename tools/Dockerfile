@@ -5,6 +5,8 @@ ARG OPENTOFU_LINUX_AMD64_SHA256=46b48c3438c65cf479fc076c9281422ffa2f493548d1e813
 ARG TFLINT_VERSION=0.63.1
 ARG TFLINT_LINUX_AMD64_SHA256=8441a7d97df20431f19c9b9d27ff4c63e308c964e86660bc7cc0cf7bbe0725e8
 ARG PIP_VERSION=26.1.2
+ARG SOPS_VERSION=3.13.3
+ARG SOPS_LINUX_AMD64_SHA256=e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
 
 COPY tools/requirements.txt /tmp/requirements.txt
 
@@ -17,6 +19,7 @@ RUN apt-get update \
         bash \
         ca-certificates \
         curl \
+        age \
         gosu \
         jq \
         openssh-client \
@@ -37,6 +40,10 @@ RUN apt-get update \
     && unzip /tmp/tflint.zip -d /usr/local/bin tflint \
     && chmod 0755 /usr/local/bin/tflint \
     && rm -f /tmp/tflint.zip \
+    && curl -fsSL -o /usr/local/bin/sops \
+        "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64" \
+    && printf '%s  %s\n' "${SOPS_LINUX_AMD64_SHA256}" /usr/local/bin/sops | sha256sum -c - \
+    && chmod 0755 /usr/local/bin/sops \
     && python3 -m venv /opt/ansible \
     && /opt/ansible/bin/pip install --no-cache-dir --upgrade "pip==${PIP_VERSION}" \
     && /opt/ansible/bin/pip install --no-cache-dir -r /tmp/requirements.txt \

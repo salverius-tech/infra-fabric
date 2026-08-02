@@ -194,6 +194,82 @@ def inspect_existing_site(target: Path, site: str, metadata: dict[str, Any]) -> 
         f"site artifact inventory: {len(artifacts)} files",
         "no-op: site migration is already complete",
     ]
+
+
+def adopt_existing_site(target: Path, site: str, metadata: dict[str, Any], apply: bool) -> list[str]:
+    """Adopt an already-installed canonical site without moving legacy files."""
+    site_json = target / "site.json"
+    manifest_json = target / "migration-manifest.json"
+    canonical_path = target / "site.yaml"
+    if not site_json.is_file() or not canonical_path.is_file():
+        raise SiteMigrationError(f"existing canonical site is incomplete: {target}")
+    try:
+        existing_metadata = json.loads(site_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SiteMigrationError(f"existing site metadata is invalid: {target}") from error
+    identity_keys = ("name", "class", "lifecycle", "allow_apply", "allow_destroy")
+    if any(existing_metadata.get(key) != metadata.get(key) for key in identity_keys):
+        raise SiteMigrationError(f"existing site metadata conflicts: {target}")
+    services = existing_metadata.get("services")
+    if not isinstance(services, list) or not all(isinstance(item, str) for item in services):
+        raise SiteMigrationError(f"existing site metadata services are invalid: {target}")
+    try:
+        load_site(
+            canonical_path,
+            expected_site=site,
+            catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json",
+        )
+    except CanonicalValuesError as error:
+        raise SiteMigrationError(f"existing canonical site is invalid: {error}") from error
+    if manifest_json.exists():
+        try:
+            existing_manifest = json.loads(manifest_json.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise SiteMigrationError(f"existing adoption manifest is invalid: {target}") from error
+        if (
+            existing_manifest.get("source") == "canonical-existing"
+            and existing_manifest.get("canonical_destination") == f"sites/{site}"
+            and existing_manifest.get("operations") == []
+            and existing_manifest.get("secret_values_included") is False
+        ):
+            return [
+                f"existing canonical site verified: {target}",
+                "no-op: canonical site adoption is already complete",
+            ]
+        return inspect_existing_site(target, site, metadata)
+    manifest = {
+        "schema_version": 1,
+        "source": "canonical-existing",
+        "canonical_destination": f"sites/{site}",
+        "operations": [],
+        "secret_values_included": False,
+        "backup_id": None,
+        "adoption": "existing-canonical-site-no-legacy-moves",
+    }
+    if not apply:
+        return [
+            f"existing canonical site verified: {target}",
+            f"would create {manifest_json}",
+            "no legacy files moved or removed",
+        ]
+    temporary = manifest_json.with_name(f".{manifest_json.name}.adoption-")
+    staged: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", dir=manifest_json.parent, prefix=temporary.name, delete=False, encoding="utf-8") as handle:
+            json.dump(manifest, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            staged = Path(handle.name)
+        staged.chmod(0o600)
+        staged.replace(manifest_json)
+    except Exception:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+        raise
+    return [
+        f"existing canonical site verified: {target}",
+        f"created adoption manifest: {manifest_json}",
+        "no legacy files moved or removed",
+    ]
 def validate_request(values_root: Path, site: str, metadata: dict[str, Any]) -> tuple[Path, list[tuple[Path, Path]]]:
     if not SITE_NAME_RE.fullmatch(site) or ".." in site:
         raise SiteMigrationError("site must be a simple site identifier")
@@ -301,13 +377,18 @@ def migrate(
     apply: bool,
     canonical_base: Path | None = None,
     allow_sensitive_artifacts: bool = False,
+    adopt_existing: bool = False,
 ) -> list[str]:
     metadata = site_metadata(repo, site, site_class, lifecycle, allow_apply, allow_destroy)
     target = values_root / "sites" / site
     if target.exists() and not apply:
         if not SITE_NAME_RE.fullmatch(site) or ".." in site:
             raise SiteMigrationError("site must be a simple site identifier")
+        if adopt_existing:
+            return adopt_existing_site(target, site, metadata, apply=False)
         return inspect_existing_site(target, site, metadata)
+    if target.exists() and adopt_existing:
+        return adopt_existing_site(target, site, metadata, apply=True)
     target, items = validate_request(values_root, site, metadata)
     sensitive_paths = sensitive_migration_paths(items, values_root)
     if (site_class == "development" or lifecycle == "disposable") and sensitive_paths and not allow_sensitive_artifacts:
@@ -400,6 +481,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--allow-destroy", action="store_true")
     parser.add_argument("--allow-sensitive-artifacts", action="store_true", help="allow state, backups, and known-hosts in a development migration")
     parser.add_argument("--canonical-base", type=Path, help="approved canonical YAML base for explicit candidate generation")
+    parser.add_argument("--adopt-existing", action="store_true", help="adopt an existing valid site.yaml without moving legacy files")
     parser.add_argument("--apply", action="store_true", help="perform the migration; default is dry-run")
     args = parser.parse_args(argv)
 
@@ -422,6 +504,7 @@ def main(argv: list[str] | None = None) -> int:
             args.apply,
             args.canonical_base,
             args.allow_sensitive_artifacts,
+            args.adopt_existing,
         )
     except (OSError, SiteMigrationError, json.JSONDecodeError) as error:
         print(f"site migration failed: {error}", file=sys.stderr)

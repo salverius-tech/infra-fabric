@@ -23,11 +23,12 @@ policy until the private workflow supplies the real recipient.
 
 ## Initial key creation
 
-1. Create the site recipient and its corresponding private age identity in the
-   approved private key-management system. Keep the private identity outside the
-   repository and outside ordinary dotenv, Terraform state, plan, inventory, and
-   backup artifacts.
-2. Record the recipient in the private deployment policy for the exact
+1. Create the site recipient and a separately controlled recovery recipient, with
+   corresponding private age identities in the approved private key-management
+   system. Keep both private identities outside the repository and outside ordinary
+   dotenv, Terraform state, plan, inventory, and backup artifacts. The recovery
+   identity is not mounted during routine operations.
+2. Record the exact site-plus-recovery recipient set in the private deployment policy for the exact
    `values/sites/<site>/secrets.sops.yaml` scope. Do not replace the public
    placeholder in this repository with a private recipient.
 3. Create the encrypted bundle with only the logical namespaces and values needed
@@ -55,15 +56,16 @@ placeholder policy is intentionally reported as not configured.
 
 Rotation is an explicit, reversible operation:
 
-1. Generate a new recipient and private identity using the approved private
+1. Generate a new site recipient and private identity using the approved private
    workflow.
-2. Re-encrypt each selected site bundle to the new recipient while retaining the
-   old identity only for the bounded recovery window.
+2. Temporarily re-encrypt each selected site bundle to the old site recipient, new
+   site recipient, and unchanged recovery recipient.
 3. Validate policy scope, recipient-set equality, ciphertext identity, and required
    logical paths before delivery.
 4. Run a consumer-specific smoke check without printing values. Record only site,
    operation, recipient-policy state, ciphertext identity, and result metadata.
-5. Revoke or destroy the old private identity only after all required bundles and
+5. Re-encrypt to the new site recipient plus the recovery recipient, then revoke or
+   destroy the old private identity only after all required bundles and
    recovery backups have been verified with the new identity.
 
 A revoked recipient must not remain an accepted delivery path. If rotation fails,

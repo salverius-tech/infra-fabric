@@ -63,9 +63,26 @@ candidate construction when the selected source has protected/provider inputs
 without an approved delivery contract or has genuine source conflicts. It must
 leave the legacy values unchanged.
 
-The report-only discovery CLI retains the candidate-shaped interface for a
-future explicitly admitted runtime scope, but currently fails closed and writes
-no candidate:
+When a selected development site already contains a valid `site.yaml` and
+`site.json` but is missing only its migration manifest, use the explicit adoption
+boundary instead of rerunning migration or moving legacy files:
+
+```bash
+scripts/python.sh scripts/migrate-site-values.py \\
+  --values-dir values \\
+  --site dev \\
+  --adopt-existing \\
+  --apply
+```
+
+Adoption validates site identity, lifecycle/apply policy, the canonical model, and
+the existing service list, then writes a mode-0600 manifest with zero legacy move
+operations. It never deletes, moves, or rewrites legacy values. It refuses
+incomplete or conflicting existing sites and remains dry-run by default.
+
+The report-only discovery CLI also supports an explicitly admitted bounded runtime
+scope. It still fails closed and writes no candidate unless the selected source
+passes admission and an approved canonical base declares every overlaid resource:
 
 ```bash
 scripts/legacy-values-discovery.py \\
@@ -75,7 +92,10 @@ scripts/legacy-values-discovery.py \\
   --site dev
 ```
 
-No `site.yaml` or `secrets.sops.yaml` is fabricated by these blocked paths.
+No `site.yaml` or `secrets.sops.yaml` is fabricated by these paths. A successful
+candidate remains a disposable migration artifact and must be loaded through the
+canonical model from an identity-matching `<site>/site.yaml` layout, then rendered
+and verified as a complete non-secret projection set before any private installation.
 
 The Ansible semantic discovery and normalized importer boundary can inspect the
 public inventory and static consumer references without executing Ansible:

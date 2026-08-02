@@ -73,6 +73,19 @@ values/sites/dev/site.yaml
 values/sites/dev/secrets.sops.yaml
 ```
 
+Edit the encrypted bundle through the tooling container with the external site age
+identity. The recipe defaults to `dev`; pass `SITE=<site>` for another site:
+
+```bash
+export SOPS_AGE_KEY_FILE="$HOME/.config/infra-fabric/keys/dev/site.age"
+just edit-secrets
+just edit-secrets SITE=dev
+```
+
+The recipe validates canonical site authority, mounts the key read-only, and does not
+create a plaintext bundle in the values repository. Do not use the recovery identity
+for routine edits.
+
 Generated projections under `values/sites/<site>/generated/` are disposable
 consumer inputs. Do not edit them or treat legacy `.env`, `terraform.tfvars`,
 static inventory, or DNS JSON files as canonical inputs. The legacy migration

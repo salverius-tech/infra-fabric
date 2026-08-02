@@ -1,6 +1,6 @@
 # Canonical Values Model — Deferred Input Register
 
-**Status:** Source inventory/classification, semantic mapping, normalized non-secret importer admission, and canonical consumer authority for selected sites are implemented and test-covered. Candidate generation remains selected-source gated; protected delivery, private-site migration acceptance, semantic plan equivalence, and compatibility removal remain open. Legacy compatibility remains an explicit opt-in for workspaces without `site.yaml`.
+**Status:** Source inventory/classification, semantic mapping, normalized non-secret importer admission, canonical consumer authority, and the selected-source candidate/projection path are implemented and test-covered. Private secret/key setup, live host acceptance, provider-backed plan evidence, durable private restore rehearsal, and compatibility removal remain open. Legacy compatibility remains an explicit opt-in for workspaces without `site.yaml`.
 **Scope:** Every unmatched identity in the current public-safe source inventory is classified here or by the machine-readable inventory report. No values are read or retained by this register.
 
 The current source inventory contains 378 identities. Of these, 368 are mapping-eligible and 10 are explicitly excluded as generated projections, operational artifacts, or retired inputs. The live inventory requires semantic path, classification, consumer-evidence, source-reconciliation, and normalized importer gates; those gates are now implemented for the declared public scope. Candidate generation remains limited to an approved canonical base plus selected-source admission: it is not authorization for arbitrary legacy import, secret-bundle generation, or compatibility removal.
@@ -11,7 +11,7 @@ Regenerate the value-free inventory with:
 python3 scripts/canonical-mapping-inventory.py
 ```
 
-**Current baseline: 307 mapping rows, 368 matched eligible inputs, 0 unmatched eligible inputs, 10 excluded non-canonical identities, and 0 ambiguous eligible matches.** The live report marks semantic mapping `semantic-coverage-complete`, canonical consumer authority `canonical-site-authoritative-with-legacy-compatibility`, and the runtime importer contract `implemented`. Candidate generation is still blocked by the explicit selected-source runtime-admission gate, including conflicts or unresolved protected inputs. The inventory's `deferred_classification.items` remains the authoritative identity-level disposition list.
+**Current baseline: 307 mapping rows, 368 matched eligible inputs, 0 unmatched eligible inputs, 10 excluded non-canonical identities, and 0 ambiguous eligible matches.** The live report marks semantic mapping `semantic-coverage-complete`, canonical consumer authority `canonical-site-authoritative-with-legacy-compatibility`, and the runtime importer contract `implemented`. Candidate generation is available only after the explicit selected-source runtime-admission gate and an approved canonical base; conflicts, unresolved protected inputs, and undeclared resources remain fail-closed. The inventory's `deferred_classification.items` remains the authoritative identity-level disposition list.
 
 ## Secret or protected inputs
 
@@ -96,4 +96,4 @@ The exact identities are preserved in `deferred_classification.items` in the mac
 
 
 
-Source reconciliation, semantic mapping, typed ownership, normalized non-secret importer scope, and selected-site canonical consumer authority are complete for the current public report. Remaining blockers are selected-source candidate admission, private recipient/key and migration evidence, representative semantic plan equivalence, operational backup/restore and rollback rehearsal, and final compatibility removal. Existing legacy consumers remain available only through the explicit compatibility override. The historical audit above must be read with this reconciliation note.
+Source reconciliation, semantic mapping, typed ownership, normalized non-secret importer scope, selected-source candidate/projection acceptance, and selected-site canonical consumer authority are complete for the current public report. Remaining blockers are private recipient/key and secret-delivery evidence, live host identity acceptance, representative provider-backed plan equivalence, operational backup/restore and rollback rehearsal, and final compatibility removal. Existing legacy consumers remain available only through the explicit compatibility override. The historical audit above must be read with this reconciliation note.

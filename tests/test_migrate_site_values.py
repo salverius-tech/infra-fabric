@@ -160,6 +160,58 @@ class SiteMigrationTests(unittest.TestCase):
             with self.assertRaisesRegex(migration.SiteMigrationError, "invalid canonical site model"):
                 migration.migrate(values, values.parent, "dev", "development", "disposable", True, True, False)
 
+    def test_existing_canonical_site_can_be_adopted_without_moving_legacy_files(self) -> None:
+        temp, values = self.make_legacy_values()
+        with temp:
+            target = values / "sites" / "dev"
+            target.mkdir(parents=True)
+            metadata = migration.site_metadata(values.parent, "dev", "development", "disposable", True, True)
+            (target / "site.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (target / "site.yaml").write_text("canonical: existing\n", encoding="utf-8")
+            with patch.object(migration, "load_site"):
+                dry_run = migration.migrate(
+                    values,
+                    values.parent,
+                    "dev",
+                    "development",
+                    "disposable",
+                    True,
+                    True,
+                    False,
+                    adopt_existing=True,
+                )
+                self.assertIn("no legacy files moved or removed", dry_run)
+                self.assertFalse((target / "migration-manifest.json").exists())
+                migration.migrate(
+                    values,
+                    values.parent,
+                    "dev",
+                    "development",
+                    "disposable",
+                    True,
+                    True,
+                    True,
+                    adopt_existing=True,
+                )
+                rerun = migration.migrate(
+                    values,
+                    values.parent,
+                    "dev",
+                    "development",
+                    "disposable",
+                    True,
+                    True,
+                    False,
+                    adopt_existing=True,
+                )
+                self.assertIn("adoption is already complete", rerun[1])
+            manifest = json.loads((target / "migration-manifest.json").read_text())
+            self.assertEqual(manifest["source"], "canonical-existing")
+            self.assertEqual(manifest["operations"], [])
+            self.assertFalse(manifest["secret_values_included"])
+            self.assertTrue((values / ".env").exists())
+            self.assertTrue((values / "terraform.tfvars").exists())
+
     def test_site_identifier_rejects_path_traversal(self) -> None:
         temp, values = self.make_legacy_values()
         with temp:

@@ -44,7 +44,7 @@ printf 'env=%s\\n' "${{transport_compose_env_args[*]}}"
             result = self.run_helper(env_key, option=option_key, extra=["--wrapped", "value"])
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("remaining=--wrapped value", result.stdout)
-        self.assertIn("dst=/run/secrets/sops-age-key,readonly", result.stdout)
+        self.assertIn("/run/secrets/sops-age-key:ro", result.stdout)
         self.assertIn("--env SOPS_AGE_KEY_FILE=/run/secrets/sops-age-key", result.stdout)
         self.assertNotIn("OTHER_KEY_CONTENT", result.stdout + result.stderr)
         self.assertNotIn(str(option_key), result.stdout.split("env=", 1)[-1])

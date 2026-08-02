@@ -1845,7 +1845,14 @@ def build_candidate_site(
     }
     for path in static_expected_addresses:
         parts = path.split(".")
-        candidate[parts[0]][parts[1]][parts[2]].get("network", {}).pop("expected_address", None)
+        _validate_resource_overlay_target(candidate, path)
+        resource = candidate[parts[0]][parts[1]][parts[2]]
+        if not isinstance(resource, dict):
+            raise DiscoveryError(f"candidate resource {parts[2]} must be a mapping")
+        network = resource.get("network", {})
+        if not isinstance(network, dict):
+            raise DiscoveryError(f"candidate resource {parts[2]} network must be a mapping")
+        network.pop("expected_address", None)
     for observation in report.observations:
         if observation.classification in {"secret", "provider", "operational"}:
             continue

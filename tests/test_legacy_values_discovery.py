@@ -2659,6 +2659,66 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 runtime_importer_admission=legacy_values_discovery.runtime_importer_admission(report),
             )
 
+    def test_undeclared_static_expected_address_is_rejected(self) -> None:
+        report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        report.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation(
+                    "inventory",
+                    "forgejo_domain",
+                    "mapped",
+                    "services.forgejo.endpoints.public_names",
+                    "list",
+                    ["git.example.internal"],
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory",
+                    "forgejo_root_url",
+                    "mapped",
+                    "services.forgejo.endpoints.public_url",
+                    "str",
+                    "https://git.example.internal/",
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory",
+                    "forgejo_runtime",
+                    "mapped",
+                    "resources.guests.forgejo.type",
+                    "str",
+                    "lxc",
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory",
+                    "forgejo_expected_address",
+                    "mapped",
+                    "resources.guests.forgejo.network.expected_address",
+                    "str",
+                    "192.0.2.10/24",
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "inventory",
+                    "technitium_vmid",
+                    "mapped",
+                    "resources.guests.technitium.identity.vmid",
+                    "int",
+                    106,
+                ),
+            ]
+        )
+
+        with self.assertRaisesRegex(legacy_values_discovery.DiscoveryError, "resource forgejo is not declared"):
+            legacy_values_discovery.build_candidate_site(
+                report,
+                base_document={
+                    "schema_version": 1,
+                    "site": {"name": "dev"},
+                    "resources": {"guests": {"technitium": {}}},
+                    "services": {},
+                },
+                site_name="dev",
+                runtime_importer_admission=legacy_values_discovery.runtime_importer_admission(report),
+            )
+
     def test_secret_only_report_remains_fail_closed(self) -> None:
         temp = tempfile.TemporaryDirectory()
         values = Path(temp.name) / "values"

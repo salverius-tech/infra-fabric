@@ -4,8 +4,6 @@ set -euo pipefail
 source scripts/site-context.sh
 require_site_context
 require_canonical_authority
-values_dir="$(site_values_dir)"
-rm -f "${values_dir}/tfplan" "${values_dir}/tfplan.meta.json"
 
 target_service="${INFRA_TARGET_SERVICE:-}"
 replace_service="${INFRA_REPLACE_SERVICE:-}"
@@ -20,8 +18,10 @@ fi
 # shellcheck disable=SC2016
 INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh bash -euo pipefail -c '
 equivalence_after_json=""
+equivalence_required="${INFRA_REQUIRE_EQUIVALENCE:-false}"
 python scripts/workspace-preflight.py --require-values
 python scripts/settings.py summary
+rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"
 
 generated_tmp=""
 generated_backup=""
@@ -83,6 +83,11 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
   tofu_vars_file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"
   canonical_site=true
+fi
+
+if [[ "${canonical_site}" == true && "${equivalence_required}" == true && -z "${INFRA_EQUIVALENCE_BEFORE_JSON:-}" ]]; then
+  printf "%s\\n" "Canonical planning requires INFRA_EQUIVALENCE_BEFORE_JSON when INFRA_REQUIRE_EQUIVALENCE=true." >&2
+  exit 2
 fi
 
 ansible_inventory_args=("-i" "${ansible_inventory}")

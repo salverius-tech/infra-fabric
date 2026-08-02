@@ -55,7 +55,7 @@ transport_prepare() {
     return 1
   fi
   # shellcheck disable=SC2034
-  transport_compose_mount_args=(--mount "type=bind,src=${resolved},dst=${SOPS_AGE_CONTAINER_KEY_FILE},readonly")
+  transport_compose_mount_args=(-v "${resolved}:${SOPS_AGE_CONTAINER_KEY_FILE}:ro")
   # shellcheck disable=SC2034
   transport_compose_env_args=(--env "SOPS_AGE_KEY_FILE=${SOPS_AGE_CONTAINER_KEY_FILE}")
 }
