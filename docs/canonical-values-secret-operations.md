@@ -20,6 +20,13 @@ policy until the private workflow supplies the real recipient.
 - The external age key file is private operator material. It must be a regular,
   readable file with no group/other permission bits and must never be read into
   documentation or command output.
+- The bootstrap SSH private key is stored at the encrypted logical path
+  `secrets.bootstrap.ssh_private_key`. It is not part of `site.yaml`, generated
+  projections, plans, state, or ordinary service delivery. Canonical tooling
+  materializes it only inside the short-lived tooling container, verifies its
+  derived public key against `bootstrap.ssh.public_keys`, and removes it with
+  the container filesystem. The SOPS age identity remains separate and external;
+  it must never be stored inside the bundle it decrypts.
 
 ## Initial key creation
 
@@ -36,6 +43,14 @@ policy until the private workflow supplies the real recipient.
    recipient metadata without decrypting during ordinary preflight.
 4. Verify the ciphertext hash and a value-free required-secret report. Never use a
    secret value or sentinel as an identity check.
+
+For canonical SSH execution, add the matching unencrypted-at-runtime private key
+under `secrets.bootstrap.ssh_private_key` through the approved SOPS editing
+workflow. The key may be encrypted at rest by SOPS, but it must not require an
+interactive SSH passphrase after SOPS decryption. The canonical workflow derives
+its public half with `ssh-keygen -y` and fails closed unless it matches one of the
+declared bootstrap public keys. Do not add the private key to projections or copy
+it through the ordinary service-secret environment boundary.
 
 For a private deployment policy, preflight can receive the policy metadata through
 the operator environment without committing it to this repository:

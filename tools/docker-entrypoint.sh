@@ -45,6 +45,27 @@ fi
 if [[ -d /ssh-ro ]]; then
   install -d -m 0700 -o "${container_user}" -g "${container_user}" "${ssh_dir}"
 
+  case "${INFRA_SSH_IDENTITY_SOURCE:-external}" in
+    external|sops) ;;
+    *)
+      printf 'Unsupported SSH identity source.\n' >&2
+      exit 2
+      ;;
+  esac
+
+  if [[ "${INFRA_SSH_IDENTITY_SOURCE:-external}" == "sops" ]]; then
+    if [[ "${INFRA_COPY_SSH_KEYS:-false}" != "true" ]]; then
+      printf 'SOPS-backed SSH identity requires the protected SSH transport boundary.\n' >&2
+      exit 2
+    fi
+    if [[ -z "${INFRA_VALUES_DIR:-}" || -z "${SOPS_AGE_KEY_FILE:-}" ]]; then
+      printf 'SOPS-backed SSH identity inputs are unavailable.\n' >&2
+      exit 2
+    fi
+    python3 /workspace/scripts/canonical_ssh_identity.py --destination "${ssh_dir}/canonical-bootstrap"
+    export INFRA_SSH_IDENTITY_FILE=canonical-bootstrap
+  fi
+
   for path in /ssh-ro/known_hosts /ssh-ro/config /ssh-ro/*.pub; do
     if [[ -f "${path}" ]]; then
       cp "${path}" "${ssh_dir}/"

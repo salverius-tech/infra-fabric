@@ -16,10 +16,10 @@ if [[ -n "${replace_service}" ]]; then
 fi
 
 # shellcheck disable=SC2016
-INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh bash -euo pipefail -c '
+INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh bash -euo pipefail -c '
 equivalence_after_json=""
 equivalence_required="${INFRA_REQUIRE_EQUIVALENCE:-false}"
-python scripts/workspace-preflight.py --require-values
+python scripts/workspace-preflight.py --require-values --require-secrets
 python scripts/settings.py summary
 rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"
 

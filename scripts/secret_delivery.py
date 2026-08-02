@@ -34,6 +34,9 @@ class DeliveredSecret:
     value: str
 
 
+BOOTSTRAP_SSH_PRIVATE_KEY_PATH = "secrets.bootstrap.ssh_private_key"
+
+
 # Environment names are explicit policy, never inferred from logical paths.
 DEFAULT_REQUIREMENTS: tuple[SecretRequirement, ...] = (
     SecretRequirement(
@@ -218,6 +221,7 @@ def redact_environment(environment: Mapping[str, str], secret_names: set[str]) -
 
 __all__ = [
     "ALL_REQUIREMENTS",
+    "BOOTSTRAP_SSH_PRIVATE_KEY_PATH",
     "DEFAULT_REQUIREMENTS",
     "SERVICE_REQUIREMENTS",
     "DeliveredSecret",

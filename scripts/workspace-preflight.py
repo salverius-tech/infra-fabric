@@ -16,6 +16,7 @@ try:
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
+    from secret_delivery import BOOTSTRAP_SSH_PRIVATE_KEY_PATH
     from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy, validate_sops_age_recipients
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -24,6 +25,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
+    from secret_delivery import BOOTSTRAP_SSH_PRIVATE_KEY_PATH
     from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy, validate_sops_age_recipients
 
 
@@ -185,6 +187,7 @@ def check_canonical_required_secrets(repo: Path, *, require_secrets: bool) -> tu
     if not require_secrets:
         return report
     paths: set[str] = {str(entry["path"]) for entry in report}
+    paths.add(BOOTSTRAP_SSH_PRIVATE_KEY_PATH)
     if not paths:
         return report
     bundle = context.values_dir / "secrets.sops.yaml"

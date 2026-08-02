@@ -24,8 +24,8 @@ if [[ -n "${replace_service}" ]]; then
 fi
 
 # shellcheck disable=SC2016
-INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh bash -euo pipefail -c '
-python scripts/workspace-preflight.py --require-values
+INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh bash -euo pipefail -c '
+python scripts/workspace-preflight.py --require-values --require-secrets
 python scripts/settings.py policy --action apply
 
 if [[ ! -f "${INFRA_VALUES_DIR}/tfplan" && ! -f "${INFRA_VALUES_DIR}/tfplan.meta.json" ]]; then

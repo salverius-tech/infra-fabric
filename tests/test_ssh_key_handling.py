@@ -18,6 +18,13 @@ class SshKeyHandlingTests(unittest.TestCase):
     def test_compose_passes_selected_identity_name_only(self) -> None:
         text = COMPOSE.read_text(encoding="utf-8")
         self.assertIn("INFRA_SSH_IDENTITY_FILE", text)
+        self.assertIn("INFRA_SSH_IDENTITY_SOURCE", text)
+
+    def test_sops_source_materializes_only_canonical_bootstrap_identity(self) -> None:
+        text = ENTRYPOINT.read_text(encoding="utf-8")
+        self.assertIn('INFRA_SSH_IDENTITY_SOURCE:-external', text)
+        self.assertIn("canonical_ssh_identity.py", text)
+        self.assertIn("canonical-bootstrap", text)
 
 
 if __name__ == "__main__":
