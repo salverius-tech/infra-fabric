@@ -13,7 +13,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Mapping
 
 REPO = Path(__file__).resolve().parents[1]
 SETTINGS_SPEC = importlib.util.spec_from_file_location("settings", REPO / "scripts" / "settings.py")
@@ -25,7 +25,7 @@ try:
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver, operator_password_requirements, root_password_requirements
+    from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -34,7 +34,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver, operator_password_requirements, root_password_requirements
+    from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -65,6 +65,19 @@ def enabled_services(settings_path: Path | None = None, service: str = "") -> li
     if service not in services:
         raise settings.SettingsError(f"service is not enabled: {service}")
     return [service]
+
+
+def canonical_enabled_services(context: object, service: str = "") -> list[str]:
+    site_file = getattr(context, "canonical_site_path", None)
+    if site_file is None:
+        raise RuntimeError("canonical Ansible execution requires a selected canonical site")
+    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
+    services = [name for name, definition in model.services.items() if definition.enabled]
+    if service:
+        if service not in services:
+            raise RuntimeError(f"service is not enabled in the canonical site: {service}")
+        return [service]
+    return services
 
 
 def dependency_waves(services: Iterable[str]) -> list[list[str]]:
@@ -397,10 +410,13 @@ def run_service(
     base_env: dict[str, str],
     runner: RunCommand = default_runner,
     extra_args: tuple[str, ...] = (),
+    service_environment: Mapping[str, str] | None = None,
 ) -> ServiceResult:
     playbooks = tuple(settings.SERVICES[service]["playbooks"])
     log_path = log_dir / f"{service}.log"
     env = dict(base_env)
+    if service_environment:
+        env.update(service_environment)
     for playbook in playbooks:
         if playbook == "infra/ansible/playbooks/technitium-dns.yml":
             rc = bootstrap_technitium_token(env_file, log_path, env, runner)
@@ -421,11 +437,21 @@ def run_sequential(
     base_env: dict[str, str],
     runner: RunCommand = default_runner,
     extra_args: tuple[str, ...] = (),
+    service_environments: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[ServiceResult]:
     results: list[ServiceResult] = []
     for service in services:
         print(f"==> ansible service {service}", flush=True)
-        result = run_service(service, inventories, log_dir, env_file, base_env, runner, extra_args)
+        result = run_service(
+            service,
+            inventories,
+            log_dir,
+            env_file,
+            base_env,
+            runner,
+            extra_args,
+            (service_environments or {}).get(service),
+        )
         results.append(result)
         if result.returncode != 0:
             break
@@ -442,13 +468,24 @@ def run_parallel(
     max_workers: int,
     runner: RunCommand = default_runner,
     extra_args: tuple[str, ...] = (),
+    service_environments: Mapping[str, Mapping[str, str]] | None = None,
 ) -> list[ServiceResult]:
     results: list[ServiceResult] = []
     for index, wave in enumerate(dependency_waves(services), 1):
         print(f"==> ansible wave {index}: {', '.join(wave)}", flush=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(wave))) as executor:
             future_map = {
-                executor.submit(run_service, service, inventories, log_dir, env_file, base_env, runner, extra_args): service
+                executor.submit(
+                    run_service,
+                    service,
+                    inventories,
+                    log_dir,
+                    env_file,
+                    base_env,
+                    runner,
+                    extra_args,
+                    (service_environments or {}).get(service),
+                ): service
                 for service in wave
             }
             wave_results: list[ServiceResult] = []
@@ -500,12 +537,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--canonical-ansible", action="store_true", help="use the verified canonical inventory and vars pair")
     args = parser.parse_args(argv)
 
+    context = from_environment(REPO)
     try:
-        services = enabled_services(args.settings, args.service)
-    except settings.SettingsError as error:
+        services = (
+            canonical_enabled_services(context, args.service)
+            if args.canonical_ansible
+            else enabled_services(args.settings, args.service)
+        )
+    except (settings.SettingsError, RuntimeError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
-    context = from_environment(REPO)
     if args.canonical_ansible and args.inventory:
         print("--canonical-ansible cannot be combined with --inventory", file=sys.stderr)
         return 1
@@ -533,10 +574,34 @@ def main(argv: list[str] | None = None) -> int:
             if host_identity_rc != 0:
                 print(f"canonical host identity convergence failed with exit code {host_identity_rc}", file=sys.stderr)
                 return 1
-        if args.mode == "sequential":
-            results = run_sequential(services, inventories, log_dir, env_file, base_env, extra_args=extra_args)
+            provider = SopsAgeProvider(context.path("secrets.sops.yaml"))
+            service_environments = {
+                selected_service: deliver_services_environment(provider, [selected_service])
+                for selected_service in services
+            }
         else:
-            results = run_parallel(services, inventories, log_dir, env_file, base_env, max(1, args.max_workers), extra_args=extra_args)
+            service_environments = None
+        if args.mode == "sequential":
+            results = run_sequential(
+                services,
+                inventories,
+                log_dir,
+                env_file,
+                base_env,
+                extra_args=extra_args,
+                service_environments=service_environments,
+            )
+        else:
+            results = run_parallel(
+                services,
+                inventories,
+                log_dir,
+                env_file,
+                base_env,
+                max(1, args.max_workers),
+                extra_args=extra_args,
+                service_environments=service_environments,
+            )
         if args.canonical_ansible:
             print("==> canonical host bootstrap", flush=True)
             bootstrap_rc = run_canonical_bootstrap(context, inventories, log_dir, base_env, extra_args=extra_args)

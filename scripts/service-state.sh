@@ -100,6 +100,26 @@ PY
 
 enabled_supported_services() {
   local service
+  if [[ -n "${VALUES_SITE:-}" ]]; then
+    while IFS= read -r service; do
+      if is_supported_service "${service}"; then
+        printf '%s\n' "${service}"
+      fi
+    done < <(scripts/python.sh - <<'PY'
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "scripts")
+from canonical_values import load_site
+from values_context import from_environment
+
+context = from_environment(Path.cwd())
+model = load_site(context.canonical_site_path, expected_site=context.site, catalog_path=Path("infra/services.json"))
+print(" ".join(name for name, service in model.services.items() if service.enabled))
+PY
+)
+    return
+  fi
   while IFS= read -r service; do
     if is_supported_service "${service}"; then
       printf '%s\n' "${service}"

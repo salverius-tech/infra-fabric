@@ -22,6 +22,7 @@ from canonical_projections import (
     render_ansible_vars,
     render_dns_records,
     render_opentofu_variables,
+    render_runtime_env,
 )
 from canonical_mapping import MappingContractError, MappingEntry, validate_mapping_matrix
 from service_catalog import ServiceCatalogError, load_catalog
@@ -95,6 +96,25 @@ services:
 
 
 class CanonicalValuesTests(unittest.TestCase):
+    def test_runtime_env_is_allow_listed_and_escaped(self) -> None:
+        rendered = render_runtime_env(
+            {"PUBLIC_URL": "https://example.internal/$service", "TOKEN": "synthetic-secret"},
+            allowed_keys={"PUBLIC_URL", "TOKEN"},
+            secret_keys={"TOKEN"},
+        )
+        self.assertEqual(
+            rendered,
+            'PUBLIC_URL="https://example.internal/\\$service"\nTOKEN="synthetic-secret"\n',
+        )
+
+    def test_runtime_env_rejects_undeclared_and_multiline_values(self) -> None:
+        with self.assertRaises(ProjectionError):
+            render_runtime_env({"UNKNOWN": "value"}, allowed_keys=set())
+        with self.assertRaises(ProjectionError):
+            render_runtime_env({"TOKEN": "value"}, allowed_keys={"TOKEN"}, secret_keys={"MISSING"})
+        with self.assertRaises(ProjectionError):
+            render_runtime_env({"TOKEN": "line1\nline2"}, allowed_keys={"TOKEN"})
+
     def test_bootstrap_ssh_policy_accepts_site_and_host_keys(self) -> None:
         site = canonical_values.YAML(typ="safe").load(VALID_SITE)
         site["bootstrap"] = {

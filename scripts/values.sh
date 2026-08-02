@@ -78,6 +78,12 @@ case "${command_name}" in
         exit 1
       fi
       copy_if_missing "${site_template}" "${values_dir}/site.json"
+      site_yaml_template="${template_dir}/sites/${site}/site.yaml"
+      if [[ ! -f "${site_yaml_template}" ]]; then
+        printf 'Missing canonical site scaffold: %s\n' "${site_yaml_template}" >&2
+        exit 1
+      fi
+      copy_if_missing "${site_yaml_template}" "${values_dir}/site.yaml"
     fi
     if [[ ! -d "${values_root}/.git" ]]; then
       git -C "${values_root}" init

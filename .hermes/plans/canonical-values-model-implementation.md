@@ -236,7 +236,7 @@ The implementation is complete when all of the following are true:
 
 ### Runtime and DNS projections
 
-- [ ] Render restricted `runtime.env` only for declared process-environment keys and secrets.
+- [~] Render restricted `runtime.env` only for declared process-environment keys and secrets. A transient, allow-listed renderer now validates key names, declared secret membership, and newline-safe dotenv escaping; consumer wiring and failure-boundary integration remain open.
 - [ ] Retain restricted dotenv parsing and escaping; reject duplicates, unknown keys, invalid quoting, and newline violations.
 - [~] Render `dns-records.json` from canonical DNS ownership plus service endpoint intent and resolved resource addresses. Strict resolver settings, zones, A records, CNAME records, normalization, and conflict checks exist; provider delivery and consumer wiring remain.
 - [x] Feed DNS projection through the existing `DNS_RECORDS_FILE` path during migration.
@@ -792,5 +792,11 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-08-01 — Completed Item #2 schema/catalog fixture slice: the public `dev` scaffold now declares all nine catalog services, with only Forgejo and Technitium enabled; canonical/catalog tests confirm every typed configuration rejects unknown fields and every catalog schema contract is represented. Full service-schema coverage remains bounded by the existing catalog-specific required-field and resource-owned contracts.
 
 - 2026-08-01 — Completed Item #2 required-field admission slice: `validate_model_services()` now enforces enabled-service dependency closure directly; disabled services remain absent from required-field reports; resource-owned nested requirements retain value-free presence evidence and fail closed when missing. 75 focused canonical/catalog tests and a fresh resource/dependency probe passed.
+- 2026-08-01 — Added the first runtime dotenv projection boundary: `render_runtime_env()` accepts only explicit uppercase allow-listed keys, requires declared secret keys to be present and allow-listed, rejects newline-bearing values, and performs deterministic dotenv escaping without writing files. Focused canonical tests (69) and Python compilation passed; protected temporary-file delivery and consumer wiring remain open.
+- 2026-08-01 — Fresh canonical setup slice: site-aware `scripts/values.sh init` now seeds `site.yaml` from the matching public scaffold, refuses a missing canonical scaffold, and preserves an existing operator-edited file. Two shell integration tests passed in the tooling image; private secret/key setup and selected-site validation remain separate gates.
+- 2026-08-01 — Reconciled the public dev scaffold so `site.json` metadata and canonical `site.yaml` agree on enabled services (`technitium`, `forgejo`); setup coverage now asserts the copied metadata does not reintroduce an ambiguous service selection.
+- 2026-08-01 — Closed a canonical validation authority leak: `validate-values.sh` now checks the verified generated `dns-records.json` for selected canonical sites and uses `dns-records.local.json` only on explicit legacy-compatible layouts.
+- 2026-08-01 — Closed a service-state authority leak: canonical `service-state.sh backup all` now derives enabled backup targets from the validated selected `site.yaml`; the legacy settings service list remains only on compatibility layouts.
+- 2026-08-01 — Closed the canonical Ansible service-consumer boundary: `apply-ansible-services.py --canonical-ansible` now derives enabled services from the selected `site.yaml`, delivers only each service's approved runtime secret requirements transiently to that service's Ansible process environment, and leaves the base environment/filesystem unchanged. Added regression coverage; live execution remains gated on private SOPS/age material and host acceptance.
 
 

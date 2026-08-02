@@ -112,8 +112,13 @@ migration. Run the migration for development separately from production.
 
 The environment is recreated from scratch for a consistent test run.
 
-1. Prepare or migrate the private dev values repository with `just setup`.
-2. Select the required services in the private settings file.
+1. Prepare or migrate the private dev values repository with
+   `just setup "" dev`. The optional site argument initializes the canonical
+   layout and seeds the public-safe `sites/dev/site.yaml` once; it never
+   overwrites an operator-edited copy. `just setup` without a site remains
+   available for legacy-compatible root initialization.
+2. Select the required services in the selected site's metadata and complete the
+   private secret/key setup before validation.
 3. Run `just validate`.
 4. Run `just plan` and review the dev-only resource changes.
 5. Run `just apply` only after explicit approval.

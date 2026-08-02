@@ -16,6 +16,7 @@ class ProjectionError(ValueError):
 
 
 _SENSITIVE_KEY = re.compile(r"(?:password|passphrase|secret|token|private[_-]?key|api[_-]?key|credential)", re.IGNORECASE)
+_ENVIRONMENT_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 def _is_sensitive_key(key: str, value: Any) -> bool:
@@ -33,6 +34,41 @@ def _assert_non_secret(value: Any, path: str = "projection") -> None:
     elif isinstance(value, (list, tuple)):
         for index, child in enumerate(value):
             _assert_non_secret(child, f"{path}[{index}]")
+
+
+def render_runtime_env(
+    values: Mapping[str, str],
+    *,
+    allowed_keys: set[str],
+    secret_keys: set[str] | None = None,
+) -> str:
+    """Render an allow-listed dotenv payload for transient runtime delivery.
+
+    This helper intentionally does not write a file. Callers must keep the
+    returned payload in the protected temporary-material boundary, especially
+    when ``secret_keys`` are present. Canonical projections never infer process
+    environment names from logical secret paths; the caller supplies the
+    explicit, catalog-owned names.
+    """
+    if not isinstance(values, Mapping) or not isinstance(allowed_keys, set):
+        raise ProjectionError("runtime environment inputs must be mappings and an allow-list set")
+    secret_keys = secret_keys or set()
+    if not secret_keys <= allowed_keys:
+        raise ProjectionError("runtime secret keys must be explicitly allow-listed")
+    if set(values) - allowed_keys:
+        raise ProjectionError("runtime environment contains an undeclared key")
+    if not secret_keys <= set(values):
+        raise ProjectionError("runtime environment is missing a declared secret key")
+    lines: list[str] = []
+    for key in sorted(values):
+        if not isinstance(key, str) or not _ENVIRONMENT_KEY.fullmatch(key):
+            raise ProjectionError("runtime environment contains an invalid key")
+        value = values[key]
+        if not isinstance(value, str) or "\n" in value or "\r" in value:
+            raise ProjectionError(f"runtime environment value is invalid: {key}")
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+        lines.append(f'{key}="{escaped}"')
+    return "\n".join(lines) + ("\n" if lines else "")
 
 
 def _validate_non_secret_inputs(model: CanonicalSite) -> None:
@@ -462,6 +498,7 @@ def verify_cross_projection_identity(
 
 __all__ = [
     "ProjectionError",
+    "render_runtime_env",
     "render_ansible_inventory",
     "render_ansible_vars",
     "render_dns_records",

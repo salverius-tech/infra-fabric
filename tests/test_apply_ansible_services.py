@@ -84,6 +84,29 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             [["ansible-playbook", "-i", "inventory.yml", "-i", "tfvars.py", "infra/ansible/playbooks/forgejo-runner.yml"]],
         )
 
+    def test_run_service_delivers_transient_service_environment(self) -> None:
+        observed_env: list[dict[str, str]] = []
+
+        def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
+            observed_env.append(dict(env))
+            return 0
+
+        with tempfile.TemporaryDirectory() as temp:
+            base_env = {"SAFE_FLAG": "1"}
+            result = apply_ansible_services.run_service(
+                "forgejo_runner",
+                ("canonical-inventory.json",),
+                Path(temp),
+                Path(temp) / ".env",
+                base_env,
+                runner,
+                service_environment={"FORGEJO_RUNNER_REGISTRATION_SECRET": "runtime-secret"},
+            )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(observed_env[0]["FORGEJO_RUNNER_REGISTRATION_SECRET"], "runtime-secret")
+        self.assertNotIn("FORGEJO_RUNNER_REGISTRATION_SECRET", base_env)
+
     def test_run_bootstrap_host_limits_target_and_keeps_secret_transient(self) -> None:
         commands: list[list[str]] = []
         observed_env: list[dict[str, str]] = []

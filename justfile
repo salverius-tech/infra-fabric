@@ -8,7 +8,7 @@ default:
     @just --list
 
 # Fresh-checkout setup: build tools, create or clone values/, then show next files to edit
-setup remote="":
+setup remote="" site="":
     docker compose build infra
     @scripts/python.sh scripts/settings.py validate >/dev/null
     @selected_remote="$(scripts/discover-values-remote.sh "{{remote}}")"; \
@@ -19,12 +19,14 @@ setup remote="":
     else \
         scripts/values.sh init; \
     fi
+    @if [[ -n "{{site}}" ]]; then VALUES_SITE="{{site}}" scripts/values.sh init; fi
     scripts/python.sh scripts/migrate-values.py
     docker compose run --rm infra python scripts/workspace-preflight.py --require-values
     @if [[ -t 0 && -t 1 ]]; then INFRA_COPY_SSH_KEYS=true docker compose run --rm infra bash scripts/bootstrap-pve-token.sh --if-needed; else printf 'Skipping Proxmox token bootstrap wizard because just setup is not interactive.\n'; fi
     @if [[ -t 0 && -t 1 ]]; then scripts/python.sh scripts/bootstrap-domain.py --if-needed; else printf 'Skipping domain wizard because just setup is not interactive.\n'; fi
     @printf '\nEdit these private values before running `just validate` and `just plan`:\n'
-    @printf '  values/.env\n  values/terraform.tfvars\n  values/dns-records.local.json\n  values/ansible/inventory/local.yml\n'
+    @printf '  values/.env\n  values/terraform.tfvars\n  values/dns-records.local.json\n  values/ansible/inventory/local.yml\n'; \
+    if [[ -n "{{site}}" ]]; then printf '  values/sites/{{site}}/site.yaml\n'; fi
 
 # Show private values repo git status
 [private]

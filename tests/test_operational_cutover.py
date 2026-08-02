@@ -28,6 +28,12 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertIn('--canonical-ansible', apply)
         self.assertIn('generated/ansible-inventory.json', apply)
 
+    def test_validation_uses_canonical_dns_projection(self) -> None:
+        script = (ROOT / "scripts" / "validate-values.sh").read_text(encoding="utf-8")
+        self.assertIn('dns_records_file="${INFRA_VALUES_DIR}/generated/dns-records.json"', script)
+        self.assertIn('apply-technitium-dns.py --check "${dns_records_file}"', script)
+        self.assertNotIn('apply-technitium-dns.py --check "${INFRA_VALUES_DIR}/dns-records.local.json"', script)
+
     def test_operator_site_actions_require_selected_site_context(self) -> None:
         justfile = (ROOT / "justfile").read_text(encoding="utf-8")
         for recipe in ("actions-status", "actions-watch", "actions-logs", "actions-runners", "clean-plans"):
@@ -42,6 +48,11 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertIn('generated/ansible-inventory.json', script)
         self.assertNotIn("ansible/inventory/local.yml", script)
         self.assertNotIn("infra/ansible/inventory/tfvars.py", script)
+
+    def test_service_state_selection_uses_canonical_services(self) -> None:
+        script = (ROOT / "scripts" / "service-state.sh").read_text(encoding="utf-8")
+        self.assertIn("canonical_values import load_site", script)
+        self.assertIn("model.services.items()", script)
 
     def test_update_requires_selected_canonical_context(self) -> None:
         justfile = (ROOT / "justfile").read_text(encoding="utf-8")
