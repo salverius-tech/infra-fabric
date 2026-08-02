@@ -127,6 +127,38 @@ class StorageVarsTests(unittest.TestCase):
             self.assertEqual(payload["storage_bind_mounts"][0]["source"], "/srv/homelab/forgejo")
             self.assertEqual(payload["storage_bind_mounts"][0]["host_prepare"]["type"], "directory")
 
+    def test_main_accepts_generated_canonical_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            projection = Path(temp) / "terraform.auto.tfvars.json"
+            projection.write_text(
+                json.dumps(
+                    {
+                        "enabled_services": ["forgejo"],
+                        "service_storage": {
+                            "forgejo": {
+                                "data": {
+                                    "type": "bind",
+                                    "source": "/srv/canonical/forgejo",
+                                    "target": "/var/lib/forgejo",
+                                }
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            import contextlib
+            import io
+
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                rc = storage_vars.main(["--projection", str(projection)])
+
+            self.assertEqual(rc, 0)
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(payload["storage_bind_mounts"][0]["source"], "/srv/canonical/forgejo")
+
     def test_main_filters_to_requested_service(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

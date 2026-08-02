@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
+import json
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -37,6 +41,25 @@ class ServiceRuntimeTests(unittest.TestCase):
     def test_rejects_unknown_runtime(self) -> None:
         with self.assertRaises(service_runtime.ServiceRuntimeError):
             service_runtime.runtime_type("hermes", {"service_runtime": {"hermes": {"type": "baremetal"}}})
+
+    def test_main_accepts_canonical_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            projection = Path(temp) / "terraform.auto.tfvars.json"
+            projection.write_text(
+                json.dumps(
+                    {
+                        "enabled_services": ["forgejo"],
+                        "service_runtime": {"forgejo": {"type": "vm"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = service_runtime.main(["forgejo", "--projection", str(projection)])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(output.getvalue().strip(), "vm")
 
 
 if __name__ == "__main__":

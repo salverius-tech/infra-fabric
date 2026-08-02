@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import Callable, Any
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO / "scripts"))
+from canonical_values import CanonicalValuesError, load_site
+
 SCHEMA_VERSION = 3
 MAX_OUTPUT = 6000
 PRIVATE_IP_RE = re.compile(
@@ -62,6 +65,16 @@ def load_registry(repo: Path) -> dict[str, Any]:
 
 def enabled_services(repo: Path) -> list[str]:
     registry = load_registry(repo)
+    selected_site = os.environ.get("VALUES_SITE", "")
+    canonical_path = repo / "values" / "sites" / selected_site / "site.yaml" if selected_site else None
+    if canonical_path is not None:
+        if not canonical_path.is_file():
+            raise OperatorError(f"selected canonical site is missing: {selected_site}")
+        try:
+            model = load_site(canonical_path, expected_site=selected_site, catalog_path=repo / "infra" / "services.json")
+        except CanonicalValuesError as error:
+            raise OperatorError(f"selected canonical site is invalid: {error}") from error
+        return sorted(name for name, service in model.services.items() if service.enabled)
     settings_path = repo / "settings.local.json"
     raw: dict[str, Any] = {}
     if settings_path.is_file():

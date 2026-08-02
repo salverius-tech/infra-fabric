@@ -143,6 +143,19 @@ def tofu_replace_targets(service: str, enabled_services: list[str], runtime_type
     return list(dict.fromkeys(targets))
 
 
+def projection_services(path: Path) -> list[str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise SettingsError(f"cannot read canonical projection {path}: {error}") from error
+    if not isinstance(data, dict) or not isinstance(data.get("enabled_services"), list):
+        raise SettingsError(f"canonical projection {path}: enabled_services must be a list")
+    services = data["enabled_services"]
+    if not all(isinstance(service, str) for service in services):
+        raise SettingsError(f"canonical projection {path}: enabled_services must contain strings")
+    return normalize_services(services, path)
+
+
 def all_ansible_playbooks() -> list[str]:
     playbooks: list[str] = []
     for service in SERVICES:
@@ -178,6 +191,18 @@ def ensure_site_action_allowed(settings: dict[str, Any], action: str) -> None:
         raise SettingsError(f"site {settings['site']} does not allow apply")
     if action == "destroy" and metadata.get("allow_destroy") is not True:
         raise SettingsError(f"site {settings['site']} does not allow destroy")
+
+
+def canonical_site_policy(action: str) -> None:
+    try:
+        context = from_environment()
+        if context.site is None:
+            raise SettingsError("canonical site policy requires VALUES_SITE")
+        metadata = load_metadata(context)
+    except ValuesContextError as error:
+        raise SettingsError(str(error)) from error
+    validate_site_metadata(metadata, context.site, context.metadata_path or DEFAULT_SETTINGS)
+    ensure_site_action_allowed({"site": context.site, "site_metadata": metadata}, action)
 
 
 def settings_summary(settings: dict[str, Any]) -> str:
@@ -256,18 +281,46 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("values-remote")
     subparsers.add_parser("services")
     ansible_playbooks_parser = subparsers.add_parser("ansible-playbooks")
+    ansible_playbooks_parser.add_argument("--projection", type=Path, default=None)
     ansible_playbooks_parser.add_argument("--all", action="store_true")
     ansible_playbooks_parser.add_argument("--settings", type=Path, default=None)
     subparsers.add_parser("summary")
     policy_parser = subparsers.add_parser("policy")
     policy_parser.add_argument("--action", required=True, choices=("plan", "apply", "destroy"))
+    policy_parser.add_argument("--canonical", action="store_true")
     subparsers.add_parser("tofu-var")
     tofu_target_parser = subparsers.add_parser("tofu-targets")
     tofu_target_parser.add_argument("service")
+    tofu_target_parser.add_argument("--projection", type=Path, default=None)
     tofu_replace_parser = subparsers.add_parser("tofu-replace-targets")
     tofu_replace_parser.add_argument("service")
     tofu_replace_parser.add_argument("--runtime", required=True, choices=("lxc", "vm"))
+    tofu_replace_parser.add_argument("--projection", type=Path, default=None)
     args = parser.parse_args(argv)
+
+    if args.command == "policy" and args.canonical:
+        try:
+            canonical_site_policy(args.action)
+        except SettingsError as error:
+            print(error, file=sys.stderr)
+            return 1
+        print(f"site policy allows {args.action}")
+        return 0
+
+    if args.command in {"tofu-targets", "tofu-replace-targets", "ansible-playbooks"} and args.projection is not None:
+        try:
+            enabled = projection_services(args.projection)
+            if args.command == "tofu-targets":
+                targets = tofu_targets(args.service, enabled)
+            elif args.command == "tofu-replace-targets":
+                targets = tofu_replace_targets(args.service, enabled, args.runtime)
+            else:
+                targets = ansible_playbooks(enabled)
+        except SettingsError as error:
+            print(error, file=sys.stderr)
+            return 1
+        print("\n".join(targets))
+        return 0
 
     try:
         settings = load_settings(args.settings)

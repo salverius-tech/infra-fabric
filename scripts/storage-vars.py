@@ -54,6 +54,16 @@ def load_tfvars(path: Path) -> dict[str, Any]:
     return _unquote_hcl_values(data)
 
 
+def load_projection(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise StorageVarsError(f"cannot read canonical projection {path}: {error}") from error
+    if not isinstance(data, dict):
+        raise StorageVarsError(f"canonical projection {path} must contain an object")
+    return data
+
+
 def legacy_forgejo_storage(tfvars: dict[str, Any]) -> dict[str, Any] | None:
     host_path = tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["mountpoint"])
     if not host_path:
@@ -139,19 +149,27 @@ def format_storage_summary(mounts: list[dict[str, Any]]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tfvars", type=Path, default=DEFAULT_TFVARS)
+    parser.add_argument("--projection", type=Path, default=None, help="use a generated canonical OpenTofu JSON projection")
     parser.add_argument("--settings", type=Path, default=None)
     parser.add_argument("--service", default="")
     parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
 
     try:
-        loaded_settings = settings.load_settings(args.settings)
-        enabled_services = loaded_settings["services"]
+        if args.projection is not None:
+            projection = load_projection(args.projection)
+            enabled_services = projection.get("enabled_services", [])
+            if not isinstance(enabled_services, list) or not all(isinstance(service, str) for service in enabled_services):
+                raise StorageVarsError("canonical projection enabled_services must be a string list")
+            tfvars = projection
+        else:
+            loaded_settings = settings.load_settings(args.settings)
+            enabled_services = loaded_settings["services"]
+            tfvars = load_tfvars(args.tfvars)
         if args.service:
             if args.service not in enabled_services:
                 raise StorageVarsError(f"service is not enabled: {args.service}")
             enabled_services = [args.service]
-        tfvars = load_tfvars(args.tfvars)
         mounts = build_storage_mounts(enabled_services, tfvars)
         payload = {"storage_bind_mounts": mounts}
     except (settings.SettingsError, StorageVarsError, OSError) as error:

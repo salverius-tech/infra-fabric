@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,16 @@ def load_tfvars(path: Path) -> dict[str, Any]:
     return data
 
 
+def load_projection(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ServiceRuntimeError(f"cannot read canonical projection {path}: {error}") from error
+    if not isinstance(data, dict):
+        raise ServiceRuntimeError(f"canonical projection {path} must contain an object")
+    return data
+
+
 def runtime_type(service: str, tfvars: dict[str, Any]) -> str:
     runtimes = tfvars.get("service_runtime", {})
     runtime = runtimes.get(service) if isinstance(runtimes, dict) else None
@@ -55,13 +66,22 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("service")
     parser.add_argument("--tfvars", type=Path, default=DEFAULT_TFVARS)
+    parser.add_argument("--projection", type=Path, default=None, help="use a generated canonical OpenTofu JSON projection")
     parser.add_argument("--settings", type=Path, default=None)
     args = parser.parse_args(argv)
     try:
-        enabled = settings.load_settings(args.settings)["services"]
+        if args.projection is not None:
+            projection = load_projection(args.projection)
+            enabled = projection.get("enabled_services", [])
+            if not isinstance(enabled, list) or not all(isinstance(item, str) for item in enabled):
+                raise ServiceRuntimeError("canonical projection enabled_services must be a string list")
+            tfvars = projection
+        else:
+            enabled = settings.load_settings(args.settings)["services"]
+            tfvars = load_tfvars(args.tfvars)
         if args.service not in enabled:
             raise ServiceRuntimeError(f"service is not enabled: {args.service}")
-        print(runtime_type(args.service, load_tfvars(args.tfvars)))
+        print(runtime_type(args.service, tfvars))
     except (settings.SettingsError, ServiceRuntimeError) as error:
         print(error, file=sys.stderr)
         return 1

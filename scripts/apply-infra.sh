@@ -26,7 +26,11 @@ fi
 # shellcheck disable=SC2016
 INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh bash -euo pipefail -c '
 python scripts/workspace-preflight.py --require-values --require-secrets
-python scripts/settings.py policy --action apply
+if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
+  python scripts/settings.py policy --action apply --canonical
+else
+  python scripts/settings.py policy --action apply
+fi
 
 if [[ ! -f "${INFRA_VALUES_DIR}/tfplan" && ! -f "${INFRA_VALUES_DIR}/tfplan.meta.json" ]]; then
   printf "No saved infrastructure plan found. Run just plan, review the output, then run just apply.\n" >&2
@@ -57,9 +61,12 @@ python scripts/tfplan-metadata.py verify \
   --replace-service "${replace_service}" \
   "${verify_args[@]}"
 python scripts/tfplan-metadata.py summary --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json"
-python scripts/settings.py summary
+if [[ ! -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
+  python scripts/settings.py summary
+fi
 ansible_inventory="${INFRA_VALUES_DIR}/ansible/inventory/local.yml"
 canonical_ansible_args=()
+canonical_site=false
 if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
     if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
@@ -71,6 +78,7 @@ if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
   tofu_vars_file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"
   canonical_ansible_args=(--canonical-ansible)
+  canonical_site=true
 fi
 
 ansible_inventory_args=("-i" "${ansible_inventory}")
@@ -79,13 +87,17 @@ if [[ "${#canonical_ansible_args[@]}" -eq 0 ]]; then
 fi
 
 storage_vars_args=()
-if [[ -n "${target_service}" ]]; then
-  storage_vars_args+=(--service "${target_service}")
+if [[ -n "${1:-}" ]]; then
+  storage_vars_args+=(--service "${1}")
 fi
-python scripts/storage-vars.py --summary "${storage_vars_args[@]}"
-python scripts/guest-mount-feature-vars.py --summary
+projection_args=()
+if [[ "${canonical_site}" == true ]]; then
+  projection_args+=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+fi
+python scripts/storage-vars.py --summary "${storage_vars_args[@]}" "${projection_args[@]}"
+python scripts/guest-mount-feature-vars.py --summary "${projection_args[@]}"
 
-guest_mount_feature_vars="$(python scripts/guest-mount-feature-vars.py)"
+guest_mount_feature_vars="$(python scripts/guest-mount-feature-vars.py "${projection_args[@]}")"
 ansible-playbook \
   "${ansible_inventory_args[@]}" \
   -e "${guest_mount_feature_vars}" \
@@ -97,7 +109,7 @@ cleanup_plan_artifacts() {
 }
 trap cleanup_plan_artifacts EXIT
 
-storage_vars="$(python scripts/storage-vars.py "${storage_vars_args[@]}")"
+storage_vars="$(python scripts/storage-vars.py "${storage_vars_args[@]}" "${projection_args[@]}")"
 if python -c "import json, sys; raise SystemExit(0 if json.loads(sys.argv[1]).get(\"storage_bind_mounts\") else 1)" "${storage_vars}"; then
   ansible-playbook \
     "${ansible_inventory_args[@]}" \

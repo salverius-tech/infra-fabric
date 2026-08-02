@@ -20,7 +20,9 @@ INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh bas
 equivalence_after_json=""
 equivalence_required="${INFRA_REQUIRE_EQUIVALENCE:-false}"
 python scripts/workspace-preflight.py --require-values --require-secrets
-python scripts/settings.py summary
+if [[ ! -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
+  python scripts/settings.py summary
+fi
 rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"
 
 generated_tmp=""
@@ -99,10 +101,14 @@ storage_vars_args=()
 if [[ -n "${1:-}" ]]; then
   storage_vars_args+=(--service "${1}")
 fi
-python scripts/storage-vars.py --summary "${storage_vars_args[@]}"
-python scripts/guest-mount-feature-vars.py --summary
+projection_args=()
+if [[ "${canonical_site}" == true ]]; then
+  projection_args+=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+fi
+python scripts/storage-vars.py --summary "${storage_vars_args[@]}" "${projection_args[@]}"
+python scripts/guest-mount-feature-vars.py --summary "${projection_args[@]}"
 
-guest_mount_feature_vars="$(python scripts/guest-mount-feature-vars.py)"
+guest_mount_feature_vars="$(python scripts/guest-mount-feature-vars.py "${projection_args[@]}")"
 ansible-playbook \
   "${ansible_inventory_args[@]}" \
   -e "${guest_mount_feature_vars}" \
@@ -118,16 +124,28 @@ if [[ "${canonical_site}" == true ]]; then
   enabled_services_args=()
 fi
 if [[ -n "${1:-}" ]]; then
+  target_projection_args=()
+  if [[ "${canonical_site}" == true ]]; then
+    target_projection_args+=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+  fi
   while IFS= read -r target; do
     [[ -n "${target}" ]] && target_args+=("-target=${target}")
-  done < <(python scripts/settings.py tofu-targets "${1}")
+  done < <(python scripts/settings.py tofu-targets "${1}" "${target_projection_args[@]}")
   printf "Creating one-service canary plan for %s. A full plan is required after this rollout.\n" "${1}"
 fi
 if [[ -n "${2:-}" ]]; then
-  replace_runtime="$(python scripts/service-runtime.py "${2}")"
+  replace_runtime_args=()
+  if [[ "${canonical_site}" == true ]]; then
+    replace_runtime_args+=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+  fi
+  replace_runtime="$(python scripts/service-runtime.py "${2}" "${replace_runtime_args[@]}")"
+  replace_projection_args=()
+  if [[ "${canonical_site}" == true ]]; then
+    replace_projection_args+=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+  fi
   while IFS= read -r target; do
     [[ -n "${target}" ]] && replace_args+=("-replace=${target}")
-  done < <(python scripts/settings.py tofu-replace-targets "${2}" --runtime "${replace_runtime}")
+  done < <(python scripts/settings.py tofu-replace-targets "${2}" --runtime "${replace_runtime}" "${replace_projection_args[@]}")
   printf "Forcing replacement of %s service resources for runtime %s. Review destroy/create output carefully.\n" "${2}" "${replace_runtime}"
 fi
 

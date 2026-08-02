@@ -94,6 +94,30 @@ class SecretDeliveryTests(unittest.TestCase):
         self.assertEqual(delivered.environment_name, "INFRA_BOOTSTRAP_ROOT_PASSWORD")
         self.assertEqual(delivered.value, "SENTINEL")
 
+    def test_delivery_rejects_multiline_environment_values(self) -> None:
+        provider = FakeProvider({"secrets.bootstrap.root_password": "line1\nline2"})
+        with self.assertRaisesRegex(secret_delivery.SecretDeliveryError, "multiline"):
+            secret_delivery.deliver(
+                provider,
+                path="secrets.bootstrap.root_password",
+                consumer="ansible-bootstrap",
+            )
+
+    def test_delivery_rejects_invalid_environment_names(self) -> None:
+        requirement = secret_delivery.SecretRequirement(
+            "secrets.bootstrap.root_password",
+            "bootstrap",
+            frozenset({"ansible-bootstrap"}),
+            "not-an-environment",
+        )
+        with self.assertRaisesRegex(secret_delivery.SecretDeliveryError, "environment name"):
+            secret_delivery.deliver(
+                FakeProvider({"secrets.bootstrap.root_password": "ROOT"}),
+                path=requirement.path,
+                consumer="ansible-bootstrap",
+                requirements=(requirement,),
+            )
+
     def test_service_delivery_is_scoped_to_selected_services(self) -> None:
         provider = FakeProvider(
             {

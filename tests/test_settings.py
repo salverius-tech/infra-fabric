@@ -206,6 +206,17 @@ class SettingsTests(unittest.TestCase):
         with self.assertRaises(settings_script.SettingsError):
             settings_script.tofu_targets("forgejo", loaded["services"])
 
+    def test_projection_services_are_used_for_canonical_targets(self) -> None:
+        path = self.write_settings({"enabled_services": ["forgejo"]})
+        try:
+            self.assertEqual(settings_script.projection_services(path), ["forgejo"])
+            self.assertEqual(
+                settings_script.tofu_targets("forgejo", settings_script.projection_services(path)),
+                ["module.forgejo", "module.forgejo_vm", "terraform_data.forgejo_storage_validation"],
+            )
+        finally:
+            path.unlink()
+
     def test_summary_lists_services_and_playbooks(self) -> None:
         path = self.write_settings({"services": ["tailscale_client"]})
         try:

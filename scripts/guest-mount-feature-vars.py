@@ -40,6 +40,16 @@ def load_tfvars(path: Path) -> dict[str, Any]:
     return data
 
 
+def load_projection(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise GuestMountFeatureError(f"cannot read canonical projection {path}: {error}") from error
+    if not isinstance(data, dict):
+        raise GuestMountFeatureError(f"canonical projection {path} must contain an object")
+    return data
+
+
 def build_feature_checks(enabled_services: list[str], tfvars: dict[str, Any]) -> list[dict[str, Any]]:
     storage = tfvars.get("service_storage", {})
     if not isinstance(storage, dict):
@@ -97,13 +107,23 @@ def format_summary(checks: list[dict[str, Any]]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tfvars", type=Path, default=DEFAULT_TFVARS)
+    parser.add_argument("--projection", type=Path, default=None, help="use a generated canonical OpenTofu JSON projection")
     parser.add_argument("--settings", type=Path, default=None)
     parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
 
     try:
-        loaded_settings = settings.load_settings(args.settings)
-        checks = build_feature_checks(loaded_settings["services"], load_tfvars(args.tfvars))
+        if args.projection is not None:
+            projection = load_projection(args.projection)
+            enabled_services = projection.get("enabled_services", [])
+            if not isinstance(enabled_services, list) or not all(isinstance(service, str) for service in enabled_services):
+                raise GuestMountFeatureError("canonical projection enabled_services must be a string list")
+            tfvars = projection
+        else:
+            loaded_settings = settings.load_settings(args.settings)
+            enabled_services = loaded_settings["services"]
+            tfvars = load_tfvars(args.tfvars)
+        checks = build_feature_checks(enabled_services, tfvars)
     except (settings.SettingsError, GuestMountFeatureError) as error:
         print(f"guest mount feature vars failed: {error}", file=sys.stderr)
         return 1

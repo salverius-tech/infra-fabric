@@ -7,6 +7,7 @@ secret projections, command-line arguments, logs, or persistent dotenv files.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Mapping
 
 from secret_provider import SecretProvider, SecretProviderError
@@ -35,6 +36,7 @@ class DeliveredSecret:
 
 
 BOOTSTRAP_SSH_PRIVATE_KEY_PATH = "secrets.bootstrap.ssh_private_key"
+_ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 # Environment names are explicit policy, never inferred from logical paths.
@@ -143,6 +145,8 @@ def requirement_index(
             raise SecretDeliveryError("duplicate logical secret delivery requirement")
         if not requirement.path or not requirement.consumers or not requirement.environment_name:
             raise SecretDeliveryError("secret delivery requirement is incomplete")
+        if not _ENVIRONMENT_NAME.fullmatch(requirement.environment_name):
+            raise SecretDeliveryError("secret delivery environment name is invalid")
         index[requirement.path] = requirement
     return index
 
@@ -168,6 +172,8 @@ def deliver(
         raise SecretDeliveryError("secret provider resolution failed") from error
     if not isinstance(value, str) or not value:
         raise SecretDeliveryError("secret provider returned an invalid value")
+    if "\n" in value or "\r" in value:
+        raise SecretDeliveryError("secret provider returned a multiline environment value")
     return DeliveredSecret(path, consumer, requirement.environment_name or "", value)
 
 

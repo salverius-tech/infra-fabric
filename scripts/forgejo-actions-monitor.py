@@ -15,6 +15,10 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from values_context import from_environment
+from canonical_projections import render_ansible_inventory, render_ansible_vars, render_opentofu_variables, verify_cross_projection_identity
+from canonical_values import load_site, model_digest
+from projection_manifest import verify_manifest
+from service_catalog import load_catalog
 
 REPO = Path(__file__).resolve().parents[1]
 INVENTORY = "values/ansible/inventory/local.yml"
@@ -104,6 +108,55 @@ def redact(text: str) -> str:
 
 def shell_quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
+
+
+def verify_canonical_monitor_inputs(context: object) -> Path:
+    site_file = getattr(context, "canonical_site_path", None)
+    if site_file is None:
+        raise MonitorError("canonical site.yaml is required")
+    catalog_path = REPO / "infra" / "services.json"
+    try:
+        model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=catalog_path)
+        catalog = load_catalog(catalog_path)
+    except Exception as error:
+        raise MonitorError("canonical monitor site or catalog is invalid") from error
+    names = ("terraform.auto.tfvars.json", "ansible-inventory.json", "ansible-vars.json")
+    projections: dict[str, dict[str, Any]] = {}
+    try:
+        for name in names:
+            projection = json.loads(getattr(context, "generated_path")(name).read_text(encoding="utf-8"))
+            if not isinstance(projection, dict):
+                raise MonitorError(f"canonical monitor projection is not an object: {name}")
+            projections[name] = projection
+        manifest = json.loads(getattr(context, "projection_manifest_path").read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise MonitorError("canonical monitor manifest is not an object")
+    except (OSError, json.JSONDecodeError) as error:
+        raise MonitorError("canonical monitor projections or manifest are unavailable") from error
+    expected = {
+        "terraform.auto.tfvars.json": render_opentofu_variables(model),
+        "ansible-inventory.json": render_ansible_inventory(model, catalog),
+        "ansible-vars.json": render_ansible_vars(model, catalog),
+    }
+    if projections != expected:
+        raise MonitorError("canonical monitor projections do not match the selected model")
+    try:
+        verify_cross_projection_identity(
+            site=model.site.name,
+            opentofu=projections["terraform.auto.tfvars.json"],
+            inventory=projections["ansible-inventory.json"],
+            ansible_vars=projections["ansible-vars.json"],
+        )
+        verify_manifest(
+            manifest,
+            site=model.site.name,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+        )
+    except Exception as error:
+        raise MonitorError("canonical monitor projection identity verification failed") from error
+    return getattr(context, "generated_path")("ansible-inventory.json")
 
 
 def run_ansible_shell(command: str) -> str:
@@ -294,7 +347,7 @@ def main(argv: list[str] | None = None) -> int:
         raise MonitorError("VALUES_SITE is required for Forgejo Actions monitoring")
     if context.canonical_site_path is None:
         raise MonitorError(f"canonical site.yaml is required: {context.values_dir / 'site.yaml'}")
-    inventory = context.generated_path("ansible-inventory.json")
+    inventory = verify_canonical_monitor_inputs(context)
     if not inventory.is_file():
         raise MonitorError(f"canonical generated inventory is missing: {inventory}")
     INVENTORY = str(inventory)

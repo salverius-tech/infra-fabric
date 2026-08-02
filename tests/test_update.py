@@ -91,6 +91,42 @@ class UpdateTests(unittest.TestCase):
             self.assertEqual(result.status, "hold")
             self.assertEqual(inventory.read_text(encoding="utf-8"), 'forgejo_version: "12.0.4"\n')
 
+    def test_updates_canonical_release_owner(self) -> None:
+        document = {
+            "services": {"forgejo": {"release": {"version": "12.0.4"}}}
+        }
+        now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+        result, changed = update_script.process_canonical_target(
+            update_script.TARGETS[2],
+            document,
+            Path("."),
+            now,
+            timedelta(hours=48),
+            lambda _url: self.fake_release("12.1.0", now - timedelta(hours=72)),
+        )
+
+        self.assertEqual(result.status, "updated")
+        self.assertTrue(changed)
+        self.assertEqual(document["services"]["forgejo"]["release"]["version"], "12.1.0")
+
+    def test_canonical_update_holds_without_mutating(self) -> None:
+        document = {
+            "services": {"forgejo": {"release": {"version": "12.0.4"}}}
+        }
+        now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+        result, changed = update_script.process_canonical_target(
+            update_script.TARGETS[2],
+            document,
+            Path("."),
+            now,
+            timedelta(hours=48),
+            lambda _url: self.fake_release("12.1.0", now - timedelta(hours=12)),
+        )
+
+        self.assertEqual(result.status, "hold")
+        self.assertFalse(changed)
+        self.assertEqual(document["services"]["forgejo"]["release"]["version"], "12.0.4")
+
     def test_skips_missing_private_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             target = update_script.TARGETS[2]

@@ -91,6 +91,12 @@ consumer inputs. Do not edit them or treat legacy `.env`, `terraform.tfvars`,
 static inventory, or DNS JSON files as canonical inputs. The legacy migration
 command remains available for reviewed, explicit imports only.
 
+For a selected site, edit only `values/sites/<site>/site.yaml` for non-secret
+infrastructure and service configuration. Keep encrypted runtime credentials in
+`values/sites/<site>/secrets.sops.yaml`; keep the external SOPS/age identity
+outside the repository. The legacy root files remain compatibility projections or
+migration inputs and must not be edited to change a canonical site.
+
 If you skipped the Proxmox token wizard or need to rotate the token later, run:
 
 ```bash
@@ -119,7 +125,7 @@ Check for eligible pinned version updates without applying infrastructure change
 VALUES_SITE=dev just update
 ```
 
-`just update` checks known upstream releases and only updates pins for releases at least 48 hours old. In canonical mode it refuses to mutate legacy service inventory; canonical service-release changes must be made in `site.yaml` or by the reviewed migration workflow. Review the resulting diff before continuing with validation and planning.
+`just update` checks known upstream releases and only updates pins for releases at least 48 hours old. In canonical mode it updates only typed release owners in `site.yaml` (Forgejo, Forgejo Runner, Docker Compose, and `just`) after validating the complete candidate; it never falls back to legacy service inventory. Review the resulting diff before continuing with validation and planning.
 
 Technitium is managed by Ansible using a versioned portable archive, a private SHA256 pin, an installed-version marker, activation health checks, and rollback handling. An optional controller-side cache can be configured with `technitium_artifact_path` under private values. Technitium is not yet automatically discovered or updated by `just update`; review and change its private version/checksum pins explicitly before running `just validate`, `just plan`, and approved `just apply`. Do not rerun the upstream installer as a routine update mechanism.
 
@@ -137,11 +143,11 @@ just apply
 
 `just plan` writes `tfplan` plus `tfplan.meta.json`. `just apply` refuses to run if the saved plan or its inputs changed, then applies infrastructure, runs enabled Ansible service chains in dependency-safe parallel waves, and syncs Technitium DNS records after the DNS service is installed. Set `INFRA_APPLY_ANSIBLE_MODE=sequential` to use the older one-playbook-at-a-time behavior, or `INFRA_APPLY_ANSIBLE_MAX_WORKERS=<n>` to cap parallel service chains. It removes plan artifacts after the apply attempt. `TECHNITIUM_API_URL` should use the direct LXC API endpoint (`http://<technitium-lxc-ip>:5380/api`) so DNS sync does not depend on records it creates. If the Technitium token is missing or still a placeholder, apply bootstraps one through the local API and stores it in `values/.env` without printing the token.
 
-After a successful apply, review and commit the private `values/` repo because OpenTofu state and local inventory may have changed:
+After a successful apply, review and commit the private `values/` repo because OpenTofu state, compatibility projections, and operational artifacts may have changed. Do not manually edit generated projections:
 
 ```bash
 git -C values status --short
-git -C values add -- terraform.tfstate terraform.tfstate.backup ansible/inventory/local.yml dns-records.local.json
+git -C values add -- terraform.tfstate terraform.tfstate.backup 'sites/<site>/generated'
 git -C values commit -m "chore: update local infrastructure state"
 git -C values push
 ```

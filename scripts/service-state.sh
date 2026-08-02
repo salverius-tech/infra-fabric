@@ -127,6 +127,26 @@ PY
   done < <(scripts/python.sh scripts/settings.py services | tr ' ' '\n')
 }
 
+verify_canonical_service_state_inputs() {
+  if [[ -z "${VALUES_SITE:-}" ]]; then
+    return 0
+  fi
+  scripts/python.sh scripts/verify-projections.py \
+    --site-file "${repo_root}/${site_values_dir}/site.yaml" \
+    --generated-dir "${repo_root}/${site_values_dir}/generated"
+}
+
+require_canonical_service_enabled() {
+  local requested="$1"
+  if [[ -z "${VALUES_SITE:-}" ]]; then
+    return 0
+  fi
+  if ! enabled_supported_services | grep -Fxq "${requested}"; then
+    printf 'Service-state target is not enabled in the canonical site: %s\n' "${requested}" >&2
+    exit 2
+  fi
+}
+
 run_playbook() {
   local mode="$1"
   local service="$2"
@@ -176,6 +196,7 @@ case "${command_name}" in
   backup)
     require_site_context
     require_canonical_authority
+    verify_canonical_service_state_inputs
     if [[ $# -ne 1 ]]; then
       usage
       exit 2
@@ -196,12 +217,14 @@ case "${command_name}" in
         printf 'Unsupported service-state target: %s\n' "${target}" >&2
         exit 2
       fi
+      require_canonical_service_enabled "${target}"
       run_playbook backup "${target}"
     fi
     ;;
   restore)
     require_site_context
     require_canonical_authority
+    verify_canonical_service_state_inputs
     if [[ $# -ne 2 ]]; then
       usage
       exit 2
@@ -211,6 +234,7 @@ case "${command_name}" in
       printf 'Unsupported service-state target: %s\n' "${service}" >&2
       exit 2
     fi
+    require_canonical_service_enabled "${service}"
     restore_file="$(container_path "$2")"
     validate_restore_file "${service}" "${restore_file}"
     run_playbook restore "${service}"
@@ -218,6 +242,7 @@ case "${command_name}" in
   restore-if-present)
     require_site_context
     require_canonical_authority
+    verify_canonical_service_state_inputs
     if [[ $# -lt 1 || $# -gt 2 ]]; then
       usage
       exit 2
@@ -227,6 +252,7 @@ case "${command_name}" in
       printf 'Unsupported service-state target: %s\n' "${service}" >&2
       exit 2
     fi
+    require_canonical_service_enabled "${service}"
     if [[ $# -eq 2 ]]; then
       local_restore_file="$2"
       if [[ ! -f "${local_restore_file}" ]]; then

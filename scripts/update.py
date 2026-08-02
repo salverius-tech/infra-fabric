@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -13,11 +14,15 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Callable
 
+import yaml
+
 try:
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from values_context import from_environment
+
+from canonical_values import CanonicalValuesError, load_site
 
 DEFAULT_MIN_AGE_HOURS = 48
 USER_AGENT = "homelab-infra-update/1.0"
@@ -47,6 +52,7 @@ class Target:
     checksum_replacement: str | None = None
     checksum_asset_template: str | None = None
     checksum_file_template: str | None = None
+    canonical_path: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -88,6 +94,7 @@ TARGETS = (
         pattern=r'(?m)^(\s*forgejo_version:\s*["\']?)([^"\'\s]+)(["\']?\s*)$',
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://code.forgejo.org/api/v1/repos/forgejo/forgejo/releases/latest",
+        canonical_path=("services", "forgejo", "release", "version"),
     ),
     Target(
         name="Forgejo runner",
@@ -95,6 +102,7 @@ TARGETS = (
         pattern=r'(?m)^(\s*forgejo_runner_version:\s*["\']?)([^"\'\s]+)(["\']?\s*)$',
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://code.forgejo.org/api/v1/repos/forgejo/runner/releases/latest",
+        canonical_path=("services", "forgejo_runner", "release", "version"),
     ),
     Target(
         name="Docker Compose plugin",
@@ -102,6 +110,7 @@ TARGETS = (
         pattern=r"(version=\"{{ forgejo_runner_compose_version \| default\(')([^']+)('\) }}\";)",
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://api.github.com/repos/docker/compose/releases/latest",
+        canonical_path=("services", "forgejo_runner", "configuration", "compose_version"),
     ),
     Target(
         name="just",
@@ -109,6 +118,7 @@ TARGETS = (
         pattern=r"(version=\"{{ forgejo_runner_just_version \| default\(')([^']+)('\) }}\";)",
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://api.github.com/repos/casey/just/releases/latest",
+        canonical_path=("services", "forgejo_runner", "configuration", "just_version"),
     ),
 )
 
@@ -306,6 +316,56 @@ def process_target(
     )
 
 
+def canonical_value(document: dict[str, object], path: tuple[str, ...]) -> object:
+    current: object = document
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            raise UpdateError(f"canonical path is missing: {'.'.join(path)}")
+        current = current[key]
+    return current
+
+
+def set_canonical_value(document: dict[str, object], path: tuple[str, ...], value: str) -> None:
+    current: object = document
+    for key in path[:-1]:
+        if not isinstance(current, dict) or key not in current:
+            raise UpdateError(f"canonical path is missing: {'.'.join(path)}")
+        current = current[key]
+    if not isinstance(current, dict):
+        raise UpdateError(f"canonical path parent is not an object: {'.'.join(path)}")
+    current[path[-1]] = value
+
+
+def process_canonical_target(
+    target: Target,
+    document: dict[str, object],
+    root: Path,
+    now: datetime,
+    min_age: timedelta,
+    opener: Callable[[str], bytes] | None = None,
+) -> tuple[UpdateResult, bool]:
+    if target.canonical_path is None:
+        return UpdateResult(target.name, Path("values/sites/<site>/site.yaml"), None, None, "skip", "no canonical owner"), False
+    try:
+        current_value = canonical_value(document, target.canonical_path)
+    except UpdateError as error:
+        return UpdateResult(target.name, Path("values/sites/<site>/site.yaml"), None, None, "skip", f"{error}; legacy inventory is not authoritative"), False
+    if not isinstance(current_value, str) or not current_value:
+        raise UpdateError(f"{target.name}: canonical release value must be a non-empty string")
+    release = release_from_payload(target, fetch_release(target.release_url, opener))
+    age = now - release.published_at
+    display_path = Path("values/sites/<site>/site.yaml")
+    if release.version == current_value:
+        return UpdateResult(target.name, display_path, current_value, release.version, "current", f"already at latest ({release.url})"), False
+    if age < min_age:
+        remaining = min_age - age
+        hours = int(remaining.total_seconds() // 3600)
+        minutes = int((remaining.total_seconds() % 3600) // 60)
+        return UpdateResult(target.name, display_path, current_value, release.version, "hold", f"published {release.published_at.isoformat()}; wait {hours}h {minutes}m more ({release.url})"), False
+    set_canonical_value(document, target.canonical_path, release.version)
+    return UpdateResult(target.name, display_path, current_value, release.version, "updated", f"release age {age}; {release.url}"), True
+
+
 def run(
     root: Path,
     min_age_hours: int,
@@ -314,6 +374,46 @@ def run(
     now = datetime.now(timezone.utc)
     min_age = timedelta(hours=min_age_hours)
     context = from_environment(root)
+    if context.canonical_site_path is not None:
+        site_path = context.canonical_site_path
+        try:
+            document = yaml.safe_load(site_path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as error:
+            raise UpdateError(f"cannot load canonical site {site_path}: {error}") from error
+        if not isinstance(document, dict):
+            raise UpdateError(f"canonical site {site_path} must contain an object")
+        results: list[UpdateResult] = []
+        changed = False
+        for target in TARGETS:
+            if target.canonical_path is None:
+                results.append(UpdateResult(target.name, target.path, None, None, "skip", "not owned by canonical model"))
+                continue
+            result, target_changed = process_canonical_target(target, document, root, now, min_age, opener)
+            results.append(result)
+            changed = changed or target_changed
+        if changed:
+            rendered = yaml.safe_dump(document, sort_keys=False)
+            candidate_path: Path | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    "w",
+                    encoding="utf-8",
+                    newline="\n",
+                    dir=site_path.parent,
+                    prefix=f".{site_path.name}.update-",
+                    suffix=".tmp",
+                    delete=False,
+                ) as candidate:
+                    candidate.write(rendered)
+                    candidate_path = Path(candidate.name)
+                load_site(candidate_path, expected_site=site_path.parent.name)
+                candidate_path.replace(site_path)
+            except (OSError, CanonicalValuesError) as error:
+                raise UpdateError(f"canonical update failed validation: {error}") from error
+            finally:
+                if candidate_path is not None:
+                    candidate_path.unlink(missing_ok=True)
+        return results
     inventory_path = context.path("ansible/inventory/local.yml").relative_to(root)
     targets = tuple(
         Target(
