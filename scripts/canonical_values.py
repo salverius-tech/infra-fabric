@@ -247,8 +247,8 @@ class ImageDefinition(StrictModel):
     @classmethod
     def validate_url(cls, value: str) -> str:
         parsed = urlsplit(value)
-        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
-            raise ValueError("image url must be an HTTPS URL without credentials or fragments")
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("image url must be an HTTP(S) URL without credentials or fragments")
         return value
 
     @field_validator("file_name")

@@ -8,10 +8,10 @@ import sys
 from pathlib import Path
 
 try:
-    from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, render_migration_report, runtime_importer_admission
+    from legacy_values_discovery import DiscoveryError, assess_candidate_mapping, build_candidate_site, discover_legacy, render_migration_report, runtime_importer_admission
 except ModuleNotFoundError:  # pragma: no cover - direct import from another cwd
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from legacy_values_discovery import DiscoveryError, build_candidate_site, discover_legacy, render_migration_report, runtime_importer_admission
+    from legacy_values_discovery import DiscoveryError, assess_candidate_mapping, build_candidate_site, discover_legacy, render_migration_report, runtime_importer_admission
 
 
 def _reject_values_output(output: Path, values_dir: Path) -> None:
@@ -55,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, help="write the redacted JSON report to this path")
     parser.add_argument("--candidate-base", type=Path, help="approved canonical YAML base for public candidate generation")
     parser.add_argument("--candidate-output", type=Path, help="write a public candidate YAML outside the legacy values directory")
+    parser.add_argument("--assessment-base", type=Path, help="approved canonical base for a value-free mapping assessment")
     parser.add_argument("--site", help="override candidate site.name")
     args = parser.parse_args(argv)
     try:
@@ -64,6 +65,12 @@ def main(argv: list[str] | None = None) -> int:
             ansible_inventory=args.ansible_inventory,
         )
         payload = render_migration_report(report)
+        if args.assessment_base is not None:
+            from ruamel.yaml import YAML
+
+            yaml = YAML(typ="safe")
+            base = yaml.load(args.assessment_base.read_text(encoding="utf-8"))
+            payload["candidate_assessment"] = assess_candidate_mapping(report, base_document=base)
         if args.candidate_base is not None or args.candidate_output is not None:
             if args.candidate_base is None or args.candidate_output is None:
                 raise DiscoveryError("--candidate-base and --candidate-output must be supplied together")

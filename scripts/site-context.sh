@@ -10,10 +10,16 @@ require_site_context() {
   fi
   local values_path
   values_path="$(site_values_dir)" || return
-  if [[ ! -f "${values_path}/site.json" ]]; then
-    printf 'Selected site metadata is missing: %s/site.json\n' "${values_path}" >&2
-    return 2
+  export INFRA_VALUES_DIR="${INFRA_VALUES_DIR:-${values_path}}"
+  if [[ -f "${values_path}/site.yaml" ]]; then
+    return 0
   fi
+  if [[ "${INFRA_ALLOW_LEGACY_COMPATIBILITY:-}" == "true" && -f "${values_path}/site.json" ]]; then
+    printf 'WARNING: legacy site metadata explicitly enabled for %s.\n' "${values_path}" >&2
+    return 0
+  fi
+  printf 'Selected canonical site is missing: %s/site.yaml\n' "${values_path}" >&2
+  return 2
 }
 
 require_canonical_authority() {

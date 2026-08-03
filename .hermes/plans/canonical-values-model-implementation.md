@@ -4,7 +4,7 @@
 **Branch:** `feat/canonical-values-model`
 **PRD:** [`canonical-values-model-prd.md`](./canonical-values-model-prd.md)
 **Repository:** `infra-fabric`
-**Last updated:** 2026-07-30
+**Last updated:** 2026-08-02
 
 ## Purpose
 
@@ -58,6 +58,13 @@ The following execution-planning items were discussed and approved. They sequenc
 **Execution gate:** The next implementation authorization should be limited to the first report-only Ansible discovery slice and its tests/evidence. Migration apply, candidate generation, default consumer cutover, legacy removal, and infrastructure mutation remain separately gated.
 
 ## Scope and guardrails
+
+### Follow-up review: canonical projection variable naming
+
+- [ ] Review all Ansible and OpenTofu consumer variable names against the names
+  produced by the canonical model, including runtime-specific exceptions such
+  as Forgejo Runner. Confirm that every generated key is consumed by the target
+  playbooks/modules and that no consumer silently falls back to a legacy default.
 
 - Canonical operator-edited inputs become `values/sites/<site>/site.yaml` and encrypted `secrets.sops.yaml`.
 - Existing OpenTofu, Ansible, DNS, service-role, and public `just` interfaces remain compatible during migration.
@@ -809,5 +816,8 @@ Update this table with real command output, fixture names, or review links. Do n
 - 2026-08-01 — Updated the public operator contract in `README.md`: canonical non-secret edits belong in `values/sites/<site>/site.yaml`, encrypted runtime credentials remain in the site bundle, managed updates mutate typed canonical release owners, and post-apply guidance treats generated projections as disposable rather than editable legacy authority.
 - 2026-08-01 — Closed the canonical validation authority leak in `validate-values.sh`: canonical validation now loads and validates `site.yaml`, verifies the complete generated projection set, and derives Ansible playbooks from projected `enabled_services`; legacy `settings.py validate` and service selection remain only in compatibility layouts.
 - 2026-08-01 — Routed `hermes-operator.py` status/action service selection through the selected canonical `site.yaml` when `VALUES_SITE` is set. The operator now fails closed for a missing or invalid selected canonical site; its legacy settings fallback remains only for unselected compatibility operation.
+- 2026-08-02 — Implemented the canonical-only selected-site cleanup boundary while retaining explicit legacy compatibility: canonical site context no longer requires `site.json`, canonical setup no longer seeds legacy Terraform/inventory/DNS files, and canonical plan no longer reads legacy settings for enabled-service selection. Removed the dev site's legacy `site.json`, `terraform.tfvars`, static inventory, local DNS JSON, saved plan artifacts, stale host-key backup, and legacy `.env`. State, backups, SOPS files, generated projections, and active known-hosts remain intentionally retained. Dev validation passes with the legacy files absent.
+- 2026-08-02 — Implemented canonical setup-time Proxmox token bootstrap: selected canonical setup now invokes the token wizard through the SOPS age-key transport, checks `secrets.providers.proxmox.api_token` idempotently, creates/rotates the remote token only through the existing interactive SSH flow, and atomically writes the token into the encrypted bundle without `.env`; legacy setup retains its dotenv branch. Added the canonical SOPS setter and regression tests. Full 656-test suite, public validation, focused tests, ShellCheck, compilation, and diff checks pass. The live setup/token-generation step was not executed.
+- 2026-08-02 — Implemented the canonical Proxmox provider-secret handoff: the explicit `secrets.providers.proxmox.api_token` contract delivers only `PROXMOX_VE_API_TOKEN` to an `opentofu-provider` child process, canonical plan/apply invoke the transient wrapper, canonical provider preflight requires the logical path, and dotenv remains compatibility-only. The real dev plan fails closed at the missing encrypted provider-secret path; no credential was fabricated or written.
 
 

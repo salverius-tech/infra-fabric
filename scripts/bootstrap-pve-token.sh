@@ -5,6 +5,13 @@ set -euo pipefail
 source "$(dirname "$0")/site-context.sh"
 values_dir="$(site_values_dir)"
 env_file="${values_dir}/.env"
+canonical_site=false
+if [[ -f "${values_dir}/site.yaml" ]]; then
+  canonical_site=true
+fi
+canonical_bundle="${values_dir}/secrets.sops.yaml"
+canonical_key_file="${SOPS_AGE_KEY_FILE:-}"
+canonical_secret_path="secrets.providers.proxmox.api_token"
 force=0
 if_needed=0
 
@@ -17,9 +24,10 @@ Interactively bootstrap a Proxmox API token for this repo:
   - verifies root SSH key access and pveum availability
   - creates/updates a dedicated Proxmox user ACL
   - creates an API token
-  - writes PROXMOX_VE_ENDPOINT, PROXMOX_VE_API_TOKEN, and PVE_HOST to values/.env
+  - canonical sites write the API token to the encrypted SOPS bundle
+  - legacy sites write PROXMOX_VE_ENDPOINT, PROXMOX_VE_API_TOKEN, and PVE_HOST to values/.env
 
-The token secret is written only to values/.env and is not printed.
+The token secret is never printed. Canonical sites store it only in SOPS.
 USAGE
 }
 
@@ -105,17 +113,38 @@ validate_user_id() {
   [[ "$user" =~ ^[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+$ ]]
 }
 
-require_file "$env_file"
+if [[ "${canonical_site}" != true ]]; then
+  require_file "$env_file"
+fi
 
-current_token="$(get_env_value PROXMOX_VE_API_TOKEN || true)"
-current_endpoint="$(get_env_value PROXMOX_VE_ENDPOINT || true)"
-current_pve_host="$(get_env_value PVE_HOST || true)"
-if [[ "$if_needed" -eq 1 && "$force" -eq 0 ]] && \
-  ! is_placeholder_token "$current_token" && \
-  [[ -n "$current_endpoint" && "$current_endpoint" != *REPLACE* ]] && \
-  [[ -n "$current_pve_host" && "$current_pve_host" != *REPLACE* ]]; then
-  printf 'Proxmox API endpoint, token, and SSH target already configured in %s; skipping bootstrap wizard.\n' "$env_file"
-  exit 0
+if [[ "${canonical_site}" == true ]]; then
+  require_file "${canonical_bundle}"
+  if [[ -z "${canonical_key_file}" || ! -r "${canonical_key_file}" ]]; then
+    printf 'Canonical SOPS age identity is missing or unreadable.\n' >&2
+    exit 1
+  fi
+fi
+
+if [[ "${canonical_site}" == true ]]; then
+  if [[ "$if_needed" -eq 1 && "$force" -eq 0 ]] && \
+    python scripts/canonical-secret-set.py --bundle "${canonical_bundle}" --path "${canonical_secret_path}" --check >/dev/null 2>&1; then
+    printf 'Proxmox API token already exists in the canonical SOPS bundle; skipping bootstrap wizard.\n'
+    exit 0
+  fi
+  current_token=""
+  current_endpoint="$(python -c 'import sys; from ruamel.yaml import YAML; data=YAML(typ="safe").load(open(sys.argv[1])); print(data.get("platform", {}).get("proxmox", {}).get("endpoint", ""))' "${values_dir}/site.yaml")"
+  current_pve_host="$(python -c 'import sys; from ruamel.yaml import YAML; data=YAML(typ="safe").load(open(sys.argv[1])); print(data.get("platform", {}).get("proxmox", {}).get("management", {}).get("host", ""))' "${values_dir}/site.yaml")"
+else
+  current_token="$(get_env_value PROXMOX_VE_API_TOKEN || true)"
+  current_endpoint="$(get_env_value PROXMOX_VE_ENDPOINT || true)"
+  current_pve_host="$(get_env_value PVE_HOST || true)"
+  if [[ "$if_needed" -eq 1 && "$force" -eq 0 ]] && \
+    ! is_placeholder_token "$current_token" && \
+    [[ -n "$current_endpoint" && "$current_endpoint" != *REPLACE* ]] && \
+    [[ -n "$current_pve_host" && "$current_pve_host" != *REPLACE* ]]; then
+    printf 'Proxmox API endpoint, token, and SSH target already configured in %s; skipping bootstrap wizard.\n' "$env_file"
+    exit 0
+  fi
 fi
 
 if [[ ! -t 0 || ! -t 1 ]]; then
@@ -123,7 +152,7 @@ if [[ ! -t 0 || ! -t 1 ]]; then
   exit 0
 fi
 
-if [[ "$force" -eq 0 ]] && ! is_placeholder_token "$current_token"; then
+if [[ "${canonical_site}" != true && "$force" -eq 0 ]] && ! is_placeholder_token "$current_token"; then
   printf 'A Proxmox API token is already configured in %s.\n' "$env_file"
   if ! confirm 'Rotate/replace it now?'; then
     exit 0
@@ -163,6 +192,17 @@ if [[ -z "$pve_role" ]]; then
 fi
 
 ssh_identity_file=""
+if [[ -n "${INFRA_SSH_IDENTITY_FILE:-}" ]]; then
+  if [[ ! "${INFRA_SSH_IDENTITY_FILE}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    printf 'INFRA_SSH_IDENTITY_FILE is invalid.\n' >&2
+    exit 1
+  fi
+  ssh_identity_file="${HOME}/.ssh/${INFRA_SSH_IDENTITY_FILE}"
+  if [[ ! -f "${ssh_identity_file}" ]]; then
+    printf 'Configured SSH identity is unavailable: %s\n' "${INFRA_SSH_IDENTITY_FILE}" >&2
+    exit 1
+  fi
+fi
 
 ssh_run() {
   local batch_mode="$1"
@@ -257,9 +297,9 @@ remote_script='set -euo pipefail
 user="$1"
 token="$2"
 role="$3"
-comment="homelab-infra OpenTofu token"
+comment="infra-fabric OpenTofu token"
 if ! pveum user list | grep -Fq "$user"; then
-  pveum user add "$user" --comment "homelab-infra OpenTofu service user"
+  pveum user add "$user" --comment "infra-fabric OpenTofu service user"
 fi
 pveum acl modify / --users "$user" --roles "$role"
 if pveum user token list "$user" 2>/dev/null | grep -Fq "$token"; then
@@ -279,9 +319,22 @@ if [[ -z "$secret" ]]; then
   exit 1
 fi
 
-set_env_var PROXMOX_VE_ENDPOINT "$api_endpoint"
-set_env_var PROXMOX_VE_API_TOKEN "${pve_user}!${token_id}=${secret}"
-set_env_var PVE_HOST "$ssh_target"
-
-printf 'Wrote Proxmox endpoint, API token, and SSH target to %s.\n' "$env_file"
+if [[ "${canonical_site}" == true ]]; then
+  secret_set_args=()
+  if [[ "$force" -eq 1 ]]; then
+    secret_set_args+=(--replace)
+  fi
+  CANONICAL_VALUE="${pve_user}!${token_id}=${secret}" \
+    python scripts/canonical-secret-set.py \
+      --bundle "${canonical_bundle}" \
+      --path "${canonical_secret_path}" \
+      --value-env CANONICAL_VALUE \
+      "${secret_set_args[@]}"
+  printf 'Wrote the Proxmox API token to the canonical encrypted SOPS bundle.\n'
+else
+  set_env_var PROXMOX_VE_ENDPOINT "$api_endpoint"
+  set_env_var PROXMOX_VE_API_TOKEN "${pve_user}!${token_id}=${secret}"
+  set_env_var PVE_HOST "$ssh_target"
+  printf 'Wrote Proxmox endpoint, API token, and SSH target to %s.\n' "$env_file"
+fi
 printf 'Token secret was not printed. Next: edit remaining values files, then run just validate.\n'

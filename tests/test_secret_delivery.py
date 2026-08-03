@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1] / "scripts"
 for name in ("secret_provider", "secret_delivery"):
@@ -13,6 +14,12 @@ for name in ("secret_provider", "secret_delivery"):
     sys.modules[name] = module
     spec.loader.exec_module(module)
 secret_delivery = sys.modules["secret_delivery"]
+
+service_catalog_spec = importlib.util.spec_from_file_location("service_catalog", ROOT / "service_catalog.py")
+assert service_catalog_spec and service_catalog_spec.loader
+service_catalog = importlib.util.module_from_spec(service_catalog_spec)
+sys.modules["service_catalog"] = service_catalog
+service_catalog_spec.loader.exec_module(service_catalog)
 
 
 class FakeProvider:
@@ -94,6 +101,26 @@ class SecretDeliveryTests(unittest.TestCase):
         self.assertEqual(delivered.environment_name, "INFRA_BOOTSTRAP_ROOT_PASSWORD")
         self.assertEqual(delivered.value, "SENTINEL")
 
+    def test_proxmox_provider_contract_delivers_api_token_only_to_opentofu(self) -> None:
+        provider = FakeProvider({secret_delivery.PROXMOX_PROVIDER_PATH: "TOKEN"})
+        requirements = secret_delivery.provider_requirements()
+        environment = secret_delivery.deliver_environment(
+            provider,
+            consumer="opentofu-provider",
+            requirements=requirements,
+        )
+        self.assertEqual(environment, {"PROXMOX_VE_API_TOKEN": "TOKEN"})
+        with self.assertRaises(secret_delivery.SecretDeliveryError):
+            secret_delivery.deliver_environment(
+                provider,
+                consumer="ansible-bootstrap",
+                requirements=requirements,
+            )
+
+    def test_provider_contract_rejects_unsupported_provider(self) -> None:
+        with self.assertRaisesRegex(secret_delivery.SecretDeliveryError, "unsupported canonical provider"):
+            secret_delivery.provider_requirements("unknown")
+
     def test_delivery_rejects_multiline_environment_values(self) -> None:
         provider = FakeProvider({"secrets.bootstrap.root_password": "line1\nline2"})
         with self.assertRaisesRegex(secret_delivery.SecretDeliveryError, "multiline"):
@@ -119,30 +146,63 @@ class SecretDeliveryTests(unittest.TestCase):
             )
 
     def test_service_delivery_is_scoped_to_selected_services(self) -> None:
+        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        services = {"forgejo": SimpleNamespace(enabled=True, configuration={})}
+        requirements = secret_delivery.requirements_for_model(catalog, services)
         provider = FakeProvider(
             {
                 "secrets.bootstrap.root_password": "ROOT",
-                **{requirement.path: f"VALUE_{requirement.environment_name}" for requirement in secret_delivery.SERVICE_REQUIREMENTS if requirement.service == "forgejo"},
+                **{requirement.path: f"VALUE_{requirement.environment_name}" for requirement in requirements},
             }
         )
-        environment = secret_delivery.deliver_services_environment(provider, ["forgejo"])
+        environment = secret_delivery.deliver_services_environment(provider, catalog, services)
         self.assertEqual(environment["INFRA_BOOTSTRAP_ROOT_PASSWORD"], "ROOT")
         self.assertEqual(environment["FORGEJO_SECRET_KEY"], "VALUE_FORGEJO_SECRET_KEY")
         self.assertNotIn("HERMES_CONTROL_API_TOKEN", environment)
 
+    def test_catalog_model_requirements_use_service_owned_paths_and_feature_conditions(self) -> None:
+        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        services = {
+            "hermes": SimpleNamespace(
+                enabled=True,
+                configuration={"control": {"enabled": True}, "dashboard": {"enabled": False}},
+            )
+        }
+
+        requirements = secret_delivery.requirements_for_model(catalog, services)
+
+        self.assertEqual(
+            {requirement.path for requirement in requirements},
+            {
+                "services.hermes.secrets.control_api_token",
+                "services.hermes.secrets.control_bridge_token",
+            },
+        )
+        self.assertEqual(
+            {requirement.environment_name for requirement in requirements},
+            {"HERMES_CONTROL_API_TOKEN", "HERMES_CONTROL_BRIDGE_TOKEN"},
+        )
+
     def test_service_delivery_requires_every_selected_contract_secret(self) -> None:
+        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        services = {"forgejo": SimpleNamespace(enabled=True, configuration={})}
         provider = FakeProvider({"secrets.bootstrap.root_password": "ROOT"})
         with self.assertRaises(secret_delivery.SecretDeliveryError):
-            secret_delivery.deliver_services_environment(provider, ["forgejo"])
+            secret_delivery.deliver_services_environment(provider, catalog, services)
 
     def test_service_without_runtime_secrets_keeps_bootstrap_only(self) -> None:
+        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        services = {"technitium": SimpleNamespace(enabled=True, configuration={})}
         provider = FakeProvider({"secrets.bootstrap.root_password": "ROOT"})
-        environment = secret_delivery.deliver_services_environment(provider, ["technitium"])
+        environment = secret_delivery.deliver_services_environment(provider, catalog, services)
         self.assertEqual(environment, {"INFRA_BOOTSTRAP_ROOT_PASSWORD": "ROOT"})
 
-    def test_all_contract_secrets_forbid_state_exposure(self) -> None:
-        self.assertTrue(secret_delivery.ALL_REQUIREMENTS)
-        self.assertTrue(all(requirement.state_exposure == "forbidden" for requirement in secret_delivery.ALL_REQUIREMENTS))
+    def test_model_contract_secrets_forbid_state_exposure(self) -> None:
+        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        services = {"forgejo": SimpleNamespace(enabled=True, configuration={})}
+        requirements = secret_delivery.requirements_for_model(catalog, services)
+        self.assertTrue(requirements)
+        self.assertTrue(all(requirement.state_exposure == "forbidden" for requirement in requirements))
 
     def test_delivery_rejects_wrong_consumer(self) -> None:
         provider = FakeProvider({"secrets.bootstrap.root_password": "SENTINEL"})

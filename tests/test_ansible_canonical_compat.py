@@ -30,6 +30,10 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         }
         self.assertNotIn("_meta", inventory)
         self.assertIsInstance(inventory["all"]["children"], dict)
+        self.assertEqual(
+            inventory["all"]["vars"]["ansible_ssh_common_args"],
+            "-o UserKnownHostsFile=/workspace/values/sites/dev/ansible/known_hosts -o StrictHostKeyChecking=yes",
+        )
         enabled = {name for name, service in self.model.services.items() if service.enabled}
         self.assertEqual(set(inventory["all"]["children"]), {self.catalog.get(name).inventory["group"] for name in enabled})
         for name in enabled:

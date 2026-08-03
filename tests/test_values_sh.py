@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-import json
+
 import subprocess
 import tempfile
 import unittest
@@ -41,10 +41,10 @@ class ValuesScriptTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             site = values / "sites" / "dev"
             self.assertTrue((site / "site.yaml").is_file())
-            self.assertEqual(
-                json.loads((site / "site.json").read_text(encoding="utf-8"))["services"],
-                ["technitium", "forgejo"],
-            )
+            self.assertFalse((site / "site.json").exists())
+            self.assertFalse((site / "terraform.tfvars").exists())
+            self.assertFalse((site / "dns-records.local.json").exists())
+            self.assertFalse((site / "ansible" / "inventory" / "local.yml").exists())
             original = (site / "site.yaml").read_bytes()
             (site / "site.yaml").write_bytes(b"operator-edited\n")
 

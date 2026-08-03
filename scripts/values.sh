@@ -68,22 +68,17 @@ case "${command_name}" in
     install -d -m 0755 "${values_dir}"
     copy_if_missing "${template_dir}/README.md" "${values_root}/README.md"
     copy_if_missing "${template_dir}/.env.example" "${values_dir}/.env"
-    copy_if_missing "${template_dir}/terraform.tfvars" "${values_dir}/terraform.tfvars"
-    copy_if_missing "${template_dir}/dns-records.local.json" "${values_dir}/dns-records.local.json"
-    copy_if_missing "${template_dir}/ansible/inventory/local.yml" "${values_dir}/ansible/inventory/local.yml"
     if [[ -n "${site}" ]]; then
-      site_template="${template_dir}/sites/${site}/site.json"
-      if [[ ! -f "${site_template}" ]]; then
-        printf 'Missing site scaffold: %s\n' "${site_template}" >&2
-        exit 1
-      fi
-      copy_if_missing "${site_template}" "${values_dir}/site.json"
       site_yaml_template="${template_dir}/sites/${site}/site.yaml"
       if [[ ! -f "${site_yaml_template}" ]]; then
         printf 'Missing canonical site scaffold: %s\n' "${site_yaml_template}" >&2
         exit 1
       fi
       copy_if_missing "${site_yaml_template}" "${values_dir}/site.yaml"
+    else
+      copy_if_missing "${template_dir}/terraform.tfvars" "${values_dir}/terraform.tfvars"
+      copy_if_missing "${template_dir}/dns-records.local.json" "${values_dir}/dns-records.local.json"
+      copy_if_missing "${template_dir}/ansible/inventory/local.yml" "${values_dir}/ansible/inventory/local.yml"
     fi
     if [[ ! -d "${values_root}/.git" ]]; then
       git -C "${values_root}" init
@@ -113,10 +108,14 @@ case "${command_name}" in
   check)
     require_values
     missing=0
-    required_paths=(.env terraform.tfvars dns-records.local.json ansible/inventory/local.yml)
-  if [[ -n "${site}" ]]; then
-    required_paths+=(site.json)
-  fi
+    if [[ -n "${site}" && -f "${values_dir}/site.yaml" ]]; then
+      required_paths=(site.yaml .sops.yaml secrets.sops.yaml)
+    else
+      required_paths=(.env terraform.tfvars dns-records.local.json ansible/inventory/local.yml)
+      if [[ -n "${site}" ]]; then
+        required_paths+=(site.json)
+      fi
+    fi
   for path in "${required_paths[@]}"; do
       if [[ ! -f "${values_dir}/${path}" ]]; then
         printf 'Missing %s/%s\n' "${values_dir}" "${path}" >&2

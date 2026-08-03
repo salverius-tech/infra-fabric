@@ -84,6 +84,23 @@
     group: "{{ host_identity_operator_user }}"
     mode: '0600'
 
+- name: Install host identity prerequisite packages
+  become: true
+  ansible.builtin.package:
+    name:
+      - sudo
+      - git
+    state: present
+
+- name: Ensure sudoers directory exists
+  become: true
+  ansible.builtin.file:
+    path: /etc/sudoers.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
 - name: Install passwordless sudo policy for automation
   become: true
   ansible.builtin.copy:
@@ -97,7 +114,7 @@
 - name: Install authenticated full sudo policy for operator
   become: true
   ansible.builtin.copy:
-    dest: /etc/sudoers.d/systemboss
+    dest: "/etc/sudoers.d/{{ host_identity_operator_user }}"
     content: "{{ host_identity_operator_user }} ALL=(ALL:ALL) ALL\n"
     owner: root
     group: root
@@ -110,6 +127,15 @@
     state: directory
     prefix: host-identity-chezmoi-
   register: host_identity_workspace
+  when: host_identity_dotfiles_enabled | bool
+
+- name: Make temporary chezmoi workspace traversable
+  become: true
+  ansible.builtin.file:
+    path: "{{ host_identity_workspace.path }}"
+    owner: root
+    group: root
+    mode: '0755'
   when: host_identity_dotfiles_enabled | bool
 
 - name: Download pinned chezmoi archive
@@ -152,21 +178,59 @@
     single_branch: true
   when: host_identity_dotfiles_enabled | bool
 
-- name: Apply pinned operator dotfiles as systemboss
+- name: Apply pinned operator dotfiles as {{ host_identity_operator_user }}
   become: true
-  become_user: "{{ host_identity_operator_user }}"
-  ansible.builtin.command:
-    argv:
-      - /usr/local/bin/chezmoi
-      - init
-      - --apply
-      - --source
-      - "{{ host_identity_workspace.path }}/dotfiles"
-  environment:
-    HOME: "{{ host_identity_operator_home }}"
-  changed_when: true
   when: host_identity_dotfiles_enabled | bool
+  block:
+    - name: Hand dotfiles source to {{ host_identity_operator_user }}
+      ansible.builtin.file:
+        path: "{{ host_identity_workspace.path }}/dotfiles"
+        owner: "{{ host_identity_operator_user }}"
+        group: "{{ host_identity_operator_user }}"
+        recurse: true
 
+    - name: Temporarily allow passwordless sudo for dotfiles installation
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ host_identity_operator_user }}-bootstrap"
+        content: "{{ host_identity_operator_user }} ALL=(ALL:ALL) NOPASSWD: ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Run chezmoi as {{ host_identity_operator_user }}
+      become: true
+      become_user: "{{ host_identity_operator_user }}"
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/chezmoi
+          - init
+          - --apply
+          - --exclude
+          - scripts
+          - --source
+          - "{{ host_identity_workspace.path }}/dotfiles"
+      environment:
+        HOME: "{{ host_identity_operator_home }}"
+        CI: "true"
+        DEBIAN_FRONTEND: noninteractive
+        GIT_TERMINAL_PROMPT: "0"
+        NEEDRESTART_MODE: a
+      timeout: 300
+      changed_when: true
+  always:
+    - name: Restore protected operator sudo policy
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ host_identity_operator_user }}"
+        content: "{{ host_identity_operator_user }} ALL=(ALL:ALL) ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+        validate: /usr/sbin/visudo -cf %s
+    - name: Remove temporary passwordless sudo policy
+      ansible.builtin.file:
+        path: "/etc/sudoers.d/{{ host_identity_operator_user }}-bootstrap"
+        state: absent
 - name: Remove temporary chezmoi workspace
   become: true
   ansible.builtin.file:

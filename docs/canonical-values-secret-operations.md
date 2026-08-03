@@ -44,13 +44,18 @@ policy until the private workflow supplies the real recipient.
 4. Verify the ciphertext hash and a value-free required-secret report. Never use a
    secret value or sentinel as an identity check.
 
-For canonical SSH execution, add the matching unencrypted-at-runtime private key
-under `secrets.bootstrap.ssh_private_key` through the approved SOPS editing
-workflow. The key may be encrypted at rest by SOPS, but it must not require an
-interactive SSH passphrase after SOPS decryption. The canonical workflow derives
-its public half with `ssh-keygen -y` and fails closed unless it matches one of the
-declared bootstrap public keys. Do not add the private key to projections or copy
-it through the ordinary service-secret environment boundary.
+For a new canonical site, `just setup "" <site>` creates only public-safe
+scaffolding. It deliberately defers bootstrap credential initialization until
+the operator has supplied the site SOPS policy and external age identity. The
+standalone `just ssh-initialize SITE=<site>` recipe is the explicit
+secret-dependent setup/repair operation. It is never called by setup,
+validation, planning, or apply.
+
+The key may be encrypted at rest by SOPS, but it must not require an interactive
+SSH passphrase after SOPS decryption. The canonical workflow derives its public
+half with `ssh-keygen -y` and fails closed unless it matches one of the declared
+bootstrap public keys. Do not add the private key to projections or copy it
+through the ordinary service-secret environment boundary.
 
 For a private deployment policy, preflight can receive the policy metadata through
 the operator environment without committing it to this repository:

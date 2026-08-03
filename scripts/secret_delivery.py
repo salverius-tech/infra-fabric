@@ -36,10 +36,13 @@ class DeliveredSecret:
 
 
 BOOTSTRAP_SSH_PRIVATE_KEY_PATH = "secrets.bootstrap.ssh_private_key"
+PROXMOX_PROVIDER_PATH = "secrets.providers.proxmox.api_token"
 _ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
-# Environment names are explicit policy, never inferred from logical paths.
+# Environment names are explicit consumer bindings, never inferred from logical
+# paths. Service bindings live beside the service's canonical requirement in the
+# catalog; this module only turns that combined model into transient delivery.
 DEFAULT_REQUIREMENTS: tuple[SecretRequirement, ...] = (
     SecretRequirement(
         "secrets.bootstrap.root_password",
@@ -62,39 +65,17 @@ OPERATOR_REQUIREMENTS: tuple[SecretRequirement, ...] = (
 )
 
 
-def _service_requirement(service: str, key: str, environment_name: str) -> SecretRequirement:
-    return SecretRequirement(
-        f"secrets.services.{service}.{key}",
-        "runtime",
-        frozenset({f"ansible-service:{service}"}),
-        environment_name,
-        service,
-        "forbidden",
-    )
-
-
-SERVICE_REQUIREMENTS: tuple[SecretRequirement, ...] = (
-    _service_requirement("forgejo", "bootstrap_admin_password", "FORGEJO_ADMIN_PASSWORD"),
-    _service_requirement("forgejo", "bootstrap_owner_password", "FORGEJO_REPO_OWNER_PASSWORD"),
-    _service_requirement("forgejo", "internal_token", "FORGEJO_INTERNAL_TOKEN"),
-    _service_requirement("forgejo", "lfs_jwt_secret", "FORGEJO_LFS_JWT_SECRET"),
-    _service_requirement("forgejo", "oauth2_jwt_secret", "FORGEJO_OAUTH2_JWT_SECRET"),
-    _service_requirement("forgejo", "postgres_password", "FORGEJO_POSTGRES_PASSWORD"),
-    _service_requirement("forgejo", "secret_key", "FORGEJO_SECRET_KEY"),
-    _service_requirement("forgejo_runner", "registration_secret", "FORGEJO_RUNNER_REGISTRATION_SECRET"),
-    _service_requirement("hermes", "control_api_token", "HERMES_CONTROL_API_TOKEN"),
-    _service_requirement("hermes", "control_bridge_token", "HERMES_CONTROL_BRIDGE_TOKEN"),
-    _service_requirement("hermes", "dashboard_basic_auth_password_hash", "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH"),
-    _service_requirement("hermes", "dashboard_basic_auth_secret", "HERMES_DASHBOARD_BASIC_AUTH_SECRET"),
-    _service_requirement("infisical", "auth_secret", "INFISICAL_AUTH_SECRET"),
-    _service_requirement("infisical", "encryption_key", "INFISICAL_ENCRYPTION_KEY"),
-    _service_requirement("infisical", "postgres_password", "INFISICAL_POSTGRES_PASSWORD"),
-    _service_requirement("searxng_onramp", "secret_key", "SEARXNG_SECRET_KEY"),
-    _service_requirement("tailscale_client", "auth_key", "TS_AUTHKEY"),
-    _service_requirement("caddy", "cloudflare_api_token", "CLOUDFLARE_API_TOKEN"),
+PROVIDER_REQUIREMENTS: tuple[SecretRequirement, ...] = (
+    SecretRequirement(
+        PROXMOX_PROVIDER_PATH,
+        "provider",
+        frozenset({"opentofu-provider"}),
+        "PROXMOX_VE_API_TOKEN",
+        state_exposure="forbidden",
+    ),
 )
 
-ALL_REQUIREMENTS = DEFAULT_REQUIREMENTS + OPERATOR_REQUIREMENTS + SERVICE_REQUIREMENTS
+ALL_REQUIREMENTS = DEFAULT_REQUIREMENTS + OPERATOR_REQUIREMENTS + PROVIDER_REQUIREMENTS
 
 
 def operator_password_requirements() -> tuple[SecretRequirement, ...]:
@@ -131,9 +112,51 @@ def root_password_requirements(
     )
 
 
-def requirements_for_services(services: list[str] | tuple[str, ...]) -> tuple[SecretRequirement, ...]:
-    selected = set(services)
-    return DEFAULT_REQUIREMENTS + tuple(requirement for requirement in SERVICE_REQUIREMENTS if requirement.service in selected)
+def requirements_for_model(
+    catalog: object,
+    services: Mapping[str, object],
+    *,
+    selected_services: list[str] | tuple[str, ...] | None = None,
+) -> tuple[SecretRequirement, ...]:
+    """Derive active service delivery requirements from the canonical model.
+
+    The catalog evaluates feature conditions against the model. Its per-service
+    bindings provide the only mapping from an approved logical path to a
+    consumer environment name; no legacy path table is retained here.
+    """
+    enabled = {name for name, service in services.items() if getattr(service, "enabled", False)}
+    selected = set(selected_services or enabled)
+    if not selected <= enabled:
+        raise SecretDeliveryError("requested service is not enabled in the canonical model")
+    active_paths = catalog.required_secret_paths_for_model(dict(services))
+    requirements: list[SecretRequirement] = []
+    for service in sorted(selected):
+        capability = catalog.get(service)
+        for path in capability.required_secrets:
+            if path not in active_paths:
+                continue
+            try:
+                environment_name = capability.secret_environment[path]
+            except KeyError as error:
+                raise SecretDeliveryError("service secret has no catalog environment binding") from error
+            requirements.append(
+                SecretRequirement(
+                    path,
+                    capability.secret_classifications.get(path, "runtime"),
+                    frozenset({f"ansible-service:{service}"}),
+                    environment_name,
+                    service,
+                    "forbidden",
+                )
+            )
+    return tuple(requirements)
+
+
+def provider_requirements(provider: str = "proxmox") -> tuple[SecretRequirement, ...]:
+    """Return the explicit canonical provider credential contract."""
+    if provider != "proxmox":
+        raise SecretDeliveryError("unsupported canonical provider")
+    return PROVIDER_REQUIREMENTS
 
 
 def requirement_index(
@@ -200,20 +223,21 @@ def deliver_environment(
 
 def deliver_services_environment(
     provider: SecretProvider,
-    services: list[str] | tuple[str, ...],
+    catalog: object,
+    services: Mapping[str, object],
     *,
+    selected_services: list[str] | tuple[str, ...] | None = None,
     bootstrap_requirements: tuple[SecretRequirement, ...] = DEFAULT_REQUIREMENTS,
 ) -> dict[str, str]:
-    """Resolve bootstrap plus only the runtime secrets required by selected services."""
+    """Resolve bootstrap plus model-derived runtime secrets for selected services."""
     environment = deliver_environment(provider, consumer="ansible-bootstrap", requirements=bootstrap_requirements)
-    for service in services:
-        service_requirements = requirements_for_services([service])
-        if not any(requirement.service == service for requirement in service_requirements):
-            continue
+    service_requirements = requirements_for_model(catalog, services, selected_services=selected_services)
+    for service in sorted({requirement.service for requirement in service_requirements if requirement.service is not None}):
+        requirements = tuple(requirement for requirement in service_requirements if requirement.service == service)
         delivered = deliver_environment(
             provider,
             consumer=f"ansible-service:{service}",
-            requirements=service_requirements,
+            requirements=requirements,
         )
         for name, value in delivered.items():
             if name in environment and environment[name] != value:
@@ -229,7 +253,8 @@ __all__ = [
     "ALL_REQUIREMENTS",
     "BOOTSTRAP_SSH_PRIVATE_KEY_PATH",
     "DEFAULT_REQUIREMENTS",
-    "SERVICE_REQUIREMENTS",
+    "PROVIDER_REQUIREMENTS",
+    "PROXMOX_PROVIDER_PATH",
     "DeliveredSecret",
     "SecretDeliveryError",
     "SecretRequirement",
@@ -240,5 +265,6 @@ __all__ = [
     "requirement_index",
     "root_password_requirements",
     "root_password_secret_path",
-    "requirements_for_services",
+    "requirements_for_model",
+    "provider_requirements",
 ]

@@ -25,7 +25,9 @@ class OperationalCutoverTests(unittest.TestCase):
         apply = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
         self.assertIn('generated/terraform.auto.tfvars.json', plan)
         self.assertIn('enabled_services_args=()', plan)
-        self.assertIn('--canonical-ansible', apply)
+        self.assertIn("--canonical-ansible", apply)
+        self.assertIn("canonical-provider-env.py", plan)
+        self.assertIn("canonical-provider-env.py", apply)
         self.assertIn('generated/ansible-inventory.json', apply)
 
     def test_validation_uses_canonical_dns_projection(self) -> None:
@@ -60,6 +62,17 @@ class OperationalCutoverTests(unittest.TestCase):
         block = justfile[start:justfile.index("\n# ", start + 1)]
         self.assertIn("scripts/require-site-context.sh", block)
         self.assertIn("require_canonical_authority", block)
+
+    def test_canonical_setup_defers_secret_initialization_and_lifecycle_never_migrates(self) -> None:
+        justfile = (ROOT / "justfile").read_text(encoding="utf-8")
+        setup = justfile[justfile.index("setup remote"):justfile.index("\n# Show private values", justfile.index("setup remote"))]
+        self.assertNotIn("just ssh-initialize", setup)
+        self.assertIn("Skipping bootstrap credential initialization for canonical site", setup)
+        for recipe in ("validate-values:", "plan:\n", "apply:\n"):
+            start = justfile.index(recipe)
+            next_recipe = justfile.find("\n# ", start + 1)
+            block = justfile[start:] if next_recipe < 0 else justfile[start:next_recipe]
+            self.assertNotIn("migrate-values.py", block, recipe)
 
 
 if __name__ == "__main__":

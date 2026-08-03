@@ -2659,6 +2659,30 @@ class LegacyValuesDiscoveryTests(unittest.TestCase):
                 runtime_importer_admission=legacy_values_discovery.runtime_importer_admission(report),
             )
 
+    def test_candidate_assessment_continues_after_undeclared_resource(self) -> None:
+        report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
+        report.observations.extend(
+            [
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "mapped_platform", "mapped", "platform.proxmox.node", "str", "pve"
+                ),
+                legacy_values_discovery.FieldObservation(
+                    "tfvars", "infisical_vmid", "mapped", "resources.guests.infisical.identity.vmid", "int", 108
+                ),
+            ]
+        )
+
+        assessment = legacy_values_discovery.assess_candidate_mapping(
+            report,
+            base_document={"schema_version": 1, "resources": {"guests": {}}},
+        )
+
+        self.assertEqual(assessment["mapped_path_count"], 1)
+        self.assertEqual(
+            assessment["review_required"],
+            [{"key": "infisical_vmid", "path": "resources.guests.infisical.identity.vmid", "reason": "resource is not declared in the approved base document"}],
+        )
+
     def test_undeclared_static_expected_address_is_rejected(self) -> None:
         report = legacy_values_discovery.DiscoveryReport(values_dir="/tmp/values")
         report.observations.extend(

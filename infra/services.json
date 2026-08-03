@@ -61,6 +61,33 @@
         "infra/ansible/playbooks/forgejo.yml"
       ],
       "dependencies": [],
+      "required_secrets": [
+        "services.forgejo.secrets.bootstrap_admin_password",
+        "services.forgejo.secrets.bootstrap_owner_password",
+        "services.forgejo.secrets.internal_token",
+        "services.forgejo.secrets.lfs_jwt_secret",
+        "services.forgejo.secrets.oauth2_jwt_secret",
+        "services.forgejo.secrets.postgres_password",
+        "services.forgejo.secrets.secret_key"
+      ],
+      "secret_classifications": {
+        "services.forgejo.secrets.bootstrap_admin_password": "runtime",
+        "services.forgejo.secrets.bootstrap_owner_password": "runtime",
+        "services.forgejo.secrets.internal_token": "runtime",
+        "services.forgejo.secrets.lfs_jwt_secret": "runtime",
+        "services.forgejo.secrets.oauth2_jwt_secret": "runtime",
+        "services.forgejo.secrets.postgres_password": "runtime",
+        "services.forgejo.secrets.secret_key": "runtime"
+      },
+      "secret_environment": {
+        "services.forgejo.secrets.bootstrap_admin_password": "FORGEJO_ADMIN_PASSWORD",
+        "services.forgejo.secrets.bootstrap_owner_password": "FORGEJO_REPO_OWNER_PASSWORD",
+        "services.forgejo.secrets.internal_token": "FORGEJO_INTERNAL_TOKEN",
+        "services.forgejo.secrets.lfs_jwt_secret": "FORGEJO_LFS_JWT_SECRET",
+        "services.forgejo.secrets.oauth2_jwt_secret": "FORGEJO_OAUTH2_JWT_SECRET",
+        "services.forgejo.secrets.postgres_password": "FORGEJO_POSTGRES_PASSWORD",
+        "services.forgejo.secrets.secret_key": "FORGEJO_SECRET_KEY"
+      },
       "inventory": {
         "host": "forgejo_lxc",
         "group": "forgejo",
@@ -112,6 +139,9 @@
         "infra/ansible/playbooks/tailscale-client.yml"
       ],
       "dependencies": [],
+      "required_secrets": ["services.tailscale_client.secrets.auth_key"],
+      "secret_classifications": {"services.tailscale_client.secrets.auth_key": "runtime"},
+      "secret_environment": {"services.tailscale_client.secrets.auth_key": "TS_AUTHKEY"},
       "inventory": {
         "host": "tailscale_client",
         "group": "tailscale_client",
@@ -150,6 +180,9 @@
       "dependencies": [
         "forgejo"
       ],
+      "required_secrets": ["services.forgejo_runner.secrets.registration_secret"],
+      "secret_classifications": {"services.forgejo_runner.secrets.registration_secret": "runtime"},
+      "secret_environment": {"services.forgejo_runner.secrets.registration_secret": "FORGEJO_RUNNER_REGISTRATION_SECRET"},
       "inventory": {
         "host": "forgejo_runner_lxc",
         "group": "forgejo_runner",
@@ -187,6 +220,21 @@
         "infra/ansible/playbooks/infisical.yml"
       ],
       "dependencies": [],
+      "required_secrets": [
+        "services.infisical.secrets.auth_secret",
+        "services.infisical.secrets.encryption_key",
+        "services.infisical.secrets.postgres_password"
+      ],
+      "secret_classifications": {
+        "services.infisical.secrets.auth_secret": "runtime",
+        "services.infisical.secrets.encryption_key": "runtime",
+        "services.infisical.secrets.postgres_password": "runtime"
+      },
+      "secret_environment": {
+        "services.infisical.secrets.auth_secret": "INFISICAL_AUTH_SECRET",
+        "services.infisical.secrets.encryption_key": "INFISICAL_ENCRYPTION_KEY",
+        "services.infisical.secrets.postgres_password": "INFISICAL_POSTGRES_PASSWORD"
+      },
       "inventory": {
         "host": "infisical_lxc",
         "group": "infisical",
@@ -269,6 +317,12 @@
         "services.hermes.secrets.control_bridge_token": "runtime",
         "services.hermes.secrets.dashboard_basic_auth_password_hash": "runtime",
         "services.hermes.secrets.dashboard_basic_auth_secret": "runtime"
+      },
+      "secret_environment": {
+        "services.hermes.secrets.control_api_token": "HERMES_CONTROL_API_TOKEN",
+        "services.hermes.secrets.control_bridge_token": "HERMES_CONTROL_BRIDGE_TOKEN",
+        "services.hermes.secrets.dashboard_basic_auth_password_hash": "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
+        "services.hermes.secrets.dashboard_basic_auth_secret": "HERMES_DASHBOARD_BASIC_AUTH_SECRET"
       },
       "conditional_required_secrets": {
         "configuration.control.enabled": [
@@ -383,6 +437,9 @@
       "dependencies": [
         "onramp_host"
       ],
+      "required_secrets": ["services.searxng_onramp.secrets.secret_key"],
+      "secret_classifications": {"services.searxng_onramp.secrets.secret_key": "runtime"},
+      "secret_environment": {"services.searxng_onramp.secrets.secret_key": "SEARXNG_SECRET_KEY"},
       "release": {
         "source": "container",
         "legacy_image_var": "searxng_container_image",

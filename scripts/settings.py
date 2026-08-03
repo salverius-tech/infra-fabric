@@ -198,10 +198,21 @@ def canonical_site_policy(action: str) -> None:
         context = from_environment()
         if context.site is None:
             raise SettingsError("canonical site policy requires VALUES_SITE")
-        metadata = load_metadata(context)
+        canonical_site_path = context.canonical_site_path
+        if canonical_site_path is not None:
+            from canonical_values import load_site
+
+            canonical_site = load_site(canonical_site_path, expected_site=context.site)
+            metadata = canonical_site.site.model_dump(by_alias=True)
+        else:
+            metadata = load_metadata(context)
     except ValuesContextError as error:
         raise SettingsError(str(error)) from error
-    validate_site_metadata(metadata, context.site, context.metadata_path or DEFAULT_SETTINGS)
+    except Exception as error:
+        if isinstance(error, SettingsError):
+            raise
+        raise SettingsError(str(error)) from error
+    validate_site_metadata(metadata, context.site, canonical_site_path or context.metadata_path or DEFAULT_SETTINGS)
     ensure_site_action_allowed({"site": context.site, "site_metadata": metadata}, action)
 
 

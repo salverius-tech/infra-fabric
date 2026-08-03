@@ -66,6 +66,7 @@ class ServiceCapability:
     dependencies: tuple[str, ...]
     required_secrets: tuple[str, ...]
     secret_classifications: dict[str, SecretClassification]
+    secret_environment: dict[str, str]
     conditional_required_secrets: dict[str, tuple[str, ...]]
     inventory: dict[str, object]
     raw: dict[str, object]
@@ -318,6 +319,18 @@ def load_catalog(path: Path) -> ServiceCatalog:
             raise ServiceCatalogError(
                 f"service {name} secret_classifications must map required paths to supported classifications"
             )
+        secret_environment = raw.get("secret_environment", {})
+        if not isinstance(secret_environment, dict) or any(
+            not isinstance(secret_path, str)
+            or secret_path not in required_secrets
+            or not isinstance(environment_name, str)
+            or not re.fullmatch(r"[A-Z][A-Z0-9_]*", environment_name)
+            for secret_path, environment_name in secret_environment.items()
+        ):
+            raise ServiceCatalogError(
+                f"service {name} secret_environment must map required paths to environment names"
+            )
+
         conditional_required_secrets = raw.get("conditional_required_secrets", {})
         if not isinstance(conditional_required_secrets, dict) or any(
             not isinstance(condition, str)
@@ -379,6 +392,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
             dependencies=tuple(dependencies),
             required_secrets=tuple(required_secrets),
             secret_classifications=dict(secret_classifications),
+            secret_environment=dict(secret_environment),
             conditional_required_secrets=conditional_paths,
             inventory=inventory,
             raw=raw,

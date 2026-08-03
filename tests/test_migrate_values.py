@@ -18,13 +18,13 @@ spec.loader.exec_module(migrate_values)
 
 
 class MigrateValuesTests(unittest.TestCase):
-    def test_main_skips_legacy_mutation_for_canonical_site(self) -> None:
+    def test_main_rejects_legacy_mutation_for_canonical_site(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             values = Path(temp)
             (values / "site.yaml").write_text("schema_version: 1\n", encoding="utf-8")
             with patch.dict(os.environ, {}, clear=True):
                 result = migrate_values.main(["--values-dir", str(values)])
-            self.assertEqual(result, 0)
+            self.assertEqual(result, 1)
             self.assertFalse((values / ".env").exists())
             self.assertFalse((values / "terraform.tfvars").exists())
 
@@ -67,7 +67,7 @@ class MigrateValuesTests(unittest.TestCase):
         return temp, values
 
     def test_ensure_lxc_template_integrity_tfvars_adds_missing_pins(self) -> None:
-        lines = ['debian_template_url = "http://download.proxmox.com/images/system/debian-13-standard_13.1-2_amd64.tar.zst"\n']
+        lines = ['debian_template_url = "http://download.proxmox.com/images/system/debian-13-standard_13.6-1_amd64.tar.zst"\n']
 
         changes = migrate_values.ensure_lxc_template_integrity_tfvars(lines)
 

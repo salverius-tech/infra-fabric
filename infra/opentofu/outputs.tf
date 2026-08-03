@@ -59,8 +59,10 @@ output "infisical_container_vmid" {
 }
 
 output "infisical_lan_ip" {
-  description = "Expected Infisical LAN IP, usually supplied by static DHCP, or null when disabled."
-  value       = local.infisical_enabled ? var.infisical_lan_ip : null
+  description = "Configured Infisical LAN IP without CIDR suffix, or null when disabled."
+  value = local.infisical_enabled ? (
+    var.infisical_container_ipv4_address == "dhcp" ? var.infisical_lan_ip : split("/", var.infisical_container_ipv4_address)[0]
+  ) : null
 }
 
 output "infisical_https_url" {
@@ -76,8 +78,10 @@ output "hermes_container_vmid" {
 }
 
 output "hermes_lan_ip" {
-  description = "Expected Hermes LAN IP, usually supplied by static DHCP, or null when disabled."
-  value       = local.hermes_enabled ? var.hermes_lan_ip : null
+  description = "Configured Hermes LAN IP without CIDR suffix, or null when disabled."
+  value = local.hermes_enabled ? (
+    var.hermes_container_ipv4_address == "dhcp" ? var.hermes_lan_ip : split("/", var.hermes_container_ipv4_address)[0]
+  ) : null
 }
 
 output "hermes_https_url" {

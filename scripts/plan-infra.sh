@@ -19,15 +19,23 @@ fi
 INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh bash -euo pipefail -c '
 equivalence_after_json=""
 equivalence_required="${INFRA_REQUIRE_EQUIVALENCE:-false}"
+umask 077
 python scripts/workspace-preflight.py --require-values --require-secrets
 if [[ ! -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   python scripts/settings.py summary
 fi
-rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"
+for plan_artifact in "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"; do
+  if [[ -e "${plan_artifact}" ]] && [[ $(stat -c "%a" "${plan_artifact}") != "600" ]]; then
+    printf "Removing plan artifact with non-private permissions: %s\\n" "${plan_artifact}" >&2
+    rm -f "${plan_artifact}"
+  fi
+done
 
 generated_tmp=""
 generated_backup=""
 generated_verified=false
+plan_tmp=""
+metadata_tmp=""
 cleanup_generated_tmp() {
   if [[ -n "${generated_tmp}" && -d "${generated_tmp}" ]]; then
     rm -rf "${generated_tmp}"
@@ -38,6 +46,12 @@ cleanup_generated_tmp() {
   fi
   if [[ -n "${equivalence_after_json}" ]]; then
     rm -f "${equivalence_after_json}"
+  fi
+  if [[ -n "${plan_tmp}" ]]; then
+    rm -f "${plan_tmp}"
+  fi
+  if [[ -n "${metadata_tmp}" ]]; then
+    rm -f "${metadata_tmp}"
   fi
 }
 trap cleanup_generated_tmp EXIT
@@ -116,12 +130,14 @@ ansible-playbook \
 
 tofu -chdir=infra/opentofu init
 
-enabled_services="$(python scripts/settings.py tofu-var)"
-enabled_services_args=("-var" "enabled_services=${enabled_services}")
+enabled_services_args=()
 target_args=()
 replace_args=()
 if [[ "${canonical_site}" == true ]]; then
   enabled_services_args=()
+else
+  enabled_services="$(python scripts/settings.py tofu-var)"
+  enabled_services_args=("-var" "enabled_services=${enabled_services}")
 fi
 if [[ -n "${1:-}" ]]; then
   target_projection_args=()
@@ -149,29 +165,42 @@ if [[ -n "${2:-}" ]]; then
   printf "Forcing replacement of %s service resources for runtime %s. Review destroy/create output carefully.\n" "${2}" "${replace_runtime}"
 fi
 
-tofu -chdir=infra/opentofu plan \
+plan_tmp="$(mktemp "${INFRA_VALUES_DIR}/.tfplan-next.XXXXXX")"
+rm -f "${plan_tmp}"
+plan_command=(tofu -chdir=infra/opentofu plan \
   "${enabled_services_args[@]}" \
   -var-file="${tofu_vars_file}" \
   -state=../../${INFRA_VALUES_DIR}/terraform.tfstate \
   "${target_args[@]}" \
   "${replace_args[@]}" \
-  -out=../../${INFRA_VALUES_DIR}/tfplan
+  -out="../../${plan_tmp}")
+if [[ "${canonical_site}" == true ]]; then
+  python scripts/canonical-provider-env.py -- "${plan_command[@]}"
+else
+  "${plan_command[@]}"
+fi
 
-tofu -chdir=infra/opentofu show ../../${INFRA_VALUES_DIR}/tfplan
+tofu -chdir=infra/opentofu show "../../${plan_tmp}"
 
 if [[ -n "${INFRA_EQUIVALENCE_BEFORE_JSON:-}" ]]; then
   equivalence_after_json="$(mktemp "${INFRA_VALUES_DIR}/.tfplan-equivalence.XXXXXX.json")"
-  tofu -chdir=infra/opentofu show -json ../../${INFRA_VALUES_DIR}/tfplan > "${equivalence_after_json}"
+  tofu -chdir=infra/opentofu show -json "../../${plan_tmp}" > "${equivalence_after_json}"
   if ! python scripts/report-plan-equivalence.py "${INFRA_EQUIVALENCE_BEFORE_JSON}" "${equivalence_after_json}"; then
     printf "%s\n" "Plan equivalence review failed; inspect the redacted report before proceeding." >&2
     exit 1
   fi
 fi
 
+metadata_tmp="$(mktemp "${INFRA_VALUES_DIR}/.tfplan-meta-next.XXXXXX")"
 python scripts/tfplan-metadata.py create \
-  --plan "${INFRA_VALUES_DIR}/tfplan" \
-  --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json" \
+  --plan "${plan_tmp}" \
+  --metadata "${metadata_tmp}" \
   --target-service "${1:-}" \
   --replace-service "${2:-}" \
   --print-summary
+chmod 600 "${plan_tmp}" "${metadata_tmp}"
+mv -f "${plan_tmp}" "${INFRA_VALUES_DIR}/tfplan"
+plan_tmp=""
+mv -f "${metadata_tmp}" "${INFRA_VALUES_DIR}/tfplan.meta.json"
+metadata_tmp=""
 ' bash "${target_service}" "${replace_service}"

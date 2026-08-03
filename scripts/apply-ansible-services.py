@@ -8,6 +8,7 @@ import datetime as dt
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -107,6 +108,13 @@ def inventory_args(inventories: Iterable[str]) -> list[str]:
     return args
 
 
+def canonical_identity_extra_args() -> tuple[str, ...]:
+    identity = os.environ.get("INFRA_SSH_IDENTITY_FILE", "")
+    if not identity or not re.fullmatch(r"[A-Za-z0-9._-]+", identity):
+        return ()
+    return ("-e", f"ansible_ssh_private_key_file={Path.home() / '.ssh' / identity}")
+
+
 def load_env_file(path: Path) -> dict[str, str]:
     spec = importlib.util.spec_from_file_location("parse_env_script", REPO / "scripts" / "parse-env.py")
     if spec is None or spec.loader is None:
@@ -176,9 +184,12 @@ def canonical_bootstrap_targets(context: object) -> tuple[tuple[str, str], ...]:
     catalog_path = REPO / "infra" / "services.json"
     model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=catalog_path)
     catalog = load_catalog(catalog_path)
+    selected_resource = os.environ.get("INFRA_HOST_IDENTITY_ONLY", "").strip()
     targets: dict[str, str] = {}
     for service_name, service in model.services.items():
         if not service.enabled or service.resource is None:
+            continue
+        if selected_resource and service.resource != selected_resource:
             continue
         host = str(catalog.get(service_name).inventory.get("host", service.resource))
         existing = targets.get(service.resource)
@@ -266,7 +277,10 @@ def run_canonical_host_identity(
             consumer="ansible-host-identity",
             requirements=(operator_requirement,),
         )
-        phases = (("root", False), ("infra", True)) if resource.type == "lxc" else (("infra", True),)
+        if resource.type == "lxc" and os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "").lower() == "true":
+            phases = (("infra", True),)
+        else:
+            phases = (("root", False), ("infra", True)) if resource.type == "lxc" else (("infra", True),)
         for connection_user, cleanup_root in phases:
             env = dict(base_env)
             root_environment_name: str | None = None
@@ -305,6 +319,40 @@ def run_canonical_host_identity(
     return 0
 
 
+def run_canonical_direct_access_ready(
+    context: object,
+    inventories: tuple[str, ...],
+    log_dir: Path,
+    base_env: dict[str, str],
+    extra_args: tuple[str, ...] = (),
+    enroll_only: bool = False,
+    runner: RunCommand | None = None,
+) -> int:
+    """Enroll and verify guest SSH trust before the first canonical connection."""
+    runner = runner or default_runner
+    known_hosts = getattr(context, "path")("ansible/known_hosts")
+    ready_hosts = "all:!proxmox"
+    selected_resource = os.environ.get("INFRA_HOST_IDENTITY_ONLY", "").strip()
+    if selected_resource:
+        selected_targets = dict(canonical_bootstrap_targets(context))
+        ready_hosts = selected_targets.get(selected_resource, ready_hosts)
+    command = [
+        "ansible-playbook",
+        *inventory_args(inventories),
+        *extra_args,
+        "-e",
+        f"direct_access_ready_hosts={ready_hosts}",
+        "-e",
+        f"direct_access_ready_known_hosts_file={known_hosts}",
+    ]
+    if os.environ.get("INFRA_ACCEPT_CHANGED_HOST_KEYS", "").lower() == "true":
+        command.extend(("-e", "direct_access_ready_accept_host_key_change=true"))
+    if enroll_only:
+        command.extend(("-e", "direct_access_ready_enroll_only=true"))
+    command.append("infra/ansible/playbooks/direct-access-ready.yml")
+    return runner(command, log_dir / "direct-access-ready.log", dict(base_env))
+
+
 def canonical_ansible_transport(context: object, log_dir: Path, services: list[str] | tuple[str, ...]) -> CanonicalAnsibleTransport | None:
     """Build an opt-in paired inventory/vars transport from verified projections."""
     if getattr(context, "canonical_site_path", None) is None:
@@ -320,7 +368,9 @@ def canonical_ansible_transport(context: object, log_dir: Path, services: list[s
     services = projection.get("services") if isinstance(projection, dict) else None
     if not isinstance(services, dict):
         raise RuntimeError("canonical Ansible vars projection has an invalid shape")
-    flattened: dict[str, object] = {}
+    flattened: dict[str, object] = {
+        key: value for key, value in projection.items() if key != "services"
+    }
     for service, values in sorted(services.items()):
         legacy_vars = values.get("legacy_vars", {}) if isinstance(values, dict) else None
         if not isinstance(legacy_vars, dict):
@@ -349,7 +399,7 @@ def canonical_ansible_transport(context: object, log_dir: Path, services: list[s
         raise
     return CanonicalAnsibleTransport(
         inventory=str(inventory_path),
-        extra_args=("-e", f"@{vars_path}"),
+        extra_args=("-e", f"@{vars_path}", *canonical_identity_extra_args()),
         vars_path=vars_path,
         environment=environment,
     )
@@ -570,13 +620,51 @@ def main(argv: list[str] | None = None) -> int:
             base_env.update(canonical_dns_environment(context))
             extra_args = ()
         if args.canonical_ansible:
+            direct_access_rc = run_canonical_direct_access_ready(
+                context,
+                inventories,
+                log_dir,
+                base_env,
+                extra_args=extra_args,
+                enroll_only=True,
+            )
+            if direct_access_rc != 0:
+                print(f"canonical direct access readiness failed with exit code {direct_access_rc}", file=sys.stderr)
+                return 1
             host_identity_rc = run_canonical_host_identity(context, inventories, log_dir, base_env, extra_args=extra_args)
             if host_identity_rc != 0:
                 print(f"canonical host identity convergence failed with exit code {host_identity_rc}", file=sys.stderr)
                 return 1
+            direct_access_rc = run_canonical_direct_access_ready(
+                context,
+                inventories,
+                log_dir,
+                base_env,
+                extra_args=extra_args,
+            )
+            if direct_access_rc != 0:
+                print(f"canonical direct service readiness failed with exit code {direct_access_rc}", file=sys.stderr)
+                return 1
+            if os.environ.get("INFRA_HOST_IDENTITY_ONLY", "").strip():
+                print("host-identity-only recovery completed; skipping service apply")
+                return 0
             provider = SopsAgeProvider(context.path("secrets.sops.yaml"))
+            site_file = context.canonical_site_path
+            if site_file is None:
+                raise RuntimeError("canonical Ansible execution requires a selected canonical site")
+            model = load_site(
+                site_file,
+                expected_site=context.site,
+                catalog_path=REPO / "infra" / "services.json",
+            )
+            catalog = load_catalog(REPO / "infra" / "services.json")
             service_environments = {
-                selected_service: deliver_services_environment(provider, [selected_service])
+                selected_service: deliver_services_environment(
+                    provider,
+                    catalog,
+                    model.services,
+                    selected_services=[selected_service],
+                )
                 for selected_service in services
             }
         else:

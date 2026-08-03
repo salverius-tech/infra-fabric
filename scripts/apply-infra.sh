@@ -87,8 +87,8 @@ if [[ "${#canonical_ansible_args[@]}" -eq 0 ]]; then
 fi
 
 storage_vars_args=()
-if [[ -n "${1:-}" ]]; then
-  storage_vars_args+=(--service "${1}")
+if [[ -n "${target_service}" ]]; then
+  storage_vars_args+=(--service "${target_service}")
 fi
 projection_args=()
 if [[ "${canonical_site}" == true ]]; then
@@ -125,7 +125,12 @@ fi
       TF_VAR_*) unset "${variable}" ;;
     esac
   done < <(env)
-  tofu -chdir=infra/opentofu apply -state=../../${INFRA_VALUES_DIR}/terraform.tfstate ../../${INFRA_VALUES_DIR}/tfplan
+  apply_command=(tofu -chdir=infra/opentofu apply -state=../../${INFRA_VALUES_DIR}/terraform.tfstate ../../${INFRA_VALUES_DIR}/tfplan)
+  if [[ "${canonical_site}" == true ]]; then
+    python scripts/canonical-provider-env.py -- "${apply_command[@]}"
+  else
+    "${apply_command[@]}"
+  fi
 )
 
 python scripts/tfplan-metadata.py verify \
@@ -142,7 +147,6 @@ fi
 if [[ "${#canonical_ansible_args[@]}" -gt 0 ]]; then
   python scripts/apply-ansible-services.py \
     "${canonical_ansible_args[@]}" \
-    --env-file "${INFRA_VALUES_DIR}/.env" \
     "${ansible_service_args[@]}"
 else
   python scripts/apply-ansible-services.py \

@@ -61,6 +61,43 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             1,
         )
 
+    def test_canonical_direct_access_ready_enrolls_site_known_hosts(self) -> None:
+        commands: list[list[str]] = []
+
+        def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
+            commands.append(command)
+            return 0
+
+        class Context:
+            def path(self, relative: str) -> Path:
+                return Path("/workspace/values/sites/dev") / relative
+
+        result = apply_ansible_services.run_canonical_direct_access_ready(
+            Context(),
+            ("canonical-inventory.json",),
+            Path("/tmp"),
+            {},
+            extra_args=("-e", "@canonical-vars.json"),
+            runner=runner,
+        )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            commands[0],
+            [
+                "ansible-playbook",
+                "-i",
+                "canonical-inventory.json",
+                "-e",
+                "@canonical-vars.json",
+                "-e",
+                "direct_access_ready_hosts=all:!proxmox",
+                "-e",
+                "direct_access_ready_known_hosts_file=/workspace/values/sites/dev/ansible/known_hosts",
+                "infra/ansible/playbooks/direct-access-ready.yml",
+            ],
+        )
+
     def test_run_service_keeps_service_playbooks_sequential(self) -> None:
         commands: list[list[str]] = []
 

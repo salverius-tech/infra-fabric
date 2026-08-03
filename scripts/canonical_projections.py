@@ -151,7 +151,10 @@ def _compatibility_value(
 
 
 def _resource_variables(name: str, resource: Any) -> dict[str, Any]:
-    prefix = name if resource.type == "vm" else f"{name}_container"
+    # Forgejo Runner is an LXC resource whose existing OpenTofu interface uses
+    # the unsuffixed forgejo_runner_* variable names. Keep this compatibility
+    # exception explicit until the consumer naming audit is complete.
+    prefix = name if resource.type == "vm" or name in {"forgejo_runner", "tailscale_client"} else f"{name}_container"
     network = resource.network
     values: dict[str, Any] = {
         f"{prefix}_vmid": resource.identity.vmid,
@@ -160,13 +163,12 @@ def _resource_variables(name: str, resource: Any) -> dict[str, Any]:
         f"{prefix}_ipv4_address": network.address,
         f"{prefix}_cores": resource.compute.cores,
         f"{prefix}_memory_mb": resource.compute.memory_mb,
-        f"{prefix}_swap_mb": resource.compute.swap_mb,
         f"{prefix}_disk_gb": resource.storage.root.size_gb,
     }
+    if resource.type == "lxc":
+        values[f"{prefix}_swap_mb"] = resource.compute.swap_mb
     if name == "onramp_host":
         values["onramp_host_datastore_id"] = resource.storage.root.storage_id
-        if resource.runtime.cloud_init_user is not None:
-            values["onramp_host_cloud_init_user"] = resource.runtime.cloud_init_user
     if name in {"forgejo_runner", "infisical", "hermes", "tailscale_client", "onramp_host"}:
         values[f"{name}_started"] = resource.runtime.started
         values[f"{name}_start_on_boot"] = resource.runtime.start_on_boot
@@ -234,12 +236,16 @@ def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | No
         "operator_chezmoi_version": model.operator.dotfiles.chezmoi.version,
         "operator_chezmoi_sha256": model.operator.dotfiles.chezmoi.sha256,
     }
-    if model.platform.vm_cloud_init_user is not None:
-        values["guest_vm_cloud_init_user"] = model.platform.vm_cloud_init_user
     if model.platform.lxc_template_download_timeout_seconds is not None:
         values["lxc_template_download_timeout_seconds"] = model.platform.lxc_template_download_timeout_seconds
+    enabled_resources = {
+        service.resource
+        for service in model.services.values()
+        if service.enabled and service.resource is not None
+    }
     for name, resource in (*model.resources.guests.items(), *model.resources.shared_hosts.items()):
-        values.update(_resource_variables(name, resource))
+        if name in enabled_resources:
+            values.update(_resource_variables(name, resource))
     forgejo = model.resources.guests.get("forgejo")
     if forgejo is not None:
         values["forgejo_lan_ip"] = _address(forgejo)
@@ -281,10 +287,9 @@ def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | No
                     for volume_name, volume in resource.storage.volumes.items()
                 }
         endpoint_names = service.endpoints.public_names
-        if endpoint_names:
-            values[f"{name}_server_name"] = endpoint_names[0]
-        if service.endpoints.public_url:
-            values[f"{name}_public_url"] = service.endpoints.public_url
+        tf_domain = catalog.get(name).inventory.get("tf_domain")
+        if endpoint_names and isinstance(tf_domain, str) and tf_domain not in values:
+            values[tf_domain] = endpoint_names[0]
     _assert_non_secret(values, "opentofu")
     return values
 
@@ -334,7 +339,13 @@ def render_ansible_inventory(model: CanonicalSite, catalog: ServiceCatalog) -> d
     result = {
         "all": {
             "children": {group: {} for group in sorted(groups)},
-            "vars": {"canonical_site": model.site.name},
+            "vars": {
+                "canonical_site": model.site.name,
+                "ansible_ssh_common_args": (
+                    "-o UserKnownHostsFile=/workspace/values/sites/"
+                    f"{model.site.name}/ansible/known_hosts -o StrictHostKeyChecking=yes"
+                ),
+            },
         },
         **groups,
     }
@@ -400,7 +411,16 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
         if legacy_vars:
             service_vars["legacy_vars"] = legacy_vars
         services[name] = service_vars
-    result = {"canonical_site": model.site.name, "services": services}
+    result = {
+        "canonical_site": model.site.name,
+        "bootstrap_ssh_user": model.bootstrap.ssh.user,
+        "operator_user": model.operator.user,
+        "operator_dotfiles_repository": model.operator.dotfiles.repository,
+        "operator_dotfiles_revision": model.operator.dotfiles.revision,
+        "operator_chezmoi_version": model.operator.dotfiles.chezmoi.version,
+        "operator_chezmoi_sha256": model.operator.dotfiles.chezmoi.sha256,
+        "services": services,
+    }
     _assert_non_secret(result, "ansible")
     return result
 

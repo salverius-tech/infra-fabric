@@ -355,7 +355,7 @@ The Searxng legacy `searxng_container_port` is a host-published loopback port ma
 
 The service-selection/runtime aliases `service_runtime`, `forgejo_runtime`, and the secondary `tailscale_client_enabled` gate remain unmatched until one identity-bound compatibility adapter defines canonical enablement precedence, runtime projection, Forgejo legacy adaptation, and Tailscale’s dual gate at both OpenTofu and Ansible boundaries.
 
-The Debian LXC template legacy inputs (`debian_template_url`, `debian_template_file_name`, `debian_template_checksum_algorithm`, and `debian_template_checksum`) remain unmatched until the HTTPS transport policy is resolved: the public scaffold currently supplies an HTTP URL, while `ImageDefinition` requires HTTPS. No HTTP-to-HTTPS rewrite is assumed.
+The Debian LXC template legacy inputs (`debian_template_url`, `debian_template_file_name`, `debian_template_checksum_algorithm`, and `debian_template_checksum`) are now pinned to the current Proxmox APLInfo catalog artifact. The catalog currently publishes the download over HTTP because the `download.proxmox.com` HTTPS endpoint presents a certificate without that hostname; integrity remains enforced with the catalog SHA-512 checksum.
 
 The VM image families `guest_vm_image_*` and `onramp_host_image_*` remain unmatched until canonical image keys, datastore ownership, canonical-to-OpenTofu image projection, and the onramp-enabled shared `file_id`/guest-metadata coupling are specified. The two families remain distinct; equal current defaults do not establish a shared canonical owner.
 

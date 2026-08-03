@@ -4,8 +4,10 @@ import sys
 import subprocess
 import tempfile
 import stat
+import re
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -18,6 +20,7 @@ import canonical_values
 from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, InfisicalOnrampConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, ServiceEndpoints, ServiceRelease, SearxngConfiguration, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
+    _resource_variables,
     render_ansible_inventory,
     render_ansible_vars,
     render_dns_records,
@@ -617,7 +620,7 @@ class CanonicalValuesTests(unittest.TestCase):
         )
         model = load_site(self.write_site(content))
         values = render_opentofu_variables(model)
-        self.assertEqual(values["guest_vm_cloud_init_user"], "vmadmin")
+        self.assertNotIn("guest_vm_cloud_init_user", values)
         self.assertEqual(values["lxc_template_download_timeout_seconds"], 1800)
         self.assertEqual(values["service_runtime"]["forgejo"]["cloud_init_user"], "forgejo-admin")
         with self.assertRaises(CanonicalValuesError):
@@ -971,6 +974,37 @@ class CanonicalValuesTests(unittest.TestCase):
         )
         self.assertEqual(dns["a_records"], {"git.example.internal": "192.0.2.62"})
 
+    def test_forgejo_runner_lxc_uses_its_unsuffixed_opentofu_interface(self) -> None:
+        resource = SimpleNamespace(
+            type="lxc",
+            identity=SimpleNamespace(vmid=7003, hostname="forgejo-runner", description="runner"),
+            network=SimpleNamespace(
+                address="dhcp",
+                gateway=None,
+                dns_servers=["192.0.2.1"],
+                search_domain="example.internal",
+                mac_address="BC:24:11:00:00:02",
+                bridge="vmbr0",
+                vlan_id=40,
+            ),
+            compute=SimpleNamespace(cores=2, memory_mb=2048, swap_mb=512),
+            storage=SimpleNamespace(root=SimpleNamespace(size_gb=16)),
+            runtime=SimpleNamespace(started=True, start_on_boot=True),
+        )
+
+        values = _resource_variables("forgejo_runner", resource)
+
+        self.assertEqual(values["forgejo_runner_vmid"], 7003)
+        self.assertNotIn("forgejo_runner_container_vmid", values)
+
+    def test_opentofu_projection_uses_only_declared_root_variables(self) -> None:
+        model = load_site(self.write_site(VALID_SITE))
+        values = render_opentofu_variables(model)
+        variables_path = Path(__file__).resolve().parents[1] / "infra" / "opentofu" / "variables.tf"
+        declared = set(re.findall(r'(?m)^variable "([^"]+)"', variables_path.read_text()))
+
+        self.assertEqual(set(values) - declared, set())
+
 
     def test_general_dns_contract_projects_owned_records_and_settings(self) -> None:
         model = load_site(
@@ -1113,8 +1147,13 @@ class CanonicalValuesTests(unittest.TestCase):
             checksum=checksum,
         )
         self.assertEqual(image.file_name, "debian.tar.zst")
-        with self.assertRaises(ValueError):
-            ImageDefinition(type="lxc_template", url="http://images.example.internal/image", file_name="image", checksum=checksum)
+        http_image = ImageDefinition(
+            type="lxc_template",
+            url="http://images.example.internal/image",
+            file_name="image",
+            checksum=checksum,
+        )
+        self.assertEqual(http_image.url, "http://images.example.internal/image")
         with self.assertRaises(ValueError):
             ImageDefinition(type="lxc_template", url="https://images.example.internal/image", file_name="../image", checksum=checksum)
 

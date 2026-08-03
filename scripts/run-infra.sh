@@ -8,7 +8,11 @@ set -- "${transport_remaining_args[@]}"
 transport_prepare
 values_dir="$(site_values_dir)"
 env_file="${values_dir}/.env"
-if [[ ! -f "${env_file}" ]]; then
+canonical_site=false
+if [[ -f "${values_dir}/site.yaml" ]]; then
+  canonical_site=true
+fi
+if [[ "${canonical_site}" != true && ! -f "${env_file}" ]]; then
   printf 'Missing %s. Run just setup or just setup <remote>.\n' "${env_file}" >&2
   exit 1
 fi
@@ -25,10 +29,14 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-# Convert values/.env to a sanitized Docker env file. Do not source it directly.
 umask 077
-scripts/python.sh scripts/parse-env.py --env-file "${env_file}" >"${compose_env_file}"
-chmod 0600 "${compose_env_file}"
+compose_env_args=()
+if [[ "${canonical_site}" != true ]]; then
+  # Convert values/.env to a sanitized Docker env file. Do not source it directly.
+  scripts/python.sh scripts/parse-env.py --env-file "${env_file}" >"${compose_env_file}"
+  chmod 0600 "${compose_env_file}"
+  compose_env_args=(--env-from-file "${compose_env_file}")
+fi
 
 docker compose run --rm \
   "${transport_compose_mount_args[@]}" \
@@ -36,5 +44,7 @@ docker compose run --rm \
   --env VALUES_DIR="${VALUES_DIR:-values}" \
   --env VALUES_SITE="${VALUES_SITE:-}" \
   --env INFRA_VALUES_DIR="${values_dir}" \
-  --env-from-file "${compose_env_file}" \
+  --env INFRA_HOST_IDENTITY_SKIP_ROOT="${INFRA_HOST_IDENTITY_SKIP_ROOT:-}" \
+  --env INFRA_HOST_IDENTITY_ONLY="${INFRA_HOST_IDENTITY_ONLY:-}" \
+  "${compose_env_args[@]}" \
   infra "$@"

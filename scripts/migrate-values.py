@@ -130,7 +130,7 @@ PINNED_GUEST_VM_IMAGE_FILE_NAME = "debian-13-genericcloud-amd64-20260623-2518.qc
 
 LXC_TEMPLATE_INTEGRITY_DEFAULTS = {
     "debian_template_checksum_algorithm": '"sha512"',
-    "debian_template_checksum": '"5aec4ab2ac5c16c7c8ecb87bfeeb10213abe96db6b85e2463585cea492fc861d7c390b3f9c95629bf690b95e9dfe1037207fc69c0912429605f208d5cb2621f8"',
+    "debian_template_checksum": '"4c0c27ca6ceab5ef0b84db57825a00f26157ef1854bafe97297813e1cbe8ecb8cc9c453cab6b3b0efe1ba193a50c47ece1e41d950e411b8730b835b71e9e754b"',
     "guest_vm_image_checksum_algorithm": '"sha512"',
     "guest_vm_image_checksum": '"df2bd468b08566c0409a7982d6489d73499ad22f9a28646b538c2f21d08f15040a5e4737952ca209e9ad4488cd00793191791be9f135dee93082c86fcca3300c"',
 }
@@ -588,7 +588,7 @@ def ensure_optional_service_tfvars(tfvars_lines: list[str], optional_services: s
             "onramp_host_vmid": "112",
             "onramp_host_hostname": hcl_quote("onramp-host"),
             "onramp_host_description": hcl_quote("Debian 13 Podman onramp host for Onramp-managed services."),
-            "onramp_host_image_datastore_id": hcl_quote("local"),
+            "onramp_host_image_datastore_id": hcl_quote("pve-storage"),
             "onramp_host_image_url": hcl_quote(PINNED_GUEST_VM_IMAGE_URL),
             "onramp_host_image_file_name": hcl_quote(PINNED_GUEST_VM_IMAGE_FILE_NAME),
             "onramp_host_image_checksum_algorithm": '"sha512"',
@@ -1057,8 +1057,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         values_dir = args.values_dir or from_environment().values_dir
         if (values_dir / "site.yaml").is_file():
-            print(f"canonical site selected; legacy values migration skipped: {values_dir}")
-            return 0
+            raise MigrationError(
+                "legacy values migration is not available for a canonical site; use the explicit canonical recovery importer"
+            )
         if args.transactional:
             if args.backup_dir is None:
                 raise MigrationError("--transactional requires --backup-dir")

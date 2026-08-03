@@ -72,7 +72,7 @@ if [[ -d /ssh-ro ]]; then
     fi
   done
 
-  if [[ "${INFRA_COPY_SSH_KEYS:-false}" == "true" ]]; then
+  if [[ "${INFRA_COPY_SSH_KEYS:-false}" == "true" && "${INFRA_SSH_IDENTITY_SOURCE:-external}" != "sops" ]]; then
     identity_file="${INFRA_SSH_IDENTITY_FILE:-}"
     if [[ ! "${identity_file}" =~ ^[A-Za-z0-9._-]+$ ]]; then
       printf 'INFRA_SSH_IDENTITY_FILE must name one SSH identity file when INFRA_COPY_SSH_KEYS=true.\n' >&2

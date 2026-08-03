@@ -1783,6 +1783,51 @@ def _derive_image_family_types(candidate: dict[str, Any], report: DiscoveryRepor
         definition["type"] = expected
 
 
+def assess_candidate_mapping(report: DiscoveryReport, *, base_document: dict[str, Any]) -> dict[str, Any]:
+    """Collect every independently mappable path and value-free review blockers.
+
+    This report-only boundary deliberately does not construct or validate a
+    candidate. It permits review to continue past protected, ambiguous, or
+    base-topology blockers while preserving the strict builder used for an
+    installable canonical candidate.
+    """
+    if not isinstance(base_document, dict) or base_document.get("schema_version") != 1:
+        raise DiscoveryError("candidate base document must be a canonical schema_version 1 mapping")
+    mapped_paths: set[str] = set()
+    findings: list[dict[str, str]] = []
+    for observation in report.observations:
+        path = observation.proposed_path
+        if observation.classification != "mapped" or path is None:
+            findings.append(
+                {
+                    "key": observation.key,
+                    "path": path or "",
+                    "reason": f"{observation.classification} observation requires review",
+                }
+            )
+            continue
+        try:
+            _validate_resource_overlay_target(base_document, path)
+        except DiscoveryError:
+            findings.append(
+                {
+                    "key": observation.key,
+                    "path": path,
+                    "reason": "resource is not declared in the approved base document",
+                }
+            )
+            continue
+        mapped_paths.add(path)
+    for conflict in report.conflicts:
+        path = conflict.get("canonical_path")
+        if isinstance(path, str):
+            findings.append({"key": "", "path": path, "reason": "conflicting legacy observations require review"})
+    return {
+        "mapped_path_count": len(mapped_paths),
+        "review_required": sorted(findings, key=lambda item: (item["path"], item["key"], item["reason"])),
+    }
+
+
 def build_candidate_site(
     report: DiscoveryReport,
     *,
