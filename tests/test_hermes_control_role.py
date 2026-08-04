@@ -22,6 +22,19 @@ class HermesControlRoleTests(unittest.TestCase):
         self.assertLess(text.index("Verify Hermes Caddy service is active"), text.index("Configure optional Hermes Control companion stack"))
         self.assertLess(text.index("Configure optional Hermes Control companion stack"), text.index("Verify Hermes Control HTTPS health through Caddy"))
 
+    def test_parent_control_diagnostics_use_templated_private_header(self) -> None:
+        tasks = yaml.safe_load(PARENT_TASKS.read_text(encoding="utf-8"))
+        diagnostic = next(
+            task for task in tasks
+            if task.get("name") == "Verify Hermes Control HTTPS diagnostics through Caddy"
+        )
+        self.assertEqual(
+            diagnostic["ansible.builtin.command"]["argv"][10],
+            "Authorization: Bearer {{ hermes_control_api_token }}",
+        )
+        self.assertNotIn("***", diagnostic["ansible.builtin.command"]["argv"][10])
+        self.assertTrue(diagnostic["no_log"])
+
     def test_control_role_enforces_pinned_source_and_readiness(self) -> None:
         text = CONTROL_TASKS.read_text(encoding="utf-8")
         for fragment in (
