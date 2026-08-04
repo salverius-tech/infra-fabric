@@ -1,5 +1,6 @@
 import json
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -13,9 +14,11 @@ class DocumentationContractTests(unittest.TestCase):
         self.assertEqual(inventory["schema_version"], 1)
         documents = inventory["documents"]
         tracked = {
-            path.relative_to(ROOT).as_posix()
-            for path in ROOT.rglob("*.md")
-            if not {".git", ".hermes", ".specs", "values"}.intersection(path.parts)
+            path
+            for path in subprocess.check_output(
+                ["git", "-C", str(ROOT), "ls-files", "--", "*.md"], text=True
+            ).splitlines()
+            if not {".hermes", ".specs", "values"}.intersection(Path(path).parts)
         }
         self.assertEqual(set(documents), tracked)
         self.assertTrue(set(inventory["classifications"]).issuperset(documents.values()))
