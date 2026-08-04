@@ -63,8 +63,11 @@ scripts/python.sh scripts/service-author.py \
 ## Documentation
 
 - [Canonical site quick start](docs/canonical-quick-start.md)
+- [Canonical architecture and ownership](docs/canonical-architecture.md)
 - [Public Just recipes](docs/just-recipes.md)
+- [Service catalog and implementation map](docs/service-catalog.md)
 - [Canonical service authoring](docs/canonical-service-authoring.md)
 - [Canonical secret operations](docs/canonical-values-secret-operations.md)
+- [Canonical teardown and site retirement](docs/canonical-teardown.md)
 - [Service update policy](docs/service-update-policy.md)
 - [Documentation index](docs/README.md)
