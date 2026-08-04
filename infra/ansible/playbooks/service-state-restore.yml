@@ -16,6 +16,9 @@
           - service_state_service in managed_service_state_catalog
           - service_state_hosts is defined
           - service_state_restore_file | length > 0
+          - service_state_service != "forgejo" or forgejo_database is defined
+          - service_state_service != "forgejo" or forgejo_database.type is defined
+          - service_state_service != "forgejo" or forgejo_database.name is defined
           - service_state_restore_file is match('^' ~ (service_state_backup_root | regex_escape) ~ '/' ~ service_state_service ~ '/.+\.tar\.gz$')
         fail_msg: >-
           service_state_service, service_state_hosts, and SERVICE_STATE_RESTORE_FILE under
@@ -220,7 +223,7 @@
           register: forgejo_state_postgres_dump
           when:
             - service_state_service == "forgejo"
-            - forgejo_database.type | default("sqlite") == "postgres"
+            - forgejo_database.type == "postgres"
 
         - name: Restore managed Forgejo PostgreSQL database
           ansible.builtin.command:
@@ -238,7 +241,7 @@
           changed_when: true
           when:
             - service_state_service == "forgejo"
-            - forgejo_database.type | default("sqlite") == "postgres"
+            - forgejo_database.type == "postgres"
             - forgejo_state_postgres_dump.stat.exists
 
       always:
@@ -270,6 +273,8 @@
           environment:
             XDG_RUNTIME_DIR: "/run/user/{{ service_state_user_service_uid.stdout | trim }}"
           loop: "{{ service_state_definition.user_services | default([]) }}"
+          register: service_state_user_restart
+          failed_when: false
           when: service_state_definition.user_services | default([]) | length > 0
 
         - name: Restart managed system services after restore
@@ -279,7 +284,15 @@
             enabled: true
             daemon_reload: true
           loop: "{{ service_state_definition.services | default([]) }}"
+          register: service_state_system_restart
           failed_when: false
+
+    - name: Fail after attempting all managed service restarts
+      ansible.builtin.assert:
+        that:
+          - (service_state_user_restart.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length) == 0
+          - (service_state_system_restart.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length) == 0
+        fail_msg: Managed services did not restart successfully after service-state restore.
 
     - name: Report service-state restore result
       ansible.builtin.debug:

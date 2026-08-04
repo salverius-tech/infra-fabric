@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -50,6 +51,29 @@ class ServiceStateTests(unittest.TestCase):
         restore = RESTORE.read_text(encoding="utf-8")
         self.assertIn("service_state_backup_root | regex_escape", restore)
         self.assertIn("delegate_to: localhost", restore)
+
+    def test_cli_derives_targets_from_state_catalog_and_uses_verified_projection_pair(self) -> None:
+        cli = SERVICE_STATE_CLI.read_text(encoding="utf-8")
+        stateful = {
+            name for name, config in json.loads(SERVICES.read_text(encoding="utf-8"))["services"].items()
+            if config.get("state_capable")
+        }
+        self.assertEqual(stateful, set(self.catalog))
+        self.assertIn("state_capable_services()", cli)
+        self.assertNotIn("supported_services=(", cli)
+        self.assertIn('print(name)', cli)
+        self.assertIn("generated/ansible-vars.json", cli)
+
+    def test_forgejo_database_state_contract_fails_closed_without_projection(self) -> None:
+        for path in (BACKUP, RESTORE):
+            playbook = path.read_text(encoding="utf-8")
+            self.assertIn("forgejo_database is defined", playbook)
+            self.assertIn("forgejo_database.name is defined", playbook)
+            self.assertNotIn('forgejo_database.type | default("sqlite")', playbook)
+        restore = RESTORE.read_text(encoding="utf-8")
+        self.assertIn("Fail after attempting all managed service restarts", restore)
+        self.assertIn("service_state_system_restart", restore)
+        self.assertIn("service_state_user_restart", restore)
 
     def test_onramp_recovery_dependencies_and_container_paths_are_wired(self) -> None:
         defaults = yaml.safe_load(ONRAMP_DEFAULTS.read_text(encoding="utf-8"))

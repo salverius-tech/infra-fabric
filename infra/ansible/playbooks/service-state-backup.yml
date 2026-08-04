@@ -14,6 +14,9 @@
           - service_state_service is defined
           - service_state_service in managed_service_state_catalog
           - service_state_hosts is defined
+          - service_state_service != "forgejo" or forgejo_database is defined
+          - service_state_service != "forgejo" or forgejo_database.type is defined
+          - service_state_service != "forgejo" or forgejo_database.name is defined
         fail_msg: service_state_service and service_state_hosts are required for service state backup.
 
     - name: Select managed service-state definition
@@ -50,7 +53,7 @@
             mode: "0711"
           when:
             - service_state_service == "forgejo"
-            - forgejo_database.type | default("sqlite") == "postgres"
+            - forgejo_database.type == "postgres"
 
         - name: Ensure Forgejo database snapshot directory exists
           ansible.builtin.file:
@@ -61,7 +64,7 @@
             mode: "0700"
           when:
             - service_state_service == "forgejo"
-            - forgejo_database.type | default("sqlite") == "postgres"
+            - forgejo_database.type == "postgres"
 
         - name: Export managed Forgejo PostgreSQL database
           ansible.builtin.command:
@@ -77,7 +80,7 @@
           changed_when: true
           when:
             - service_state_service == "forgejo"
-            - forgejo_database.type | default("sqlite") == "postgres"
+            - forgejo_database.type == "postgres"
 
         - name: Check managed service-state paths
           ansible.builtin.stat:

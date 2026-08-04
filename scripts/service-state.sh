@@ -19,23 +19,20 @@ source "${repo_root}/scripts/site-context.sh"
 site_values_dir="$(site_values_dir)"
 backup_root="${SERVICE_STATE_BACKUP_ROOT:-/workspace/${site_values_dir}/service-backups}"
 
-supported_services=(
-  hermes
-  forgejo
-  infisical
-  technitium
-  onramp_host
-  infisical_onramp
-  searxng_onramp
-)
+state_capable_services() {
+  scripts/python.sh - <<'PY'
+from pathlib import Path
+import yaml
+
+catalog = yaml.safe_load(Path("infra/ansible/vars/service-state.yml").read_text(encoding="utf-8"))
+for service in sorted(catalog["managed_service_state_catalog"]):
+    print(service)
+PY
+}
 
 is_supported_service() {
   local service="$1"
-  local item
-  for item in "${supported_services[@]}"; do
-    [[ "${item}" == "${service}" ]] && return 0
-  done
-  return 1
+  state_capable_services | grep -Fxq "${service}"
 }
 
 container_path() {
@@ -115,7 +112,9 @@ from values_context import from_environment
 
 context = from_environment(Path.cwd())
 model = load_site(context.canonical_site_path, expected_site=context.site, catalog_path=Path("infra/services.json"))
-print(" ".join(name for name, service in model.services.items() if service.enabled))
+for name, service in model.services.items():
+    if service.enabled:
+        print(name)
 PY
 )
     return
@@ -153,6 +152,7 @@ run_playbook() {
   local group
   group="$(service_group "${service}")"
   local inventory="/workspace/${site_values_dir}/generated/ansible-inventory.json"
+  local vars_file="/workspace/${site_values_dir}/generated/ansible-vars.json"
 
   local msys_env_conv_excl="${MSYS2_ENV_CONV_EXCL:-}"
   if [[ -n "${msys_env_conv_excl}" ]]; then
@@ -165,14 +165,14 @@ run_playbook() {
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i ${inventory@Q} -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml"
+      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i ${inventory@Q} -e @${vars_file@Q} -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml"
   else
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       SERVICE_STATE_RESTORE_FILE="${restore_file}" \
       scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i ${inventory@Q} -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml"
+      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i ${inventory@Q} -e @${vars_file@Q} -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml"
   fi
 }
 
@@ -191,7 +191,7 @@ case "${command_name}" in
       exit 2
     fi
     printf 'Supported service-state targets:\n'
-    printf '  %s\n' "${supported_services[@]}"
+    state_capable_services | sed 's/^/  /'
     ;;
   backup)
     require_site_context
