@@ -129,7 +129,7 @@ class ServiceAuthorTests(unittest.TestCase):
     def test_catalog_report_is_deterministic_and_public_safe(self) -> None:
         report = service_author.build_catalog_report(ROOT)
         self.assertEqual(report["schema_version"], 1)
-        self.assertEqual(report["summary"], {"total": 9, "passed": 9, "failed": 0})
+        self.assertEqual(report["summary"], {"total": 10, "passed": 10, "failed": 0})
         service_ids = [item["service_id"] for item in report["services"]]
         self.assertEqual(service_ids, sorted(service_ids))
         self.assertNotIn("secret", json.dumps(report).lower())

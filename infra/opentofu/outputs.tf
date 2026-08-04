@@ -94,6 +94,18 @@ output "hermes_ssh_target" {
   value       = local.hermes_enabled ? "${var.hermes_runtime_user}@${var.hermes_server_name}" : null
 }
 
+output "sssf_vmid" {
+  description = "Proxmox VMID for the SSSF guest, or null when disabled."
+  value = local.sssf_enabled ? (
+    local.sssf_runtime_type == "vm" ? module.sssf_vm[0].vm_id : module.sssf[0].vm_id
+  ) : null
+}
+
+output "sssf_lan_ip" {
+  description = "Expected SSSF LAN IP without CIDR, or null when disabled."
+  value       = local.sssf_enabled ? var.sssf_lan_ip : null
+}
+
 output "onramp_host_vmid" {
   description = "Proxmox VMID for the optional onramp-host VM, or null when disabled."
   value       = local.onramp_host_enabled ? proxmox_virtual_environment_vm.onramp_host[0].vm_id : null

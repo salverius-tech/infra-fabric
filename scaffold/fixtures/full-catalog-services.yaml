@@ -69,3 +69,25 @@ services:
       disable_policy: retain
     dependencies:
       - onramp_host
+  sssf:
+    enabled: true
+    resource: example-vm
+    release:
+      commit: "0000000000000000000000000000000000000000"
+    state:
+      capable: true
+      disable_policy: retain
+    configuration:
+      runtime_user: sssf
+      workspace_root: /srv/sssf/workspaces
+      data_dir: /var/lib/sssf
+      config_path: /etc/sssf/sssf.config.yaml
+      upstream_repository: https://github.com/disler/super-simple-software-factory
+      pi_path: /usr/local/bin/pi
+      uv_path: /usr/local/bin/uv
+      visualizer_enabled: false
+      visualizer_host: 127.0.0.1
+      visualizer_port: 4600
+      max_concurrent_runs: 1
+      allowed_repositories: []
+      provider: openrouter

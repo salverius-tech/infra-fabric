@@ -161,5 +161,7 @@ services:
     enabled: false
   searxng_onramp:
     enabled: false
+  sssf:
+    enabled: false
   tailscale_client:
     enabled: false

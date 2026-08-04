@@ -17,6 +17,8 @@ services:
       owner: resources.shared_hosts.onramp_host
   searxng_onramp:
     configuration: {}
+  sssf:
+    configuration: {}
   tailscale_client:
     configuration: {}
   technitium:

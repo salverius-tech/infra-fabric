@@ -102,6 +102,7 @@ FAMILY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("shared_onramp_resource", ("onramp_host_",)),
     ("tailscale_resource", ("tailscale_client_",)),
     ("searxng_service", ("searxng_",)),
+    ("sssf_resource_or_service", ("sssf_",)),
 )
 
 

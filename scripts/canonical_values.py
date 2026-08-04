@@ -772,6 +772,77 @@ class ForgejoConfiguration(StrictModel):
         return value
 
 
+class SssfConfiguration(StrictModel):
+    """Typed non-secret configuration for the Super Simple Software Factory VM."""
+
+    runtime_user: StrictStr = "sssf"
+    workspace_root: StrictStr = "/srv/sssf/workspaces"
+    data_dir: StrictStr = "/var/lib/sssf"
+    config_path: StrictStr = "/etc/sssf/sssf.config.yaml"
+    upstream_repository: StrictStr = "https://github.com/disler/super-simple-software-factory"
+    pi_path: StrictStr = "/usr/local/bin/pi"
+    uv_path: StrictStr = "/usr/local/bin/uv"
+    visualizer_enabled: StrictBool = False
+    visualizer_host: StrictStr = "127.0.0.1"
+    visualizer_port: StrictInt = 4600
+    max_concurrent_runs: StrictInt = 1
+    allowed_repositories: list[StrictStr] = Field(default_factory=list)
+    provider: Literal["openrouter", "openai", "fireworks"] = "openrouter"
+
+    @field_validator("runtime_user")
+    @classmethod
+    def validate_runtime_user(cls, value: str) -> str:
+        if value == "root" or not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("SSSF runtime_user must be a non-root Linux user identifier")
+        return value
+
+    @field_validator("workspace_root", "data_dir", "config_path", "pi_path", "uv_path")
+    @classmethod
+    def validate_absolute_paths(cls, value: str) -> str:
+        path = PurePosixPath(value)
+        if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("SSSF paths must be normalized absolute POSIX paths")
+        return value
+
+    @field_validator("upstream_repository", "allowed_repositories")
+    @classmethod
+    def validate_https_repositories(cls, value: str | list[str]) -> str | list[str]:
+        values = [value] if isinstance(value, str) else value
+        for repository in values:
+            parsed = urlsplit(repository)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+                raise ValueError("SSSF repositories must be HTTPS URLs without credentials or fragments")
+        return value
+
+    @field_validator("visualizer_host")
+    @classmethod
+    def validate_visualizer_host(cls, value: str) -> str:
+        if value not in {"127.0.0.1", "::1", "localhost"}:
+            raise ValueError("SSSF visualizer_host must be loopback-only")
+        return value
+
+    @field_validator("visualizer_port")
+    @classmethod
+    def validate_port(cls, value: int) -> int:
+        if not 1 <= value <= 65535:
+            raise ValueError("SSSF visualizer_port must be between 1 and 65535")
+        return value
+
+    @field_validator("max_concurrent_runs")
+    @classmethod
+    def validate_concurrency(cls, value: int) -> int:
+        if not 1 <= value <= 4:
+            raise ValueError("SSSF max_concurrent_runs must be between 1 and 4")
+        return value
+
+    @field_validator("allowed_repositories")
+    @classmethod
+    def validate_repository_list(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("SSSF allowed_repositories must not contain duplicates")
+        return value
+
+
 class ServiceState(StrictModel):
     capable: StrictBool = False
     backup: dict[str, Any] = Field(default_factory=dict)
@@ -1046,6 +1117,7 @@ SERVICE_CONFIGURATION_MODELS: dict[str, type[StrictModel]] = {
     "infisical": InfisicalConfiguration,
     "infisical_onramp": InfisicalOnrampConfiguration,
     "searxng_onramp": SearxngConfiguration,
+    "sssf": SssfConfiguration,
     "tailscale_client": TailscaleConfiguration,
     "technitium": TechnitiumConfiguration,
 }

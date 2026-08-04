@@ -17,7 +17,7 @@ from typing import Any
 
 SERVICE_ID = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 ARCHETYPES = {"dedicated-lxc", "dedicated-vm", "shared-host", "no-runtime"}
-SECRET_CLASSES = {"bootstrap", "credential", "generated", "key", "password", "provider", "recovery", "runtime", "token", "certificate"}
+SECRET_CLASSES = {"bootstrap", "credential", "generated", "key", "password", "provider", "recovery", "runtime", "token", "certificate"}  # public-safety: allow-secret
 
 
 def _required(value: str | None, label: str) -> str:

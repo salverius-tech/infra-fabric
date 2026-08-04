@@ -11,6 +11,8 @@
   ansible.builtin.import_playbook: infisical.yml
 - name: Configure Hermes management service
   ansible.builtin.import_playbook: hermes.yml
+- name: Configure Super Simple Software Factory service
+  ansible.builtin.import_playbook: sssf.yml
 - name: Prepare Debian Podman onramp host for Onramp
   ansible.builtin.import_playbook: onramp-host.yml
 - name: Configure Tailscale client

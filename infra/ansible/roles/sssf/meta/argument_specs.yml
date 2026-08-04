@@ -1,0 +1,39 @@
+---
+argument_specs:
+  main:
+    short_description: Install the pinned Super Simple Software Factory on a dedicated guest.
+    options:
+      sssf_vmid:
+        type: int
+        required: true
+      sssf_runtime_user:
+        type: str
+        required: false
+      sssf_workspace_root:
+        type: str
+        required: false
+      sssf_data_dir:
+        type: str
+        required: false
+      sssf_config_path:
+        type: str
+        required: false
+      sssf_upstream_repository:
+        type: str
+        required: false
+      sssf_upstream_commit:
+        type: str
+        required: true
+      sssf_allowed_repositories:
+        type: list
+        elements: str
+        required: false
+      sssf_visualizer_enabled:
+        type: bool
+        required: false
+      sssf_visualizer_host:
+        type: str
+        required: false
+      sssf_visualizer_port:
+        type: int
+        required: false

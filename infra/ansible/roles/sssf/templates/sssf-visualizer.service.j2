@@ -1,0 +1,21 @@
+[Unit]
+Description=SSSF visualizer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ sssf_runtime_user }}
+Group={{ sssf_runtime_user }}
+WorkingDirectory={{ sssf_data_dir }}/factory
+EnvironmentFile=/etc/sssf/env
+ExecStart=/usr/bin/env {{ sssf_visualizer_command }}
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={{ sssf_data_dir }}
+
+[Install]
+WantedBy=multi-user.target

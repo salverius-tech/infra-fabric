@@ -1,0 +1,26 @@
+defaults:
+  coding_agent: pi
+  model: openrouter/google/gemini-3.6-flash
+  thinking: medium
+  tools: [read, bash, edit, write, grep, find, ls]
+  protected_files: [adws/adw_modules/, adws/adw_sssf_config/, adws/adw_*.py]
+  data_dir: {{ sssf_data_dir }}/factory/adw_data
+observability:
+  db: {{ sssf_data_dir }}/factory/adw_data/sssf.db
+  poll_ms: 500
+agents:
+  - name: planner
+    purpose: Turn a request into an implementation plan.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/planner/system.md
+      user: adws/adw_data/prompt_engineering/planner/user.md
+  - name: builder
+    purpose: Implement the plan and report changed files.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/builder/system.md
+      user: adws/adw_data/prompt_engineering/builder/user.md
+  - name: reviewer
+    purpose: Review the implementation without changing it.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/reviewer/system.md
+      user: adws/adw_data/prompt_engineering/reviewer/user.md

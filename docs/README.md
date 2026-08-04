@@ -17,6 +17,7 @@ Public-safe documentation for canonical site infrastructure.
 - [Hermes tuning](hermes-tuning.md) — managed Hermes runtime tuning.
 - [Hermes Control operations](hermes-control-operations.md) — companion-stack operation and verification.
 - [Managed service-state backup and restore](service-state-backup.md) — state backup and restore contracts.
+- [Super Simple Software Factory](sssf.md) — dedicated VM installation, workspace, visualizer, health, and state operations.
 - [Hermes state backup and restore](hermes-state-backup.md) — Hermes-specific state handling.
 - [Onramp app-platform contract](onramp-app-platform-contract.md) — ownership and placement boundaries for shared-host applications.
 - [Onramp host runbook](onramp-host-runbook.md) — canonical shared-host substrate operation.

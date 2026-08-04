@@ -1,0 +1,20 @@
+---
+sssf_runtime_user: sssf
+sssf_workspace_root: /srv/sssf/workspaces
+sssf_data_dir: /var/lib/sssf
+sssf_data_device: /dev/sdb
+sssf_config_path: /etc/sssf/sssf.config.yaml
+sssf_upstream_repository: https://github.com/disler/super-simple-software-factory
+sssf_upstream_commit: de31374882e7a4e3e5b7bb9bd09e69dc2f779356
+sssf_pi_path: /usr/local/bin/pi
+sssf_uv_path: /usr/local/bin/uv
+sssf_visualizer_enabled: false
+sssf_visualizer_host: 127.0.0.1
+sssf_visualizer_port: 4600
+sssf_max_concurrent_runs: 1
+sssf_allowed_repositories: []
+sssf_provider: openrouter
+sssf_visualizer_command: bun run --cwd .claude/skills/sssf/apps/visualizer dev --host {{ sssf_visualizer_host }} --port {{ sssf_visualizer_port }}
+sssf_openrouter_api_key: ""
+sssf_openai_api_key: ""
+sssf_fireworks_api_key: ""

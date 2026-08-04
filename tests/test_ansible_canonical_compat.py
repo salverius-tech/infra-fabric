@@ -64,10 +64,11 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             update={"version": "14.0.0", "checksum": "a" * 64, "source": "binary"}
         )
         projected = render_ansible_vars(model, self.catalog)
-        self.assertEqual(
-            projected["services"]["technitium"]["legacy_vars"],
-            {"technitium_discovery_version": "14.0.0", "technitium_portable_sha256": "a" * 64},
-        )
+        legacy = projected["services"]["technitium"]["legacy_vars"]
+        self.assertEqual(legacy["technitium_discovery_version"], "14.0.0")
+        self.assertEqual(legacy["technitium_portable_sha256"], "a" * 64)
+        self.assertEqual(legacy["technitium_vmid"], 106)
+        self.assertIn("technitium_runtime", legacy)
 
     def test_onramp_root_datastore_projects_from_typed_resource_storage(self) -> None:
         resource = self.model.resources.guests["forgejo"]
@@ -97,7 +98,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             {
                 "enabled": True,
                 "resource": "forgejo",
-                "endpoints": {"ports": {"dashboard": 8080}},
+                "endpoints": {"public_names": ["hermes.example.internal"], "ports": {"dashboard": 8080}},
                 "release": {"version": "1.0.0", "tag": "v2026.7.1", "commit": "d" * 40, "checksum": "e" * 64},
                 "configuration": configuration,
             }
@@ -144,9 +145,8 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         model = self.model.model_copy(deep=True)
         model.services["forgejo"].release = model.services["forgejo"].release.model_copy(update={"version": "10.0.0"})
         projected = render_ansible_vars(model, self.catalog)
-        self.assertEqual(
-            projected["services"]["forgejo"]["legacy_vars"],
-            {
+        legacy = projected["services"]["forgejo"]["legacy_vars"]
+        expected = {
                 "forgejo_domain": "git.example.internal",
                 "forgejo_root_url": "https://git.example.internal/",
                 "forgejo_ssh_port": 22,
@@ -160,8 +160,10 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                     "user": "forgejo",
                     "ssl_mode": "disable",
                 },
-            },
-        )
+            }
+        self.assertEqual({key: legacy[key] for key in expected}, expected)
+        self.assertEqual(legacy["forgejo_vmid"], 107)
+        self.assertIn("forgejo_runtime", legacy)
 
         mapping = self.catalog.get("hermes").inventory["canonical_play_vars"]
         self.assertEqual(mapping["hermes_runtime_user"], "configuration.runtime_user")
@@ -185,6 +187,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "services.hermes.secrets.control_bridge_token",
                 "services.hermes.secrets.dashboard_basic_auth_password_hash",
                 "services.hermes.secrets.dashboard_basic_auth_secret",
+                "services.providers.cloudflare.secrets.api_token",
             },
         )
         self.assertEqual(mapping["hermes_runtime_passwordless_sudo"], "resources.guests.hermes.security.allow_passwordless_sudo")

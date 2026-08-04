@@ -1,0 +1,263 @@
+---
+- name: Validate SSSF required variables
+  ansible.builtin.assert:
+    that:
+      - sssf_vmid is defined
+      - sssf_runtime_user is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - sssf_runtime_user != 'root'
+      - sssf_upstream_repository is match('^https://[^/@]+(?:/[^/@]+)+$')
+      - sssf_upstream_commit is match('^[0-9a-f]{40}$')
+      - sssf_workspace_root is match('^/[^ ]+$')
+      - sssf_data_dir is match('^/[^ ]+$')
+      - sssf_config_path is match('^/[^ ]+$')
+      - sssf_visualizer_host in ['127.0.0.1', '::1', 'localhost']
+      - sssf_visualizer_port | int >= 1
+      - sssf_visualizer_port | int <= 65535
+      - sssf_max_concurrent_runs | int >= 1
+      - sssf_max_concurrent_runs | int <= 4
+      - sssf_allowed_repositories is iterable
+      - lookup('env', 'OPENROUTER_API_KEY') | length > 0 or lookup('env', 'OPENAI_API_KEY') | length > 0 or lookup('env', 'FIREWORKS_API_KEY') | length > 0
+    fail_msg: >-
+      SSSF requires a pinned upstream commit, non-root runtime user, normalized paths,
+      loopback-only visualizer binding, bounded concurrency, and at least one provider key.
+
+- name: Install SSSF operating-system dependencies
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - git
+      - gnupg
+      - jq
+      - python3
+      - python3-venv
+      - sqlite3
+      - build-essential
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Ensure SSSF runtime user exists
+  ansible.builtin.user:
+    name: "{{ sssf_runtime_user }}"
+    shell: /bin/bash
+    create_home: true
+    groups: users
+    append: true
+
+- name: Ensure SSSF data mount point exists
+  ansible.builtin.file:
+    path: "{{ sssf_data_dir }}"
+    state: directory
+    owner: "{{ sssf_runtime_user }}"
+    group: "{{ sssf_runtime_user }}"
+    mode: '0750'
+
+- name: Detect SSSF data disk filesystem
+  ansible.builtin.command:
+    argv: [blkid, -s, TYPE, -o, value, "{{ sssf_data_device }}"]
+  register: sssf_data_filesystem
+  changed_when: false
+  failed_when: false
+
+- name: Create SSSF data disk filesystem when absent
+  ansible.builtin.command:
+    argv: [mkfs.ext4, -F, "{{ sssf_data_device }}"]
+  when: sssf_data_filesystem.stdout | trim == ''
+
+- name: Persist SSSF data disk mount
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: "^{{ sssf_data_device | regex_escape }}\\s"
+    line: "{{ sssf_data_device }} {{ sssf_data_dir }} ext4 noatime 0 2"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Mount SSSF data disk
+  ansible.builtin.command:
+    argv: [mount, "{{ sssf_data_dir }}"]
+  register: sssf_mount_result
+  changed_when: sssf_mount_result.rc == 0
+  failed_when: false
+
+- name: Ensure SSSF directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner | default(sssf_runtime_user) }}"
+    group: "{{ item.group | default(sssf_runtime_user) }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ sssf_workspace_root }}", mode: '0750' }
+    - { path: "{{ sssf_data_dir }}", mode: '0750' }
+    - { path: "{{ sssf_data_dir }}/upstream", mode: '0750' }
+    - { path: "{{ sssf_data_dir }}/factory", mode: '0750' }
+    - { path: /etc/sssf, owner: root, group: root, mode: '0755' }
+
+- name: Ensure Node.js 22 is available for the Pi coding agent
+  ansible.builtin.shell: |
+    set -euo pipefail
+    required_version='22.19.0'
+    if command -v node >/dev/null 2>&1; then
+      installed_version="$(node --version | sed 's/^v//')"
+      if dpkg --compare-versions "${installed_version}" ge "${required_version}"; then
+        printf '%s\n' node-current
+        exit 0
+      fi
+    fi
+    install -d -m 0755 /etc/apt/keyrings
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+      | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg
+    printf '%s\n' \
+      'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' \
+      > /etc/apt/sources.list.d/nodesource.list
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+  args:
+    executable: /bin/bash
+  register: sssf_node_install
+  changed_when: sssf_node_install.rc == 0 and 'node-current' not in sssf_node_install.stdout
+
+- name: Validate Node.js version for the Pi coding agent
+  ansible.builtin.command: node --version
+  register: sssf_node_version
+  changed_when: false
+  failed_when: >-
+    sssf_node_version.rc != 0 or
+    (sssf_node_version.stdout | trim | regex_replace('^v', '')) is version('22.19.0', '<')
+
+- name: Install uv when absent
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! command -v uv >/dev/null 2>&1; then
+      curl -LsSf https://astral.sh/uv/install.sh | sh
+    fi
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ sssf_runtime_user }}"
+  environment:
+    HOME: "/home/{{ sssf_runtime_user }}"
+  changed_when: false
+
+- name: Install pi coding agent when absent
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! command -v pi >/dev/null 2>&1; then
+      curl -fsSL https://pi.dev/install.sh | bash
+    fi
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ sssf_runtime_user }}"
+  environment:
+    HOME: "/home/{{ sssf_runtime_user }}"
+  changed_when: false
+
+- name: Expose non-root SSSF tool installations
+  ansible.builtin.file:
+    src: "/home/{{ sssf_runtime_user }}/.local/bin/{{ item.name }}"
+    dest: "{{ item.path }}"
+    state: link
+    force: true
+  loop:
+    - { name: uv, path: "{{ sssf_uv_path }}" }
+    - { name: pi, path: "{{ sssf_pi_path }}" }
+
+- name: Initialize SSSF upstream checkout
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if [ ! -d {{ (sssf_data_dir ~ '/upstream/.git') | quote }} ]; then
+      rm -rf {{ sssf_data_dir | quote }}/upstream
+      git clone --no-checkout {{ sssf_upstream_repository | quote }} {{ (sssf_data_dir ~ '/upstream') | quote }}
+    fi
+    upstream={{ (sssf_data_dir ~ '/upstream') | quote }}
+    git -c safe.directory="${upstream}" -C "${upstream}" fetch --depth=1 origin {{ sssf_upstream_commit | quote }}
+    git -c safe.directory="${upstream}" -C "${upstream}" checkout --force {{ sssf_upstream_commit | quote }}
+    chown -R {{ sssf_runtime_user | quote }}:{{ sssf_runtime_user | quote }} {{ (sssf_data_dir ~ '/upstream') | quote }}
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Install SSSF config
+  ansible.builtin.template:
+    src: sssf.config.yaml.j2
+    dest: "{{ sssf_config_path }}"
+    owner: root
+    group: "{{ sssf_runtime_user }}"
+    mode: '0640'
+  notify: Restart sssf visualizer
+
+- name: Install SSSF environment file
+  ansible.builtin.template:
+    src: sssf.env.j2
+    dest: /etc/sssf/env
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  notify: Restart sssf visualizer
+
+- name: Install SSSF workspace initialization helper
+  ansible.builtin.template:
+    src: sssf-init
+    dest: /usr/local/bin/sssf-init
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install SSSF health check
+  ansible.builtin.template:
+    src: sssf-health
+    dest: /usr/local/bin/sssf-health
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install SSSF visualizer unit
+  ansible.builtin.template:
+    src: sssf-visualizer.service.j2
+    dest: /etc/systemd/system/sssf-visualizer.service
+    owner: root
+    group: root
+    mode: '0644'
+  when: sssf_visualizer_enabled | bool
+  notify: Restart sssf visualizer
+
+- name: Install Bun for the optional SSSF visualizer
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if ! command -v bun >/dev/null 2>&1; then
+      curl -fsSL https://bun.sh/install | bash
+      install -m 0755 /root/.bun/bin/bun /usr/local/bin/bun
+    fi
+    bun install --cwd {{ (sssf_data_dir ~ '/upstream/.claude/skills/sssf/apps/visualizer') | quote }} --frozen-lockfile
+  args:
+    executable: /bin/bash
+  become: true
+  become_user: "{{ sssf_runtime_user }}"
+  when: sssf_visualizer_enabled | bool
+  changed_when: false
+
+- name: Remove SSSF visualizer unit when disabled
+  ansible.builtin.file:
+    path: /etc/systemd/system/sssf-visualizer.service
+    state: absent
+  when: not (sssf_visualizer_enabled | bool)
+  notify: Restart sssf visualizer
+
+- name: Enable SSSF visualizer
+  ansible.builtin.systemd:
+    name: sssf-visualizer
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: sssf_visualizer_enabled | bool
+
+- name: Verify SSSF source revision
+  ansible.builtin.command:
+    argv: [git, -c, "safe.directory={{ sssf_data_dir }}/upstream", -C, "{{ sssf_data_dir }}/upstream", rev-parse, HEAD]
+  register: sssf_revision
+  changed_when: false
+  failed_when: sssf_revision.stdout | trim != sssf_upstream_commit

@@ -1,7 +1,7 @@
 locals {
   service_registry                  = jsondecode(file("${path.module}/../services.json"))
   service_names                     = keys(local.service_registry.services)
-  runtime_service_names             = ["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes", "onramp_host"]
+  runtime_service_names             = ["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes", "sssf", "onramp_host"]
   enabled_services                  = toset(coalesce(var.enabled_services, local.service_registry.default_services))
   invalid_enabled_services          = setsubtract(local.enabled_services, toset(local.service_names))
   invalid_service_runtime_services  = setsubtract(toset(keys(var.service_runtime)), toset(local.runtime_service_names))
@@ -13,6 +13,7 @@ locals {
   forgejo_runner_enabled   = contains(local.enabled_services, "forgejo_runner")
   infisical_enabled        = contains(local.enabled_services, "infisical")
   hermes_enabled           = contains(local.enabled_services, "hermes")
+  sssf_enabled             = contains(local.enabled_services, "sssf")
   onramp_host_enabled      = contains(local.enabled_services, "onramp_host")
 
   technitium_runtime       = lookup(var.service_runtime, "technitium", { type = "lxc", cloud_init_user = null })
@@ -20,6 +21,7 @@ locals {
   forgejo_runner_runtime   = lookup(var.service_runtime, "forgejo_runner", { type = "lxc", cloud_init_user = null })
   infisical_runtime        = lookup(var.service_runtime, "infisical", { type = "lxc", cloud_init_user = null })
   hermes_runtime           = lookup(var.service_runtime, "hermes", { type = "lxc", cloud_init_user = null })
+  sssf_runtime             = lookup(var.service_runtime, "sssf", { type = "vm", cloud_init_user = null })
   onramp_host_runtime      = lookup(var.service_runtime, "onramp_host", { type = "vm", cloud_init_user = null })
 
   canonical_operator_access = {
@@ -36,6 +38,7 @@ locals {
   forgejo_runner_runtime_type   = local.forgejo_runner_runtime.type
   infisical_runtime_type        = local.infisical_runtime.type
   hermes_runtime_type           = local.hermes_runtime.type
+  sssf_runtime_type             = local.sssf_runtime.type
   onramp_host_runtime_type      = local.onramp_host_runtime.type
 
   technitium_lxc_enabled       = local.technitium_enabled && local.technitium_runtime_type == "lxc"
@@ -43,9 +46,10 @@ locals {
   forgejo_runner_lxc_enabled   = local.forgejo_runner_enabled && local.forgejo_runner_runtime_type == "lxc"
   infisical_lxc_enabled        = local.infisical_enabled && local.infisical_runtime_type == "lxc"
   hermes_lxc_enabled           = local.hermes_enabled && local.hermes_runtime_type == "lxc"
+  sssf_lxc_enabled             = local.sssf_enabled && local.sssf_runtime_type == "lxc"
 
-  service_vm_image_enabled = (local.technitium_enabled && local.technitium_runtime_type == "vm") || (local.tailscale_client_enabled && local.tailscale_client_runtime_type == "vm") || (local.forgejo_runner_enabled && local.forgejo_runner_runtime_type == "vm") || (local.infisical_enabled && local.infisical_runtime_type == "vm") || (local.hermes_enabled && local.hermes_runtime_type == "vm")
-  lxc_template_enabled     = local.technitium_lxc_enabled || (local.forgejo_enabled && local.forgejo_runtime_type == "lxc") || local.tailscale_client_lxc_enabled || local.forgejo_runner_lxc_enabled || local.infisical_lxc_enabled || local.hermes_lxc_enabled
+  service_vm_image_enabled = (local.technitium_enabled && local.technitium_runtime_type == "vm") || (local.tailscale_client_enabled && local.tailscale_client_runtime_type == "vm") || (local.forgejo_runner_enabled && local.forgejo_runner_runtime_type == "vm") || (local.infisical_enabled && local.infisical_runtime_type == "vm") || (local.hermes_enabled && local.hermes_runtime_type == "vm") || (local.sssf_enabled && local.sssf_runtime_type == "vm")
+  lxc_template_enabled     = local.technitium_lxc_enabled || (local.forgejo_enabled && local.forgejo_runtime_type == "lxc") || local.tailscale_client_lxc_enabled || local.forgejo_runner_lxc_enabled || local.infisical_lxc_enabled || local.hermes_lxc_enabled || local.sssf_lxc_enabled
 }
 
 resource "terraform_data" "enabled_services_validation" {

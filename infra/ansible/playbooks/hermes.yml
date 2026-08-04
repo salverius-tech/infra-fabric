@@ -9,7 +9,9 @@
       vars:
         lxc_ready_vmid: '{{ hermes_vmid }}'
         lxc_ready_name: hermes
-      when: hermes_runtime.type | default('lxc') == 'lxc'
+      when:
+        - hermes_runtime.type | default('lxc') == 'lxc'
+        - not (infra_host_identity_skip_root | default(false) | bool)
 - name: Run direct access handoff for Hermes
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
@@ -22,5 +24,11 @@
   hosts: hermes
   gather_facts: true
   become: true
+  vars:
+    caddy_cloudflare_api_token: "{{ lookup('env', 'CF_DNS_API_TOKEN') }}"
+    hermes_control_api_token: "{{ lookup('env', 'HERMES_CONTROL_API_TOKEN') }}"
+    hermes_control_bridge_token: "{{ lookup('env', 'HERMES_CONTROL_BRIDGE_TOKEN') }}"
+    hermes_dashboard_basic_auth_password_hash: "{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH') }}"
+    hermes_dashboard_basic_auth_secret: "{{ lookup('env', 'HERMES_DASHBOARD_BASIC_AUTH_SECRET') }}"
   roles:
     - hermes

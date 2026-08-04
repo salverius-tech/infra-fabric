@@ -21,12 +21,12 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
     def test_current_sources_are_fully_classified(self) -> None:
         report = MODULE.build_report(ROOT)
 
-        self.assertEqual(report["opentofu"]["variable_count"], 184)
-        self.assertEqual(len(report["opentofu"]["variables"]), 184)
+        self.assertEqual(report["opentofu"]["variable_count"], 205)
+        self.assertEqual(len(report["opentofu"]["variables"]), 205)
         self.assertEqual(report["classification"]["unclassified_variables"], [])
-        self.assertEqual(len(report["service_catalog"]["services"]), 9)
-        self.assertEqual(report["canonical_path_coverage"]["checked_count"], 71)
-        self.assertEqual(report["canonical_path_coverage"]["valid_count"], 71)
+        self.assertEqual(len(report["service_catalog"]["services"]), 10)
+        self.assertEqual(report["canonical_path_coverage"]["checked_count"], 86)
+        self.assertEqual(report["canonical_path_coverage"]["valid_count"], 86)
         self.assertEqual(report["canonical_path_coverage"]["invalid_count"], 0)
         self.assertEqual(report["canonical_path_coverage"]["status"], "complete")
         self.assertEqual(report["matrix_path_coverage"]["checked_count"], 248)
@@ -59,7 +59,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(report["source_reconciliation"]["status"], "complete")
         self.assertEqual(report["source_inventory"]["source_count"], 16)
         self.assertTrue(report["source_inventory"]["coverage"]["source_files_present"])
-        self.assertEqual(report["source_inventory"]["coverage"]["opentofu_variables_inventoried"], 184)
+        self.assertEqual(report["source_inventory"]["coverage"]["opentofu_variables_inventoried"], 205)
         self.assertGreater(report["source_inventory"]["scaffold"]["terraform_assignment_count"], 0)
         self.assertIn("a_records", report["source_inventory"]["scaffold"]["dns"]["top_level_keys"])
         self.assertIn("tf_vmid", report["source_inventory"]["ansible"]["inventory_fields"])
@@ -382,7 +382,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             },
             report["matrix_coverage"]["matched"],
         )
-        self.assertEqual(len(report["service_contracts"]), 9)
+        self.assertEqual(len(report["service_contracts"]), 10)
         self.assertTrue(report["consumer_contract"]["legacy_terraform_input_present"])
         self.assertTrue(report["consumer_contract"]["legacy_static_inventory_present"])
         self.assertEqual(report["classification"]["inventory_status"], "complete")
@@ -519,7 +519,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertNotIn("REPLACE_WITH_A_LONG_RANDOM_PASSWORD", encoded)
         self.assertNotIn("ssh-ed25519 AAAA", encoded)
         self.assertEqual(report["schema"], 1)
-        self.assertEqual(report["opentofu"]["variable_count"], 184)
+        self.assertEqual(report["opentofu"]["variable_count"], 205)
         blockers = (ROOT / "docs" / "canonical-values-model-blockers.md").read_text(encoding="utf-8")
         for heading in (
             "## Secret or protected inputs",

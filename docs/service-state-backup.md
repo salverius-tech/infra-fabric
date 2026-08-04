@@ -65,6 +65,8 @@ Current service-state targets are:
 - `onramp_host` — `/etc/caddy` and the configured onramp deployment directory.
 - `infisical_onramp` — Infisical onramp deployment directory and Caddy snippet.
 - `searxng_onramp` — SearXNG onramp deployment directory and Caddy snippet.
+- `sssf` — the pinned upstream checkout, factory configuration, SQLite event trace,
+  and workspace state under the dedicated SSSF guest.
 
 The definitions live in `infra/ansible/vars/service-state.yml`. Add a target
 there when this repo starts managing a new stateful service.

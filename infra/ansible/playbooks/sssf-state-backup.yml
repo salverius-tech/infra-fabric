@@ -1,0 +1,9 @@
+---
+- name: Back up SSSF runtime state through the managed service-state workflow
+  ansible.builtin.import_playbook: service-state-backup.yml
+  vars:
+    service_state_service: sssf
+    service_state_hosts: sssf
+    service_state_backup_root: >-
+      {{ lookup('env', 'SSSF_STATE_BACKUP_DIR')
+         | default('/workspace/values/service-backups', true) }}

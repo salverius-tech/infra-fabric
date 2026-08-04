@@ -60,6 +60,16 @@ variable "disk" {
   })
 }
 
+variable "extra_disks" {
+  description = "Additional Proxmox-managed VM disks."
+  type = list(object({
+    datastore_id = string
+    size_gb      = number
+    interface    = string
+  }))
+  default = []
+}
+
 variable "cores" {
   description = "CPU cores."
   type        = number

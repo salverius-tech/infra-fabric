@@ -56,6 +56,13 @@ guests:
         size_gb: 16
         target: /
         backup: true
+      volumes:
+        data:
+          type: proxmox_volume
+          storage_id: local-lvm
+          size_gb: 100
+          target: /var/lib/sssf
+          backup: true
     runtime:
       started: true
       start_on_boot: false

@@ -17,7 +17,7 @@ from atomic_output import atomic_output_directory
 from pydantic import ValidationError
 
 import canonical_values
-from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, InfisicalOnrampConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, ServiceEndpoints, ServiceRelease, SearxngConfiguration, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
+from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, InfisicalOnrampConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, ServiceEndpoints, ServiceRelease, SearxngConfiguration, SssfConfiguration, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
 from canonical_projections import (
     ProjectionError,
     _resource_variables,
@@ -99,6 +99,21 @@ services:
 
 
 class CanonicalValuesTests(unittest.TestCase):
+    def test_sssf_configuration_is_strict_and_loopback_visualizer_is_default(self) -> None:
+        configuration = SssfConfiguration.model_validate({})
+        self.assertEqual(configuration.runtime_user, "sssf")
+        self.assertFalse(configuration.visualizer_enabled)
+        self.assertEqual(configuration.visualizer_host, "127.0.0.1")
+        self.assertEqual(configuration.provider, "openrouter")
+        with self.assertRaises(ValueError):
+            SssfConfiguration.model_validate({"runtime_user": "root"})
+        with self.assertRaises(ValueError):
+            SssfConfiguration.model_validate({"visualizer_host": "0.0.0.0"})
+        with self.assertRaises(ValueError):
+            SssfConfiguration.model_validate({"allowed_repositories": ["https://user:pass@example.invalid/repo.git"]})
+        with self.assertRaises(ValueError):
+            SssfConfiguration.model_validate({"provider": "unsupported"})
+
     def test_runtime_env_is_allow_listed_and_escaped(self) -> None:
         rendered = render_runtime_env(
             {"PUBLIC_URL": "https://example.internal/$service", "TOKEN": "synthetic-secret"},
@@ -254,7 +269,7 @@ class CanonicalValuesTests(unittest.TestCase):
     def test_service_configuration_registry_covers_typed_services(self) -> None:
         self.assertEqual(
             set(canonical_values.SERVICE_CONFIGURATION_MODELS),
-            {"forgejo", "forgejo_runner", "hermes", "infisical", "infisical_onramp", "searxng_onramp", "tailscale_client", "technitium"},
+            {"forgejo", "forgejo_runner", "hermes", "infisical", "infisical_onramp", "searxng_onramp", "sssf", "tailscale_client", "technitium"},
         )
         for name, model in canonical_values.SERVICE_CONFIGURATION_MODELS.items():
             with self.subTest(service=name):

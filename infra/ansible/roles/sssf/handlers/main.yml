@@ -1,0 +1,7 @@
+---
+- name: Restart sssf visualizer
+  ansible.builtin.systemd:
+    name: sssf-visualizer
+    state: restarted
+    daemon_reload: true
+  when: sssf_visualizer_enabled | bool

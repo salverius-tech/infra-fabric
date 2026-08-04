@@ -311,7 +311,7 @@ Docs: operator runbook, service-specific maintenance/rollback guidance
 
 **Step 3: Define acceptance gates**
 
-Separate static/public gates from private/live gates. Require all of:
+Separate static/public gates from site-local/live gates. Require all of:
 
 ```text
 schema/catalog/projection parity
@@ -396,7 +396,7 @@ catalog candidate requirements
 required schema/projection/OpenTofu/Ansible/state/secret contract work
 files to create or modify
 fixture/test/documentation checklist
-manual/private/live acceptance gates
+manual/site-local/live acceptance gates
 unsupported requested behavior
 ```
 
@@ -478,7 +478,7 @@ Run `just --list` and compare every public recipe, signature, and command exampl
 
 **Step 5: Review without committing**
 
-Present the exact changed-file list, validation evidence, and remaining private/live acceptance gates. Do not commit, push, plan against production, or apply without separate authorization.
+Present the exact changed-file list, validation evidence, and remaining site-local/live acceptance gates. Do not commit, push, plan against production, or apply without separate authorization.
 
 ## Risks and mitigations
 

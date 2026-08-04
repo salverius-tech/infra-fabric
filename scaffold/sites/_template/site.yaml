@@ -104,6 +104,44 @@ resources:
         started: true
         start_on_boot: true
         unprivileged: true
+    sssf:
+      type: vm
+      identity:
+        vmid: 113
+        hostname: sssf-factory
+        description: Super Simple Software Factory example VM
+      network:
+        address: 192.0.2.73/24
+        gateway: 192.0.2.1
+        bridge: vmbr0
+        dns_servers:
+          - 1.1.1.1
+          - 9.9.9.9
+        search_domain: example.internal
+      compute:
+        cores: 4
+        memory_mb: 8192
+        swap_mb: 0
+      storage:
+        root:
+          type: proxmox_volume
+          storage_id: local-lvm
+          size_gb: 40
+          target: /
+          backup: true
+        volumes:
+          data:
+            type: proxmox_volume
+            storage_id: local-lvm
+            size_gb: 100
+            target: /var/lib/sssf
+            backup: true
+      runtime:
+        started: true
+        start_on_boot: true
+        firmware: uefi
+        machine: q35
+        guest_agent: true
 
 services:
   technitium:
@@ -149,6 +187,32 @@ services:
     configuration:
       database:
         type: sqlite
+  sssf:
+    enabled: true
+    resource: sssf
+    release:
+      commit: "de31374882e7a4e3e5b7bb9bd09e69dc2f779356"
+    state:
+      capable: true
+      disable_policy: retain
+    configuration:
+      runtime_user: sssf
+      workspace_root: /srv/sssf/workspaces
+      data_dir: /var/lib/sssf
+      config_path: /etc/sssf/sssf.config.yaml
+      upstream_repository: https://github.com/disler/super-simple-software-factory
+      pi_path: /usr/local/bin/pi
+      uv_path: /usr/local/bin/uv
+      visualizer_enabled: false
+      visualizer_host: 127.0.0.1
+      visualizer_port: 4600
+      max_concurrent_runs: 1
+      allowed_repositories: []
+      provider: openrouter
+    endpoints:
+      visibility: internal
+      dns:
+        enabled: false
   forgejo_runner:
     enabled: false
   hermes:

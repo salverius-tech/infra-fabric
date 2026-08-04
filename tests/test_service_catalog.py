@@ -25,6 +25,7 @@ class ServiceCatalogTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "infra" / "services.json"
         catalog = load_catalog(path)
         self.assertIn("forgejo", catalog.names)
+        self.assertIn("sssf", catalog.names)
         catalog.validate_selection({"forgejo", "forgejo_runner"})
         searxng = catalog.get("searxng_onramp")
         self.assertEqual(searxng.raw["release"]["source"], "container")
@@ -36,6 +37,7 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(catalog.get("forgejo").runtime_owner, "guest")
         self.assertEqual(catalog.get("onramp_host").runtime_owner, "shared_host")
         self.assertEqual(catalog.get("searxng_onramp").runtime_owner, "none")
+        self.assertEqual(catalog.get("sssf").runtime_owner, "guest")
 
     def test_required_field_report_is_value_free_and_ordered(self) -> None:
         catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
@@ -293,9 +295,10 @@ class ServiceCatalogTests(unittest.TestCase):
                 state=SimpleNamespace(capable=False),
                 configuration={"control": {"enabled": control}, "dashboard": {"enabled": dashboard}},
             )
-        api = {"services.hermes.secrets.control_api_token", "services.hermes.secrets.control_bridge_token"}
-        dashboard = {"services.hermes.secrets.dashboard_basic_auth_password_hash", "services.hermes.secrets.dashboard_basic_auth_secret"}
-        self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(False, False)}), frozenset())
+        cloudflare = {"services.providers.cloudflare.secrets.api_token"}
+        api = {"services.hermes.secrets.control_api_token", "services.hermes.secrets.control_bridge_token"} | cloudflare
+        dashboard = {"services.hermes.secrets.dashboard_basic_auth_password_hash", "services.hermes.secrets.dashboard_basic_auth_secret"} | cloudflare
+        self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(False, False)}), cloudflare)
         self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(True, False)}), api)
         self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(False, True)}), dashboard)
         self.assertEqual(catalog.required_secret_paths_for_model({"hermes": service(True, True)}), api | dashboard)

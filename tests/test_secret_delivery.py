@@ -176,11 +176,12 @@ class SecretDeliveryTests(unittest.TestCase):
             {
                 "services.hermes.secrets.control_api_token",
                 "services.hermes.secrets.control_bridge_token",
+                "services.providers.cloudflare.secrets.api_token",
             },
         )
         self.assertEqual(
             {requirement.environment_name for requirement in requirements},
-            {"HERMES_CONTROL_API_TOKEN", "HERMES_CONTROL_BRIDGE_TOKEN"},
+            {"HERMES_CONTROL_API_TOKEN", "HERMES_CONTROL_BRIDGE_TOKEN", "CF_DNS_API_TOKEN"},
         )
 
     def test_service_delivery_requires_every_selected_contract_secret(self) -> None:
@@ -193,9 +194,9 @@ class SecretDeliveryTests(unittest.TestCase):
     def test_service_without_runtime_secrets_keeps_bootstrap_only(self) -> None:
         catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
         services = {"technitium": SimpleNamespace(enabled=True, configuration={})}
-        provider = FakeProvider({"secrets.bootstrap.root_password": "ROOT"})
+        provider = FakeProvider({"secrets.bootstrap.root_password": "ROOT", "services.providers.cloudflare.secrets.api_token": "CF"})
         environment = secret_delivery.deliver_services_environment(provider, catalog, services)
-        self.assertEqual(environment, {"INFRA_BOOTSTRAP_ROOT_PASSWORD": "ROOT"})
+        self.assertEqual(environment, {"INFRA_BOOTSTRAP_ROOT_PASSWORD": "ROOT", "CF_DNS_API_TOKEN": "CF"})
 
     def test_model_contract_secrets_forbid_state_exposure(self) -> None:
         catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")

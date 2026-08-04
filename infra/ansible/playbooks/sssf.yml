@@ -1,0 +1,15 @@
+---
+- name: Run direct access handoff for SSSF
+  ansible.builtin.import_playbook: direct-access-ready.yml
+  vars:
+    direct_access_ready_hosts: sssf
+- name: Converge canonical host identities for SSSF
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: sssf
+- name: Configure Super Simple Software Factory directly
+  hosts: sssf
+  gather_facts: true
+  become: true
+  roles:
+    - sssf

@@ -9,7 +9,9 @@
       vars:
         lxc_ready_vmid: '{{ infisical_vmid }}'
         lxc_ready_name: infisical
-      when: infisical_runtime.type | default('lxc') == 'lxc'
+      when:
+        - infisical_runtime.type | default('lxc') == 'lxc'
+        - not (infra_host_identity_skip_root | default(false) | bool)
 - name: Run direct access handoff for Infisical
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
@@ -22,5 +24,10 @@
   hosts: infisical
   gather_facts: false
   become: true
+  vars:
+    caddy_cloudflare_api_token: "{{ lookup('env', 'CF_DNS_API_TOKEN') }}"
+    infisical_auth_secret: "{{ lookup('env', 'INFISICAL_AUTH_SECRET') }}"
+    infisical_encryption_key: "{{ lookup('env', 'INFISICAL_ENCRYPTION_KEY') }}"
+    infisical_postgres_password: "{{ lookup('env', 'INFISICAL_POSTGRES_PASSWORD') }}"
   roles:
     - infisical

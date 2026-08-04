@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_url=${1:?usage: sssf-init https://host/org/repo [workspace]}
+workspace=${2:-"{{ sssf_workspace_root }}/$(basename "${repo_url%.git}")"}
+case "${repo_url}" in
+{% for repo in sssf_allowed_repositories %}  {{ repo }}|{{ repo }}.git)
+    ;;
+{% endfor %}  *)
+    echo "repository is not in the canonical SSSF allow-list" >&2
+    exit 1
+    ;;
+esac
+
+install -d -m 0750 -o {{ sssf_runtime_user }} -g {{ sssf_runtime_user }} "${workspace}"
+if [ ! -d "${workspace}/.git" ]; then
+  git clone "${repo_url}" "${workspace}"
+else
+  git -C "${workspace}" fetch --prune origin
+fi
+install -d -m 0750 "${workspace}/.claude/skills"
+rm -rf "${workspace}/.claude/skills/sssf"
+cp -a {{ sssf_data_dir }}/upstream/.claude/skills/sssf "${workspace}/.claude/skills/sssf"
+cp -n {{ sssf_config_path }} "${workspace}/sssf.config.yaml" || true
+chown -R {{ sssf_runtime_user }}:{{ sssf_runtime_user }} "${workspace}"
+printf 'initialized %s\n' "${workspace}"

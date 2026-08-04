@@ -358,7 +358,7 @@ def _leaf_paths(data: dict[str, Any], prefix: str = "") -> list[str]:
         path = f"{prefix}.{key}" if prefix else key
         if isinstance(value, dict):
             paths.extend(_leaf_paths(value, path))
-        elif isinstance(value, str) and value:
+        elif isinstance(value, str):
             paths.append(path)
         else:
             raise SecretProviderError(f"secret leaf must be a non-empty string: {path}")

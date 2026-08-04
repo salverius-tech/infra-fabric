@@ -165,11 +165,16 @@ def _resource_variables(name: str, resource: Any) -> dict[str, Any]:
         f"{prefix}_memory_mb": resource.compute.memory_mb,
         f"{prefix}_disk_gb": resource.storage.root.size_gb,
     }
+    if name == "sssf":
+        data_volume = resource.storage.volumes.get("data")
+        if data_volume is None or data_volume.size_gb is None:
+            raise ProjectionError("sssf resource must declare a sized storage.volumes.data volume")
+        values["sssf_data_disk_gb"] = data_volume.size_gb
     if resource.type == "lxc":
         values[f"{prefix}_swap_mb"] = resource.compute.swap_mb
     if name == "onramp_host":
         values["onramp_host_datastore_id"] = resource.storage.root.storage_id
-    if name in {"forgejo_runner", "infisical", "hermes", "tailscale_client", "onramp_host"}:
+    if name in {"forgejo_runner", "infisical", "hermes", "sssf", "tailscale_client", "onramp_host"}:
         values[f"{name}_started"] = resource.runtime.started
         values[f"{name}_start_on_boot"] = resource.runtime.start_on_boot
     if network.gateway is not None:
@@ -393,6 +398,11 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                 value = _compatibility_value(model, service, resource, canonical_path)
                 if value is not None:
                     legacy_vars[legacy_name] = value
+        vmid_var = capability.inventory.get("vmid_var")
+        if isinstance(vmid_var, str) and vmid_var:
+            legacy_vars[vmid_var] = resource.identity.vmid
+        legacy_vars[f"{name}_runtime"] = resource.runtime.model_dump(mode="json", exclude_none=True)
+        legacy_vars["caddy_email"] = model.platform.ingress.acme.email
         if name == "technitium":
             caddy = service.configuration.get("caddy")
             if isinstance(caddy, Mapping) and caddy.get("enabled", True):

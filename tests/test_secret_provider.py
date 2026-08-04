@@ -105,6 +105,15 @@ class SecretProviderTests(unittest.TestCase):
                 frozenset({"services.forgejo.missing"}),
             )
 
+    def test_bundle_allows_empty_optional_leaf_but_rejects_it_when_required(self) -> None:
+        bundle = SecretBundle(
+            {"services": {"sssf": {"openrouter_api_key": "configured", "openai_api_key": ""}}},
+            frozenset({"services.sssf.openrouter_api_key"}),
+        )
+        self.assertIn("services.sssf.openai_api_key", bundle.discover())
+        with self.assertRaisesRegex(SecretProviderError, "non-empty string"):
+            bundle.validate_required({"services.sssf.openai_api_key"})
+
     def test_bundle_repr_is_redacted(self) -> None:
         bundle = SecretBundle(
             {"services": {"forgejo": {"admin_password": "placeholder-secret"}}},

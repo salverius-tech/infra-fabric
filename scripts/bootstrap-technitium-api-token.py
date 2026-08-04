@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import secrets
 import sys
 import time
@@ -130,7 +131,7 @@ def ensure_admin_password(
 def bootstrap(env_file: Path, retries: int, delay: int, token_name: str) -> bool:
     env_lines = read_lines(env_file)
     entries = parse_env_lines(env_lines, env_file)
-    api_url = env_value(entries, "TECHNITIUM_API_URL")
+    api_url = env_value(entries, "TECHNITIUM_API_URL") or os.environ.get("TECHNITIUM_API_URL", "")
     if is_placeholder(api_url):
         raise BootstrapError("TECHNITIUM_API_URL must be set before bootstrapping Technitium API token")
 

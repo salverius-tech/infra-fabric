@@ -32,6 +32,13 @@ def _path_value(value: Any, path: str) -> Any:
     return value
 
 
+def _condition_matches(value: Any, condition: str) -> bool:
+    if "=" in condition:
+        path, expected = condition.split("=", 1)
+        return str(_path_value(value, path.removeprefix("configuration."))) == expected
+    return _path_value(value, condition.removeprefix("configuration.")) is True
+
+
 def _service_required_field_value(service: object, field: str, resources: Any | None) -> object:
     if not field.startswith("resource."):
         return _path_value(service, field)
@@ -141,7 +148,7 @@ class ServiceCatalog:
             service = services[name]
             configuration = getattr(service, "configuration", {})
             for condition, conditional_paths in self.get(name).conditional_required_secrets.items():
-                if _path_value(configuration, condition.removeprefix("configuration.")) is True:
+                if _condition_matches(configuration, condition):
                     paths.update(conditional_paths)
         return frozenset(paths)
 
@@ -335,7 +342,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
         if not isinstance(conditional_required_secrets, dict) or any(
             not isinstance(condition, str)
             or not condition
-            or not all(_LOGICAL_PART_RE.fullmatch(part) for part in condition.split("."))
+            or not all(_LOGICAL_PART_RE.fullmatch(part) for part in condition.split("=", 1)[0].split("."))
             or not isinstance(paths, list)
             or not all(
                 isinstance(secret_path, str)

@@ -12,5 +12,7 @@
   hosts: onramp_host
   gather_facts: true
   become: true
+  vars:
+    caddy_cloudflare_api_token: "{{ lookup('env', 'CF_DNS_API_TOKEN') }}"
   roles:
     - onramp_host

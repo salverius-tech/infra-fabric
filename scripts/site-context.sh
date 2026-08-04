@@ -11,6 +11,9 @@ require_site_context() {
   local values_path
   values_path="$(site_values_dir)" || return
   export INFRA_VALUES_DIR="${INFRA_VALUES_DIR:-${values_path}}"
+  # Canonical SOPS consumers use the site-scoped external age identity by default.
+  # Callers may override this for an explicitly supplied transport path.
+  export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${HOME}/.config/infra-fabric/keys/${site}/site.age}"
   if [[ -f "${values_path}/site.yaml" ]]; then
     return 0
   fi

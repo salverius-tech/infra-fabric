@@ -471,6 +471,132 @@ variable "forgejo_database" {
   }
 }
 
+variable "sssf_vmid" {
+  description = "Proxmox VMID for the SSSF guest."
+  type        = number
+  default     = 113
+}
+
+variable "sssf_hostname" {
+  description = "Hostname for the SSSF guest."
+  type        = string
+  default     = "sssf-factory"
+}
+
+variable "sssf_description" {
+  description = "Description for the SSSF guest."
+  type        = string
+  default     = "Super Simple Software Factory service VM managed by OpenTofu."
+}
+
+variable "sssf_ipv4_address" {
+  description = "IPv4 address/CIDR for SSSF, or dhcp when the router supplies a static DHCP reservation."
+  type        = string
+  default     = "dhcp"
+}
+
+variable "sssf_ipv4_gateway" {
+  description = "IPv4 gateway for SSSF. Use null when the address is dhcp."
+  type        = string
+  default     = null
+}
+
+variable "sssf_mac_address" {
+  description = "Optional MAC address for SSSF."
+  type        = string
+  default     = null
+}
+
+variable "sssf_lan_ip" {
+  description = "Expected SSSF LAN IP without CIDR."
+  type        = string
+  default     = "192.0.2.73"
+}
+
+variable "sssf_dns_servers" {
+  description = "DNS servers used by SSSF."
+  type        = list(string)
+  default     = ["192.0.2.1"]
+}
+
+variable "sssf_search_domain" {
+  description = "DNS search domain for SSSF."
+  type        = string
+  default     = "example.internal"
+}
+
+variable "sssf_bridge" {
+  description = "Proxmox bridge for SSSF."
+  type        = string
+  default     = "vmbr0"
+}
+
+variable "sssf_vlan_id" {
+  description = "Optional VLAN tag for SSSF."
+  type        = number
+  default     = null
+}
+
+variable "sssf_cores" {
+  description = "CPU cores for SSSF."
+  type        = number
+  default     = 4
+}
+
+variable "sssf_memory_mb" {
+  description = "Dedicated memory in MiB for SSSF."
+  type        = number
+  default     = 8192
+}
+
+variable "sssf_swap_mb" {
+  description = "Swap in MiB for SSSF when using the LXC compatibility runtime."
+  type        = number
+  default     = 1024
+}
+
+variable "sssf_disk_gb" {
+  description = "Root filesystem size in GB for SSSF."
+  type        = number
+  default     = 40
+}
+
+variable "sssf_data_disk_gb" {
+  description = "Separate durable data disk size in GB for SSSF workspaces and traces."
+  type        = number
+  default     = 100
+}
+
+variable "sssf_started" {
+  description = "Whether OpenTofu should start SSSF."
+  type        = bool
+  default     = true
+}
+
+variable "sssf_start_on_boot" {
+  description = "Whether Proxmox should start SSSF on host boot."
+  type        = bool
+  default     = true
+}
+
+variable "sssf_startup_order" {
+  description = "Proxmox startup order for SSSF."
+  type        = string
+  default     = "7"
+}
+
+variable "sssf_startup_up_delay" {
+  description = "Seconds to wait after starting SSSF."
+  type        = string
+  default     = "20"
+}
+
+variable "sssf_startup_down_delay" {
+  description = "Seconds to wait after stopping SSSF."
+  type        = string
+  default     = "20"
+}
+
 variable "service_storage" {
   description = "Per-service durable storage definitions. Keys are service names, then logical mount names such as data, config, backup, or cache."
   type = map(map(object({

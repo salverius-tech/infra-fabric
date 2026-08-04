@@ -110,9 +110,12 @@ def inventory_args(inventories: Iterable[str]) -> list[str]:
 
 def canonical_identity_extra_args() -> tuple[str, ...]:
     identity = os.environ.get("INFRA_SSH_IDENTITY_FILE", "")
-    if not identity or not re.fullmatch(r"[A-Za-z0-9._-]+", identity):
-        return ()
-    return ("-e", f"ansible_ssh_private_key_file={Path.home() / '.ssh' / identity}")
+    args: list[str] = []
+    if identity and re.fullmatch(r"[A-Za-z0-9._-]+", identity):
+        args.extend(("-e", f"ansible_ssh_private_key_file={Path.home() / '.ssh' / identity}"))
+    if os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "").strip().lower() != "false":
+        args.extend(("-e", "infra_host_identity_skip_root=true"))
+    return tuple(args)
 
 
 def load_env_file(path: Path) -> dict[str, str]:
@@ -173,7 +176,14 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     dns_path = generated_path("dns-records.json")
     if not dns_path.is_file():
         raise RuntimeError("canonical DNS projection is unavailable")
-    return {"DNS_RECORDS_FILE": str(dns_path)}
+    technitium = model.resources.guests.get("technitium")
+    if technitium is None or not getattr(technitium.network, "address", ""):
+        raise RuntimeError("canonical Technitium guest address is unavailable")
+    technitium_address = technitium.network.address.split("/", 1)[0]
+    return {
+        "DNS_RECORDS_FILE": str(dns_path),
+        "TECHNITIUM_API_URL": f"http://{technitium_address}:5380",
+    }
 
 
 def canonical_bootstrap_targets(context: object) -> tuple[tuple[str, str], ...]:
@@ -277,7 +287,8 @@ def run_canonical_host_identity(
             consumer="ansible-host-identity",
             requirements=(operator_requirement,),
         )
-        if resource.type == "lxc" and os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "").lower() == "true":
+        skip_root = os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "").strip().lower() != "false"
+        if resource.type == "lxc" and skip_root:
             phases = (("infra", True),)
         else:
             phases = (("root", False), ("infra", True)) if resource.type == "lxc" else (("infra", True),)

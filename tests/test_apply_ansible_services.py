@@ -278,6 +278,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 mock.patch.object(apply_ansible_services, "canonical_bootstrap_targets", return_value=(("technitium", "technitium"),)),
                 mock.patch.object(apply_ansible_services, "SopsAgeProvider", return_value=object()),
                 mock.patch.object(apply_ansible_services, "deliver", side_effect=fake_deliver),
+                mock.patch.dict(os.environ, {"INFRA_HOST_IDENTITY_SKIP_ROOT": "false"}),
             ):
                 result = apply_ansible_services.run_canonical_host_identity(Context(), ("inventory.json",), root, {}, runner=fake_run)
 

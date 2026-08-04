@@ -9,7 +9,9 @@
       vars:
         lxc_ready_vmid: '{{ technitium_vmid }}'
         lxc_ready_name: technitium
-      when: technitium_runtime.type | default('lxc') == 'lxc'
+      when:
+        - technitium_runtime.type | default('lxc') == 'lxc'
+        - not (infra_host_identity_skip_root | default(false) | bool)
 - name: Run direct access handoff for Technitium Caddy proxy
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
@@ -18,5 +20,7 @@
   hosts: technitium
   gather_facts: false
   become: true
+  vars:
+    caddy_cloudflare_api_token: "{{ lookup('env', 'CF_DNS_API_TOKEN') }}"
   roles:
     - caddy_proxy
