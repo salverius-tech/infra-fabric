@@ -1,5 +1,6 @@
 import json
 import re
+import shutil
 import subprocess
 import unittest
 from pathlib import Path
@@ -13,13 +14,21 @@ class DocumentationContractTests(unittest.TestCase):
         inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
         self.assertEqual(inventory["schema_version"], 1)
         documents = inventory["documents"]
-        tracked = {
-            path
-            for path in subprocess.check_output(
-                ["git", "-C", str(ROOT), "ls-files", "--", "*.md"], text=True
-            ).splitlines()
-            if not {".hermes", ".specs", "values"}.intersection(Path(path).parts)
-        }
+        if shutil.which("git"):
+            tracked = {
+                path
+                for path in subprocess.check_output(
+                    ["git", "-C", str(ROOT), "ls-files", "--", "*.md"], text=True
+                ).splitlines()
+                if not {".hermes", ".specs", "values"}.intersection(Path(path).parts)
+            }
+        else:
+            ignored_roots = {".git", ".hermes", ".specs", "values", ".venv", ".tmp", ".terraform"}
+            tracked = {
+                path.relative_to(ROOT).as_posix()
+                for path in ROOT.rglob("*.md")
+                if not ignored_roots.intersection(path.parts)
+            }
         self.assertEqual(set(documents), tracked)
         self.assertTrue(set(inventory["classifications"]).issuperset(documents.values()))
         for relative, classification in documents.items():
