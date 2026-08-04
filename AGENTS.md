@@ -4,121 +4,64 @@ Guidance for coding agents working in this repository.
 
 ## Overview
 
-This repo is a generic, reusable homelab infrastructure runbook for Proxmox LXCs running Technitium DNS, Caddy, Forgejo, Infisical, and Hermes.
+This repository is a public-safe, reusable runbook for canonical site infrastructure: Proxmox resources, Technitium DNS, Caddy, Forgejo, Infisical, Hermes, and shared-host application substrates.
 
-Tracked source must stay public-safe and free of the operator's real network/domain specifics. Use placeholders such as `example.internal`, `git.example.internal`, `apps.example.net`, and RFC 5737 addresses like `192.0.2.0/24` in tracked files.
+The selected canonical site model is authoritative:
 
-Real Proxmox endpoints, LAN IPs, DNS zones/records, hostnames, credentials, and state belong in `values/`, an ignored nested private Git repo. In this deployment, expect `values/` to have its own private Forgejo remote; do not treat it as part of the public runbook repo.
+- `values/sites/<site>/site.yaml` owns non-secret site, resource, service, endpoint, release, storage, and state configuration.
+- `values/sites/<site>/secrets.sops.yaml` owns encrypted protected logical values.
+- `values/sites/<site>/.sops.yaml` and external age identities are private deployment policy/material.
+- `values/sites/<site>/generated/` is derived and must never be edited.
 
-Private values files include:
+Tracked source must remain public-safe and use placeholders such as `example.internal`, `apps.example.net`, and RFC 5737 addresses. Real endpoints, domains, addresses, credentials, state, plans, identities, and backups belong in private external storage.
 
-- `values/.env`
-- `values/terraform.tfvars`
-- `values/dns-records.local.json`
-- `values/ansible/inventory/local.yml`
-- `values/terraform.tfstate*`
+## Safety rules
 
-`scaffold/` is the public-safe starter template copied into `values/`; keep it generic and sanitized. `settings.example.json` documents the ignored local `settings.local.json` operator settings file used for the private values repo remote and enabled service list.
+- Do not run `tofu apply`, `terraform apply`, destroy, import, or state surgery without explicit user approval.
+- Do not commit secrets, live site values, identities, state, plans, generated private artifacts, or credentials to the public repository.
+- Do not mutate production routers, firewalls, DNS infrastructure, or service guests without explicit approval.
+- Service version changes use managed pins/checksums and the public `just update` → `just validate` → `just plan` → approved `just apply` workflow.
+- Prefer direct service endpoints for diagnostics. Use Proxmox access for resource lifecycle, host-boundary readiness, storage preparation, bootstrap, and recovery.
+- Keep service orchestration in Ansible and infrastructure/resource declaration in OpenTofu. Do not use OpenTofu `local-exec` for service configuration.
+- Generated secrets and protected values must remain encrypted or transient, must be idempotent, and must never appear in logs or responses.
 
-## Layout
+## Public command surface
 
-- `infra/opentofu/` — OpenTofu configuration for Proxmox resources.
-- `infra/ansible/` — Ansible playbooks, dynamic inventory, and service configuration helpers.
-- `scaffold/` — public-safe values repo starter files.
-- `scripts/` — workflow helpers and explicit live-mutation helpers.
-- `tools/` — Docker tooling image files.
-- `values/` — ignored nested private Git repo for site values/state.
+The supported recipes are:
 
-## Safety Rules
-
-- Do not run `tofu apply`, `terraform apply`, `destroy`, import, or state surgery without explicit user approval.
-- Do not commit secrets, live domains/IPs/hostnames, `values/`, `settings.local.json`, state files, plans, or generated local credentials.
-- Keep non-public material in `values/` or outside the checkout; do not add another sensitive-data directory to this repo.
-- Treat DNS, Forgejo, and HTTPS/SSH endpoints as critical infrastructure. Prefer reviewed plans over ad hoc mutation.
-- Service version changes must use managed pins and the `just update`/`just validate`/`just plan`/approved `just apply` path when a service has update support. Do not rerun upstream installers or ad hoc upgrade commands as the normal update mechanism.
-- Prefer direct service access for service diagnostics and operator guidance. Do not default to SSHing into the Proxmox host and then using `pct exec`/`pct enter` when a service has its own LAN IP, DNS name, SSH daemon, or HTTPS endpoint. Proxmox host access is for Proxmox/LXC lifecycle diagnostics, console recovery, or cases where direct service access is unavailable or explicitly requested.
-- Do not mutate production routers/firewalls unless explicitly requested.
-- If changing service IPs, hostnames, SSH ports, proxy topology, or service-selection behavior, update scaffold examples, private values as requested, README, and any migration notes together.
-
-## Commands
-
-Preferred workflow:
-
-```bash
-just setup      # first checkout only; or: just setup <private-values-repo-url>
-just validate
-just update     # when checking or changing managed version pins
-just plan
-just apply      # only after explicit approval
+```text
+just
+just setup "" <site>
+just edit-secrets SITE=<site>
+just ssh-initialize SITE=<site>
+VALUES_SITE=<site> just update
+VALUES_SITE=<site> just validate
+VALUES_SITE=<site> just plan
+VALUES_SITE=<site> just apply
 ```
 
-Validation performed by `just validate` includes public-safety checks, OpenTofu format/validate, TFLint, ShellCheck, Python compile/unit checks, Technitium DNS JSON validation, Ansible syntax, ansible-lint, and private `values/` wiring checks.
-
-Treat `[private]` just recipes as implementation details for other recipes only. Do not invoke private recipes directly during normal agent work, even for validation. Use the public command surface above, primarily `just validate`.
-
-Containerized tooling is used for Windows/local consistency. Project commands parse `values/.env` as dotenv-style data through `scripts/parse-env.py` / `scripts/run-infra.sh` and run inside the Docker Compose `infra` service. Do not source `values/.env` directly in new workflow code.
-
-Forgejo Actions deployment monitoring helpers exist as private workflow plumbing for the private values repo. Agents must not invoke those private recipes directly. If monitoring is needed, ask the operator for the approved public workflow or explicit instructions. The underlying monitor redacts logs by default; do not print unredacted logs unless explicitly requested.
-
-## Design Doctrine
-
-- Do not ask the operator for values the repo can derive from existing private values. `just setup` and migrations should infer deterministic defaults such as service hostnames, VMIDs, LAN IPs, DNS records, inventory vars, and generated local secrets from `values/terraform.tfvars`, `values/.env`, DNS records, and existing inventory.
-- `values/terraform.tfvars` is the source of truth for infrastructure-derived service shape: VMIDs, Proxmox networking, service LAN IPs, hostnames, and OpenTofu inputs. Ansible inventory should consume those values through `infra/ansible/inventory/tfvars.py` instead of duplicating them by hand.
-- Keep service orchestration in Ansible and resource declaration in OpenTofu. Do not use OpenTofu `local-exec` for host or service configuration; add an Ansible playbook/role and wire it into `just apply` in the correct order.
-- No breadcrumbs, comment-only placeholder files, dead wrappers, or permanent duplicate knobs. When behavior moves, add or update migration code for existing `values/` repos, update scaffold/docs/tests, and remove the old surface.
-- Prefer small Python helpers for local data transformation and Ansible/OpenTofu integration over shell glue. Keep shell wrappers only when they are a narrow tooling boundary.
-- Generated secrets belong in `values/.env`, must be idempotent, and must never be printed in logs or responses.
+`edit-secrets` and `ssh-initialize` are explicit protected-input operations. `apply` is the only normal infrastructure mutation operation and requires explicit approval of a fresh verified plan. Private implementation recipes are not operator commands.
 
 ## Workflow
 
-1. Keep tracked edits generic/public-safe.
-2. Put site-specific changes in `values/` only; commit/push them with `git -C values ...` to the private values remote when requested.
-3. Run `just validate` after source or scaffold changes.
-4. If a plan is requested, run `just plan` and summarize creates/changes/destroys.
-5. Apply only after explicit approval using `just apply`; it verifies `tfplan.meta.json` before applying.
-6. Use the user-facing `just` recipes (`setup`, `validate`, `plan`, `apply`) rather than private recipes or ad hoc shell sequences for normal operations.
-7. Do not run `[private]` just recipes directly. If a narrow diagnostic command is needed to investigate a failure, state why before running it and do not present it as repo validation.
-8. Do not add new public `just` recipes unless the user explicitly asks for that exact command. Prefer scripts or internal helpers for implementation details, and keep the public command surface limited to requested commands.
-9. If plan verification fails, rerun `just plan` instead of reusing or editing saved plan files.
-10. For in-LXC service configuration, prefer Ansible playbooks via `just apply` over ad hoc shell changes.
-11. For live diagnostics, use the service's direct endpoint first: SSH to the service DNS name/IP with its configured service user, or use the service HTTPS URL. Use Proxmox `pct exec`/`pct enter` only when debugging Proxmox/container lifecycle, recovering a broken service that cannot be reached directly, or following explicit operator instructions.
+1. Inspect the relevant canonical model, catalog, schema, projection, and tests before changing code.
+2. Keep all tracked examples public-safe.
+3. Run `VALUES_SITE=<site> just validate` after source or canonical fixture changes.
+4. If a plan is requested, run `VALUES_SITE=<site> just plan` and summarize creates, changes, replacements, and destroys without exposing private values.
+5. Apply only after explicit approval using `VALUES_SITE=<site> just apply`.
+6. If plan verification fails, correct canonical inputs and rerun plan; never edit saved plans or generated projections.
+7. For service changes, use the canonical service-authoring contract and add catalog/schema/projection/OpenTofu/Ansible/secret/state/test/doc coverage as applicable.
 
-## Service Access Pattern
+## Design doctrine
 
-Services are intended to be accessible directly on the LAN by their service DNS names or IPs. Do not present Proxmox host SSH plus `pct enter` as the normal operator access path for services.
+- Canonical site configuration is the only normal authoring surface.
+- Service identity, ownership, dependencies, runtime, releases, state, and allowed configuration belong in the catalog and typed canonical model.
+- Consumer projections are derived from the canonical model and must be identity-verified before use.
+- Secret delivery is explicit and transient. Logical paths use `services.<service>.secrets.<key>` and catalog-declared provider namespaces.
+- DNS synchronization belongs in Ansible. Do not call DNS APIs from OpenTofu resources.
+- New browser-facing first-class guests normally use app plus service-local Caddy; shared-host services use the documented shared Caddy contract.
+- A service-authoring manifest is design evidence, not permission to create secrets, site values, state, plans, or infrastructure.
 
-Examples:
+## Verification and response hygiene
 
-- Hermes operator shell access should be described as direct SSH to the Hermes service endpoint and configured user, e.g. `ssh <user>@hermes.example.internal`, not `ssh <proxmox-host>` followed by `pct enter`.
-- Browser access should use the service-local HTTPS endpoint, e.g. `https://hermes.example.internal`.
-- Proxmox host access is appropriate for OpenTofu/Ansible bootstrap, LXC lifecycle checks, console recovery, or when direct SSH/HTTPS is unavailable and the operator approves that diagnostic path.
-
-## Service HTTPS / Caddy Pattern
-
-This repo generally uses service-local Caddy instances rather than one central reverse proxy.
-
-- Technitium LXC runs its own Caddy for the DNS/Technitium UI.
-- Forgejo LXC runs its own Caddy for Forgejo.
-- New browser-facing first-class LXC services should usually follow the same pattern: app plus Caddy in the same LXC, with Caddy proxying to the app on loopback. Hermes follows this pattern. Containerized app services that belong on `onramp_host`, such as Infisical onramp, should use the shared onramp Caddy instance with per-service snippets under `/etc/caddy/sites.d/`.
-- Caddy uses Cloudflare DNS-01 ACME via `CF_DNS_API_TOKEN`, so multiple service-local Caddy instances can obtain certificates without competing for HTTP-01 port 80 routing.
-- Avoid turning the Technitium/DNS LXC into a general ingress proxy unless there is an explicit design reason. `caddy_extra_vhosts` exists, but should not be the default for new first-class services.
-
-## DNS Management
-
-Technitium DNS records are synced by `infra/ansible/playbooks/technitium-dns.yml` during `just apply`, after OpenTofu creates the LXC and Ansible installs/configures Technitium. Do not call the Technitium API from OpenTofu resources.
-
-The Ansible playbook invokes `infra/ansible/scripts/apply-technitium-dns.py`; keep DNS service orchestration in Ansible.
-
-The intended pattern is hybrid DNS:
-
-- Technitium Forwarder zones hold explicit static records.
-- Unknown names in those zones forward to existing internal resolvers.
-- The gateway should remain focused on DHCP/routing/firewall and eventually point DHCP DNS to Technitium.
-
-Technitium DNS sync runtime settings belong in `values/.env`: `TECHNITIUM_API_URL`, `TECHNITIUM_API_TOKEN`, and `DNS_RECORDS_FILE`. Keep application runtime workflow variables out of OpenTofu variables unless OpenTofu directly uses them.
-
-Technitium service updates must become a managed version/checksum workflow rather than relying on `curl https://download.technitium.com/dns/install.sh | bash` after first install. The upstream portable tarball URL is mutable, so the intended managed design is: read version metadata from the Technitium GitHub release, pin the desired version and SHA256 in private values, optionally cache the tarball under ignored `values/artifacts/technitium/`, and let Ansible update only when the installed marker differs from the pin. Do not add new ad hoc Technitium installer reruns as an update path.
-
-## Response hygiene
-
-Do not print token values, generated passwords, real domains/IPs/hostnames, or real local DNS inventory in responses or logs. When summarizing live checks, describe outcomes without exposing site-specific inventory unless the user explicitly requests it.
+Before finalizing work, run relevant tests and `git diff --check`. Distinguish static validation, provider-backed planning, live health, and recovery evidence. Never print credentials, private keys, tokens, recipient material, live endpoints, state contents, or decrypted values.

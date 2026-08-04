@@ -95,8 +95,8 @@ Repo automation may run validation, planning, deployment, and status checks, but
 - OpenTofu owns Proxmox LXC shape, VMIDs, networking, storage attachments, and service enablement resources.
 - Ansible owns in-LXC service installation and configuration.
 - Technitium DNS record sync remains in Ansible, after Technitium is installed and reachable.
-- `values/terraform.tfvars` remains the source of truth for infrastructure-derived service shape.
-- Inventory should derive service hosts, VMIDs, and addresses from tfvars instead of duplicating them manually.
+- The selected canonical site model remains the source of truth for infrastructure-derived service shape.
+- Inventory should derive service hosts, VMIDs, and addresses from verified canonical projections instead of duplicating them manually.
 
 ### App-platform boundary requirements
 

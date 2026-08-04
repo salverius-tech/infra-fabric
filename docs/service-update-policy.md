@@ -3,10 +3,10 @@
 Managed services should use deterministic version pins and the normal reviewed workflow:
 
 ```bash
-just update
-just validate
-just plan
-just apply
+VALUES_SITE=<site> just update
+VALUES_SITE=<site> just validate
+VALUES_SITE=<site> just plan
+VALUES_SITE=<site> just apply
 ```
 
 `just update` applies the release-age safety hold before changing supported pins. After any update, review the diff and plan before applying.

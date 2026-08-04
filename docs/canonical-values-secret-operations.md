@@ -1,170 +1,71 @@
-# Canonical Values Secret Operations
+# Canonical secret operations
 
-**Status:** public operational contract; recipient and key material remain private and unconfigured in this repository
+**Status:** public operational contract. Recipient and key material remain private and external to this repository.
 
-This document defines the safe lifecycle for the encrypted canonical secret bundle at
-`values/sites/<site>/secrets.sops.yaml`. It does not contain private age keys,
-recipients, decrypted values, or production credentials. The tracked `.sops.yaml`
-contains a deliberate placeholder recipient and is not an operational encryption
-policy until the private workflow supplies the real recipient.
+## Boundary
 
-## Boundary and ownership
+- `site.yaml` contains non-secret canonical configuration.
+- `secrets.sops.yaml` is encrypted and site-scoped.
+- `.sops.yaml` is private deployment policy for the selected site.
+- The external age identity is private operator material and must have restrictive permissions.
+- Generated projections, plans, state, inventories, logs, and reports must not contain decrypted values.
+- Bootstrap private SSH material is stored only at `secrets.bootstrap.ssh_private_key`, validated against `bootstrap.ssh.public_keys`, and materialized only inside the protected tooling boundary.
+- Service values use `services.<service>.secrets.<key>`; provider values use catalog-declared provider namespaces.
 
-- `site.yaml` contains non-secret configuration only.
-- `secrets.sops.yaml` is ciphertext and must remain site-scoped.
-- The service catalog owns required logical paths and classifications.
-- The provider resolves only paths requested by the selected enabled-service set.
-- Consumer delivery is separate from ordinary OpenTofu, Ansible inventory, DNS,
-  and runtime projections. Secret values must not enter those projections, state,
-  plans, logs, reports, or tracker files.
-- The external age key file is private operator material. It must be a regular,
-  readable file with no group/other permission bits and must never be read into
-  documentation or command output.
-- The bootstrap SSH private key is stored at the encrypted logical path
-  `secrets.bootstrap.ssh_private_key`. It is not part of `site.yaml`, generated
-  projections, plans, state, or ordinary service delivery. Canonical tooling
-  materializes it only inside the short-lived tooling container, verifies its
-  derived public key against `bootstrap.ssh.public_keys`, and removes it with
-  the container filesystem. The SOPS age identity remains separate and external;
-  it must never be stored inside the bundle it decrypts.
+## New site prerequisites
 
-## Initial key creation
+1. Create the site scaffold:
 
-1. Create the site recipient and a separately controlled recovery recipient, with
-   corresponding private age identities in the approved private key-management
-   system. Keep both private identities outside the repository and outside ordinary
-   dotenv, Terraform state, plan, inventory, and backup artifacts. The recovery
-   identity is not mounted during routine operations.
-2. Record the exact site-plus-recovery recipient set in the private deployment policy for the exact
-   `values/sites/<site>/secrets.sops.yaml` scope. Do not replace the public
-   placeholder in this repository with a private recipient.
-3. Create the encrypted bundle with only the logical namespaces and values needed
-   by the catalog-approved consumers. Validate the public policy scope and bundle
-   recipient metadata without decrypting during ordinary preflight.
-4. Verify the ciphertext hash and a value-free required-secret report. Never use a
-   secret value or sentinel as an identity check.
+   ```bash
+   just setup "" <site>
+   export VALUES_SITE=<site>
+   ```
 
-For a new canonical site, `just setup "" <site>` creates only public-safe
-scaffolding. It deliberately defers bootstrap credential initialization until
-the operator has supplied the site SOPS policy and external age identity. The
-standalone `just ssh-initialize SITE=<site>` recipe is the explicit
-secret-dependent setup/repair operation. It is never called by setup,
-validation, planning, or apply.
+2. Create the site and recovery age identities in the approved private key-management system. Keep both outside the repository and ordinary runtime environments.
+3. Configure the private `.sops.yaml` policy for the exact site bundle and supply the external age identity.
+4. Create or update the encrypted bundle with only catalog-approved logical paths.
+5. Verify recipient-policy metadata and required logical-path metadata without printing values.
+6. Run `just edit-secrets SITE=<site>` for protected edits and `just ssh-initialize SITE=<site>` for explicit bootstrap identity setup.
 
-The key may be encrypted at rest by SOPS, but it must not require an interactive
-SSH passphrase after SOPS decryption. The canonical workflow derives its public
-half with `ssh-keygen -y` and fails closed unless it matches one of the declared
-bootstrap public keys. Do not add the private key to projections or copy it
-through the ordinary service-secret environment boundary.
+Setup does not create credentials or initialize the bootstrap key automatically.
 
-For a private deployment policy, preflight can receive the policy metadata through
-the operator environment without committing it to this repository:
+## Editing and delivery
+
+Use:
 
 ```bash
-export INFRA_SOPS_POLICY_PATH=<private-policy-root>/.sops.yaml
-export INFRA_SOPS_AGE_RECIPIENTS='age1site...,age1recovery...'
+just edit-secrets SITE=<site>
+VALUES_SITE=<site> just validate
 ```
 
-The recipient list is metadata, not secret material, but it must still remain out
-of tracked public files when it identifies private operational policy. Preflight
-passes the expected set to both the policy-rule check and encrypted-bundle metadata
-check. A mismatch fails closed before required-secret resolution or consumer
-delivery. Omit these variables only for public scaffold validation where the
-placeholder policy is intentionally reported as not configured.
+Secret delivery resolves only required paths for the selected enabled services, passes values transiently to the approved consumer boundary, and removes protected temporary material on completion and failure. Do not put secrets in `site.yaml`, generated projections, OpenTofu variables, state, plans, command arguments, or logs.
 
-## Rotation and revocation
+## Rotation
 
-Rotation is an explicit, reversible operation:
+1. Generate a replacement site identity through the approved private workflow.
+2. Re-encrypt the selected site bundle to the old site identity, new site identity, and recovery identity.
+3. Validate policy scope, recipient-set equality, ciphertext identity, and required logical paths.
+4. Run non-secret consumer smoke checks and record only metadata.
+5. Re-encrypt to the new site identity plus recovery identity.
+6. Revoke the old identity only after all bundles and recovery backups are verified.
 
-1. Generate a new site recipient and private identity using the approved private
-   workflow.
-2. Temporarily re-encrypt each selected site bundle to the old site recipient, new
-   site recipient, and unchanged recovery recipient.
-3. Validate policy scope, recipient-set equality, ciphertext identity, and required
-   logical paths before delivery.
-4. Run a consumer-specific smoke check without printing values. Record only site,
-   operation, recipient-policy state, ciphertext identity, and result metadata.
-5. Re-encrypt to the new site recipient plus the recovery recipient, then revoke or
-   destroy the old private identity only after all required bundles and
-   recovery backups have been verified with the new identity.
-
-A revoked recipient must not remain an accepted delivery path. If rotation fails,
-restore the prior ciphertext and private-key reference from the approved backup
-without changing ordinary consumer inputs.
-
-## Logical-path migration
-
-The operator password contract is identity-neutral:
-`secrets.operator.password`, delivered transiently as `INFRA_OPERATOR_PASSWORD`.
-Older private bundles may contain `secrets.operator.systemboss_password`. Migrate
-those bundles with the repository helper from the repository root:
-
-```bash
-bash scripts/python.sh scripts/migrate-secret-bundle.py \
-  values/sites/<site>/secrets.sops.yaml
-```
-
-The command is dry-run by default. It decrypts only in memory, reports metadata,
-and does not modify the ciphertext. Review the result, then repeat with `--apply`
-to write a re-encrypted bundle. Apply mode creates the ciphertext backup
-`secrets.sops.yaml.pre-migration` beside the bundle and refuses to overwrite an
-existing migration backup. Do not delete that backup until the migrated bundle has
-passed recipient-policy and required-path validation.
-
-The migration fails closed if both old and new paths exist with different values.
-It never prints decrypted values, writes plaintext outside a restricted temporary
-directory, or changes any other logical secret path.
+If rotation fails, restore the prior ciphertext and private-key reference from the approved backup. Do not modify ordinary consumer inputs to bypass a policy mismatch.
 
 ## Backup and recovery
 
-Back up ciphertext and value-free manifests, not decrypted secret material. A backup
-manifest should contain only:
+Back up ciphertext and value-free manifests, not decrypted secret material. A manifest may contain site identifier, relative bundle path, schema/renderer version, ciphertext hash and size, recipient-policy state, selected source paths, backup ID, and creation time.
 
-- site identifier and bundle relative path;
-- schema/renderer version;
-- ciphertext hash and file size;
-- selected source paths and backup identifier;
-- recipient-policy state and creation time.
+Private age identities require separate protected offline backup and access control. Recovery must use a disposable restricted workspace, verify site identity, ciphertext identity, recipient policy, required paths, key permissions, cleanup, and redaction before any approved consumer sees the restored bundle.
 
-Private age identities require a separate protected offline backup with independent
-access control. Do not place private identities beside repository backups or in the
-repository. Recovery must restore a disposable copy first, validate its recipient
-metadata and required logical paths, and only then make it available to an approved
-consumer.
+## Restore rehearsal
 
-Recovery is fail-closed when the site is wrong, the bundle is altered, the recipient
-set is unexpected, required paths are missing, or the key file is missing,
-unreadable, or too permissive. Errors must identify only the failed contract, never
-secret values, recipient payloads, or key contents.
+A disposable rehearsal with synthetic values must prove:
 
-## Disposable restore test
+1. encrypted bundle and value-free metadata restore successfully;
+2. the external key file has restrictive permissions;
+3. selected site and policy match;
+4. every catalog-required path resolves;
+5. values, key material, and sentinels never appear in output or artifacts;
+6. temporary material is removed on success, failure, interruption, and termination paths where supported.
 
-A restore rehearsal must use a temporary site fixture and synthetic secret values.
-It must prove:
-
-1. the encrypted bundle and value-free manifest restore to a restricted temporary
-   directory;
-2. the key file is supplied through the external key-file boundary and has mode
-   `0600` (or stricter);
-3. the selected site and recipient policy match;
-4. every catalog-required logical path resolves;
-5. no value, key content, or sentinel appears in stdout, stderr, logs, manifests,
-   or exception text; and
-6. the temporary directory and files are removed on success, validation failure,
-   provider failure, interruption, and termination paths where the runner permits
-   cleanup.
-
-This rehearsal is not production deployment evidence. Live recipient provisioning,
-backup storage, and consumer-specific delivery require the private operational
-workflow and separate approval.
-
-## Current repository contract
-
-The repository currently supports structural bundle validation, logical-path
-resolution, secret/ciphertext identities, metadata-only SOPS/age checks, required
-secret evaluation, protected temporary material helpers, identity-neutral operator
-path migration, and explicit transient consumer delivery for the canonical Ansible
-bootstrap boundary. It does **not** yet
-make provider, runtime, recovery, or generated secrets authoritative for all live
-consumers. Legacy consumer inputs and broader consumer cutover therefore remain
-unchanged and deferred.
+A rehearsal is not production deployment evidence. Live identity provisioning, backup storage, and consumer delivery require separate private operational approval.

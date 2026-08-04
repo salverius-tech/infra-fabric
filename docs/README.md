@@ -1,35 +1,33 @@
-# Documentation Index
+# Documentation index
 
-Public-safe documentation for this homelab infrastructure runbook.
+Public-safe documentation for canonical site infrastructure.
 
-## Operator and platform docs
+## Start here
 
-- [Hermes operator pilot PRD](hermes-operator-pilot-prd.md) defines the Hermes cockpit requirements, safety boundaries, and SearXNG pilot classification.
-- [Managed service-state backup and restore](service-state-backup.md) covers private `values/` backups for Hermes memory/soul state and other managed service state.
-- [Hermes state backup and restore](hermes-state-backup.md) keeps the Hermes-specific compatibility notes.
-- [Hermes tuning](hermes-tuning.md) documents managed compression and delegation settings.
-- [Hermes Control operations](hermes-control-operations.md) documents the private companion-stack lifecycle, verification, token rotation, and rollback boundaries.
-- [Onramp app-platform contract](onramp-app-platform-contract.md) defines the `homelab-infra`, `onramp-vNext`, and Hermes ownership split for onramp-host services.
-- [Debian baseline split](debian-baseline.md) explains the current LXC/host Debian versions, rationale, and the reviewed migration path.
-- [Onramp SearXNG handoff](onramp-searxng-handoff.md) gives `onramp-vNext` the future SearXNG-on-Podman contract and records the current temporary `searxng_onramp` exception.
-- [App-host runbook](onramp-host-runbook.md) covers `onramp_host` and `searxng_onramp` enable/disable, rollback, and live deployment validation.
-- [Service update policy](service-update-policy.md) defines the managed update workflow, current service boundaries, and Technitium version/checksum management.
-- [Canonical values migration boundary](canonical-values-migration.md) documents validation-only canonical and legacy input checks without consumer cutover.
-- [Canonical values Ansible inventory audit](canonical-values-ansible-inventory-audit.md) classifies static inventory data and defines the safe reduction order.
-- [Canonical values deferred-input register](canonical-values-model-blockers.md) classifies every unmatched source identity and records the remaining review decisions.
-- [Canonical values secret operations](canonical-values-secret-operations.md) defines the public-safe key, rotation, backup, recovery, and disposable-restore contract.
-- [Normalized plan equivalence](normalized-plan-equivalence.md) defines the report-only schema and comparison boundaries for public fixtures.
+- [Canonical site quick start](canonical-quick-start.md) — initialize a site, establish protected prerequisites, validate, plan, and apply safely.
+- [Public Just recipes](just-recipes.md) — supported commands, parameters, prerequisites, side effects, and safety gates.
+- [Canonical service authoring](canonical-service-authoring.md) — implement a service across the catalog, schema, projections, OpenTofu, Ansible, secrets, state, tests, and operations.
+- [Canonical readiness matrix](canonical-readiness.md) — distinguish structural validation, provider planning, convergence, drift, and recovery gates.
+- [Canonical troubleshooting](canonical-troubleshooting.md) — diagnose site, SOPS, projection, provider, host-trust, service, storage, and drift failures.
 
-- [Development testing environment](development-environment.md) documents disposable integration testing and the agent workflow for adding services.
+## Canonical operations
 
-## Repository review
+- [Canonical secret operations](canonical-values-secret-operations.md) — SOPS/age policy, bootstrap identity, rotation, backup, recovery, and restore rehearsal.
+- [Service update policy](service-update-policy.md) — managed releases, pins, checksums, rollback, and maintenance windows.
+- [Hermes tuning](hermes-tuning.md) — managed Hermes runtime tuning.
+- [Hermes Control operations](hermes-control-operations.md) — companion-stack operation and verification.
+- [Managed service-state backup and restore](service-state-backup.md) — state backup and restore contracts.
+- [Hermes state backup and restore](hermes-state-backup.md) — Hermes-specific state handling.
+- [Onramp app-platform contract](onramp-app-platform-contract.md) — ownership and placement boundaries for shared-host applications.
+- [Onramp host runbook](onramp-host-runbook.md) — canonical shared-host substrate operation.
+- [Onramp SearXNG handoff](onramp-searxng-handoff.md) — shared-host service ownership contract.
+- [Debian baseline](debian-baseline.md) — guest and host operating-system policy.
 
-- [Repository audit (2026-07-19)](repository-audit-2026-07-19.md) reviews the tracked projects, layout, documentation, validation, security boundaries, recovery workflows, and prioritized improvements at commit `524ac1f`.
-- [Upstream gap and suitability review (2026-07-22)](upstream-gap-review-2026-07-19.md) groups all 43 upstream-only commits into final capability series, maps corrective follow-ups, and records fork adoption decisions with commit-level evidence in an appendix.
-- [Upstream commit review](upstream-commit-review.md) tracks the 2026-07-14 upstream changes and their applicability to this fork.
+## Contributor and architecture references
 
-## Workflow reminder
+- [Documentation authority inventory](documentation-inventory.json) — maintained classification of public Markdown and superseded historical documents.
+- [Development environment](development-environment.md) — disposable development workflow and implementation safety.
+- [Normalized plan equivalence](normalized-plan-equivalence.md) — report-only comparison schema and boundaries.
+- [Canonical values secret operations](canonical-values-secret-operations.md) — protected-value lifecycle contract.
 
-Use the repository workflow from the main [README](../README.md): check managed version pins with `just update`, validate with `just validate`, review infrastructure changes with `just plan`, and apply only after explicit approval with `just apply`.
-
-Service diagnostics and steady-state Ansible configuration should use direct service inventory groups and endpoints, for example `ssh <user>@hermes.example.internal` or the service-local HTTPS URL. Proxmox host access is for lifecycle readiness, storage prep, explicit bootstrap/recovery, and host-boundary work, not routine in-service changes.
+All current documents assume a selected canonical site. Generated projections are derived and must not be edited. Live site values, state, credentials, identities, and plans remain private and are not examples in this documentation.

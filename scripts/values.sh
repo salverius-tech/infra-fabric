@@ -2,6 +2,7 @@
 set -euo pipefail
 
 command_name="${1:-}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 values_root="${VALUES_DIR:-values}"
 template_dir="${VALUES_TEMPLATE_DIR:-scaffold}"
 site="${VALUES_SITE:-}"
@@ -71,10 +72,17 @@ case "${command_name}" in
     if [[ -n "${site}" ]]; then
       site_yaml_template="${template_dir}/sites/${site}/site.yaml"
       if [[ ! -f "${site_yaml_template}" ]]; then
-        printf 'Missing canonical site scaffold: %s\n' "${site_yaml_template}" >&2
-        exit 1
+        site_yaml_template="${template_dir}/sites/_template/site.yaml"
+        if [[ ! -f "${site_yaml_template}" ]]; then
+          printf 'Missing canonical site scaffold: %s\n' "${site_yaml_template}" >&2
+          exit 1
+        fi
+        if [[ ! -e "${values_dir}/site.yaml" ]]; then
+          python3 "${repo_root}/scripts/render-site-template.py" "${site_yaml_template}" "${values_dir}/site.yaml" "${site}"
+        fi
+      else
+        copy_if_missing "${site_yaml_template}" "${values_dir}/site.yaml"
       fi
-      copy_if_missing "${site_yaml_template}" "${values_dir}/site.yaml"
     else
       copy_if_missing "${template_dir}/terraform.tfvars" "${values_dir}/terraform.tfvars"
       copy_if_missing "${template_dir}/dns-records.local.json" "${values_dir}/dns-records.local.json"

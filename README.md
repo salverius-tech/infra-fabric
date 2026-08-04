@@ -1,270 +1,70 @@
-# Homelab Infrastructure Runbooks
+# homelab-infra
 
-Reusable OpenTofu and Ansible runbooks for Proxmox LXCs running Technitium DNS, Caddy, Forgejo, Infisical, Hermes, and optional runner/VPN services.
+A public-safe, repo-driven runbook for canonical site infrastructure. Proxmox resources, service placement, networking, releases, DNS, HTTPS, Ansible orchestration, and service state are described by the selected canonical site model.
 
-This public repo is intentionally generic. Real domains, LAN IPs, DNS records, Proxmox endpoints, credentials, and state belong in `values/`, an ignored nested Git repo. In a typical install, `values/` is pushed to a private Forgejo repository while this runbook repo stays public-safe.
+## Source of truth
 
-## Layout
+For a selected site, operators edit only:
 
-Tracked public source:
+- `values/sites/<site>/site.yaml` — non-secret site and service configuration;
+- `values/sites/<site>/.sops.yaml` — private SOPS policy supplied outside this public repository;
+- `values/sites/<site>/secrets.sops.yaml` — encrypted canonical secret bundle.
 
-```text
-infra/opentofu/    OpenTofu configuration and Technitium DNS API helper
-infra/ansible/     Ansible playbooks and roles for in-LXC service config
-scaffold/          Public-safe starter files copied into values/
-scripts/           Local workflow helpers
-tools/             Docker tooling image
-```
+Generated projections under `values/sites/<site>/generated/` are derived artifacts. Do not edit them. Age identities, recipient policy, credentials, state, plans, and live site values remain private and outside tracked public source.
 
-Ignored site/local state:
+## Canonical quick start
 
-```text
-values/            Nested private Git repo for site values/state
-.terraform/        OpenTofu/Terraform working data
-tfplan             Local plan artifact
-```
-
-Keep non-public material in `values/` or outside this checkout; do not add another sensitive-data directory to this repo.
-
-## Documentation
-
-- [Docs index](docs/README.md) lists public-safe operator and architecture notes.
-- [Debian baseline](docs/debian-baseline.md) explains the Debian 13 baseline for LXCs and service VMs.
-- [Hermes operator pilot PRD](docs/hermes-operator-pilot-prd.md) defines the Hermes cockpit requirements and safety boundaries.
-- [Managed service-state backup and restore](docs/service-state-backup.md) covers private `values/` backups for Hermes memory/soul state and other managed service state.
-- [Hermes tuning](docs/hermes-tuning.md) documents managed compression and delegation settings.
-- [Onramp app-platform contract](docs/onramp-app-platform-contract.md) defines how `homelab-infra`, `onramp-vNext`, and Hermes split onramp-host ownership.
-- [Onramp SearXNG handoff](docs/onramp-searxng-handoff.md) documents the default future Onramp-owned SearXNG contract and the current temporary `homelab-infra` exception.
-- [App-host runbook](docs/onramp-host-runbook.md) covers `onramp_host` rollback and future deployment validation.
-- [Service update policy](docs/service-update-policy.md) defines managed version updates and the target Technitium update model.
-- [Canonical values migration boundary](docs/canonical-values-migration.md) documents the validation-only `site.yaml` and legacy-input review workflow; legacy consumers remain active until cutover.
-
-## Fresh setup
-
-Local prerequisites are Git, Docker/Docker Compose, and `just`. Python, OpenTofu, Ansible, TFLint, ShellCheck, SSH client usage for setup/apply, and related tooling run inside the Docker tooling container. Your host SSH directory is mounted read-only so the container can use your existing Proxmox SSH key when a command opts in.
-
-From a fresh checkout, optionally copy the local settings template:
+From the repository root:
 
 ```bash
-cp settings.example.json settings.local.json
+just setup "" <site>
+export VALUES_SITE=<site>
 ```
 
-Edit `settings.local.json` if you want `just setup` to clone your private `values/` Git repo. For example, set `values_repo.remote` to your Forgejo SSH URL. The file is ignored by Git. Supported services are defined in `infra/services.json` and currently include `technitium`, `forgejo`, `tailscale_client`, `forgejo_runner`, `infisical`, `infisical_onramp`, `hermes`, `onramp_host`, and `searxng_onramp`; `technitium` includes its Caddy proxy, LXC browser-facing services use service-local Caddy, `onramp_host` prepares a Debian 13 Podman VM with shared Caddy, `infisical_onramp` and `searxng_onramp` deploy rootless services on that VM, and `forgejo_runner` creates/configures a separate Forgejo Actions runner LXC.
+Complete the private site SOPS policy, encrypted bundle, and external age identity, then follow [Canonical site quick start](docs/canonical-quick-start.md).
 
-Then run:
+## Normal workflow
 
 ```bash
-just setup
-```
-
-This builds the local tooling container and creates `values/` from `scaffold/`, or clones the `values_repo.remote` configured in `settings.local.json`. If no remote is configured and setup is interactive, it can ask for a base domain, probe `git.<domain>` for an accessible `homelab-infra-values` repository, save the discovered remote in ignored `settings.local.json`, and clone it. It also starts setup wizards for Proxmox API access and domain-derived service names. The Proxmox wizard asks for your Proxmox host, verifies root SSH key access, offers an alternate key file or a command to authorize your default public SSH key if default keys fail, creates/updates a dedicated Proxmox API user/token, and writes the endpoint/token/SSH target to `values/.env` without printing the token secret. The domain wizard asks for your base domain plus service IPs, then derives names such as `dns.<domain>`, `technitium.<domain>`, `git.<domain>`, `infisical.<domain>`, `hermes.<domain>`, and `searxng.apps.<domain>` in the authoritative private values files.
-
-You can also pass the values repo URL directly:
-
-```bash
-just setup git@git.example.internal:owner/homelab-infra-values.git
-```
-
-Then select a site explicitly and edit the canonical site document and encrypted secret bundle:
-
-```text
-VALUES_SITE=dev
-values/sites/dev/site.yaml
-values/sites/dev/secrets.sops.yaml
-```
-
-Edit the encrypted bundle through the tooling container with the external site age
-identity. The recipe defaults to `dev`; pass `SITE=<site>` for another site:
-
-```bash
-export SOPS_AGE_KEY_FILE="$HOME/.config/infra-fabric/keys/dev/site.age"
-just edit-secrets
-just edit-secrets SITE=dev
-```
-
-The recipe validates canonical site authority, mounts the key read-only, and does not
-create a plaintext bundle in the values repository. Do not use the recovery identity
-for routine edits.
-
-Generated projections under `values/sites/<site>/generated/` are disposable
-consumer inputs. Do not edit them or treat legacy `.env`, `terraform.tfvars`,
-static inventory, or DNS JSON files as canonical inputs. The legacy migration
-command remains available for reviewed, explicit imports only.
-
-For a selected site, edit only `values/sites/<site>/site.yaml` for non-secret
-infrastructure and service configuration. Keep encrypted runtime credentials in
-`values/sites/<site>/secrets.sops.yaml`; keep the external SOPS/age identity
-outside the repository. The legacy root files remain compatibility projections or
-migration inputs and must not be edited to change a canonical site.
-
-If you skipped the Proxmox token wizard or need to rotate the token later, run:
-
-```bash
-scripts/bootstrap-pve-token.sh --force
-```
-
-If you need to rerun the domain wizard, run:
-
-```bash
-scripts/python.sh scripts/bootstrap-domain.py --force
-```
-
-## Daily workflow
-
-Validate public source and private values wiring:
-
-```bash
-VALUES_SITE=dev just validate
-```
-
-`VALUES_SITE` is mandatory for site-scoped operations. `just validate` runs source checks, linting, tests, canonical model/projection checks, and private values wiring checks. Use it as the normal validation entry point.
-
-Check for eligible pinned version updates without applying infrastructure changes:
-
-```bash
-VALUES_SITE=dev just update
-```
-
-`just update` checks known upstream releases and only updates pins for releases at least 48 hours old. In canonical mode it updates only typed release owners in `site.yaml` (Forgejo, Forgejo Runner, Docker Compose, and `just`) after validating the complete candidate; it never falls back to legacy service inventory. Review the resulting diff before continuing with validation and planning.
-
-Technitium is managed by Ansible using a versioned portable archive, a private SHA256 pin, an installed-version marker, activation health checks, and rollback handling. An optional controller-side cache can be configured with `technitium_artifact_path` under private values. Technitium is not yet automatically discovered or updated by `just update`; review and change its private version/checksum pins explicitly before running `just validate`, `just plan`, and approved `just apply`. Do not rerun the upstream installer as a routine update mechanism.
-
-Review infrastructure/DNS changes:
-
-```bash
+export VALUES_SITE=<site>
+just validate
 just plan
-```
-
-Apply the reviewed plan and configure services with Ansible:
-
-```bash
+# Review creates, updates, replacements, destroys, credentials, and service boundaries.
+# Run apply only after explicit operator approval.
 just apply
 ```
 
-`just plan` writes `tfplan` plus `tfplan.meta.json`. `just apply` refuses to run if the saved plan or its inputs changed, then applies infrastructure, runs enabled Ansible service chains in dependency-safe parallel waves, and syncs Technitium DNS records after the DNS service is installed. Set `INFRA_APPLY_ANSIBLE_MODE=sequential` to use the older one-playbook-at-a-time behavior, or `INFRA_APPLY_ANSIBLE_MAX_WORKERS=<n>` to cap parallel service chains. It removes plan artifacts after the apply attempt. `TECHNITIUM_API_URL` should use the direct LXC API endpoint (`http://<technitium-lxc-ip>:5380/api`) so DNS sync does not depend on records it creates. If the Technitium token is missing or still a placeholder, apply bootstraps one through the local API and stores it in `values/.env` without printing the token.
+`validate` is the structural and static gate. `plan` refreshes and verifies private generated projections and performs provider/readiness preflight before producing a saved plan. `apply` is the infrastructure mutation gate and accepts only a fresh verified plan.
 
-After a successful apply, review and commit the private `values/` repo because OpenTofu state, compatibility projections, and operational artifacts may have changed. Do not manually edit generated projections:
+Read [Public Just recipes](docs/just-recipes.md) for parameters, side effects, and safety controls.
 
-```bash
-git -C values status --short
-git -C values add -- terraform.tfstate terraform.tfstate.backup 'sites/<site>/generated'
-git -C values commit -m "chore: update local infrastructure state"
-git -C values push
-```
+## Add a service
 
-## Forgejo Actions deployment
-
-The optional `forgejo_runner` service creates a separate Forgejo Actions runner LXC. Keep the runner repository-scoped to the private `values/` repository and use the `homelab-deploy` label for deployment workflows. The runner uses a host execution label so it can run the repo's Docker-backed `just validate`, `just plan`, and `just apply` workflow; do not share it with untrusted repositories. Enable `forgejo` together with `forgejo_runner`; runner registration depends on Forgejo being present and configured first.
-
-Bootstrap order:
-
-1. Add `forgejo` and `forgejo_runner` to `settings.local.json` services.
-2. Keep Forgejo persistent secrets and bootstrap credentials in `values/.env`: `FORGEJO_SECRET_KEY`, `FORGEJO_INTERNAL_TOKEN`, `FORGEJO_OAUTH2_JWT_SECRET`, `FORGEJO_LFS_JWT_SECRET`, `FORGEJO_ADMIN_USERNAME`, `FORGEJO_ADMIN_EMAIL`, `FORGEJO_ADMIN_PASSWORD`, `FORGEJO_REPO_OWNER_EMAIL`, `FORGEJO_REPO_OWNER_PASSWORD`, and `FORGEJO_RUNNER_REGISTRATION_SECRET`. The default admin username is `anvil`; override `FORGEJO_ADMIN_USERNAME` if needed. The runner registration secret must be exactly 40 hex characters.
-3. Configure `forgejo_runner_scope` in private inventory as the private values repo owner/name. If it is missing or still the scaffold placeholder, `scripts/migrate-values.py` tries to infer it once from the `values` Git remote and writes the explicit value into private inventory.
-4. By default, the Forgejo role creates the dedicated admin user and a separate repository-owner user derived from `forgejo_runner_scope`, then creates the runner repository under that owner. For organizations, create the organization/repository manually and disable `forgejo_bootstrap_enabled` after initial install.
-5. Run `just validate`, review `just plan`, then run `just apply` after approval.
-6. Commit and push `values/.forgejo/workflows/deploy.yml` in the private values repo.
-
-After bootstrap, pushes to the private values repo can run the deployment workflow automatically when a matching runner is online.
-
-## Service storage
-
-Durable service storage is configured in `values/terraform.tfvars` through `service_storage`. The storage `type` describes how a service receives storage: `bind`, `proxmox_volume`, `guest_nfs`, `guest_cifs`, or `none`. For `bind` storage only, `host_prepare` describes optional Proxmox-node preparation of the bind source, such as `directory`, `zfs_dataset`, `host_nfs_mount`, or `host_cifs_mount`.
-
-The scaffold defaults Forgejo data to `proxmox_volume` to avoid assuming a host ZFS pool. Existing legacy Forgejo ZFS variables are migrated to `service_storage` automatically. See `scaffold/README.md` for complete examples.
-
-## Private values repo
-
-`values/` is a separate Git repository nested inside this checkout. It is ignored by the public runbook repo and should be pushed only to a private remote, such as your Forgejo instance. `just setup` either clones that repo from `settings.local.json` / the CLI argument, or initializes a new local `values/` repo from `scaffold/`.
-
-The scaffold defines this shape:
-
-```text
-values/
-  .env
-  terraform.tfvars
-  dns-records.local.json
-  ansible/inventory/local.yml
-```
-
-The canonical model is being introduced alongside these compatibility inputs. Site-scoped canonical files live under `values/sites/<site>/site.yaml` and may be validated/rendered into non-secret projections, but the legacy files remain active consumer inputs until the documented cutover is complete. Do not put secrets into canonical non-secret projections.
-
-For a public-safe, non-mutating migration rehearsal, the backup helper can emit a content-free manifest for explicitly selected regular files:
+Use [Canonical service authoring](docs/canonical-service-authoring.md) before changing the service catalog or implementation. The public-safe authoring tool produces a reviewable contract manifest and never creates site values, secrets, plans, state, or resources:
 
 ```bash
-scripts/python.sh scripts/migration_backup.py \\
-  --root values \\
-  --output /tmp/values-backup-manifest.json \\
-  terraform.tfvars ansible/inventory/local.yml
+scripts/python.sh scripts/service-author.py \
+  --service-id <service_id> \
+  --archetype dedicated-lxc \
+  --config-model <ConfigModel> \
+  --projection-contract <projection-contract> \
+  --provisioning-contract <provisioning-contract> \
+  --output /tmp/<service_id>-authoring-manifest.json
 ```
 
-The command refuses to overwrite an existing output, follows no symlink escapes, writes mode-0600 output, and does not move or modify source files. It is not a replacement for a verified private backup or restore process, and it is not wired into migration apply.
+## Safety boundaries
 
-Use normal Git commands against the nested repo when you need to inspect, commit, or push private values:
+- Keep tracked material public-safe; use placeholders and RFC 5737 addresses in fixtures.
+- Keep site values, encrypted bundles, state, plans, generated projections, and identities in the private site repository or approved external stores.
+- Never print or commit credentials, keys, tokens, recipient material, live endpoints, or state contents.
+- Do not apply, destroy, import, alter state, or mutate routers/firewalls without explicit approval.
+- Use direct service endpoints for service diagnostics. Use the Proxmox boundary for resource lifecycle and host-boundary readiness.
 
-```bash
-git -C values status --short --branch
-git -C values remote -v
-```
+## Documentation
 
-## Responsibilities
-
-OpenTofu manages:
-
-- Proxmox LXC resources, including optional per-container VLAN tags when
-  `*_vlan_id` values are set in `values/terraform.tfvars`
-- Optional Tailscale client LXC shape, disabled by default until `tailscale_client_enabled` is set in private values
-- Optional Forgejo Actions runner LXC when `forgejo_runner` is enabled in local settings
-- Optional Infisical secrets service, either as the legacy LXC with service-local Caddy or as `infisical_onramp` on the shared onramp host
-- Optional Hermes management LXC with SSH tooling, a non-root `anvil` dashboard runtime user, and a service-local Caddy reverse proxy for the Hermes Agent web dashboard
-- Optional Debian 13 Podman `onramp_host` VM substrate for app services, using `anvil` as the default cloud-init/deploy user and a shared Caddy instance with per-service snippets. The boot source is a clean Debian 13 genericcloud image imported by OpenTofu from the URL declared in private `values/terraform.tfvars`.
-- LXC bind mount or Proxmox-managed volume attachments for services that use durable storage
-
-Ansible manages:
-
-- Optional Proxmox host storage preparation for bind mounts before OpenTofu apply
-- LXC lifecycle readiness on the Proxmox host, followed by direct SSH/become service configuration on each service host
-- Technitium installation
-- Caddy installation/configuration directly on the Technitium LXC. The scaffold exposes the Technitium UI at both `dns.example.internal` and `technitium.example.internal`; set `caddy_server_names` in private inventory for your real domain aliases.
-- Forgejo installation/configuration, including Actions settings
-- Caddy and OpenSSH integration on the Forgejo LXC
-- Forgejo Actions runner installation/registration on a separate LXC
-- Infisical Docker Compose stack on the legacy LXC, or rootless Infisical Podman stack on `onramp_host` when `infisical_onramp` is enabled
-- Hermes management tooling, SSH-oriented bootstrap directories, the Hermes Agent web dashboard running as `anvil`, and Caddy
-- App-host SSH hardening, rootless Podman readiness, `anvil` deploy-user setup, shared Caddy setup, default-deny host firewall policy, and deployment directory preparation
-- Temporary SearXNG onramp workload deployment with rootless Podman, a shared Caddy site snippet, Technitium DNS record input, and Hermes endpoint env wiring when `searxng_onramp` is enabled
-- Optional Tailscale installation and private backup restore on the Tailscale client LXC
-- Technitium DNS records/settings through `infra/ansible/playbooks/technitium-dns.yml`
-
-Ansible inventory combines `values/ansible/inventory/local.yml` with `infra/ansible/inventory/tfvars.py`, which derives service hosts, VMIDs, and addresses from `values/terraform.tfvars` using `python-hcl2`. Normal service diagnostics and steady-state configuration use each service's direct inventory group, such as `technitium`, `forgejo`, `infisical`, or `hermes`; Proxmox access is reserved for lifecycle readiness, storage prep, bootstrap/recovery, and explicit host-boundary work.
-
-## Safety
-
-Do not apply without reviewing `just plan` output. If `just apply` says the saved plan is stale, rerun `just plan` and review it again. Do not commit secrets, state, plans, or real site values to the public repo.
-
-`settings.local.json` is the local operator settings file. It can set `values_repo.remote` for setup and the `services` list used by OpenTofu planning plus Ansible validation/apply. Removing a service from the list tells OpenTofu to stop maintaining its resources, which can plan destroys; review `just plan` before applying.
-
-Container VLAN tags are optional. Omit a `*_vlan_id` variable or set it to
-`null` for an untagged LXC interface; set it to a VLAN ID from 1 through 4094
-for a tagged interface. The selected Proxmox bridge must already be configured
-for that VLAN.
-
-Browser-facing services with DNS records should use static LXC IP addresses,
-not DHCP-only addresses. The setup wizard derives contiguous static service IPs
-from the first managed service IP you provide and keeps `*_lan_ip`, LXC network
-configuration, and Technitium DNS records aligned.
-
-Hermes dashboard uses a form-login provider named `basic`. Store
-`HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH` in private values instead of a
-plaintext password; generate it with `python scripts/hermes-password-hash.py`.
-The service-local Caddy config rewrites the upstream provider redirect to the
-form login route and proxies only to the loopback-bound dashboard. Hermes `web-searxng` plugin/runtime should read the SearXNG endpoint from the
-Hermes-native `SEARXNG_URL` environment key. Private values keep the same
-endpoint as `HERMES_WEB_SEARXNG_URL`, and Ansible renders both names into the
-Hermes dashboard environment for compatibility. When `searxng_onramp` is
-enabled, this repo temporarily manages that endpoint on `onramp_host` as
-`https://searxng.apps.<domain>` or the private equivalent.
-
-`values/.env` is parsed as dotenv-style data by `scripts/parse-env.py`; it is not sourced as shell. Keep required variables from `scaffold/.env.example` in sync with your private `values/.env`.
-
-The tooling container runs as the unprivileged `anvil` user and mounts `${HOST_SSH_DIR:-${HOME}/.ssh}` read-only. It copies public SSH support files into `/home/anvil/.ssh` by default. When a run needs a private identity, set both `INFRA_COPY_SSH_KEYS=true` and `INFRA_SSH_IDENTITY_FILE=<single-key-file-name>`; the container refuses to copy every key in the host directory. Direct service runs use strict host-key checking with private `values/ansible/known_hosts`; changed trusted keys are safety events and require explicit approval before replacement.
+- [Canonical site quick start](docs/canonical-quick-start.md)
+- [Public Just recipes](docs/just-recipes.md)
+- [Canonical service authoring](docs/canonical-service-authoring.md)
+- [Canonical secret operations](docs/canonical-values-secret-operations.md)
+- [Service update policy](docs/service-update-policy.md)
+- [Documentation index](docs/README.md)

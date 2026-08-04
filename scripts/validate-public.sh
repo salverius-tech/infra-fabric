@@ -23,6 +23,7 @@ python -m py_compile "${python_files[@]}"
 python infra/ansible/scripts/apply-technitium-dns.py --check scaffold/dns-records.local.json
 python scripts/parse-env.py --env-file scaffold/.env.example >/dev/null
 python scripts/settings.py --settings settings.example.json validate >/dev/null
+python scripts/validate-service-contracts.py --repo .
 python -m unittest discover -s tests -p "test_*.py"
 
 export ANSIBLE_TFVARS_FILE=scaffold/terraform.tfvars

@@ -1,0 +1,165 @@
+schema_version: 1
+
+site:
+  name: example
+  class: development
+  lifecycle: disposable
+  allow_apply: false
+  allow_destroy: false
+
+bootstrap:
+  ssh:
+    user: infra
+    public_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIpublicsafeexample public@example.invalid
+
+operator:
+  user: systemboss
+  ssh:
+    public_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIpublicsafeexample operator@example.invalid
+  dotfiles:
+    repository: https://github.com/salverius-tech/dotfiles
+    revision: 4aeeadd928b0d03090e5aa973d10d989e846cf15
+    chezmoi:
+      version: v2.71.1
+      sha256: e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed
+
+platform:
+  proxmox:
+    endpoint: https://proxmox.example.internal:8006/
+    node: pve
+    insecure: true
+  network:
+    default_bridge: vmbr0
+    default_gateway: 192.0.2.1
+    default_dns_servers:
+      - 1.1.1.1
+      - 9.9.9.9
+    default_search_domain: example.internal
+  storage:
+    rootfs_datastore: local-lvm
+    template_datastore: local
+    backup_datastore: backup
+  images:
+    lxc: {}
+    vm: {}
+
+resources:
+  guests:
+    technitium:
+      type: lxc
+      identity:
+        vmid: 106
+        hostname: technitium-dns
+        description: Technitium DNS example guest
+      network:
+        address: 192.0.2.53/24
+        gateway: 192.0.2.1
+        bridge: vmbr0
+        dns_servers:
+          - 1.1.1.1
+          - 9.9.9.9
+        search_domain: example.internal
+      compute:
+        cores: 1
+        memory_mb: 1024
+        swap_mb: 512
+      storage:
+        root:
+          type: proxmox_volume
+          storage_id: local-lvm
+          size_gb: 8
+          target: /
+          backup: true
+      runtime:
+        started: true
+        start_on_boot: true
+        unprivileged: true
+    forgejo:
+      type: lxc
+      identity:
+        vmid: 107
+        hostname: forgejo
+        description: Forgejo example guest
+      network:
+        address: dhcp
+        expected_address: 192.0.2.62
+        bridge: vmbr0
+        dns_servers:
+          - 192.0.2.1
+        search_domain: example.internal
+      compute:
+        cores: 2
+        memory_mb: 2048
+        swap_mb: 512
+      storage:
+        root:
+          type: proxmox_volume
+          storage_id: local-lvm
+          size_gb: 8
+          target: /
+          backup: true
+      runtime:
+        started: true
+        start_on_boot: true
+        unprivileged: true
+
+services:
+  technitium:
+    enabled: true
+    resource: technitium
+    release:
+      source: package
+      version: 15.2.0
+      checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    state:
+      capable: true
+      disable_policy: retain
+    endpoints:
+      public_names:
+        - dns.example.internal
+      visibility: internal
+      dns:
+        enabled: true
+        record_type: A
+  forgejo:
+    enabled: true
+    resource: forgejo
+    state:
+      capable: true
+      disable_policy: retain
+    endpoints:
+      public_names:
+        - git.example.internal
+      public_url: https://git.example.internal/
+      protocols:
+        - https
+        - ssh
+      ports:
+        https: 443
+        ssh: 22
+      visibility: internal
+      dns:
+        enabled: true
+        record_type: A
+    release:
+      source: package
+      version: 12.0.4
+    configuration:
+      database:
+        type: sqlite
+  forgejo_runner:
+    enabled: false
+  hermes:
+    enabled: false
+  infisical:
+    enabled: false
+  infisical_onramp:
+    enabled: false
+  onramp_host:
+    enabled: false
+  searxng_onramp:
+    enabled: false
+  tailscale_client:
+    enabled: false

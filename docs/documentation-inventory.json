@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "classifications": [
+    "operator-current",
+    "contributor-current",
+    "architecture-current"
+  ],
+  "documents": {
+    "README.md": "operator-current",
+    "AGENTS.md": "contributor-current",
+    "scaffold/README.md": "contributor-current",
+    "scaffold/sites/_template/README.md": "contributor-current",
+    "docs/README.md": "contributor-current",
+    "docs/canonical-quick-start.md": "operator-current",
+    "docs/just-recipes.md": "operator-current",
+    "docs/canonical-readiness.md": "operator-current",
+    "docs/canonical-troubleshooting.md": "operator-current",
+    "docs/canonical-values-secret-operations.md": "operator-current",
+    "docs/service-update-policy.md": "operator-current",
+    "docs/hermes-tuning.md": "operator-current",
+    "docs/hermes-control-operations.md": "operator-current",
+    "docs/service-state-backup.md": "operator-current",
+    "docs/hermes-state-backup.md": "operator-current",
+    "docs/onramp-app-platform-contract.md": "operator-current",
+    "docs/onramp-host-runbook.md": "operator-current",
+    "docs/onramp-searxng-handoff.md": "operator-current",
+    "docs/debian-baseline.md": "architecture-current",
+    "docs/development-environment.md": "contributor-current",
+    "docs/canonical-service-authoring.md": "contributor-current",
+    "docs/canonical-values-migration.md": "architecture-current",
+    "docs/canonical-values-mapping-v1.md": "architecture-current",
+    "docs/canonical-values-model-blockers.md": "architecture-current",
+    "docs/hermes-operator-pilot-prd.md": "architecture-current",
+    "docs/normalized-plan-equivalence.md": "architecture-current"
+  },
+  "historical_remove": {
+    "docs/canonical-values-phase0-inventory.md": "docs/canonical-readiness.md",
+    "docs/canonical-values-implementation-audit-2026-07-30.md": "docs/canonical-service-authoring.md",
+    "docs/canonical-values-ansible-inventory-audit.md": "docs/canonical-service-authoring.md",
+    "docs/repository-audit-2026-07-19.md": "docs/README.md",
+    "docs/upstream-commit-review.md": "docs/README.md",
+    "docs/upstream-gap-review-2026-07-19.md": "docs/canonical-readiness.md"
+  }
+}
