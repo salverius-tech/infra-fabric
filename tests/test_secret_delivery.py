@@ -198,6 +198,37 @@ class SecretDeliveryTests(unittest.TestCase):
         self.assertNotIn("INFRA_OPERATOR_PASSWORD", environment)
         self.assertNotIn("PROXMOX_VE_API_TOKEN", environment)
 
+    def test_infisical_onramp_declares_every_role_secret(self) -> None:
+        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        services = {
+            "infisical_onramp": SimpleNamespace(enabled=True, configuration={}),
+            "onramp_host": SimpleNamespace(enabled=True, configuration={}),
+        }
+        requirements = secret_delivery.requirements_for_model(
+            catalog,
+            services,
+            selected_services=["infisical_onramp"],
+        )
+        self.assertEqual(
+            {requirement.environment_name for requirement in requirements},
+            {"INFISICAL_AUTH_SECRET", "INFISICAL_ENCRYPTION_KEY", "INFISICAL_POSTGRES_PASSWORD"},
+        )
+
+    def test_protected_environment_is_removed_before_service_delivery(self) -> None:
+        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        inherited = {
+            "SAFE_FLAG": "1",
+            "PROXMOX_VE_API_TOKEN": "provider",
+            "INFRA_BOOTSTRAP_ROOT_PASSWORD": "root",
+            "INFRA_OPERATOR_PASSWORD": "operator",
+            "FORGEJO_SECRET_KEY": "forgejo",
+            "HERMES_CONTROL_API_TOKEN": "hermes",
+        }
+        self.assertEqual(
+            secret_delivery.without_protected_environment(inherited, catalog),
+            {"SAFE_FLAG": "1"},
+        )
+
     def test_model_contract_secrets_forbid_state_exposure(self) -> None:
         catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
         services = {"forgejo": SimpleNamespace(enabled=True, configuration={})}

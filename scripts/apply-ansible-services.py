@@ -26,7 +26,7 @@ try:
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements
+    from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements, without_protected_environment
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -35,7 +35,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements
+    from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements, without_protected_environment
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -721,6 +721,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 for selected_service in services
             }
+            base_env = without_protected_environment(base_env, catalog)
         else:
             service_environments = None
         if args.mode == "sequential":

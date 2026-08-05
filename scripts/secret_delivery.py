@@ -8,13 +8,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Mapping
+from typing import Any, Mapping, Protocol
 
 from secret_provider import SecretProvider, SecretProviderError
 
 
 class SecretDeliveryError(SecretProviderError):
     """Raised when a logical secret cannot be delivered to a consumer."""
+
+
+class SecretCatalog(Protocol):
+    @property
+    def names(self) -> frozenset[str]: ...
+
+    def get(self, name: str) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -243,6 +250,32 @@ def deliver_services_environment(
                 raise SecretDeliveryError("conflicting secret environment delivery")
             environment[name] = value
     return environment
+
+
+def protected_environment_names(catalog: SecretCatalog) -> frozenset[str]:
+    """Return every environment name reserved for transient protected delivery."""
+    names = {
+        requirement.environment_name
+        for requirement in ALL_REQUIREMENTS
+        if requirement.environment_name is not None
+    }
+    names.update(
+        environment_name
+        for service_name in catalog.names
+        for environment_name in catalog.get(service_name).secret_environment.values()
+    )
+    return frozenset(names)
+
+
+def without_protected_environment(
+    environment: Mapping[str, str],
+    catalog: SecretCatalog,
+) -> dict[str, str]:
+    """Strip inherited provider, identity, bootstrap, and service credentials."""
+    protected = protected_environment_names(catalog)
+    return {name: value for name, value in environment.items() if name not in protected}
+
+
 def redact_environment(environment: Mapping[str, str], secret_names: set[str]) -> dict[str, str]:
     """Return metadata-only environment diagnostics."""
     return {name: "<redacted>" if name in secret_names else value for name, value in environment.items()}
@@ -266,4 +299,6 @@ __all__ = [
     "root_password_secret_path",
     "requirements_for_model",
     "provider_requirements",
+    "protected_environment_names",
+    "without_protected_environment",
 ]

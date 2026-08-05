@@ -22,6 +22,8 @@ from ruamel.yaml import YAML
 LEGACY_OPERATOR_PATH = ("operator", "systemboss_password")
 INTERIM_OPERATOR_PATH = ("operator", "password")
 CANONICAL_OPERATOR_PATH = ("secrets", "operator", "password")
+LEGACY_CLOUDFLARE_PROVIDER_PATH = ("services", "providers", "cloudflare", "secrets", "api_token")
+CANONICAL_CLOUDFLARE_PROVIDER_PATH = ("secrets", "providers", "cloudflare", "api_token")
 
 
 class SecretBundleMigrationError(ValueError):
@@ -64,29 +66,51 @@ def _delete_path(document: dict[str, Any], path: tuple[str, ...]) -> None:
             del parent[key]
 
 
-def migrate_document(document: dict[str, Any]) -> tuple[dict[str, Any], bool]:
-    """Move accepted legacy operator-password aliases to the canonical path."""
-    if not isinstance(document, dict):
-        raise SecretBundleMigrationError("secret bundle must be a mapping")
-    migrated = copy.deepcopy(document)
-    candidates = (CANONICAL_OPERATOR_PATH, INTERIM_OPERATOR_PATH, LEGACY_OPERATOR_PATH)
+def _migrate_aliases(
+    document: dict[str, Any],
+    *,
+    aliases: tuple[tuple[str, ...], ...],
+    canonical: tuple[str, ...],
+    label: str,
+) -> bool:
+    candidates = (canonical, *aliases)
     present: list[tuple[tuple[str, ...], Any]] = []
     for path in candidates:
-        found, value = _path_value(migrated, path)
+        found, value = _path_value(document, path)
         if found:
             present.append((path, value))
     if not present:
-        return migrated, False
+        return False
     canonical_value = present[0][1]
     if not isinstance(canonical_value, str) or not canonical_value:
-        raise SecretBundleMigrationError("operator secret must be a non-empty string")
+        raise SecretBundleMigrationError(f"{label} secret must be a non-empty string")
     if any(value != canonical_value for _, value in present[1:]):
-        raise SecretBundleMigrationError("legacy and canonical operator secrets conflict")
-    canonical_present = any(path == CANONICAL_OPERATOR_PATH for path, _ in present)
-    changed = not canonical_present or any(path != CANONICAL_OPERATOR_PATH for path, _ in present)
-    _set_path(migrated, CANONICAL_OPERATOR_PATH, present[0][1])
-    for path in (INTERIM_OPERATOR_PATH, LEGACY_OPERATOR_PATH):
-        _delete_path(migrated, path)
+        raise SecretBundleMigrationError(f"legacy and canonical {label} secrets conflict")
+    canonical_present = any(path == canonical for path, _ in present)
+    changed = not canonical_present or any(path != canonical for path, _ in present)
+    _set_path(document, canonical, canonical_value)
+    for path in aliases:
+        _delete_path(document, path)
+    return changed
+
+
+def migrate_document(document: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Move accepted legacy aliases to canonical logical secret paths."""
+    if not isinstance(document, dict):
+        raise SecretBundleMigrationError("secret bundle must be a mapping")
+    migrated = copy.deepcopy(document)
+    changed = _migrate_aliases(
+        migrated,
+        aliases=(INTERIM_OPERATOR_PATH, LEGACY_OPERATOR_PATH),
+        canonical=CANONICAL_OPERATOR_PATH,
+        label="operator",
+    )
+    changed = _migrate_aliases(
+        migrated,
+        aliases=(LEGACY_CLOUDFLARE_PROVIDER_PATH,),
+        canonical=CANONICAL_CLOUDFLARE_PROVIDER_PATH,
+        label="Cloudflare provider",
+    ) or changed
     return migrated, changed
 
 
@@ -202,8 +226,10 @@ def migrate_encrypted_bundle(
 
 
 __all__ = [
+    "CANONICAL_CLOUDFLARE_PROVIDER_PATH",
     "CANONICAL_OPERATOR_PATH",
     "INTERIM_OPERATOR_PATH",
+    "LEGACY_CLOUDFLARE_PROVIDER_PATH",
     "LEGACY_OPERATOR_PATH",
     "SecretBundleMigrationError",
     "migrate_document",

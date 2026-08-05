@@ -473,7 +473,7 @@
     },
     {
       "path": "docs/canonical-values-secret-operations.md",
-      "sha256": "84e9073d95478f9aecec460d2256a1e98578fe0baa3ac4c0d3c19409f02ca757",
+      "sha256": "3763de55f19ae42fe4a0765861fe05e25fc6e688660b5fa9b92b51ee886e00ff",
       "authority": "operator-current",
       "stated_status": "public operational contract. Recipient and key material remain private and external to this repository.",
       "extracted_item_count": 0

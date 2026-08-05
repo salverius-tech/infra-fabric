@@ -24,5 +24,7 @@
   hosts: forgejo_runner
   gather_facts: false
   become: true
+  vars:
+    forgejo_runner_registration_secret: "{{ lookup('env', 'FORGEJO_RUNNER_REGISTRATION_SECRET') }}"
   roles:
     - forgejo_runner

@@ -67,6 +67,39 @@ class SecretBundleMigrationTests(unittest.TestCase):
         self.assertFalse(changed)
         self.assertEqual(migrated, document)
 
+    def test_legacy_cloudflare_provider_path_migrates_to_canonical_namespace(self) -> None:
+        document = {
+            "services": {"providers": {"cloudflare": {"secrets": {"api_token": "token"}}}}
+        }
+
+        migrated, changed = migrate_document(document)
+
+        self.assertTrue(changed)
+        self.assertEqual(
+            migrated,
+            {"secrets": {"providers": {"cloudflare": {"api_token": "token"}}}},
+        )
+
+    def test_identical_cloudflare_provider_aliases_collapse(self) -> None:
+        document = {
+            "secrets": {"providers": {"cloudflare": {"api_token": "same"}}},
+            "services": {"providers": {"cloudflare": {"secrets": {"api_token": "same"}}}},
+        }
+
+        migrated, changed = migrate_document(document)
+
+        self.assertTrue(changed)
+        self.assertNotIn("services", migrated)
+
+    def test_conflicting_cloudflare_provider_aliases_fail_closed(self) -> None:
+        document = {
+            "secrets": {"providers": {"cloudflare": {"api_token": "canonical"}}},
+            "services": {"providers": {"cloudflare": {"secrets": {"api_token": "legacy"}}}},
+        }
+
+        with self.assertRaises(SecretBundleMigrationError):
+            migrate_document(document)
+
     def test_encrypted_dry_run_does_not_write(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             bundle = Path(temporary) / "secrets.sops.yaml"

@@ -71,7 +71,7 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `docs/canonical-values-mapping-v1.md` | architecture-current | `b9e6f74d7d12c5589ec36cdfea676b04c959296793eb36b8a6ef8a3d2bf09693` | 4 |
 | `docs/canonical-values-migration.md` | architecture-current | `3cfc5ad7df0acbd17dd6b7a27042befa7f80546ebdbbf0c5d66ec362a4a738b3` | 0 |
 | `docs/canonical-values-model-blockers.md` | architecture-current | `c94a50d1bd1b9b60f38baf8ead87cef314b7f43fb24af8a92dea965c32c49c5d` | 0 |
-| `docs/canonical-values-secret-operations.md` | operator-current | `84e9073d95478f9aecec460d2256a1e98578fe0baa3ac4c0d3c19409f02ca757` | 0 |
+| `docs/canonical-values-secret-operations.md` | operator-current | `3763de55f19ae42fe4a0765861fe05e25fc6e688660b5fa9b92b51ee886e00ff` | 0 |
 | `docs/debian-baseline.md` | architecture-current | `daf6009d472ae46aab424a1c6482f61f05edb8dd2508062a0a3610978de724fb` | 0 |
 | `docs/development-environment.md` | contributor-current | `6177801ff7e11de33d090dc679c009d8f3642fcf368210f023aa63e49d70e2e2` | 0 |
 | `docs/documentation-inventory.json` | unclassified | `b578abb656ed422dc846c3407b2be1ef60187408f61399708c46c0e4fdc491e1` | 0 |

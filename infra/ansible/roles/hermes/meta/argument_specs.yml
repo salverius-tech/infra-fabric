@@ -18,6 +18,7 @@ argument_specs:
       caddy_cloudflare_api_token:
         type: str
         required: true
+        no_log: true
         description: "Cloudflare DNS API token for Caddy DNS-01 challenge."
       hermes_dashboard_enabled:
         type: bool

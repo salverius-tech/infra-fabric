@@ -30,6 +30,7 @@ argument_specs:
       caddy_cloudflare_api_token:
         type: str
         required: true
+        no_log: true
         description: "Cloudflare DNS API token used by shared onramp Caddy DNS-01 challenges."
       onramp_host_bootstrap_ssh_public_keys:
         type: list

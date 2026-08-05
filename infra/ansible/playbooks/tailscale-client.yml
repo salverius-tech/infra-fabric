@@ -22,5 +22,7 @@
   hosts: tailscale_client
   gather_facts: false
   become: true
+  vars:
+    tailscale_client_auth_key: "{{ lookup('env', 'TS_AUTHKEY') }}"
   roles:
     - tailscale_client

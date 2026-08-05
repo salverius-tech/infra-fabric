@@ -8,5 +8,9 @@
   hosts: onramp_host
   gather_facts: true
   become: true
+  vars:
+    infisical_auth_secret: "{{ lookup('env', 'INFISICAL_AUTH_SECRET') }}"
+    infisical_encryption_key: "{{ lookup('env', 'INFISICAL_ENCRYPTION_KEY') }}"
+    infisical_postgres_password: "{{ lookup('env', 'INFISICAL_POSTGRES_PASSWORD') }}"
   roles:
     - infisical_onramp

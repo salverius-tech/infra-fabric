@@ -279,6 +279,21 @@
       "dependencies": [
         "onramp_host"
       ],
+      "required_secrets": [
+        "services.infisical_onramp.secrets.auth_secret",
+        "services.infisical_onramp.secrets.encryption_key",
+        "services.infisical_onramp.secrets.postgres_password"
+      ],
+      "secret_classifications": {
+        "services.infisical_onramp.secrets.auth_secret": "runtime",
+        "services.infisical_onramp.secrets.encryption_key": "runtime",
+        "services.infisical_onramp.secrets.postgres_password": "runtime"
+      },
+      "secret_environment": {
+        "services.infisical_onramp.secrets.auth_secret": "INFISICAL_AUTH_SECRET",
+        "services.infisical_onramp.secrets.encryption_key": "INFISICAL_ENCRYPTION_KEY",
+        "services.infisical_onramp.secrets.postgres_password": "INFISICAL_POSTGRES_PASSWORD"
+      },
       "inventory": {
         "host": "onramp_host_vm",
         "group": "onramp_host",

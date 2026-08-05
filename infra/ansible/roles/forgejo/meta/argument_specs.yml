@@ -34,6 +34,7 @@ argument_specs:
       caddy_cloudflare_api_token:
         type: str
         required: false
+        no_log: true
         description: "Required only when forgejo_enable_caddy is true; token for Cloudflare DNS challenge."
       forgejo_configure_system_ssh:
         type: bool
@@ -64,3 +65,33 @@ argument_specs:
         required: false
         no_log: true
         description: "Password for the managed local Forgejo PostgreSQL role when forgejo_database.type is postgres."
+      forgejo_bootstrap_admin_password:
+        type: str
+        required: false
+        no_log: true
+        description: "Protected password for the optional bootstrap administrator."
+      forgejo_bootstrap_owner_password:
+        type: str
+        required: false
+        no_log: true
+        description: "Protected password for the optional bootstrap repository owner."
+      forgejo_internal_token:
+        type: str
+        required: false
+        no_log: true
+        description: "Forgejo internal runtime token."
+      forgejo_lfs_jwt_secret:
+        type: str
+        required: false
+        no_log: true
+        description: "Forgejo LFS JWT signing secret."
+      forgejo_oauth2_jwt_secret:
+        type: str
+        required: false
+        no_log: true
+        description: "Forgejo OAuth2 JWT signing secret."
+      forgejo_secret_key:
+        type: str
+        required: false
+        no_log: true
+        description: "Forgejo application secret key."

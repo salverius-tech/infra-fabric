@@ -26,6 +26,7 @@ argument_specs:
       caddy_cloudflare_api_token:
         type: str
         required: true
+        no_log: true
         description: "Cloudflare DNS API token used by Caddy's DNS challenge provider."
       caddy_extra_vhosts:
         type: list

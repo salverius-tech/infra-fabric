@@ -12,5 +12,7 @@
   hosts: onramp_host
   gather_facts: true
   become: true
+  vars:
+    searxng_secret_key: "{{ lookup('env', 'SEARXNG_SECRET_KEY') }}"
   roles:
     - searxng_onramp
