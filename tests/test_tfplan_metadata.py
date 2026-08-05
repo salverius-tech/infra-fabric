@@ -3,7 +3,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
-import shutil
 import sys
 import tempfile
 import unittest
@@ -60,11 +59,15 @@ class TfplanMetadataTests(unittest.TestCase):
         plan.write_text("plan-data\n")
         return temp_dir, repo, plan, metadata
 
-    def add_canonical_projection_set(self, repo: Path) -> None:
+    def add_canonical_projection_set(self, repo: Path, fixture: str = "dev") -> None:
         source_root = Path(__file__).resolve().parents[1]
         site = repo / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        source = source_root / "scaffold" / "sites" / fixture / "site.yaml"
+        text = source.read_text(encoding="utf-8")
+        if fixture != "dev":
+            text = text.replace("  name: example\n", "  name: dev\n", 1)
+        (site / "site.yaml").write_text(text, encoding="utf-8")
         (repo / "infra" / "services.json").write_text(
             (source_root / "infra" / "services.json").read_text(encoding="utf-8"),
             encoding="utf-8",
@@ -109,6 +112,32 @@ class TfplanMetadataTests(unittest.TestCase):
             self.assertTrue(data["canonical"]["model_digest"])
             self.assertTrue(data["canonical"]["projection_digest"])
             tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_canonical_stateful_selection_ignores_stale_site_json(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo, "_template")
+        site_dir = repo / "values" / "sites" / "dev"
+        (site_dir / "site.json").write_text('{"name": "dev", "services": ["technitium"]}\n', encoding="utf-8")
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ):
+            mapping = tfplan_metadata.enabled_stateful_services_by_address(repo)
+            self.assertIn("sssf", {service for services in mapping.values() for service in services})
+            sssf_address = next(address for address, services in mapping.items() if "sssf" in services)
+            forgejo_address = next(address for address, services in mapping.items() if "forgejo" in services)
+            summary = tfplan_metadata.summarize_plan(
+                {
+                    "resource_changes": [
+                        {"address": f"{forgejo_address}.example", "change": {"actions": ["delete"]}},
+                        {"address": f"{sssf_address}.example", "change": {"actions": ["delete"]}},
+                    ]
+                },
+                repo,
+            )
+            self.assertEqual(summary["stateful_services"], ["forgejo", "sssf"])
+            self.assertEqual(len(summary["stateful_targets"]), 2)
 
     def test_changed_canonical_projection_fails(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()

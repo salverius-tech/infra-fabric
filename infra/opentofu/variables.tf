@@ -1,7 +1,24 @@
 variable "enabled_services" {
-  description = "Services OpenTofu should build and maintain. Service selection is normally supplied from settings.local.json by just plan. Null uses infra/services.json default_services."
+  description = "Services OpenTofu should build and maintain. Canonical generated inputs are authoritative; null retains explicit legacy compatibility."
   type        = list(string)
   default     = null
+}
+
+variable "stateful_service_disable_policies" {
+  description = "Canonical disable policy for explicitly state-capable services. Generated from site.yaml; do not author directly."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for policy in values(var.stateful_service_disable_policies) : contains(["retain", "archive", "destroy"], policy)])
+    error_message = "stateful_service_disable_policies values must be retain, archive, or destroy."
+  }
+}
+
+variable "stateful_destroy_acknowledged" {
+  description = "Explicit one-run acknowledgement permitting a canonically retained stateful service to be disabled. Use repository wrappers."
+  type        = bool
+  default     = false
 }
 
 
@@ -1413,13 +1430,13 @@ variable "onramp_host_startup_down_delay" {
 }
 
 variable "tailscale_client_enabled" {
-  description = "Create the Tailscale client LXC. Keep false for backup-only documentation until a reviewed plan should create it."
+  description = "Deprecated compatibility input. Canonical enabled_services exclusively controls Tailscale resource creation."
   type        = bool
   default     = false
 }
 
 variable "tailscale_client_vmid" {
-  description = "Proxmox VMID for the Tailscale client LXC. Set in terraform.tfvars before enabling tailscale_client_enabled."
+  description = "VMID for the Tailscale client guest when selected by canonical enabled_services."
   type        = number
   default     = 108
 }

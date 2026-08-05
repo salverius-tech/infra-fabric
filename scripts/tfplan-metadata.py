@@ -143,12 +143,23 @@ def enabled_stateful_services_by_address(repo: Path) -> dict[str, list[str]]:
         raise MetadataError(f"cannot read service registry: {registry_path}") from error
     services = registry.get("services", {})
     context = from_environment(repo)
-    settings_path = context.metadata_path or (repo / "settings.local.json")
-    try:
-        local_settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
-    except json.JSONDecodeError as error:
-        raise MetadataError(f"cannot parse site settings: {settings_path}") from error
-    enabled = local_settings.get("services", registry.get("default_services", []))
+    if context.canonical_site_path is not None:
+        try:
+            model = load_site(
+                context.canonical_site_path,
+                expected_site=context.site,
+                catalog_path=registry_path,
+            )
+        except (OSError, ValueError) as error:
+            raise MetadataError(f"cannot load canonical site selection: {context.canonical_site_path}") from error
+        enabled = [name for name, service in model.services.items() if service.enabled]
+    else:
+        settings_path = context.metadata_path or (repo / "settings.local.json")
+        try:
+            local_settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
+        except json.JSONDecodeError as error:
+            raise MetadataError(f"cannot parse site settings: {settings_path}") from error
+        enabled = local_settings.get("services", registry.get("default_services", []))
     if not isinstance(services, dict) or not isinstance(enabled, list):
         raise MetadataError("service registry or operator settings has an invalid service list")
 

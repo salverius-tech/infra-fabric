@@ -1,15 +1,19 @@
 locals {
-  service_registry                  = jsondecode(file("${path.module}/../services.json"))
-  service_names                     = keys(local.service_registry.services)
-  runtime_service_names             = ["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes", "sssf", "onramp_host"]
-  enabled_services                  = toset(coalesce(var.enabled_services, local.service_registry.default_services))
-  invalid_enabled_services          = setsubtract(local.enabled_services, toset(local.service_names))
-  invalid_service_runtime_services  = setsubtract(toset(keys(var.service_runtime)), toset(local.runtime_service_names))
+  service_registry                 = jsondecode(file("${path.module}/../services.json"))
+  service_names                    = keys(local.service_registry.services)
+  runtime_service_names            = ["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes", "sssf", "onramp_host"]
+  enabled_services                 = toset(coalesce(var.enabled_services, local.service_registry.default_services))
+  invalid_enabled_services         = setsubtract(local.enabled_services, toset(local.service_names))
+  invalid_service_runtime_services = setsubtract(toset(keys(var.service_runtime)), toset(local.runtime_service_names))
+  retained_disabled_services = toset([
+    for name, policy in var.stateful_service_disable_policies : name
+    if policy == "retain" && !contains(local.enabled_services, name)
+  ])
   onramp_host_runtime_lxc_requested = contains(keys(var.service_runtime), "onramp_host") && local.onramp_host_runtime_type == "lxc"
 
   technitium_enabled       = contains(local.enabled_services, "technitium")
   forgejo_enabled          = contains(local.enabled_services, "forgejo")
-  tailscale_client_enabled = contains(local.enabled_services, "tailscale_client") && var.tailscale_client_enabled
+  tailscale_client_enabled = contains(local.enabled_services, "tailscale_client")
   forgejo_runner_enabled   = contains(local.enabled_services, "forgejo_runner")
   infisical_enabled        = contains(local.enabled_services, "infisical")
   hermes_enabled           = contains(local.enabled_services, "hermes")
@@ -72,6 +76,11 @@ resource "terraform_data" "enabled_services_validation" {
     precondition {
       condition     = !local.onramp_host_runtime_lxc_requested
       error_message = "onramp_host is VM-only and does not support service_runtime.onramp_host.type = lxc."
+    }
+
+    precondition {
+      condition     = length(local.retained_disabled_services) == 0 || var.stateful_destroy_acknowledged
+      error_message = "Disabling retained stateful services requires explicit wrapper acknowledgement: ${join(", ", local.retained_disabled_services)}."
     }
   }
 }

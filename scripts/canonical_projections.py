@@ -221,6 +221,11 @@ def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | No
     catalog = catalog or load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
     values: dict[str, Any] = {
         "enabled_services": sorted(name for name, service in model.services.items() if service.enabled),
+        "stateful_service_disable_policies": {
+            name: service.state.disable_policy
+            for name, service in sorted(model.services.items())
+            if service.state.capable
+        },
         "proxmox_endpoint": model.platform.proxmox.endpoint,
         "proxmox_node_name": model.platform.proxmox.node,
         "proxmox_insecure": model.platform.proxmox.insecure,

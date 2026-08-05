@@ -167,8 +167,13 @@ fi
 
 plan_tmp="$(mktemp "${INFRA_VALUES_DIR}/.tfplan-next.XXXXXX")"
 rm -f "${plan_tmp}"
+stateful_destroy_acknowledged=false
+if [[ "${INFRA_ALLOW_DESTROY:-0}" == "1" ]]; then
+  stateful_destroy_acknowledged=true
+fi
 plan_command=(tofu -chdir=infra/opentofu plan \
   "${enabled_services_args[@]}" \
+  -var="stateful_destroy_acknowledged=${stateful_destroy_acknowledged}" \
   -var-file="${tofu_vars_file}" \
   -state=../../${INFRA_VALUES_DIR}/terraform.tfstate \
   "${target_args[@]}" \
