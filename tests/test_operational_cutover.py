@@ -13,9 +13,12 @@ class OperationalCutoverTests(unittest.TestCase):
             result = subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, msg=f"{name}: {result.stderr}")
 
-    def test_canonical_site_requires_complete_projection_set(self) -> None:
+    def test_canonical_projection_set_is_rendered_or_required_then_verified(self) -> None:
         required = "manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json"
-        for name in ("validate-values.sh", "plan-infra.sh", "apply-infra.sh"):
+        validate = (ROOT / "scripts" / "validate-values.sh").read_text(encoding="utf-8")
+        self.assertIn("canonical-render.py", validate)
+        self.assertIn("verify-projections.py", validate)
+        for name in ("plan-infra.sh", "apply-infra.sh"):
             text = (ROOT / "scripts" / name).read_text(encoding="utf-8")
             self.assertIn(required, text)
             self.assertIn("verify-projections.py", text)

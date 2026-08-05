@@ -47,4 +47,4 @@ docker compose run --rm \
   --env INFRA_HOST_IDENTITY_SKIP_ROOT="${INFRA_HOST_IDENTITY_SKIP_ROOT:-}" \
   --env INFRA_HOST_IDENTITY_ONLY="${INFRA_HOST_IDENTITY_ONLY:-}" \
   "${compose_env_args[@]}" \
-  infra "$@"
+  infra python scripts/site_lock.py --lock-path "${values_dir}/.infra-fabric.lock" -- "$@"

@@ -59,6 +59,8 @@ A passing validation or plan does not prove service convergence, live health, dr
 
 Direct `tofu plan`, `tofu apply`, and destroy execution are unsupported operator paths. Use the repository `just plan` and `just apply` wrappers so canonical projections, retained-state acknowledgement, saved-plan metadata, destructive classification, and site policy are enforced together. When intentionally disabling a service whose canonical `disable_policy` is `retain`, rerun planning with `INFRA_ALLOW_DESTROY=1` only after deciding that the retained resource may be removed; apply remains separately gated by the reviewed saved plan.
 
+Supported wrappers serialize operations with a persistent private lock in the selected site directory. This enforces a single-controller/single-writer model only when every operator uses the same shared values filesystem and repository wrappers; it is not a distributed lock and cannot protect direct OpenTofu CLI use.
+
 ## Site lifecycle states
 
 - `disposable`: may be created and destroyed deliberately; use public-safe fixtures and retain no production assumptions.
