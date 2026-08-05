@@ -6,6 +6,7 @@ host_identity_operator_user: ""
 host_identity_provisioning_keys: []
 host_identity_operator_keys: []
 host_identity_operator_password: ""
+host_identity_operator_password_hash_salt: infraFabricOperator
 host_identity_operator_home: "/home/{{ host_identity_operator_user }}"
 host_identity_provisioning_home: "/home/{{ host_identity_provisioning_user }}"
 host_identity_shell: /bin/bash

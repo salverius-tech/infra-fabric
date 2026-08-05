@@ -19,7 +19,9 @@ class RootCredentialsTests(unittest.TestCase):
         self.assertIn("INFRA_BOOTSTRAP_ROOT_PASSWORD", self.tasks)
         self.assertNotIn("TF_VAR_lxc_root_password", self.tasks)
         self.assertIn("no_log: true", self.tasks)
-        self.assertIn("password_hash('sha512', root_credentials_root_password_hash_salt)", self.tasks)
+        self.assertIn("password_hash(", self.tasks)
+        self.assertIn("root_credentials_root_password_hash_salt ~ ':' ~ canonical_site ~ ':' ~ canonical_resource", self.tasks)
+        self.assertIn("hash('sha256')", self.tasks)
         self.assertIn("update_password: always", self.tasks)
 
     def test_hash_salt_is_stable_for_idempotent_rotation(self) -> None:

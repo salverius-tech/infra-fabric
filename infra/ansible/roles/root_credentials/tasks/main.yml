@@ -3,6 +3,8 @@
   ansible.builtin.assert:
     that:
       - ansible_play_hosts | length == 1
+      - canonical_site | default('') | length > 0
+      - canonical_resource | default('') | length > 0
     fail_msg: Root-password bootstrap must be limited to exactly one canonical host.
   no_log: true
 
@@ -17,6 +19,10 @@
 - name: Rotate managed host root password
   ansible.builtin.user:
     name: root
-    password: "{{ lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | password_hash('sha512', root_credentials_root_password_hash_salt) }}"
+    password: >-
+      {{ lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | password_hash(
+        'sha512',
+        ((root_credentials_root_password_hash_salt ~ ':' ~ canonical_site ~ ':' ~ canonical_resource) | hash('sha256'))[:16]
+      ) }}
     update_password: always
   no_log: true

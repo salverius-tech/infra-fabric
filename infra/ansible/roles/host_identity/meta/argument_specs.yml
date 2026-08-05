@@ -24,6 +24,10 @@ argument_specs:
         type: str
         required: true
         description: Private operator password; role tasks must keep its value out of logs.
+      host_identity_operator_password_hash_salt:
+        type: str
+        required: true
+        description: Stable non-secret namespace used to derive a site/resource-specific password salt.
       host_identity_operator_home:
         type: str
         required: false
