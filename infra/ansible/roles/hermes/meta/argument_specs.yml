@@ -106,10 +106,12 @@ argument_specs:
       hermes_dashboard_basic_auth_password_hash:
         type: str
         required: false
+        no_log: true
         description: "Required when hermes_dashboard_enabled is true; argon/scrypt hash for dashboard basic-auth."
       hermes_dashboard_basic_auth_secret:
         type: str
         required: false
+        no_log: true
         description: "Required when hermes_dashboard_enabled is true; Hermes dashboard auth secret."
       hermes_web_searxng_url:
         type: str
@@ -162,10 +164,12 @@ argument_specs:
       hermes_control_api_token:
         type: str
         required: false
+        no_log: true
         description: "Private Hermes Control API bearer token."
       hermes_control_bridge_token:
         type: str
         required: false
+        no_log: true
         description: "Private Hermes Control bridge authentication token."
       hermes_control_plugin_socket:
         type: str

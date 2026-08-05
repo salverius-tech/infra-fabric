@@ -16,8 +16,20 @@ try:
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
-    from secret_delivery import BOOTSTRAP_SSH_PRIVATE_KEY_PATH, PROXMOX_PROVIDER_PATH
-    from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy, validate_sops_age_recipients
+    from secret_delivery import (
+        BOOTSTRAP_SSH_PRIVATE_KEY_PATH,
+        PROXMOX_PROVIDER_PATH,
+        operator_password_requirements,
+        root_password_requirements,
+    )
+    from secret_provider import (
+        SecretProviderError,
+        SopsAgeProvider,
+        check_sops_age_availability,
+        inspect_sops_policy,
+        sops_policy_recipients,
+        validate_sops_age_recipients,
+    )
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
@@ -25,8 +37,20 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
     from values_context import from_environment
-    from secret_delivery import BOOTSTRAP_SSH_PRIVATE_KEY_PATH, PROXMOX_PROVIDER_PATH
-    from secret_provider import SecretProviderError, SopsAgeProvider, check_sops_age_availability, inspect_sops_policy, validate_sops_age_recipients
+    from secret_delivery import (
+        BOOTSTRAP_SSH_PRIVATE_KEY_PATH,
+        PROXMOX_PROVIDER_PATH,
+        operator_password_requirements,
+        root_password_requirements,
+    )
+    from secret_provider import (
+        SecretProviderError,
+        SopsAgeProvider,
+        check_sops_age_availability,
+        inspect_sops_policy,
+        sops_policy_recipients,
+        validate_sops_age_recipients,
+    )
 
 
 class PreflightError(RuntimeError):
@@ -97,16 +121,22 @@ def _write_projection(path: Path, value: object) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _sops_policy_inputs(repo: Path) -> tuple[Path, set[str] | None]:
-    """Read private policy metadata inputs without exposing key material."""
-    policy = Path(os.environ.get("INFRA_SOPS_POLICY_PATH", str(repo / ".sops.yaml"))).expanduser()
+def _sops_policy_inputs(repo: Path, *, require_policy: bool = False) -> tuple[Path, set[str] | None]:
+    """Resolve exact-site policy recipients without reading private key material."""
+    context = from_environment(repo)
+    default_policy = context.values_dir / ".sops.yaml" if context.canonical_site_path is not None else repo / ".sops.yaml"
+    policy = Path(os.environ.get("INFRA_SOPS_POLICY_PATH", str(default_policy))).expanduser()
     raw_recipients = os.environ.get("INFRA_SOPS_AGE_RECIPIENTS", "")
-    if not raw_recipients:
-        return policy, None
-    recipients = {item.strip() for item in raw_recipients.split(",") if item.strip()}
-    if not recipients:
-        raise SecretProviderError("SOPS recipient policy is invalid")
-    return policy, recipients
+    if raw_recipients:
+        recipients = {item.strip() for item in raw_recipients.split(",") if item.strip()}
+        if not recipients:
+            raise SecretProviderError("SOPS recipient policy is invalid")
+        return policy, recipients
+    if policy.is_file() and context.site is not None:
+        return policy, sops_policy_recipients(policy, site=context.site)
+    if require_policy:
+        raise SecretProviderError("site-local SOPS policy is unavailable")
+    return policy, None
 
 
 def check_canonical_secret_availability(repo: Path) -> dict[str, str] | None:
@@ -188,17 +218,34 @@ def check_canonical_required_secrets(repo: Path, *, require_secrets: bool) -> tu
         return report
     paths: set[str] = {str(entry["path"]) for entry in report}
     paths.update({BOOTSTRAP_SSH_PRIVATE_KEY_PATH, PROXMOX_PROVIDER_PATH})
+    paths.update(requirement.path for requirement in operator_password_requirements())
+    resource_ids = sorted(
+        {
+            service.resource
+            for service in model.services.values()
+            if service.enabled and service.resource is not None
+        }
+    )
+    root_policy = model.bootstrap.root_password
+    paths.update(
+        requirement.path
+        for requirement in root_password_requirements(
+            resource_ids,
+            default_secret=root_policy.default_secret,
+            host_overrides=root_policy.host_overrides,
+        )
+    )
     if not paths:
         return report
     bundle = context.values_dir / "secrets.sops.yaml"
     if not bundle.is_file():
         raise PreflightError("required canonical secrets bundle is missing")
-    _, expected_recipients = _sops_policy_inputs(repo)
-    if expected_recipients is not None:
-        try:
-            validate_sops_age_recipients(bundle, expected_recipients)
-        except SecretProviderError as error:
-            raise PreflightError("canonical secret recipient policy preflight failed") from error
+    policy, expected_recipients = _sops_policy_inputs(repo, require_policy=True)
+    try:
+        inspect_sops_policy(policy, site=context.site or "", expected_recipients=expected_recipients)
+        validate_sops_age_recipients(bundle, expected_recipients or set())
+    except SecretProviderError as error:
+        raise PreflightError("canonical secret recipient policy preflight failed") from error
     provider = SopsAgeProvider(
         bundle,
         environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},

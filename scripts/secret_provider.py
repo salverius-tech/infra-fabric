@@ -146,6 +146,30 @@ _SOPS_SCOPE = r"^values/sites/[^/]+/secrets\.sops\.yaml$"
 _PLACEHOLDER_RECIPIENT = "age1REPLACE_WITH_SITE_RECIPIENT"
 
 
+def sops_policy_recipients(policy_path: Path, *, site: str) -> set[str]:
+    """Return the public age recipient set from one exact-site SOPS policy."""
+    if not _LOGICAL_PART_RE.fullmatch(site):
+        raise SecretProviderError("invalid selected site for SOPS policy")
+    try:
+        document = _strict_yaml(policy_path.read_text(encoding="utf-8"))
+    except (OSError, SecretProviderError) as error:
+        raise SecretProviderError("SOPS policy is unavailable or invalid") from error
+    rules = document.get("creation_rules")
+    if not isinstance(rules, list) or len(rules) != 1 or not isinstance(rules[0], dict):
+        raise SecretProviderError("SOPS policy must contain one creation rule")
+    rule = rules[0]
+    if rule.get("path_regex") != _SOPS_SCOPE:
+        raise SecretProviderError("SOPS policy scope is invalid")
+    age = rule.get("age")
+    recipients = [age] if isinstance(age, str) else age if isinstance(age, list) else []
+    if not recipients or any(not isinstance(item, str) or not item for item in recipients):
+        raise SecretProviderError("SOPS recipient policy is invalid")
+    recipient_set = set(recipients)
+    if _PLACEHOLDER_RECIPIENT in recipient_set:
+        raise SecretProviderError("SOPS recipient policy is not operational")
+    return recipient_set
+
+
 def inspect_sops_policy(
     policy_path: Path,
     *,

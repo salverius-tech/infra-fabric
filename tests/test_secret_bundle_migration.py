@@ -24,9 +24,9 @@ class SecretBundleMigrationTests(unittest.TestCase):
         migrated, changed = migrate_document(document)
 
         self.assertTrue(changed)
-        self.assertEqual(migrated["operator"], {"password": "secret-value"})
+        self.assertEqual(migrated["secrets"]["operator"], {"password": "secret-value"})
         self.assertEqual(migrated["bootstrap"], {"root_password": "root-value"})
-        self.assertNotIn("systemboss_password", migrated["operator"])
+        self.assertNotIn("operator", migrated)
 
     def test_identical_legacy_and_new_values_collapse_to_new_path(self) -> None:
         document = {"operator": {"systemboss_password": "same", "password": "same"}}
@@ -34,7 +34,7 @@ class SecretBundleMigrationTests(unittest.TestCase):
         migrated, changed = migrate_document(document)
 
         self.assertTrue(changed)
-        self.assertEqual(migrated, {"operator": {"password": "same"}})
+        self.assertEqual(migrated, {"secrets": {"operator": {"password": "same"}}})
 
     def test_conflicting_legacy_and_new_values_fail_closed(self) -> None:
         document = {"operator": {"systemboss_password": "old", "password": "new"}}
@@ -42,8 +42,25 @@ class SecretBundleMigrationTests(unittest.TestCase):
         with self.assertRaises(SecretBundleMigrationError):
             migrate_document(document)
 
-    def test_bundle_without_legacy_path_is_unchanged(self) -> None:
+    def test_conflicting_canonical_and_interim_values_fail_closed(self) -> None:
+        document = {
+            "secrets": {"operator": {"password": "canonical"}},
+            "operator": {"password": "interim"},
+        }
+
+        with self.assertRaises(SecretBundleMigrationError):
+            migrate_document(document)
+
+    def test_interim_operator_path_migrates_to_canonical_namespace(self) -> None:
         document = {"operator": {"password": "current"}}
+
+        migrated, changed = migrate_document(document)
+
+        self.assertTrue(changed)
+        self.assertEqual(migrated, {"secrets": {"operator": {"password": "current"}}})
+
+    def test_bundle_with_only_canonical_path_is_unchanged(self) -> None:
+        document = {"secrets": {"operator": {"password": "current"}}}
 
         migrated, changed = migrate_document(document)
 

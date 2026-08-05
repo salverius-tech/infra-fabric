@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "workspace-preflight.py"
 spec = importlib.util.spec_from_file_location("workspace_preflight", SCRIPT)
@@ -109,6 +109,57 @@ class WorkspacePreflightTests(unittest.TestCase):
             environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
             expected_recipients=None,
         )
+
+    def test_site_local_sops_policy_is_the_canonical_default(self) -> None:
+        temp, root = self.make_repo()
+        source_root = Path(__file__).resolve().parents[1]
+        site = root / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        policy = site / ".sops.yaml"
+        policy.write_text(
+            "creation_rules:\n  - path_regex: '^values/sites/[^/]+/secrets\\.sops\\.yaml$'\n    age: age1publictestrecipient\n",
+            encoding="utf-8",
+        )
+        with temp, patch.dict(
+            os.environ,
+            {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"},
+            clear=True,
+        ):
+            resolved_policy, recipients = workspace_preflight._sops_policy_inputs(root, require_policy=True)
+        self.assertEqual(resolved_policy, policy)
+        self.assertEqual(recipients, {"age1publictestrecipient"})
+
+    def test_required_secret_preflight_covers_apply_phase_identity_inputs(self) -> None:
+        temp, root = self.make_repo()
+        source_root = Path(__file__).resolve().parents[1]
+        site = root / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(source_root / "infra" / "services.json", root / "infra" / "services.json")
+        (site / "secrets.sops.yaml").write_text("encrypted-metadata-only\n", encoding="utf-8")
+        policy = site / ".sops.yaml"
+        policy.write_text("policy-metadata-only\n", encoding="utf-8")
+        provider = MagicMock()
+        with temp, patch.dict(
+            os.environ,
+            {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"},
+            clear=True,
+        ), patch.object(
+            workspace_preflight,
+            "_sops_policy_inputs",
+            return_value=(policy, {"age1publictestrecipient"}),
+        ), patch.object(workspace_preflight, "inspect_sops_policy"), patch.object(
+            workspace_preflight,
+            "validate_sops_age_recipients",
+        ), patch.object(workspace_preflight, "SopsAgeProvider", return_value=provider):
+            workspace_preflight.check_canonical_required_secrets(root, require_secrets=True)
+
+        required = provider.validate_required.call_args.args[0]
+        self.assertIn("secrets.bootstrap.ssh_private_key", required)
+        self.assertIn("secrets.providers.proxmox.api_token", required)
+        self.assertIn("secrets.operator.password", required)
+        self.assertIn("secrets.bootstrap.root_password", required)
 
     def test_canonical_secret_check_passes_private_policy_inputs_without_exposing_recipients(self) -> None:
         temp, root = self.make_repo()

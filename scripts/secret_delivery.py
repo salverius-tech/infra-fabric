@@ -227,10 +227,9 @@ def deliver_services_environment(
     services: Mapping[str, object],
     *,
     selected_services: list[str] | tuple[str, ...] | None = None,
-    bootstrap_requirements: tuple[SecretRequirement, ...] = DEFAULT_REQUIREMENTS,
 ) -> dict[str, str]:
-    """Resolve bootstrap plus model-derived runtime secrets for selected services."""
-    environment = deliver_environment(provider, consumer="ansible-bootstrap", requirements=bootstrap_requirements)
+    """Resolve only model-derived runtime secrets for selected services."""
+    environment: dict[str, str] = {}
     service_requirements = requirements_for_model(catalog, services, selected_services=selected_services)
     for service in sorted({requirement.service for requirement in service_requirements if requirement.service is not None}):
         requirements = tuple(requirement for requirement in service_requirements if requirement.service == service)

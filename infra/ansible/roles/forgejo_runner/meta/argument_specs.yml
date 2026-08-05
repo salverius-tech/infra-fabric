@@ -22,6 +22,7 @@ argument_specs:
       forgejo_runner_registration_secret:
         type: str
         required: true
+        no_log: true
         description: "Registration secret token (minimum length enforced) for joining the runner."
       forgejo_runner_label:
         type: str

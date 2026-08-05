@@ -69,6 +69,7 @@ class ServiceCapability:
     configuration_schema: str | None
     release_sources: tuple[str, ...]
     allowed_override_namespaces: tuple[str, ...]
+    allowed_override_fields: dict[str, tuple[str, ...]]
     required_fields: tuple[str, ...]
     dependencies: tuple[str, ...]
     required_secrets: tuple[str, ...]
@@ -249,6 +250,13 @@ class ServiceCatalog:
                 raise ServiceCatalogError(
                     f"service {name} override namespaces are not allowed: {', '.join(unknown_overrides)}"
                 )
+            allowed_override_fields = self.get(name).allowed_override_fields
+            for namespace, values in overrides.items():
+                unknown_fields = sorted(set(values) - set(allowed_override_fields.get(namespace, ())))
+                if unknown_fields:
+                    raise ServiceCatalogError(
+                        f"service {name} {namespace} override fields are not allowed: {', '.join(unknown_fields)}"
+                    )
             if resources is not None and getattr(service, "enabled", False):
                 missing_fields = [
                     str(entry["field"])
@@ -377,6 +385,21 @@ def load_catalog(path: Path) -> ServiceCatalog:
             for namespace in allowed_override_namespaces
         ) or len(allowed_override_namespaces) != len(set(allowed_override_namespaces)):
             raise ServiceCatalogError(f"service {name} allowed_override_namespaces must contain unique supported namespaces")
+        allowed_override_fields = raw.get("allowed_override_fields", {})
+        if not isinstance(allowed_override_fields, dict) or any(
+            namespace not in allowed_override_namespaces
+            or not isinstance(fields, list)
+            or any(not isinstance(field, str) or not _LOGICAL_PART_RE.fullmatch(field) for field in fields)
+            or len(fields) != len(set(fields))
+            for namespace, fields in allowed_override_fields.items()
+        ):
+            raise ServiceCatalogError(
+                f"service {name} allowed_override_fields must map declared namespaces to unique field names"
+            )
+        normalized_override_fields = {
+            namespace: tuple(fields)
+            for namespace, fields in allowed_override_fields.items()
+        }
         required_fields = raw.get("required_fields", [])
         if not isinstance(required_fields, list) or any(
             not isinstance(field, str)
@@ -395,6 +418,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
             configuration_schema=configuration_schema,
             release_sources=tuple(release_sources),
             allowed_override_namespaces=tuple(allowed_override_namespaces),
+            allowed_override_fields=normalized_override_fields,
             required_fields=tuple(required_fields),
             dependencies=tuple(dependencies),
             required_secrets=tuple(required_secrets),

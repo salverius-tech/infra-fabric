@@ -23,6 +23,7 @@ argument_specs:
       host_identity_operator_password:
         type: str
         required: true
+        no_log: true
         description: Private operator password; role tasks must keep its value out of logs.
       host_identity_operator_password_hash_salt:
         type: str

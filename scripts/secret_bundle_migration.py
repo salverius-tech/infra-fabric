@@ -20,32 +20,74 @@ from ruamel.yaml import YAML
 
 
 LEGACY_OPERATOR_PATH = ("operator", "systemboss_password")
-CANONICAL_OPERATOR_PATH = ("operator", "password")
+INTERIM_OPERATOR_PATH = ("operator", "password")
+CANONICAL_OPERATOR_PATH = ("secrets", "operator", "password")
 
 
 class SecretBundleMigrationError(ValueError):
     """Raised when a secret-bundle migration is unsafe or invalid."""
 
 
+def _path_value(document: dict[str, Any], path: tuple[str, ...]) -> tuple[bool, Any]:
+    value: Any = document
+    for part in path:
+        if not isinstance(value, dict) or part not in value:
+            return False, None
+        value = value[part]
+    return True, value
+
+
+def _set_path(document: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
+    target = document
+    for part in path[:-1]:
+        child = target.setdefault(part, {})
+        if not isinstance(child, dict):
+            raise SecretBundleMigrationError("canonical secret namespace must be a mapping")
+        target = child
+    target[path[-1]] = value
+
+
+def _delete_path(document: dict[str, Any], path: tuple[str, ...]) -> None:
+    parents: list[tuple[dict[str, Any], str]] = []
+    target: Any = document
+    for part in path[:-1]:
+        if not isinstance(target, dict) or part not in target:
+            return
+        parents.append((target, part))
+        target = target[part]
+    if not isinstance(target, dict):
+        raise SecretBundleMigrationError("operator secret namespace must be a mapping")
+    target.pop(path[-1], None)
+    for parent, key in reversed(parents):
+        child = parent.get(key)
+        if isinstance(child, dict) and not child:
+            del parent[key]
+
+
 def migrate_document(document: dict[str, Any]) -> tuple[dict[str, Any], bool]:
-    """Move the legacy operator password key to the canonical logical path."""
+    """Move accepted legacy operator-password aliases to the canonical path."""
     if not isinstance(document, dict):
         raise SecretBundleMigrationError("secret bundle must be a mapping")
     migrated = copy.deepcopy(document)
-    operator = migrated.get("operator")
-    if operator is None:
+    candidates = (CANONICAL_OPERATOR_PATH, INTERIM_OPERATOR_PATH, LEGACY_OPERATOR_PATH)
+    present: list[tuple[tuple[str, ...], Any]] = []
+    for path in candidates:
+        found, value = _path_value(migrated, path)
+        if found:
+            present.append((path, value))
+    if not present:
         return migrated, False
-    if not isinstance(operator, dict):
-        raise SecretBundleMigrationError("operator secret namespace must be a mapping")
-    legacy_present = LEGACY_OPERATOR_PATH[1] in operator
-    canonical_present = CANONICAL_OPERATOR_PATH[1] in operator
-    if not legacy_present:
-        return migrated, False
-    if canonical_present and operator[LEGACY_OPERATOR_PATH[1]] != operator[CANONICAL_OPERATOR_PATH[1]]:
+    canonical_value = present[0][1]
+    if not isinstance(canonical_value, str) or not canonical_value:
+        raise SecretBundleMigrationError("operator secret must be a non-empty string")
+    if any(value != canonical_value for _, value in present[1:]):
         raise SecretBundleMigrationError("legacy and canonical operator secrets conflict")
-    operator[CANONICAL_OPERATOR_PATH[1]] = operator[LEGACY_OPERATOR_PATH[1]]
-    del operator[LEGACY_OPERATOR_PATH[1]]
-    return migrated, True
+    canonical_present = any(path == CANONICAL_OPERATOR_PATH for path, _ in present)
+    changed = not canonical_present or any(path != CANONICAL_OPERATOR_PATH for path, _ in present)
+    _set_path(migrated, CANONICAL_OPERATOR_PATH, present[0][1])
+    for path in (INTERIM_OPERATOR_PATH, LEGACY_OPERATOR_PATH):
+        _delete_path(migrated, path)
+    return migrated, changed
 
 
 def _yaml_dump(document: dict[str, Any]) -> str:
@@ -161,6 +203,7 @@ def migrate_encrypted_bundle(
 
 __all__ = [
     "CANONICAL_OPERATOR_PATH",
+    "INTERIM_OPERATOR_PATH",
     "LEGACY_OPERATOR_PATH",
     "SecretBundleMigrationError",
     "migrate_document",

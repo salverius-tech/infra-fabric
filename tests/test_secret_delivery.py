@@ -150,13 +150,10 @@ class SecretDeliveryTests(unittest.TestCase):
         services = {"forgejo": SimpleNamespace(enabled=True, configuration={})}
         requirements = secret_delivery.requirements_for_model(catalog, services)
         provider = FakeProvider(
-            {
-                "secrets.bootstrap.root_password": "ROOT",
-                **{requirement.path: f"VALUE_{requirement.environment_name}" for requirement in requirements},
-            }
+            {requirement.path: f"VALUE_{requirement.environment_name}" for requirement in requirements}
         )
         environment = secret_delivery.deliver_services_environment(provider, catalog, services)
-        self.assertEqual(environment["INFRA_BOOTSTRAP_ROOT_PASSWORD"], "ROOT")
+        self.assertNotIn("INFRA_BOOTSTRAP_ROOT_PASSWORD", environment)
         self.assertEqual(environment["FORGEJO_SECRET_KEY"], "VALUE_FORGEJO_SECRET_KEY")
         self.assertNotIn("HERMES_CONTROL_API_TOKEN", environment)
 
@@ -176,7 +173,7 @@ class SecretDeliveryTests(unittest.TestCase):
             {
                 "services.hermes.secrets.control_api_token",
                 "services.hermes.secrets.control_bridge_token",
-                "services.providers.cloudflare.secrets.api_token",
+                "secrets.providers.cloudflare.api_token",
             },
         )
         self.assertEqual(
@@ -191,12 +188,15 @@ class SecretDeliveryTests(unittest.TestCase):
         with self.assertRaises(secret_delivery.SecretDeliveryError):
             secret_delivery.deliver_services_environment(provider, catalog, services)
 
-    def test_service_without_runtime_secrets_keeps_bootstrap_only(self) -> None:
+    def test_service_without_runtime_secrets_receives_only_declared_provider_secret(self) -> None:
         catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
         services = {"technitium": SimpleNamespace(enabled=True, configuration={})}
-        provider = FakeProvider({"secrets.bootstrap.root_password": "ROOT", "services.providers.cloudflare.secrets.api_token": "CF"})
+        provider = FakeProvider({"secrets.providers.cloudflare.api_token": "CF"})
         environment = secret_delivery.deliver_services_environment(provider, catalog, services)
-        self.assertEqual(environment, {"INFRA_BOOTSTRAP_ROOT_PASSWORD": "ROOT", "CF_DNS_API_TOKEN": "CF"})
+        self.assertEqual(environment, {"CF_DNS_API_TOKEN": "CF"})
+        self.assertNotIn("INFRA_BOOTSTRAP_ROOT_PASSWORD", environment)
+        self.assertNotIn("INFRA_OPERATOR_PASSWORD", environment)
+        self.assertNotIn("PROXMOX_VE_API_TOKEN", environment)
 
     def test_model_contract_secrets_forbid_state_exposure(self) -> None:
         catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")

@@ -14,14 +14,17 @@ argument_specs:
       infisical_encryption_key:
         type: str
         required: true
+        no_log: true
         description: "Long-form encryption key required by Infisical runtime."
       infisical_auth_secret:
         type: str
         required: true
+        no_log: true
         description: "Long-form auth secret required by Infisical."
       infisical_postgres_password:
         type: str
         required: true
+        no_log: true
         description: "PostgreSQL password for Infisical container credentials."
       caddy_email:
         type: str
@@ -30,6 +33,7 @@ argument_specs:
       caddy_cloudflare_api_token:
         type: str
         required: true
+        no_log: true
         description: "Cloudflare DNS API token for Caddy DNS-01 challenge."
       infisical_compose_version:
         type: str

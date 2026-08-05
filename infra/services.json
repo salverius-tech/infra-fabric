@@ -26,9 +26,9 @@
         "infra/ansible/playbooks/technitium-dns.yml"
       ],
       "dependencies": [],
-      "required_secrets": ["services.providers.cloudflare.secrets.api_token"],
-      "secret_classifications": {"services.providers.cloudflare.secrets.api_token": "provider"},
-      "secret_environment": {"services.providers.cloudflare.secrets.api_token": "CF_DNS_API_TOKEN"},
+      "required_secrets": ["secrets.providers.cloudflare.api_token"],
+      "secret_classifications": {"secrets.providers.cloudflare.api_token": "provider"},
+      "secret_environment": {"secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"},
       "inventory": {
         "host": "technitium_dns",
         "group": "technitium",
@@ -49,6 +49,7 @@
       "configuration_schema": "ForgejoConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "allowed_override_namespaces": ["ansible", "opentofu"],
+      "allowed_override_fields": {"ansible": ["forgejo_domain"]},
       "required_fields": ["resource", "state.capable", "release.version"],
       "state_order": 2,
       "terraform_addresses": [
@@ -72,7 +73,7 @@
         "services.forgejo.secrets.oauth2_jwt_secret",
         "services.forgejo.secrets.postgres_password",
         "services.forgejo.secrets.secret_key",
-        "services.providers.cloudflare.secrets.api_token"
+        "secrets.providers.cloudflare.api_token"
       ],
       "secret_classifications": {
         "services.forgejo.secrets.bootstrap_admin_password": "runtime",
@@ -82,7 +83,7 @@
         "services.forgejo.secrets.oauth2_jwt_secret": "runtime",
         "services.forgejo.secrets.postgres_password": "runtime",
         "services.forgejo.secrets.secret_key": "runtime",
-        "services.providers.cloudflare.secrets.api_token": "provider"
+        "secrets.providers.cloudflare.api_token": "provider"
       },
       "secret_environment": {
         "services.forgejo.secrets.bootstrap_admin_password": "FORGEJO_ADMIN_PASSWORD",
@@ -92,7 +93,7 @@
         "services.forgejo.secrets.oauth2_jwt_secret": "FORGEJO_OAUTH2_JWT_SECRET",
         "services.forgejo.secrets.postgres_password": "FORGEJO_POSTGRES_PASSWORD",
         "services.forgejo.secrets.secret_key": "FORGEJO_SECRET_KEY",
-        "services.providers.cloudflare.secrets.api_token": "CF_DNS_API_TOKEN"
+        "secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"
       },
       "inventory": {
         "host": "forgejo_lxc",
@@ -230,19 +231,19 @@
         "services.infisical.secrets.auth_secret",
         "services.infisical.secrets.encryption_key",
         "services.infisical.secrets.postgres_password",
-        "services.providers.cloudflare.secrets.api_token"
+        "secrets.providers.cloudflare.api_token"
       ],
       "secret_classifications": {
         "services.infisical.secrets.auth_secret": "runtime",
         "services.infisical.secrets.encryption_key": "runtime",
         "services.infisical.secrets.postgres_password": "runtime",
-        "services.providers.cloudflare.secrets.api_token": "provider"
+        "secrets.providers.cloudflare.api_token": "provider"
       },
       "secret_environment": {
         "services.infisical.secrets.auth_secret": "INFISICAL_AUTH_SECRET",
         "services.infisical.secrets.encryption_key": "INFISICAL_ENCRYPTION_KEY",
         "services.infisical.secrets.postgres_password": "INFISICAL_POSTGRES_PASSWORD",
-        "services.providers.cloudflare.secrets.api_token": "CF_DNS_API_TOKEN"
+        "secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"
       },
       "inventory": {
         "host": "infisical_lxc",
@@ -320,21 +321,21 @@
         "services.hermes.secrets.control_bridge_token",
         "services.hermes.secrets.dashboard_basic_auth_password_hash",
         "services.hermes.secrets.dashboard_basic_auth_secret",
-        "services.providers.cloudflare.secrets.api_token"
+        "secrets.providers.cloudflare.api_token"
       ],
       "secret_classifications": {
         "services.hermes.secrets.control_api_token": "runtime",
         "services.hermes.secrets.control_bridge_token": "runtime",
         "services.hermes.secrets.dashboard_basic_auth_password_hash": "runtime",
         "services.hermes.secrets.dashboard_basic_auth_secret": "runtime",
-        "services.providers.cloudflare.secrets.api_token": "provider"
+        "secrets.providers.cloudflare.api_token": "provider"
       },
       "secret_environment": {
         "services.hermes.secrets.control_api_token": "HERMES_CONTROL_API_TOKEN",
         "services.hermes.secrets.control_bridge_token": "HERMES_CONTROL_BRIDGE_TOKEN",
         "services.hermes.secrets.dashboard_basic_auth_password_hash": "HERMES_DASHBOARD_BASIC_AUTH_PASSWORD_HASH",
         "services.hermes.secrets.dashboard_basic_auth_secret": "HERMES_DASHBOARD_BASIC_AUTH_SECRET",
-        "services.providers.cloudflare.secrets.api_token": "CF_DNS_API_TOKEN"
+        "secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"
       },
       "conditional_required_secrets": {
         "configuration.control.enabled": [
@@ -469,9 +470,9 @@
         "infra/ansible/playbooks/onramp-host.yml"
       ],
       "dependencies": [],
-      "required_secrets": ["services.providers.cloudflare.secrets.api_token"],
-      "secret_classifications": {"services.providers.cloudflare.secrets.api_token": "provider"},
-      "secret_environment": {"services.providers.cloudflare.secrets.api_token": "CF_DNS_API_TOKEN"},
+      "required_secrets": ["secrets.providers.cloudflare.api_token"],
+      "secret_classifications": {"secrets.providers.cloudflare.api_token": "provider"},
+      "secret_environment": {"secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"},
       "inventory": {
         "host": "onramp_host_vm",
         "group": "onramp_host",

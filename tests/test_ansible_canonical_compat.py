@@ -187,7 +187,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "services.hermes.secrets.control_bridge_token",
                 "services.hermes.secrets.dashboard_basic_auth_password_hash",
                 "services.hermes.secrets.dashboard_basic_auth_secret",
-                "services.providers.cloudflare.secrets.api_token",
+                "secrets.providers.cloudflare.api_token",
             },
         )
         self.assertEqual(mapping["hermes_runtime_passwordless_sudo"], "resources.guests.hermes.security.allow_passwordless_sudo")

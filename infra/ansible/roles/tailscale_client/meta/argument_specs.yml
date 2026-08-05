@@ -22,6 +22,7 @@ argument_specs:
       tailscale_client_auth_key:
         type: str
         required: false
+        no_log: true
         description: "Optional auth key used for tailscale up when restore is not used."
       tailscale_client_enable_ip_forwarding:
         type: bool

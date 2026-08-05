@@ -54,10 +54,12 @@ argument_specs:
       hermes_control_api_token:
         type: str
         required: true
+        no_log: true
         description: "Private API bearer token; never log or expose its value."
       hermes_control_bridge_token:
         type: str
         required: true
+        no_log: true
         description: "Private bridge authentication token; never log or expose its value."
       hermes_control_plugin_socket:
         type: str
