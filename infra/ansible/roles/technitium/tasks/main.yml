@@ -416,6 +416,7 @@
           - "{{ technitium_install_root }}/releases/pre-managed"
           - "{{ technitium_install_root }}/dns"
       when: technitium_pre_managed_moved | bool
+      changed_when: true
     - name: Restore previous managed Technitium application link
       ansible.builtin.file:
         src: "{{ technitium_previous_link.stdout }}"

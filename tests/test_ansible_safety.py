@@ -63,6 +63,11 @@ def command_text(task: dict[str, Any]) -> str:
 
 
 class AnsibleSafetyTests(unittest.TestCase):
+    def test_production_lint_does_not_globally_skip_idempotence(self) -> None:
+        config = yaml.safe_load((REPO / ".ansible-lint").read_text(encoding="utf-8"))
+        self.assertEqual(config.get("profile"), "production")
+        self.assertNotIn("no-changed-when", config.get("skip_list", []))
+
     def test_service_roles_do_not_use_pct_for_steady_state(self) -> None:
         for path in sorted((REPO / "infra" / "ansible" / "roles").glob("*/**/*.yml")):
             if path in ALLOWLIST_PCT:

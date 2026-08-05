@@ -21,6 +21,7 @@
       - "mountpoint={{ storage_bind_mount.host_prepare.mountpoint }}"
       - "{{ storage_bind_mount.host_prepare.dataset }}"
   when: storage_zfs_list.rc != 0
+  changed_when: true
 
 - name: Read ZFS mountpoint {{ storage_bind_mount.host_prepare.dataset }}
   ansible.builtin.command:
@@ -43,6 +44,7 @@
       - "mountpoint={{ storage_bind_mount.host_prepare.mountpoint }}"
       - "{{ storage_bind_mount.host_prepare.dataset }}"
   when: storage_zfs_mountpoint.stdout != storage_bind_mount.host_prepare.mountpoint
+  changed_when: true
 
 - name: Mount ZFS dataset {{ storage_bind_mount.host_prepare.dataset }}
   ansible.builtin.command:

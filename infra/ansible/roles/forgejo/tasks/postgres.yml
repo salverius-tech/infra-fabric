@@ -54,6 +54,7 @@
       - >-
         create role {{ forgejo_database.user }} with login password '{{ forgejo_postgres_password | replace("'", "''") }}';
   when: forgejo_postgres_role_check.stdout | trim == ""
+  changed_when: true
   no_log: true
 
 - name: Check Forgejo PostgreSQL database
@@ -82,6 +83,7 @@
       - --owner={{ forgejo_database.user }}
       - "{{ forgejo_database.name }}"
   when: forgejo_postgres_database_check.stdout | trim == ""
+  changed_when: true
   no_log: true
 
 - name: Update Forgejo PostgreSQL role password

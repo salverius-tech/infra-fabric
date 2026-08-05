@@ -81,6 +81,7 @@
       - -lc
       - base={{ forgejo_download_base | default('https://code.forgejo.org/forgejo/forgejo/releases/download') }} && curl -fsSL -o /usr/local/bin/forgejo "$base/v{{ forgejo_version }}/forgejo-{{ forgejo_version }}-linux-amd64" && chmod 0755 /usr/local/bin/forgejo  # yamllint disable-line rule:line-length
   when: forgejo_installed_version.stdout | trim != forgejo_version
+  changed_when: true
   notify: Restart forgejo
 - name: Install Forgejo systemd service
   ansible.builtin.template:

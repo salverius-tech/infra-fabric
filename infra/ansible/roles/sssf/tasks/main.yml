@@ -64,6 +64,7 @@
   ansible.builtin.command:
     argv: [mkfs.ext4, -F, "{{ sssf_data_device }}"]
   when: sssf_data_filesystem.stdout | trim == ''
+  changed_when: true
 
 - name: Persist SSSF data disk mount
   ansible.builtin.lineinfile:

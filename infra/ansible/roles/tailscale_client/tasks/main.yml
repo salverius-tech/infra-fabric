@@ -62,6 +62,7 @@
       - -lc
       - set -euo pipefail; systemctl stop tailscaled || true; tar --warning=no-unknown-keyword -xzf /tmp/tailscale-client-backup.tgz -C / --wildcards --no-anchored etc/default/tailscaled etc/systemd/system/tailscaled.service.d var/lib/tailscale/tailscaled.state etc/sysctl.d; chown root:root /var/lib/tailscale/tailscaled.state 2>/dev/null || true; chmod 0600 /var/lib/tailscale/tailscaled.state 2>/dev/null || true; systemctl daemon-reload; rm -f /tmp/tailscale-client-backup.tgz  # yamllint disable-line rule:line-length
   no_log: true
+  changed_when: true
   notify: Restart tailscaled
   when:
     - tailscale_client_enabled | default(false) | bool
@@ -79,6 +80,7 @@
   ansible.builtin.command:
     argv: "{{\n  [\n    'tailscale', 'up', '--authkey', tailscale_client_auth_key,\n  ] + (tailscale_client_up_args | default([]))\n}}"
   no_log: true
+  changed_when: true
   when:
     - tailscale_client_enabled | default(false) | bool
     - not tailscale_client_restore_backup | default(false) | bool
