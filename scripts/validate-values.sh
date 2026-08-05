@@ -13,12 +13,13 @@ dns_records_file="${INFRA_VALUES_DIR}/dns-records.local.json"
 canonical_site=false
 if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   python scripts/canonical-values.py --site-file "${INFRA_VALUES_DIR}/site.yaml" validate >/dev/null
-  for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
-    if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
-      printf "%s\n" "Canonical site exists but generated projection is missing: ${required_projection}. Run just plan." >&2
-      exit 1
-    fi
-  done
+  # Validation owns a non-provider projection refresh so a newly scaffolded
+  # canonical site can pass structural checks before it has a reviewed plan.
+  source_commit="$(git rev-parse HEAD 2>/dev/null || printf "unknown")"
+  python scripts/canonical-render.py \
+    --site-file "${INFRA_VALUES_DIR}/site.yaml" \
+    --output-dir "${INFRA_VALUES_DIR}/generated" \
+    --source-commit "${source_commit}"
   python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
   ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
   tofu_vars_file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"

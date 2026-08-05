@@ -16,7 +16,7 @@ values/
 
 `site.yaml` contains non-secret platform, resource, service, endpoint, release, storage, and state configuration. `secrets.sops.yaml` contains only encrypted canonical logical secret paths. The SOPS policy and age identities are private deployment material. Generated projections, plans, state, backups, and local credentials remain private derived artifacts.
 
-For a new public-safe starting shape, copy `scaffold/sites/_template/` and replace the `example` identity and all example values before private validation. The template disables apply and destroy by default.
+For a new public-safe starting shape, use the site created by `just setup "" <site>` and replace the rendered site identity and all example values before private validation. The template disables apply and destroy by default.
 
 ## Initialize a site
 
@@ -27,7 +27,7 @@ just setup "" <site>
 export VALUES_SITE=<site>
 ```
 
-Complete the selected private SOPS policy, encrypted bundle, and external age identity before running secret editing, bootstrap initialization, validation, or planning. Follow [Canonical site quick start](../docs/canonical-quick-start.md).
+Complete the selected private SOPS policy, encrypted bundle, and external age identity before protected-input operations or planning. Structural validation can run immediately after setup and does not decrypt secrets. Follow the [Canonical site quick start](https://github.com/salverius-tech/infra-fabric/blob/feat/canonical-values-model/docs/canonical-quick-start.md).
 
 ## Canonical workflow
 
@@ -54,7 +54,7 @@ The first two commands are explicit protected-input operations. Validation is st
 
 ## Adding a service
 
-Read [Canonical service authoring](../docs/canonical-service-authoring.md) before changing the service catalog. Generate a public-safe contract manifest first:
+Read [Canonical service authoring](https://github.com/salverius-tech/infra-fabric/blob/feat/canonical-values-model/docs/canonical-service-authoring.md) from the runbook repository before changing the service catalog. Generate a public-safe contract manifest first:
 
 ```bash
 scripts/python.sh scripts/service-author.py \

@@ -2,6 +2,10 @@
 
 This is the supported operator path for a new or existing canonical site.
 
+## Prerequisites
+
+Use a Linux `amd64` host with Git, GNU Make-compatible shell utilities, `just`, and Docker Engine with the Compose plugin. The tooling image currently installs checksum-pinned Linux `amd64` OpenTofu, TFLint, and SOPS binaries; non-`amd64` hosts are not supported by this workflow. Docker must be available to the invoking user before running `just setup` or any validation recipe.
+
 ## 1. Create site scaffolding
 
 From the repository root:
@@ -62,7 +66,7 @@ This is an explicit secret-dependent operation. It validates the declared bootst
 VALUES_SITE=<site> just validate
 ```
 
-Validation checks the public repository, canonical model and catalog, projection contracts, OpenTofu and Ansible structure, tests, and private site wiring. It does not prove provider-backed plan equivalence, live host readiness, service health, or restore acceptance.
+Validation checks the public repository, canonical model and catalog, then atomically renders and identity-verifies the non-secret generated projections before DNS and Ansible structural checks. It does not contact the provider, decrypt secrets, require a SOPS policy/bundle, or prove provider-backed plan equivalence, live host readiness, service health, or restore acceptance. The refreshed `generated/` directory is private and derived; never edit it.
 
 ## 6. Plan
 

@@ -2,6 +2,7 @@ import json
 import re
 import shutil
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -46,6 +47,16 @@ class DocumentationContractTests(unittest.TestCase):
             self.assertTrue((index.parent / link).is_file(), link)
         for retired in ("upstream", "repository-audit", "phase0", "mapping-v1"):
             self.assertNotIn(retired, text.lower())
+
+    def test_installed_scaffold_readme_has_no_broken_relative_document_links(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            installed = Path(temporary) / "values"
+            shutil.copytree(ROOT / "scaffold", installed)
+            readme = installed / "README.md"
+            links = re.findall(r"\]\(([^)#]+)", readme.read_text(encoding="utf-8"))
+            for link in links:
+                if "://" not in link:
+                    self.assertTrue((readme.parent / link).is_file(), link)
 
     def test_current_operator_docs_are_canonical_first(self) -> None:
         required = (

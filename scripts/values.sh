@@ -117,7 +117,10 @@ case "${command_name}" in
     require_values
     missing=0
     if [[ -n "${site}" && -f "${values_dir}/site.yaml" ]]; then
-      required_paths=(site.yaml .sops.yaml secrets.sops.yaml)
+      # Static canonical validation is deliberately non-secret and can run
+      # immediately after `just setup "" <site>`. Protected-input commands
+      # validate the SOPS policy and encrypted bundle at their own boundary.
+      required_paths=(site.yaml)
     else
       required_paths=(.env terraform.tfvars dns-records.local.json ansible/inventory/local.yml)
       if [[ -n "${site}" ]]; then
