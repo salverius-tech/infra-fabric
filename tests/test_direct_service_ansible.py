@@ -11,6 +11,15 @@ HELPER = REPO / "scripts" / "check-direct-service-ansible.py"
 
 
 class DirectServiceAnsibleHelperTests(unittest.TestCase):
+    @staticmethod
+    def load_helper():
+        spec = importlib.util.spec_from_file_location("check_direct_service_ansible", HELPER)
+        assert spec and spec.loader
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+
     def run_helper(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [sys.executable, str(HELPER), *args],
@@ -65,12 +74,17 @@ class DirectServiceAnsibleHelperTests(unittest.TestCase):
         self.assertIn("SSH host key changed", playbook)
         self.assertNotIn("ssh-keygen -R {{ hostvars", playbook)
 
+    def test_nested_command_args_are_recognized_as_idempotence_guards(self) -> None:
+        checker = self.load_helper().command_task_has_idempotence
+        self.assertTrue(checker({"ansible.builtin.command": {"cmd": "tool", "creates": "/sentinel"}}))
+        self.assertTrue(checker({"ansible.builtin.shell": "tool", "args": {"removes": "/sentinel"}}))
+
+    def test_unguarded_command_is_rejected_by_idempotence_predicate(self) -> None:
+        checker = self.load_helper().command_task_has_idempotence
+        self.assertFalse(checker({"ansible.builtin.command": {"argv": ["tool"]}}))
+
     def test_redaction_blocks_private_values(self) -> None:
-        spec = importlib.util.spec_from_file_location("check_direct_service_ansible", HELPER)
-        assert spec and spec.loader
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        assert_redacted = module.assert_redacted
+        assert_redacted = self.load_helper().assert_redacted
         with self.assertRaises(Exception):
             assert_redacted("token=super-secret-value 192.168.1.10")  # public-safety: allow-ip
         assert_redacted("service=technitium endpoint=example.internal address=192.0.2.10")

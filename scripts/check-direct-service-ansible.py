@@ -234,6 +234,19 @@ def run_static_syntax(settings_path: Path, include_disabled: bool) -> list[str]:
     return ["syntax status=pass mode=source-only parser=yaml"]
 
 
+def command_task_has_idempotence(task: dict[str, Any]) -> bool:
+    if any(key in task for key in ("changed_when", "failed_when", "when")):
+        return True
+    task_args = task.get("args")
+    if isinstance(task_args, dict) and any(key in task_args for key in ("creates", "removes")):
+        return True
+    for module_name in ("ansible.builtin.command", "command", "ansible.builtin.shell", "shell"):
+        module_args = task.get(module_name)
+        if isinstance(module_args, dict) and any(key in module_args for key in ("creates", "removes")):
+            return True
+    return False
+
+
 def check_mode_static() -> list[str]:
     offenders: list[str] = []
     for path in sorted((REPO / "infra" / "ansible" / "roles").glob("*/tasks/*.yml")):
@@ -241,7 +254,7 @@ def check_mode_static() -> list[str]:
             if not isinstance(task, dict):
                 continue
             if any(key in task for key in ("ansible.builtin.command", "command", "ansible.builtin.shell", "shell")):
-                if not any(key in task for key in ("changed_when", "creates", "removes", "failed_when", "when")):
+                if not command_task_has_idempotence(task):
                     offenders.append(f"command-no-idempotence path={path.relative_to(REPO)} task={task.get('name','<unnamed>')}")
     if offenders:
         raise CheckError("\n".join(offenders))
