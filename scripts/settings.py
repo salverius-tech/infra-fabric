@@ -42,6 +42,7 @@ SERVICES = {
     name: {
         "playbooks": tuple(config["playbooks"]),
         "dependencies": tuple(config["dependencies"]),
+        "execution_resource": str(config.get("inventory", {}).get("host", "")).strip(),
         "terraform_addresses": tuple(config.get("terraform_addresses", ())),
         "terraform_replace_addresses": {
             runtime: tuple(addresses)

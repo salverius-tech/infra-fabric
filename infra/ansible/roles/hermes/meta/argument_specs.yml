@@ -115,3 +115,59 @@ argument_specs:
         type: str
         required: false
         description: "Optional public/searxng URL injected for web search integration if set."
+      hermes_control_enabled:
+        type: bool
+        required: false
+        description: "Enable the private Hermes Control companion stack (default: false)."
+      hermes_control_source_checkout_path:
+        type: str
+        required: false
+        description: "Managed checkout path for the reviewed Hermes Control source."
+      hermes_control_install_dir:
+        type: str
+        required: false
+        description: "Managed Hermes Control install path."
+      hermes_control_config_dir:
+        type: str
+        required: false
+        description: "Root-owned Hermes Control configuration directory."
+      hermes_control_state_dir:
+        type: str
+        required: false
+        description: "Persistent Hermes Control state directory."
+      hermes_control_api_host:
+        type: str
+        required: false
+        description: "Loopback-only Control API bind host."
+      hermes_control_api_port:
+        type: int
+        required: false
+        description: "Local Control API bind port."
+      hermes_control_domain:
+        type: str
+        required: false
+        description: "Private HTTPS hostname for Hermes Control."
+      hermes_control_require_task_approval:
+        type: bool
+        required: false
+        description: "Require approval before Hermes Control executes submitted tasks."
+      hermes_control_source_url:
+        type: str
+        required: false
+        description: "Private source repository URL for the reviewed Hermes Control checkout."
+      hermes_control_source_ref:
+        type: str
+        required: false
+        description: "Immutable reviewed Git commit for Hermes Control."
+      hermes_control_api_token:
+        type: str
+        required: false
+        description: "Private Hermes Control API bearer token."
+      hermes_control_bridge_token:
+        type: str
+        required: false
+        description: "Private Hermes Control bridge authentication token."
+      hermes_control_plugin_socket:
+        type: str
+        required: false
+        description: "Local Unix socket for the Hermes Control bridge."

@@ -26,6 +26,58 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertEqual(waves[0], ["technitium", "forgejo", "onramp_host", "hermes"])
         self.assertEqual(waves[1], ["forgejo_runner", "searxng_onramp"])
 
+    def test_execution_resource_waves_serialize_shared_onramp_and_keep_independent_hosts_parallel(self) -> None:
+        services = ["onramp_host", "hermes", "infisical_onramp", "searxng_onramp"]
+        resources = {
+            "onramp_host": "onramp_host",
+            "hermes": "hermes",
+            "infisical_onramp": "onramp_host",
+            "searxng_onramp": "onramp_host",
+        }
+        self.assertEqual(
+            apply_ansible_services.execution_resource_waves(services, resources),
+            [["onramp_host", "hermes"], ["infisical_onramp"], ["searxng_onramp"]],
+        )
+
+    def test_canonical_execution_resource_precedes_legacy_inventory_host(self) -> None:
+        model = SimpleNamespace(services={"hermes": SimpleNamespace(resource="shared-hermes-resource")})
+        self.assertEqual(
+            apply_ansible_services.execution_resource_keys(["hermes"], model),
+            {"hermes": "shared-hermes-resource"},
+        )
+
+    def test_parallel_shared_host_failure_prevents_later_same_host_batch(self) -> None:
+        commands: list[list[str]] = []
+
+        def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
+            commands.append(command)
+            return 2 if command[-1] == "infra/ansible/playbooks/infisical-onramp.yml" else 0
+
+        with tempfile.TemporaryDirectory() as temp:
+            results = apply_ansible_services.run_parallel(
+                ["onramp_host", "infisical_onramp", "searxng_onramp"],
+                ("inventory.yml",),
+                Path(temp),
+                Path(temp) / ".env",
+                {},
+                max_workers=3,
+                runner=runner,
+                execution_resources={
+                    "onramp_host": "onramp-host",
+                    "infisical_onramp": "onramp-host",
+                    "searxng_onramp": "onramp-host",
+                },
+            )
+
+        self.assertEqual([result.service for result in results], ["onramp_host", "infisical_onramp"])
+        self.assertEqual(results[-1].returncode, 2)
+        self.assertNotIn("infra/ansible/playbooks/searxng-onramp.yml", [command[-1] for command in commands])
+
+    def test_legacy_site_playbook_is_not_a_supported_or_validated_entrypoint(self) -> None:
+        self.assertFalse((SCRIPT.parents[1] / "infra/ansible/playbooks/site.yml").exists())
+        validation = (SCRIPT.parents[1] / "scripts/validate-public.sh").read_text(encoding="utf-8")
+        self.assertNotIn("playbooks/site.yml", validation)
+
     def test_clean_cutover_does_not_load_root_password_from_tfvars(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertNotIn("refresh_root_password_from_tfvars", source)

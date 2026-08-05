@@ -101,6 +101,44 @@ def dependency_waves(services: Iterable[str]) -> list[list[str]]:
     return waves
 
 
+def execution_resource_keys(services: Iterable[str], model: object | None = None) -> dict[str, str]:
+    """Return one validated scheduler key per service without inventing host ownership."""
+    keys: dict[str, str] = {}
+    canonical_services = getattr(model, "services", {}) if model is not None else {}
+    for service in services:
+        canonical = canonical_services.get(service) if hasattr(canonical_services, "get") else None
+        resource = str(getattr(canonical, "resource", "") or "").strip()
+        inventory_host = str(settings.SERVICES[service].get("execution_resource", "")).strip()
+        key = resource or inventory_host
+        if not key:
+            raise settings.SettingsError(f"service has no execution resource: {service}")
+        keys[service] = key
+    return keys
+
+
+def execution_resource_waves(services: Iterable[str], resources: Mapping[str, str]) -> list[list[str]]:
+    """Split dependency-ready services so each batch has one service per host/resource."""
+    batches: list[list[str]] = []
+    for ready in dependency_waves(services):
+        pending = list(ready)
+        while pending:
+            used: set[str] = set()
+            batch: list[str] = []
+            deferred: list[str] = []
+            for service in pending:
+                resource = str(resources.get(service, "")).strip()
+                if not resource:
+                    raise settings.SettingsError(f"service has no execution resource: {service}")
+                if resource in used:
+                    deferred.append(service)
+                else:
+                    used.add(resource)
+                    batch.append(service)
+            batches.append(batch)
+            pending = deferred
+    return batches
+
+
 def inventory_args(inventories: Iterable[str]) -> list[str]:
     args: list[str] = []
     for inventory in inventories:
@@ -530,9 +568,11 @@ def run_parallel(
     runner: RunCommand = default_runner,
     extra_args: tuple[str, ...] = (),
     service_environments: Mapping[str, Mapping[str, str]] | None = None,
+    execution_resources: Mapping[str, str] | None = None,
 ) -> list[ServiceResult]:
     results: list[ServiceResult] = []
-    for index, wave in enumerate(dependency_waves(services), 1):
+    resources = dict(execution_resources or execution_resource_keys(services))
+    for index, wave in enumerate(execution_resource_waves(services, resources), 1):
         print(f"==> ansible wave {index}: {', '.join(wave)}", flush=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(wave))) as executor:
             future_map = {
@@ -619,7 +659,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Ansible service apply mode: {args.mode}; started {timestamp}; logs: {log_dir}", flush=True)
     base_env = dict(os.environ)
     transport: CanonicalAnsibleTransport | None = None
+    execution_resources: dict[str, str] = {}
     try:
+        execution_resources = execution_resource_keys(services)
         if args.canonical_ansible:
             transport = canonical_ansible_transport(context, log_dir, services)
             if transport is None:
@@ -669,6 +711,7 @@ def main(argv: list[str] | None = None) -> int:
                 catalog_path=REPO / "infra" / "services.json",
             )
             catalog = load_catalog(REPO / "infra" / "services.json")
+            execution_resources = execution_resource_keys(services, model)
             service_environments = {
                 selected_service: deliver_services_environment(
                     provider,
@@ -700,6 +743,7 @@ def main(argv: list[str] | None = None) -> int:
                 max(1, args.max_workers),
                 extra_args=extra_args,
                 service_environments=service_environments,
+                execution_resources=execution_resources,
             )
         if args.canonical_ansible:
             print("==> canonical host bootstrap", flush=True)

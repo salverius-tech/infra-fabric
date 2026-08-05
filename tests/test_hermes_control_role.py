@@ -11,6 +11,9 @@ PARENT_TASKS = ROOT / "infra" / "ansible" / "roles" / "hermes" / "tasks" / "main
 CONTROL_TASKS = ROOT / "infra" / "ansible" / "roles" / "hermes_control" / "tasks" / "main.yml"
 CONTROL_API_ENV = ROOT / "infra" / "ansible" / "roles" / "hermes_control" / "templates" / "control-api.env.j2"
 CONTROL_PLUGIN_ENV = ROOT / "infra" / "ansible" / "roles" / "hermes_control" / "templates" / "plugin.env.j2"
+CONTROL_DEFAULTS = ROOT / "infra" / "ansible" / "roles" / "hermes_control" / "defaults" / "main.yml"
+CONTROL_ARGUMENT_SPECS = ROOT / "infra" / "ansible" / "roles" / "hermes_control" / "meta" / "argument_specs.yml"
+PARENT_ARGUMENT_SPECS = ROOT / "infra" / "ansible" / "roles" / "hermes" / "meta" / "argument_specs.yml"
 GATEWAY_UNIT = ROOT / "infra" / "ansible" / "roles" / "hermes" / "templates" / "hermes-gateway.service.j2"
 CADDYFILE = ROOT / "infra" / "ansible" / "roles" / "hermes" / "templates" / "Caddyfile.j2"
 OPERATIONS_DOC = ROOT / "docs" / "hermes-control-operations.md"
@@ -28,12 +31,40 @@ class HermesControlRoleTests(unittest.TestCase):
             task for task in tasks
             if task.get("name") == "Verify Hermes Control HTTPS diagnostics through Caddy"
         )
-        self.assertEqual(
-            diagnostic["ansible.builtin.command"]["argv"][10],
-            "Authorization: Bearer {{ hermes_control_api_token }}",
-        )
-        self.assertNotIn("***", diagnostic["ansible.builtin.command"]["argv"][10])
+        header = diagnostic["ansible.builtin.command"]["argv"][10]
+        self.assertEqual(header, "Authorization: Bearer {{ hermes_control_api_token }}")
+        self.assertNotIn("***", header)
+        self.assertNotIn("Bearer  ", header)
         self.assertTrue(diagnostic["no_log"])
+
+    def test_hermes_control_and_parent_role_specs_cover_the_control_contract(self) -> None:
+        child_options = yaml.safe_load(CONTROL_ARGUMENT_SPECS.read_text(encoding="utf-8"))["argument_specs"]["main"]["options"]
+        parent_options = yaml.safe_load(PARENT_ARGUMENT_SPECS.read_text(encoding="utf-8"))["argument_specs"]["main"]["options"]
+        defaults = yaml.safe_load(CONTROL_DEFAULTS.read_text(encoding="utf-8"))
+        expected = {
+            "hermes_runtime_user",
+            "hermes_control_source_checkout_path",
+            "hermes_control_install_dir",
+            "hermes_control_config_dir",
+            "hermes_control_state_dir",
+            "hermes_control_api_host",
+            "hermes_control_api_port",
+            "hermes_control_domain",
+            "hermes_control_require_task_approval",
+            "hermes_control_source_url",
+            "hermes_control_source_ref",
+            "hermes_control_api_token",
+            "hermes_control_bridge_token",
+            "hermes_control_plugin_socket",
+        }
+        self.assertTrue(expected <= set(child_options))
+        self.assertTrue(set(defaults) <= set(child_options))
+        self.assertTrue({"hermes_control_enabled", *expected} <= set(parent_options))
+        self.assertEqual(child_options["hermes_control_api_port"]["type"], "int")
+        self.assertEqual(child_options["hermes_control_require_task_approval"]["type"], "bool")
+        for secret in ("hermes_control_api_token", "hermes_control_bridge_token"):
+            self.assertTrue(child_options[secret]["required"])
+            self.assertIn("never log", child_options[secret]["description"])
 
     def test_control_role_enforces_pinned_source_and_readiness(self) -> None:
         text = CONTROL_TASKS.read_text(encoding="utf-8")

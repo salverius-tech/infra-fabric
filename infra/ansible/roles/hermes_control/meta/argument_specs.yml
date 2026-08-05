@@ -1,0 +1,65 @@
+---
+argument_specs:
+  main:
+    short_description: "Install the private Hermes Control companion API, bridge, and gateway plugin."
+    options:
+      hermes_control_enabled:
+        type: bool
+        required: false
+        description: "Enable the private Hermes Control companion stack (default: false)."
+      hermes_runtime_user:
+        type: str
+        required: true
+        description: "Existing Hermes runtime account that owns the managed Control runtime."
+      hermes_control_source_checkout_path:
+        type: str
+        required: false
+        description: "Managed checkout path for the reviewed Hermes Control source (default: /opt/src/hermes-control)."
+      hermes_control_install_dir:
+        type: str
+        required: false
+        description: "Managed Hermes Control install path (default: /opt/hermes-mobile-control)."
+      hermes_control_config_dir:
+        type: str
+        required: false
+        description: "Root-owned Hermes Control configuration directory (default: /etc/hermes-mobile-control)."
+      hermes_control_state_dir:
+        type: str
+        required: false
+        description: "Persistent Hermes Control state directory (default: /var/lib/hermes-mobile-control)."
+      hermes_control_api_host:
+        type: str
+        required: false
+        description: "Loopback-only Control API bind host (default: 127.0.0.1)."
+      hermes_control_api_port:
+        type: int
+        required: false
+        description: "Local Control API bind port (default: 8787)."
+      hermes_control_domain:
+        type: str
+        required: true
+        description: "Private HTTPS hostname proxied by the Hermes-local Caddy instance."
+      hermes_control_require_task_approval:
+        type: bool
+        required: false
+        description: "Require approval before Hermes Control executes submitted tasks (default: true)."
+      hermes_control_source_url:
+        type: str
+        required: true
+        description: "Private source repository URL for the reviewed Hermes Control checkout."
+      hermes_control_source_ref:
+        type: str
+        required: true
+        description: "Immutable 40-character reviewed Git commit for Hermes Control."
+      hermes_control_api_token:
+        type: str
+        required: true
+        description: "Private API bearer token; never log or expose its value."
+      hermes_control_bridge_token:
+        type: str
+        required: true
+        description: "Private bridge authentication token; never log or expose its value."
+      hermes_control_plugin_socket:
+        type: str
+        required: false
+        description: "Local Unix socket for the Hermes Control bridge (default: /run/hermes/control-extension.sock)."
