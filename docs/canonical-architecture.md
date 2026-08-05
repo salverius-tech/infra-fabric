@@ -61,6 +61,15 @@ Direct `tofu plan`, `tofu apply`, and destroy execution are unsupported operator
 
 Supported wrappers serialize operations with a persistent private lock in the selected site directory. This enforces a single-controller/single-writer model only when every operator uses the same shared values filesystem and repository wrappers; it is not a distributed lock and cannot protect direct OpenTofu CLI use.
 
+Immediately before a saved plan is applied, the wrapper re-verifies plan metadata and creates a checksum-bound, mode-`0700` snapshot under `values/sites/<site>/state-backups/` when local state already exists. Snapshot files and manifests are mode `0600`, installation is atomic, and the newest ten snapshots are retained. Verify or restore only while all other controllers are stopped; the restore command acquires the same site lock and refuses to replace existing state without explicit acknowledgement:
+
+```text
+python3 scripts/state-snapshot.py verify --snapshot values/sites/<site>/state-backups/<snapshot>
+python3 scripts/state-snapshot.py restore --snapshot values/sites/<site>/state-backups/<snapshot> --state values/sites/<site>/terraform.tfstate --replace-existing
+```
+
+A restore validates permissions, size, and checksum before atomically replacing the local state file. It does not migrate state or provide distributed locking; inspect and preserve the current private state separately before an operator-approved recovery.
+
 ## Site lifecycle states
 
 - `disposable`: may be created and destroyed deliberately; use public-safe fixtures and retain no production assumptions.

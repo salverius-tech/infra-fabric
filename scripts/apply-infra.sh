@@ -54,12 +54,15 @@ for verify_arg in "$@"; do
     verify_args+=("${verify_arg}")
   fi
 done
-python scripts/tfplan-metadata.py verify \
-  --plan "${INFRA_VALUES_DIR}/tfplan" \
-  --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json" \
-  --target-service "${target_service}" \
-  --replace-service "${replace_service}" \
-  "${verify_args[@]}"
+verify_saved_plan() {
+  python scripts/tfplan-metadata.py verify \
+    --plan "${INFRA_VALUES_DIR}/tfplan" \
+    --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json" \
+    --target-service "${target_service}" \
+    --replace-service "${replace_service}" \
+    "${verify_args[@]}"
+}
+verify_saved_plan
 python scripts/tfplan-metadata.py summary --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json"
 if [[ ! -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
   python scripts/settings.py summary
@@ -117,6 +120,12 @@ if python -c "import json, sys; raise SystemExit(0 if json.loads(sys.argv[1]).ge
     infra/ansible/playbooks/storage-prep.yml
 fi
 
+# Reverify immediately before the mutation boundary, then snapshot existing local state.
+verify_saved_plan
+python scripts/state-snapshot.py create \
+  --state "${INFRA_VALUES_DIR}/terraform.tfstate" \
+  --backup-dir "${INFRA_VALUES_DIR}/state-backups"
+
 # A saved plan already contains its variable values. Do not let TF_VAR_* values
 # from the runtime env be compared against those values during apply.
 (
@@ -133,12 +142,8 @@ fi
   fi
 )
 
-python scripts/tfplan-metadata.py verify \
-  --plan "${INFRA_VALUES_DIR}/tfplan" \
-  --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json" \
-  --target-service "${target_service}" \
-  --replace-service "${replace_service}" \
-  "${verify_args[@]}"
+# Diagnostic only: mutation was authorized by the immediately preceding verification.
+verify_saved_plan
 
 ansible_service_args=()
 if [[ -n "${target_service}" ]]; then
