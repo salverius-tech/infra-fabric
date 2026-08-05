@@ -1,0 +1,57 @@
+---
+argument_specs:
+  main:
+    short_description: Converge canonical automation, operator, and recovery identities.
+    options:
+      host_identity_enabled:
+        type: bool
+        required: false
+      host_identity_provisioning_user:
+        type: str
+        required: true
+      host_identity_operator_user:
+        type: str
+        required: true
+      host_identity_provisioning_keys:
+        type: list
+        elements: str
+        required: true
+      host_identity_operator_keys:
+        type: list
+        elements: str
+        required: true
+      host_identity_operator_password:
+        type: str
+        required: true
+        description: Private operator password; role tasks must keep its value out of logs.
+      host_identity_operator_home:
+        type: str
+        required: false
+      host_identity_provisioning_home:
+        type: str
+        required: false
+      host_identity_shell:
+        type: str
+        required: false
+      host_identity_chezmoi_version:
+        type: str
+        required: false
+      host_identity_chezmoi_sha256:
+        type: str
+        required: false
+      host_identity_dotfiles_repository:
+        type: str
+        required: false
+      host_identity_dotfiles_revision:
+        type: str
+        required: false
+      host_identity_dotfiles_enabled:
+        type: bool
+        required: false
+      host_identity_root_password_hash_salt:
+        type: str
+        required: true
+        description: Stable non-secret salt used for deterministic recovery hashes.
+      host_identity_root_recovery_enabled:
+        type: bool
+        required: false
