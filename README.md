@@ -12,6 +12,10 @@ For a selected site, operators edit only:
 
 Generated projections under `values/sites/<site>/generated/` are derived artifacts. Do not edit them. Age identities, recipient policy, credentials, state, plans, and live site values remain private and outside tracked public source.
 
+## Prerequisites
+
+Use a Linux `amd64` host with Git, GNU Make-compatible shell utilities, `just`, and Docker Engine with the Compose plugin. The tooling image installs checksum-pinned Linux `amd64` OpenTofu, TFLint, and SOPS binaries, so non-`amd64` hosts are not supported by this workflow. Ensure Docker is available to the invoking user before running `just setup` or any validation recipe. Site-specific protected-input operations additionally require a private SOPS policy, encrypted bundle, and external age identity; structural validation itself does not decrypt them.
+
 ## Canonical quick start
 
 From the repository root:

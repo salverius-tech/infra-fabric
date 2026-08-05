@@ -60,10 +60,10 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `.specs/archive/searxng-podman-runtime/review-1/terraform-pro.md` | unclassified | `ea20f3d89c0b92aa2c67ad0b90b54cbdb97012df8dfee5ebe5b6c091f0c572f2` | 2 |
 | `.specs/direct-hermes-ansible/plan.md` | unclassified | `69844d03f7a8ef714d1aec5696103bfd5f6f581f800f94e7553213a85df66320` | 32 |
 | `AGENTS.md` | contributor-current | `781ed9ae603d0d5cf5a65e44d33d34dd9e71041919e9aef1a6ad4d6e2f6eaeed` | 0 |
-| `README.md` | operator-current | `df29bc66985f4de07e522961e9a4175edb4e644e951302af9091380517eda2a8` | 0 |
+| `README.md` | operator-current | `40a0f5a597f70aa6a9aae0e3b8718a4754a92813536777d4e701e1c687a19a97` | 0 |
 | `docs/README.md` | contributor-current | `98e678d36d191d724efa4e60ad00b6b2eb7298205336250f216ac113349e05e3` | 0 |
-| `docs/canonical-architecture.md` | architecture-current | `31ccd09ebb43c53e41a11beedd0d887db3368f5383f20f95c37113813cae555f` | 0 |
-| `docs/canonical-quick-start.md` | operator-current | `4ed49d36a6982f152a4e710c76527ec39827b7bc603a70af91f423d141fe1177` | 0 |
+| `docs/canonical-architecture.md` | architecture-current | `2a56a87d2137bf12ebf8d802ebd86cb3336927d6e30c1c7b5a92ad1906d991a0` | 0 |
+| `docs/canonical-quick-start.md` | operator-current | `a90d2de2c3b67c730bad478bd9551c1b80ae646b97fbb40a531a639c2e4942e5` | 0 |
 | `docs/canonical-readiness.md` | operator-current | `a9454fce68c757db734713126f35e83bd495031ac4ea93205faa30fa22f94cf0` | 0 |
 | `docs/canonical-service-authoring.md` | contributor-current | `8fb1e5b5ad75385a1ef6bd7c4ed6bd78590a8fbe7c4a8eee95cb9e1014d9e3f7` | 0 |
 | `docs/canonical-teardown.md` | operator-current | `7dcf0a98c2423e384cae477a5bde84fcdf936a5427ddec44796951666fa30454` | 0 |
@@ -88,5 +88,5 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `docs/service-state-backup.md` | operator-current | `2475fd5cb6913e3ee4b13c3c57f6d36db3f223933ca7c427fb978d70f89ba36a` | 0 |
 | `docs/service-update-policy.md` | operator-current | `6e6a82416e48f69f1f57ea46734ce38fa3d87315398ea7c05410018a443dfc0f` | 0 |
 | `docs/sssf.md` | operator-current | `50dd0b720ed09703932c6ced2d1ad2e80005fda1f597bb0545017ab78d02a464` | 0 |
-| `scaffold/README.md` | contributor-current | `bc1dde00b901cc2f9c48ced1fbd1067243cde164dad77c93ac19775fb67925a9` | 0 |
+| `scaffold/README.md` | contributor-current | `851c9198663b2efb2e7bf35e29c8e9aa35b9450b53629fdbd480b564f54de801` | 0 |
 | `scaffold/sites/_template/README.md` | contributor-current | `6b7337e4dc19a5268c2f37d4d2b717cc2cffed592c66c85f8a92bd2db6f3682d` | 0 |

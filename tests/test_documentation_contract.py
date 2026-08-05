@@ -8,6 +8,32 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
+HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$")
+
+
+def _heading_anchor(value: str) -> str:
+    """Match GitHub-style Markdown fragment identifiers for local documents."""
+    value = re.sub(r"`([^`]*)`", r"\1", value)
+    value = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", value)
+    value = re.sub(r"<[^>]+>", "", value)
+    value = value.lower()
+    value = re.sub(r"[^\w\s-]", "", value, flags=re.UNICODE)
+    return re.sub(r"[\s-]+", "-", value).strip("-")
+
+
+def _document_anchors(path: Path) -> set[str]:
+    counts: dict[str, int] = {}
+    anchors: set[str] = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = HEADING.match(line)
+        if match is None:
+            continue
+        base = _heading_anchor(match.group(1))
+        suffix = counts.get(base, 0)
+        counts[base] = suffix + 1
+        anchors.add(base if suffix == 0 else f"{base}-{suffix}")
+    return anchors
 
 
 class DocumentationContractTests(unittest.TestCase):
@@ -39,12 +65,23 @@ class DocumentationContractTests(unittest.TestCase):
             self.assertFalse((ROOT / relative).exists(), relative)
             self.assertTrue((ROOT / replacement).is_file(), replacement)
 
-    def test_documentation_index_links_only_existing_current_documents(self) -> None:
+    def test_tracked_markdown_relative_links_and_anchors_resolve(self) -> None:
+        inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
+        for relative in inventory["documents"]:
+            source = ROOT / relative
+            for raw_link in MARKDOWN_LINK.findall(source.read_text(encoding="utf-8")):
+                if "://" in raw_link or raw_link.startswith(("mailto:", "#")):
+                    if raw_link.startswith("#"):
+                        self.assertIn(raw_link.removeprefix("#"), _document_anchors(source), f"{relative}: {raw_link}")
+                    continue
+                path_part, separator, fragment = raw_link.partition("#")
+                target = (source.parent / path_part).resolve()
+                self.assertTrue(target.is_file(), f"{relative}: {raw_link}")
+                if separator and target.suffix == ".md":
+                    self.assertIn(fragment, _document_anchors(target), f"{relative}: {raw_link}")
+
         index = ROOT / "docs" / "README.md"
         text = index.read_text(encoding="utf-8")
-        links = re.findall(r"\]\(([^)#]+)", text)
-        for link in links:
-            self.assertTrue((index.parent / link).is_file(), link)
         for retired in ("upstream", "repository-audit", "phase0", "mapping-v1"):
             self.assertNotIn(retired, text.lower())
 
@@ -57,6 +94,13 @@ class DocumentationContractTests(unittest.TestCase):
             for link in links:
                 if "://" not in link:
                     self.assertTrue((readme.parent / link).is_file(), link)
+
+    def test_operator_onramps_declare_tool_and_platform_prerequisites(self) -> None:
+        required = ("Linux `amd64`", "Git", "`just`", "Docker Engine", "Compose plugin")
+        for relative in ("README.md", "docs/canonical-quick-start.md"):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            for marker in required:
+                self.assertIn(marker, text, f"{marker!r} missing from {relative}")
 
     def test_current_operator_docs_are_canonical_first(self) -> None:
         required = (

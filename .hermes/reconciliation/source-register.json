@@ -396,7 +396,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "df29bc66985f4de07e522961e9a4175edb4e644e951302af9091380517eda2a8",
+      "sha256": "40a0f5a597f70aa6a9aae0e3b8718a4754a92813536777d4e701e1c687a19a97",
       "authority": "operator-current",
       "stated_status": null,
       "extracted_item_count": 0
@@ -410,14 +410,14 @@
     },
     {
       "path": "docs/canonical-architecture.md",
-      "sha256": "31ccd09ebb43c53e41a11beedd0d887db3368f5383f20f95c37113813cae555f",
+      "sha256": "2a56a87d2137bf12ebf8d802ebd86cb3336927d6e30c1c7b5a92ad1906d991a0",
       "authority": "architecture-current",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-quick-start.md",
-      "sha256": "4ed49d36a6982f152a4e710c76527ec39827b7bc603a70af91f423d141fe1177",
+      "sha256": "a90d2de2c3b67c730bad478bd9551c1b80ae646b97fbb40a531a639c2e4942e5",
       "authority": "operator-current",
       "stated_status": null,
       "extracted_item_count": 0
@@ -592,7 +592,7 @@
     },
     {
       "path": "scaffold/README.md",
-      "sha256": "bc1dde00b901cc2f9c48ced1fbd1067243cde164dad77c93ac19775fb67925a9",
+      "sha256": "851c9198663b2efb2e7bf35e29c8e9aa35b9450b53629fdbd480b564f54de801",
       "authority": "contributor-current",
       "stated_status": null,
       "extracted_item_count": 0
