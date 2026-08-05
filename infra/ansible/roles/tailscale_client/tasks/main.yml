@@ -6,13 +6,33 @@
       - not (tailscale_client_restore_backup | default(false) | bool) or tailscale_client_backup_archive is defined
     fail_msg: tailscale_client_vmid is required, and tailscale_client_backup_archive is required when restore is enabled.
   when: tailscale_client_enabled | default(false) | bool
-- name: Install Tailscale package in LXC
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - "set -euo pipefail; if ! command -v tailscale >/dev/null 2>&1; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl;\n  curl -fsSL https://tailscale.com/install.sh | sh;\nfi"  # yamllint disable-line rule:line-length
-  changed_when: false
+- name: Install Tailscale repository prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+    state: present
+    update_cache: true
+  when: tailscale_client_enabled | default(false) | bool
+- name: Install checksum-verified Tailscale repository key
+  ansible.builtin.get_url:
+    url: "https://pkgs.tailscale.com/stable/debian/{{ ansible_distribution_release }}.noarmor.gpg"
+    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    checksum: sha256:3e03dacf222698c60b8e2f990b809ca1b3e104de127767864284e6c228f1fb39
+    owner: root
+    group: root
+    mode: '0644'
+  when: tailscale_client_enabled | default(false) | bool
+- name: Configure signed Tailscale apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian {{ ansible_distribution_release }} main"
+    filename: tailscale
+    state: present
+    update_cache: true
+  when: tailscale_client_enabled | default(false) | bool
+- name: Install Tailscale package
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
   when: tailscale_client_enabled | default(false) | bool
 - name: Enable IPv4 forwarding in Tailscale client LXC
   ansible.builtin.command:
