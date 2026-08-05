@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ruamel.yaml import YAML
+from secret_provider import SecretProviderError, canonical_sops_filename
 
 
 LEGACY_OPERATOR_PATH = ("operator", "systemboss_password")
@@ -191,7 +192,13 @@ def migrate_encrypted_bundle(
     if not changed or not apply:
         return result
 
-    relative_name = os.path.relpath(destination, Path.cwd())
+    policy = destination.parent / ".sops.yaml"
+    if not policy.is_file():
+        raise SecretBundleMigrationError("site-local SOPS policy is unavailable")
+    try:
+        relative_name = canonical_sops_filename(destination)
+    except SecretProviderError as error:
+        raise SecretBundleMigrationError("secret bundle destination is not canonical") from error
     with tempfile.TemporaryDirectory(prefix="canonical-secret-migration-") as temporary:
         temporary_dir = Path(temporary)
         plaintext = temporary_dir / "bundle.yaml"
@@ -207,6 +214,8 @@ def migrate_encrypted_bundle(
                 "yaml",
                 "--filename-override",
                 relative_name,
+                "--config",
+                str(policy),
                 str(plaintext),
             ],
             environment=environment,

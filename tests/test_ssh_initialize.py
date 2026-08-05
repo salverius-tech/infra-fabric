@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -90,6 +91,21 @@ class SshInitializeTests(unittest.TestCase):
             bundle.write_text("ciphertext\n", encoding="utf-8")
             with patch.object(module, "SopsAgeProvider", return_value=FakeProvider({}, private_path.read_text(encoding="utf-8"))):
                 self.assertEqual(module.initialize(site_file, bundle, key_file), "already initialized")
+
+    def test_sops_yaml_uses_exact_site_filename_and_adjacent_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = Path(temporary) / "values" / "sites" / "dev" / "secrets.sops.yaml"
+            bundle.parent.mkdir(parents=True)
+            policy = bundle.parent / ".sops.yaml"
+            with patch.object(
+                module.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=0, stdout="ciphertext"),
+            ) as run:
+                module._sops_yaml("sops", bundle, {"secret": "synthetic"}, Path(temporary) / "key")
+        command = run.call_args.args[0]
+        self.assertEqual(command[command.index("--filename-override") + 1], "values/sites/dev/secrets.sops.yaml")
+        self.assertEqual(command[command.index("--config") + 1], str(policy))
 
 
 if __name__ == "__main__":

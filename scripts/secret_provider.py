@@ -142,8 +142,28 @@ class SopsAgeProvider:
 
 
 _LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
-_SOPS_SCOPE = r"^values/sites/[^/]+/secrets\.sops\.yaml$"
+_SOPS_PUBLIC_SCOPE = r"^values/sites/[^/]+/secrets\.sops\.yaml$"
 _PLACEHOLDER_RECIPIENT = "age1REPLACE_WITH_SITE_RECIPIENT"
+
+
+def _sops_site_scope(site: str) -> str:
+    return f"^values/sites/{site}/secrets\\.sops\\.yaml$"
+
+
+def canonical_sops_filename(bundle: Path) -> str:
+    """Return the exact site-relative filename used by private SOPS policy."""
+    resolved = bundle.expanduser().resolve()
+    parts = resolved.parts
+    for index in range(len(parts) - 3):
+        if parts[index : index + 2] == ("values", "sites"):
+            site = parts[index + 2]
+            if (
+                _LOGICAL_PART_RE.fullmatch(site)
+                and index + 3 == len(parts) - 1
+                and parts[index + 3] == "secrets.sops.yaml"
+            ):
+                return f"values/sites/{site}/secrets.sops.yaml"
+    raise SecretProviderError("canonical SOPS bundle path is invalid")
 
 
 def sops_policy_recipients(policy_path: Path, *, site: str) -> set[str]:
@@ -158,7 +178,7 @@ def sops_policy_recipients(policy_path: Path, *, site: str) -> set[str]:
     if not isinstance(rules, list) or len(rules) != 1 or not isinstance(rules[0], dict):
         raise SecretProviderError("SOPS policy must contain one creation rule")
     rule = rules[0]
-    if rule.get("path_regex") != _SOPS_SCOPE:
+    if rule.get("path_regex") != _sops_site_scope(site):
         raise SecretProviderError("SOPS policy scope is invalid")
     age = rule.get("age")
     recipients = [age] if isinstance(age, str) else age if isinstance(age, list) else []
@@ -187,18 +207,21 @@ def inspect_sops_policy(
     if not isinstance(rules, list) or len(rules) != 1 or not isinstance(rules[0], dict):
         raise SecretProviderError("SOPS policy must contain one creation rule")
     rule = rules[0]
-    if rule.get("path_regex") != _SOPS_SCOPE:
-        raise SecretProviderError("SOPS policy scope is invalid")
+    scope = rule.get("path_regex")
     age = rule.get("age")
     recipients = [age] if isinstance(age, str) else age if isinstance(age, list) else []
     if not recipients or any(not isinstance(item, str) or not item for item in recipients):
         raise SecretProviderError("SOPS recipient policy is invalid")
     recipient_set = set(recipients)
     if _PLACEHOLDER_RECIPIENT in recipient_set:
+        if scope != _SOPS_PUBLIC_SCOPE:
+            raise SecretProviderError("SOPS policy scope is invalid")
         if len(recipient_set) != 1 or expected_recipients is not None:
             raise SecretProviderError("SOPS recipient policy is not operational")
         state = "not-configured"
     else:
+        if scope != _sops_site_scope(site):
+            raise SecretProviderError("SOPS policy scope is invalid")
         if expected_recipients is not None and recipient_set != expected_recipients:
             raise SecretProviderError("SOPS recipient policy does not match")
         state = "verified" if expected_recipients is not None else "configured"
@@ -213,6 +236,26 @@ def _parts(logical_path: str) -> list[str]:
     if not parts or any(not _LOGICAL_PART_RE.fullmatch(part) for part in parts):
         raise SecretProviderError("invalid logical secret path")
     return parts
+
+
+def validate_canonical_secret_path(logical_path: str) -> None:
+    """Reject protected paths outside canonical provider, identity, and service roots."""
+    parts = _parts(logical_path)
+    canonical = (
+        len(parts) >= 3
+        and parts[0] == "secrets"
+        and parts[1] in {"bootstrap", "operator"}
+    ) or (
+        len(parts) >= 4
+        and parts[:2] == ["secrets", "providers"]
+    ) or (
+        len(parts) >= 4
+        and parts[0] == "services"
+        and parts[1] != "providers"
+        and parts[2] == "secrets"
+    )
+    if not canonical:
+        raise SecretProviderError("secret path is outside the canonical namespace")
 
 
 def _resolve(data: dict[str, Any], logical_path: str) -> str:
@@ -395,7 +438,12 @@ __all__ = [
     "SecretProvider",
     "SecretProviderError",
     "SopsAgeProvider",
+    "canonical_sops_filename",
+    "check_sops_age_availability",
     "discover_age_key_file",
+    "inspect_sops_policy",
+    "sops_policy_recipients",
+    "validate_canonical_secret_path",
     "validate_sops_age_recipients",
     "secret_material_directory",
     "write_secret_material",

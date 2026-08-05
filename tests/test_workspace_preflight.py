@@ -118,7 +118,7 @@ class WorkspacePreflightTests(unittest.TestCase):
         shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
         policy = site / ".sops.yaml"
         policy.write_text(
-            "creation_rules:\n  - path_regex: '^values/sites/[^/]+/secrets\\.sops\\.yaml$'\n    age: age1publictestrecipient\n",
+            "creation_rules:\n  - path_regex: '^values/sites/dev/secrets\\.sops\\.yaml$'\n    age: age1publictestrecipient\n",
             encoding="utf-8",
         )
         with temp, patch.dict(

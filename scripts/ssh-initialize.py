@@ -16,7 +16,7 @@ from ruamel.yaml import YAML
 
 from canonical_ssh_identity import derive_public_key
 from canonical_values import load_site
-from secret_provider import SopsAgeProvider, SecretProviderError
+from secret_provider import SopsAgeProvider, SecretProviderError, canonical_sops_filename
 
 LOGICAL_PATH = "secrets.bootstrap.ssh_private_key"
 
@@ -73,7 +73,7 @@ def _sops_yaml(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) ->
             "--output-type",
             "yaml",
             "--filename-override",
-            str(bundle),
+            canonical_sops_filename(bundle),
             "--config",
             str(bundle.parent / ".sops.yaml"),
             "/dev/stdin",

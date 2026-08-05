@@ -116,10 +116,15 @@ class SecretBundleMigrationTests(unittest.TestCase):
 
     def test_encrypted_apply_backups_and_replaces_ciphertext(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            bundle = Path(temporary) / "secrets.sops.yaml"
+            bundle = Path(temporary) / "values" / "sites" / "dev" / "secrets.sops.yaml"
+            bundle.parent.mkdir(parents=True)
             bundle.write_text("old-ciphertext", encoding="utf-8")
+            policy = bundle.parent / ".sops.yaml"
+            policy.write_text("policy-metadata", encoding="utf-8")
+            commands: list[list[str]] = []
 
             def fake_sops(args: list[str], **_: object) -> str:
+                commands.append(args)
                 if "--decrypt" in args:
                     return "operator:\n  systemboss_password: old\n"
                 return "new-ciphertext"
@@ -133,6 +138,9 @@ class SecretBundleMigrationTests(unittest.TestCase):
                 "old-ciphertext",
             )
             self.assertIn("backup", result)
+            encrypt = commands[-1]
+            self.assertEqual(encrypt[encrypt.index("--filename-override") + 1], "values/sites/dev/secrets.sops.yaml")
+            self.assertEqual(encrypt[encrypt.index("--config") + 1], str(policy))
 
 
 if __name__ == "__main__":

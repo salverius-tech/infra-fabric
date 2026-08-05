@@ -13,7 +13,12 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ruamel.yaml import YAML
 
-from secret_provider import SopsAgeProvider, SecretProviderError
+from secret_provider import (
+    SopsAgeProvider,
+    SecretProviderError,
+    canonical_sops_filename,
+    validate_canonical_secret_path,
+)
 
 
 class SecretSetError(RuntimeError):
@@ -60,7 +65,7 @@ def encrypt(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) -> by
             "--output-type",
             "yaml",
             "--filename-override",
-            str(bundle),
+            canonical_sops_filename(bundle),
             "--config",
             str(bundle.parent / ".sops.yaml"),
             "/dev/stdin",
@@ -80,6 +85,10 @@ def encrypt(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) -> by
 def set_secret(bundle: Path, path: str, value: str, key_file: Path, *, replace: bool, sops: str) -> str:
     if not value or "\n" in value or "\r" in value:
         raise SecretSetError("secret value is empty or multiline")
+    try:
+        validate_canonical_secret_path(path)
+    except SecretProviderError as error:
+        raise SecretSetError("logical secret path is outside the canonical namespace") from error
     if not bundle.is_file() or not key_file.is_file():
         raise SecretSetError("canonical SOPS bundle or external age identity is unavailable")
     try:

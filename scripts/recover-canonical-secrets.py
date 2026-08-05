@@ -19,6 +19,11 @@ from typing import Any
 
 from ruamel.yaml import YAML
 from secret_bundle_migration import SecretBundleMigrationError, _run_sops, _yaml_dump
+from secret_provider import (
+    SecretProviderError,
+    canonical_sops_filename,
+    validate_canonical_secret_path,
+)
 
 ALLOWED_LEGACY_PATHS = frozenset({".env"})
 ENV_LINE = re.compile(r"^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
@@ -34,6 +39,10 @@ def parse_mapping(raw: str) -> tuple[str, str]:
     source, target = raw.split("=", 1)
     if not ENV_LINE.match(f"{source}=x") or not re.fullmatch(r"[a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)+", target):
         raise RecoveryError("recovery mapping is invalid")
+    try:
+        validate_canonical_secret_path(target)
+    except SecretProviderError as error:
+        raise RecoveryError("recovery target is outside the canonical secret namespace") from error
     return source, target
 
 
@@ -98,7 +107,29 @@ def recover(values_root: Path, bundle: Path, mappings: list[tuple[str, str]], *,
             changed = True
             report.append(f"imported missing canonical target: {target}")
     if changed and apply:
-        encrypted = _run_sops([sops, "--encrypt", "--input-type", "yaml", "--output-type", "yaml", "--filename-override", str(bundle), "-"], input_text=_yaml_dump(document))
+        policy = bundle.parent / ".sops.yaml"
+        if not policy.is_file():
+            raise RecoveryError("site-local SOPS policy is unavailable")
+        try:
+            filename = canonical_sops_filename(bundle)
+        except SecretProviderError as error:
+            raise RecoveryError("recovery bundle path is not canonical") from error
+        encrypted = _run_sops(
+            [
+                sops,
+                "--encrypt",
+                "--input-type",
+                "yaml",
+                "--output-type",
+                "yaml",
+                "--filename-override",
+                filename,
+                "--config",
+                str(policy),
+                "-",
+            ],
+            input_text=_yaml_dump(document),
+        )
         staged = bundle.with_name(f".{bundle.name}.recovery-next")
         staged.write_text(encrypted, encoding="utf-8")
         staged.chmod(0o600)
