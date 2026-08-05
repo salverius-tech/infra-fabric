@@ -37,18 +37,23 @@ variable "start_on_boot" {
 }
 
 variable "image" {
-  description = "Cloud image import settings. Set create=false with file_id when reusing an image managed outside this module."
+  description = "Verified cloud image reference managed outside this module."
   type = object({
     datastore_id = string
     url          = string
     file_name    = string
-    file_id      = optional(string)
-    create       = optional(bool, true)
+    file_id      = string
+    create       = optional(bool, false)
   })
 
   validation {
-    condition     = var.image.create || var.image.file_id != null
-    error_message = "image.file_id is required when image.create is false."
+    condition     = trimspace(var.image.file_id) != ""
+    error_message = "image.file_id must reference a separately checksum-verified Proxmox image."
+  }
+
+  validation {
+    condition     = !var.image.create
+    error_message = "debian-vm does not download images; set image.create=false and provide a checksum-verified image.file_id."
   }
 }
 

@@ -146,11 +146,11 @@ module "forgejo_vm" {
   memory_mb = var.forgejo_container_memory_mb
 
   image = {
-    datastore_id = var.forgejo_vm_image_datastore_id
-    url          = var.forgejo_vm_image_url
-    file_name    = var.forgejo_vm_image_file_name
-    file_id      = local.onramp_host_enabled ? proxmox_download_file.debian_13_onramp_host_image[0].id : null
-    create       = !local.onramp_host_enabled
+    datastore_id = var.guest_vm_image_datastore_id
+    url          = var.guest_vm_image_url
+    file_name    = var.guest_vm_image_file_name
+    file_id      = local.onramp_host_enabled ? proxmox_download_file.debian_13_onramp_host_image[0].id : proxmox_download_file.debian_13_service_vm_image[0].id
+    create       = false
   }
 
   disk = {
