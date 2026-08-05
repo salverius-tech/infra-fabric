@@ -452,7 +452,7 @@
     },
     {
       "path": "docs/canonical-values-mapping-v1.md",
-      "sha256": "b9e6f74d7d12c5589ec36cdfea676b04c959296793eb36b8a6ef8a3d2bf09693",
+      "sha256": "43f75b19e77290d6c612e74e3f733f1160afb8970e924ed63f3f91f594f87ab8",
       "authority": "architecture-current",
       "stated_status": "Incomplete \u2014 implementation tracker W3 remains partial",
       "extracted_item_count": 4
@@ -564,7 +564,7 @@
     },
     {
       "path": "docs/service-catalog.md",
-      "sha256": "fce7676d753622dec6fde2fdf400dc1b6ef7c097456fb855954ce9f53d8fc300",
+      "sha256": "cc0f7558c8c70528fa78fa55be37bfaa8a586c12c296f7765c68f414dbd33b47",
       "authority": "architecture-current",
       "stated_status": null,
       "extracted_item_count": 0

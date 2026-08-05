@@ -11,5 +11,9 @@
   hosts: sssf
   gather_facts: true
   become: true
+  vars:
+    sssf_openrouter_api_key: "{{ lookup('ansible.builtin.env', 'OPENROUTER_API_KEY') }}"
+    sssf_openai_api_key: "{{ lookup('ansible.builtin.env', 'OPENAI_API_KEY') }}"
+    sssf_fireworks_api_key: "{{ lookup('ansible.builtin.env', 'FIREWORKS_API_KEY') }}"
   roles:
     - sssf

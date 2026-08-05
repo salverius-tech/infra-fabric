@@ -136,7 +136,6 @@ def validate_repository_surfaces(
                 required_metadata = {
                     "configuration_schema",
                     "release_sources",
-                    "allowed_override_namespaces",
                     "required_fields",
                     "runtime_owner",
                 }
@@ -260,7 +259,7 @@ def _validate_catalog_entry(service_id: str, entry: Any, service_ids: set[str]) 
     independent_runtime = owner not in {"none", "shared_host"}
     if not isinstance(entry.get("configuration_schema"), str) or not entry["configuration_schema"]:
         errors.append("catalog metadata: configuration_schema is required")
-    for field in ("required_fields", "allowed_override_namespaces", "dependencies"):
+    for field in ("required_fields", "dependencies"):
         if not isinstance(entry.get(field), list):
             errors.append(f"catalog metadata: {field} must be a list")
     release_sources = entry.get("release_sources")

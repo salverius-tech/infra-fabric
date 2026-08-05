@@ -49,7 +49,6 @@ class ServiceAuthorTests(unittest.TestCase):
                         "metrics": {
                             "configuration_schema": "MetricsConfiguration",
                             "release_sources": ["binary"],
-                            "allowed_override_namespaces": ["ansible"],
                             "required_fields": ["resource"],
                             "runtime_owner": "guest",
                         }
@@ -77,7 +76,6 @@ class ServiceAuthorTests(unittest.TestCase):
                 json.dumps({"services": {"metrics": {
                     "configuration_schema": "MetricsConfiguration",
                     "release_sources": ["binary"],
-                    "allowed_override_namespaces": ["ansible"],
                     "required_fields": ["resource"],
                     "runtime_owner": "guest",
                 }}}),
@@ -98,7 +96,6 @@ class ServiceAuthorTests(unittest.TestCase):
                         "metrics": {
                             "configuration_schema": "MetricsConfiguration",
                             "release_sources": ["binary"],
-                            "allowed_override_namespaces": ["ansible"],
                             "required_fields": ["resource"],
                             "runtime_owner": "guest",
                             "playbooks": ["infra/ansible/playbooks/metrics.yml"],

@@ -9,7 +9,6 @@
       "runtime_owner": "guest",
       "configuration_schema": "TechnitiumConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
-      "allowed_override_namespaces": ["ansible", "opentofu"],
       "required_fields": ["resource", "state.capable", "release.version", "release.checksum"],
       "state_order": 3,
       "terraform_addresses": [
@@ -48,8 +47,6 @@
       "runtime_owner": "guest",
       "configuration_schema": "ForgejoConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
-      "allowed_override_namespaces": ["ansible", "opentofu"],
-      "allowed_override_fields": {"ansible": ["forgejo_domain"]},
       "required_fields": ["resource", "state.capable", "release.version"],
       "state_order": 2,
       "terraform_addresses": [
@@ -132,7 +129,6 @@
       "runtime_owner": "guest",
       "configuration_schema": "TailscaleConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
-      "allowed_override_namespaces": ["ansible", "opentofu"],
       "required_fields": ["resource"],
       "terraform_addresses": [
         "module.tailscale_client[",
@@ -171,7 +167,6 @@
       "runtime_owner": "guest",
       "configuration_schema": "ForgejoRunnerConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
-      "allowed_override_namespaces": ["ansible", "opentofu"],
       "required_fields": ["resource", "configuration.url", "configuration.scope", "configuration.label"],
       "terraform_addresses": [
         "module.forgejo_runner[",
@@ -212,7 +207,6 @@
       "runtime_owner": "guest",
       "configuration_schema": "InfisicalConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
-      "allowed_override_namespaces": ["ansible", "opentofu"],
       "required_fields": ["resource", "state.capable"],
       "state_order": 5,
       "terraform_addresses": [
@@ -267,7 +261,6 @@
       "runtime_owner": "none",
       "configuration_schema": "InfisicalOnrampConfiguration",
       "release_sources": [],
-      "allowed_override_namespaces": [],
       "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
       "state_order": 5,
       "terraform_addresses": [
@@ -316,7 +309,6 @@
       "runtime_owner": "guest",
       "configuration_schema": "HermesConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
-      "allowed_override_namespaces": ["ansible", "opentofu"],
       "required_fields": ["resource", "state.capable"],
       "state_order": 1,
       "terraform_addresses": [
@@ -411,7 +403,6 @@
       "runtime_owner": "guest",
       "configuration_schema": "SssfConfiguration",
       "release_sources": ["binary"],
-      "allowed_override_namespaces": ["ansible", "opentofu"],
       "required_fields": ["resource", "state.capable", "release.commit"],
       "state_order": 7,
       "terraform_addresses": [
@@ -475,7 +466,6 @@
       "runtime_owner": "shared_host",
       "configuration_schema": "ResourceOwnedConfiguration",
       "release_sources": [],
-      "allowed_override_namespaces": [],
       "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
       "state_order": 4,
       "terraform_addresses": [
@@ -521,7 +511,6 @@
       "runtime_owner": "none",
       "configuration_schema": "SearxngConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
-      "allowed_override_namespaces": ["ansible", "opentofu"],
       "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
       "state_order": 6,
       "terraform_addresses": [

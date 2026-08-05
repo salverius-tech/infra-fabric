@@ -17,9 +17,6 @@ services:
     release:
       source: package
       version: 1.0.0
-    overrides:
-      ansible:
-        forgejo_domain: git.example.internal
     state:
       capable: true
       disable_policy: retain

@@ -250,22 +250,6 @@ class ServiceCatalogTests(unittest.TestCase):
         )
         self.assertEqual({entry["service"] for entry in report}, {"app"})
 
-    def test_override_fields_are_catalog_allowlisted(self) -> None:
-        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
-        base = {
-            "enabled": False,
-            "dependencies": [],
-            "state": SimpleNamespace(capable=False),
-            "release": SimpleNamespace(source=None),
-        }
-        catalog.validate_model_services(
-            {"forgejo": SimpleNamespace(**base, overrides={"ansible": {"forgejo_domain": "git.example.invalid"}})}
-        )
-        with self.assertRaisesRegex(ServiceCatalogError, "override fields are not allowed"):
-            catalog.validate_model_services(
-                {"forgejo": SimpleNamespace(**base, overrides={"ansible": {"innocent_name": "credential-value"}})}
-            )
-
     def test_unknown_enabled_service_fails_closed(self) -> None:
         catalog = load_catalog(self.write_catalog({"services": {"app": {"dependencies": []}}}))
         with self.assertRaisesRegex(ServiceCatalogError, "not in catalog"):

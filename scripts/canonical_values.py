@@ -1176,7 +1176,6 @@ class Service(StrictModel):
     endpoints: ServiceEndpoints = Field(default_factory=ServiceEndpoints)
     release: ServiceRelease = Field(default_factory=ServiceRelease)
     configuration: dict[str, Any] = Field(default_factory=dict)
-    overrides: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class RootPasswordBootstrapPolicy(StrictModel):

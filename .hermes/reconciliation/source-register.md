@@ -68,7 +68,7 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `docs/canonical-service-authoring.md` | contributor-current | `8fb1e5b5ad75385a1ef6bd7c4ed6bd78590a8fbe7c4a8eee95cb9e1014d9e3f7` | 0 |
 | `docs/canonical-teardown.md` | operator-current | `7dcf0a98c2423e384cae477a5bde84fcdf936a5427ddec44796951666fa30454` | 0 |
 | `docs/canonical-troubleshooting.md` | operator-current | `a071fdbe575952ba6b24e858984fa9898dc55965989db1edb1333930a1e9d0d9` | 0 |
-| `docs/canonical-values-mapping-v1.md` | architecture-current | `b9e6f74d7d12c5589ec36cdfea676b04c959296793eb36b8a6ef8a3d2bf09693` | 4 |
+| `docs/canonical-values-mapping-v1.md` | architecture-current | `43f75b19e77290d6c612e74e3f733f1160afb8970e924ed63f3f91f594f87ab8` | 4 |
 | `docs/canonical-values-migration.md` | architecture-current | `3cfc5ad7df0acbd17dd6b7a27042befa7f80546ebdbbf0c5d66ec362a4a738b3` | 0 |
 | `docs/canonical-values-model-blockers.md` | architecture-current | `c94a50d1bd1b9b60f38baf8ead87cef314b7f43fb24af8a92dea965c32c49c5d` | 0 |
 | `docs/canonical-values-secret-operations.md` | operator-current | `3763de55f19ae42fe4a0765861fe05e25fc6e688660b5fa9b92b51ee886e00ff` | 0 |
@@ -84,7 +84,7 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `docs/onramp-app-platform-contract.md` | operator-current | `ac3ea674420b8d26861026be7e9ac67845b42e633d0637173fd1b40a01acf772` | 0 |
 | `docs/onramp-host-runbook.md` | operator-current | `0c440c7c4fd9983d27afeb5b6f82333e741c7d49d6a0e97e58efc3e852a1b92e` | 0 |
 | `docs/onramp-searxng-handoff.md` | operator-current | `7b548efd4786d503d1cb65411fffc87999de3cf2d883f7876957a9309dadde0a` | 0 |
-| `docs/service-catalog.md` | architecture-current | `fce7676d753622dec6fde2fdf400dc1b6ef7c097456fb855954ce9f53d8fc300` | 0 |
+| `docs/service-catalog.md` | architecture-current | `cc0f7558c8c70528fa78fa55be37bfaa8a586c12c296f7765c68f414dbd33b47` | 0 |
 | `docs/service-state-backup.md` | operator-current | `2475fd5cb6913e3ee4b13c3c57f6d36db3f223933ca7c427fb978d70f89ba36a` | 0 |
 | `docs/service-update-policy.md` | operator-current | `6e6a82416e48f69f1f57ea46734ce38fa3d87315398ea7c05410018a443dfc0f` | 0 |
 | `docs/sssf.md` | operator-current | `50dd0b720ed09703932c6ced2d1ad2e80005fda1f597bb0545017ab78d02a464` | 0 |

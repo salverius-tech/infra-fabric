@@ -16,7 +16,10 @@
       - sssf_max_concurrent_runs | int >= 1
       - sssf_max_concurrent_runs | int <= 4
       - sssf_allowed_repositories is iterable
-      - lookup('env', 'OPENROUTER_API_KEY') | length > 0 or lookup('env', 'OPENAI_API_KEY') | length > 0 or lookup('env', 'FIREWORKS_API_KEY') | length > 0
+      - >-
+        (sssf_provider == 'openrouter' and sssf_openrouter_api_key | length > 0) or
+        (sssf_provider == 'openai' and sssf_openai_api_key | length > 0) or
+        (sssf_provider == 'fireworks' and sssf_fireworks_api_key | length > 0)
     fail_msg: >-
       SSSF requires a pinned upstream commit, non-root runtime user, normalized paths,
       loopback-only visualizer binding, bounded concurrency, and at least one provider key.

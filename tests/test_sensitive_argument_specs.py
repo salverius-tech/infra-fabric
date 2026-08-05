@@ -1,5 +1,6 @@
 """Sensitive Ansible role inputs must be hidden during argument validation."""
 
+import json
 from pathlib import Path
 import unittest
 
@@ -42,6 +43,11 @@ ROLE_SECRET_FIELDS = {
     },
     "onramp_host": {"caddy_cloudflare_api_token"},
     "searxng_onramp": {"searxng_secret_key"},
+    "sssf": {
+        "sssf_fireworks_api_key",
+        "sssf_openai_api_key",
+        "sssf_openrouter_api_key",
+    },
     "tailscale_client": {"tailscale_client_auth_key"},
 }
 
@@ -55,27 +61,36 @@ class SensitiveArgumentSpecsTests(unittest.TestCase):
                 self.assertIn(field, options, f"{role}.{field}")
                 self.assertTrue(options[field].get("no_log"), f"{role}.{field}")
 
-    def test_service_playbooks_wire_catalog_environment_to_sensitive_role_inputs(self) -> None:
-        bindings = {
-            "forgejo-runner.yml": {
-                "FORGEJO_RUNNER_REGISTRATION_SECRET": "forgejo_runner_registration_secret",
-            },
-            "tailscale-client.yml": {"TS_AUTHKEY": "tailscale_client_auth_key"},
-            "searxng-onramp.yml": {"SEARXNG_SECRET_KEY": "searxng_secret_key"},
-            "infisical-onramp.yml": {
-                "INFISICAL_AUTH_SECRET": "infisical_auth_secret",
-                "INFISICAL_ENCRYPTION_KEY": "infisical_encryption_key",
-                "INFISICAL_POSTGRES_PASSWORD": "infisical_postgres_password",
-            },
+    def test_catalog_secret_environment_binds_to_no_log_role_arguments(self) -> None:
+        catalog = json.loads((ROOT / "infra/services.json").read_text(encoding="utf-8"))["services"]
+        role_options = {
+            path.parents[1].name: yaml.safe_load(path.read_text(encoding="utf-8"))["argument_specs"]["main"]["options"]
+            for path in (ROOT / "infra/ansible/roles").glob("*/meta/argument_specs.yml")
         }
-        for playbook, expected in bindings.items():
-            document = yaml.safe_load(
-                (ROOT / "infra/ansible/playbooks" / playbook).read_text(encoding="utf-8")
-            )
-            variables = document[-1]["vars"]
-            for environment_name, variable_name in expected.items():
-                self.assertIn(variable_name, variables, f"{playbook}.{variable_name}")
-                self.assertIn(environment_name, variables[variable_name])
+
+        for service, capability in catalog.items():
+            for logical_path, environment_name in capability.get("secret_environment", {}).items():
+                bound_fields: set[str] = set()
+                for playbook_name in capability["playbooks"]:
+                    playbook_path = ROOT / playbook_name
+                    if not playbook_path.is_file():
+                        playbook_path = ROOT / "infra/ansible/playbooks" / playbook_name
+                    plays = yaml.safe_load(playbook_path.read_text(encoding="utf-8"))
+                    for play in plays:
+                        for field, value in play.get("vars", {}).items():
+                            if isinstance(value, str) and environment_name in value:
+                                bound_fields.add(field)
+
+                self.assertTrue(bound_fields, f"{service}.{logical_path} is not wired from {environment_name}")
+                for field in bound_fields:
+                    matching = [
+                        (role, options[field])
+                        for role, options in role_options.items()
+                        if field in options
+                    ]
+                    self.assertTrue(matching, f"{service}.{logical_path} binds unknown argument {field}")
+                    for role, specification in matching:
+                        self.assertTrue(specification.get("no_log"), f"{role}.{field}")
 
 
 if __name__ == "__main__":

@@ -214,6 +214,23 @@ class SecretDeliveryTests(unittest.TestCase):
             {"INFISICAL_AUTH_SECRET", "INFISICAL_ENCRYPTION_KEY", "INFISICAL_POSTGRES_PASSWORD"},
         )
 
+    def test_sssf_delivers_only_the_selected_provider_key(self) -> None:
+        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        services = {
+            "sssf": SimpleNamespace(enabled=True, configuration={"provider": "openai"}),
+        }
+        requirements = secret_delivery.requirements_for_model(catalog, services)
+        self.assertEqual(
+            {(requirement.path, requirement.environment_name) for requirement in requirements},
+            {("services.sssf.secrets.openai_api_key", "OPENAI_API_KEY")},
+        )
+        environment = secret_delivery.deliver_services_environment(
+            FakeProvider({"services.sssf.secrets.openai_api_key": "synthetic"}),
+            catalog,
+            services,
+        )
+        self.assertEqual(environment, {"OPENAI_API_KEY": "synthetic"})
+
     def test_protected_environment_is_removed_before_service_delivery(self) -> None:
         catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
         inherited = {

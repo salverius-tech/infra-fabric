@@ -77,9 +77,8 @@ def _validate_non_secret_inputs(model: CanonicalSite) -> None:
             if value:
                 raise ProjectionError(f"non-secret projection rejects opaque field: resources.{name}.{field_name}")
     for name, service in model.services.items():
-        for field_name, value in (("configuration", service.configuration), ("overrides", service.overrides)):
-            if value:
-                _assert_non_secret(value, f"services.{name}.{field_name}")
+        if service.configuration:
+            _assert_non_secret(service.configuration, f"services.{name}.configuration")
 
 
 def _address(resource: Any) -> str:
@@ -385,7 +384,6 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
             "endpoints": service.endpoints.model_dump(mode="json", exclude_none=True),
             "release": service.release.model_dump(mode="json", exclude_none=True),
             "configuration": service.configuration,
-            "overrides": service.overrides,
             "catalog": {
                 "inventory_host": capability.inventory.get("host"),
                 "inventory_group": capability.inventory.get("group"),
