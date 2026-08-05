@@ -129,7 +129,7 @@ class StateSnapshotTests(unittest.TestCase):
         source = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
         snapshot_call = "python scripts/state-snapshot.py create"
         apply_command = "apply_command=(tofu -chdir=infra/opentofu apply"
-        self.assertIn("verify_saved_plan\n" + snapshot_call, source)
+        self.assertIn("python scripts/execution-snapshot.py verify --snapshot", source)
         self.assertLess(source.index(snapshot_call), source.index(apply_command))
         self.assertIn("Diagnostic only: mutation was authorized", source)
 

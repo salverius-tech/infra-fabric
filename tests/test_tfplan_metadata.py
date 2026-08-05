@@ -153,6 +153,21 @@ class TfplanMetadataTests(unittest.TestCase):
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
+    def test_changed_site_sops_policy_fails_metadata_verification(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        policy = repo / "values" / "sites" / "dev" / ".sops.yaml"
+        policy.write_text("creation_rules: []\n", encoding="utf-8")
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ):
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            policy.write_text("creation_rules: [changed]\n", encoding="utf-8")
+            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "inputs changed"):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
     def test_missing_canonical_manifest_fails_creation(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         self.add_canonical_projection_set(repo)

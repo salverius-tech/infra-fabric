@@ -62,7 +62,7 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `AGENTS.md` | contributor-current | `781ed9ae603d0d5cf5a65e44d33d34dd9e71041919e9aef1a6ad4d6e2f6eaeed` | 0 |
 | `README.md` | operator-current | `40a0f5a597f70aa6a9aae0e3b8718a4754a92813536777d4e701e1c687a19a97` | 0 |
 | `docs/README.md` | contributor-current | `98e678d36d191d724efa4e60ad00b6b2eb7298205336250f216ac113349e05e3` | 0 |
-| `docs/canonical-architecture.md` | architecture-current | `88eff274934b939b7ba82a961655c714b758d2b7f3bb43d40e23ebb9b9f0fa3f` | 0 |
+| `docs/canonical-architecture.md` | architecture-current | `833dcd4c180326ce9f6f3bc348c9c7a97e6ffc8f0013da6f252a44e95653ae2b` | 0 |
 | `docs/canonical-quick-start.md` | operator-current | `a90d2de2c3b67c730bad478bd9551c1b80ae646b97fbb40a531a639c2e4942e5` | 0 |
 | `docs/canonical-readiness.md` | operator-current | `a9454fce68c757db734713126f35e83bd495031ac4ea93205faa30fa22f94cf0` | 0 |
 | `docs/canonical-service-authoring.md` | contributor-current | `8fb1e5b5ad75385a1ef6bd7c4ed6bd78590a8fbe7c4a8eee95cb9e1014d9e3f7` | 0 |

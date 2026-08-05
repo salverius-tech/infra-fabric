@@ -61,7 +61,9 @@ Direct `tofu plan`, `tofu apply`, and destroy execution are unsupported operator
 
 Supported wrappers serialize operations with a persistent private lock in the selected site directory. This enforces a single-controller/single-writer model only when every operator uses the same shared values filesystem and repository wrappers; it is not a distributed lock and cannot protect direct OpenTofu CLI use.
 
-Immediately before a saved plan is applied, the wrapper re-verifies plan metadata and creates a checksum-bound, mode-`0700` snapshot under `values/sites/<site>/state-backups/` when local state already exists. Snapshot files and manifests are mode `0600`, installation is atomic, and the newest ten snapshots are retained. Verify or restore only while all other controllers are stopped; the restore command acquires the same site lock and refuses to replace existing state without explicit acknowledgement:
+Immediately before a saved plan is applied, the wrapper re-verifies plan metadata and creates a checksum-bound, mode-`0700` snapshot under `values/sites/<site>/state-backups/` when local state already exists. Snapshot files and manifests are mode `0600`, installation is atomic, and the newest ten snapshots are retained. The canonical apply path also creates a read-only execution snapshot containing the reviewed plan and metadata, canonical site model, generated projections, encrypted secret bundle, and exact-site SOPS policy. Storage preparation, provider credential resolution, OpenTofu apply, and Ansible orchestration consume that snapshot rather than mutable live inputs; the newest five execution snapshots are retained as private evidence.
+
+Verify or restore state only while all other controllers are stopped; the restore command acquires the same site lock and refuses to replace existing state without explicit acknowledgement:
 
 ```text
 python3 scripts/state-snapshot.py verify --snapshot values/sites/<site>/state-backups/<snapshot>

@@ -410,7 +410,7 @@
     },
     {
       "path": "docs/canonical-architecture.md",
-      "sha256": "88eff274934b939b7ba82a961655c714b758d2b7f3bb43d40e23ebb9b9f0fa3f",
+      "sha256": "833dcd4c180326ce9f6f3bc348c9c7a97e6ffc8f0013da6f252a44e95653ae2b",
       "authority": "architecture-current",
       "stated_status": null,
       "extracted_item_count": 0

@@ -26,7 +26,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from canonical_values import load_site, model_digest
     from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 DEFAULT_MAX_AGE_HOURS = 24
 INPUT_GLOBS = (
     "infra/opentofu/**/*.tf",
@@ -46,6 +46,7 @@ INPUT_GLOBS = (
 VALUE_INPUTS = (
     "site.yaml",
     "secrets.sops.yaml",
+    ".sops.yaml",
     "terraform.tfvars",
     "dns-records.local.json",
     "ansible/inventory/local.yml",
