@@ -628,11 +628,36 @@
       "notes": "Extracted claim; implementation and acceptance evidence are intentionally not inferred during extraction."
     },
     {
+      "id": "recon-acceptance-c55a0f677e6f71a6",
+      "source": {
+        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+        "section": "Combined Backlog Reconciliation and Audit Remediation Plan",
+        "line": 10,
+        "kind": "acceptance"
+      },
+      "summary": "**Implementation progress (2026-08-05):** Package S2 is source-complete with focused regression evidence. Package S3 is in progress: site-scoped locking, immutable reviewed-input execution, immediate pre-mutation re-verification, and local-state snapshot/restore primitives are implemented; guarded teardown remains outstanding. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses",
+      "domain": "state",
+      "scope": "repository",
+      "disposition": "unreconciled",
+      "evidence_level": "design",
+      "evidence": [],
+      "missing_evidence": [
+        "Source-level reconciliation has not yet assigned a disposition."
+      ],
+      "superseded_by": [],
+      "duplicates": [],
+      "dependencies": [],
+      "priority": "none",
+      "recommended_action": "none",
+      "target_artifact": "",
+      "notes": "Extracted claim; implementation and acceptance evidence are intentionally not inferred during extraction."
+    },
+    {
       "id": "recon-decision-eb3aee6b05b5972f",
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Mission",
-        "line": 20,
+        "line": 22,
         "kind": "decision"
       },
       "summary": "reconcile every outstanding requirement, task, acceptance criterion, deferral, blocker, and open question in the repository's design and implementation documents; and",
@@ -657,7 +682,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Mission",
-        "line": 21,
+        "line": 23,
         "kind": "decision"
       },
       "summary": "remediate every finding in `.hermes/plans/2026-08-04-comprehensive-project-audit.md`, or record an evidence-backed disposition when a finding requires an operator decision, private-site evidence, provider access, or live/recovery validation",
@@ -682,7 +707,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Stop only when",
-        "line": 63,
+        "line": 65,
         "kind": "decision"
       },
       "summary": "a required product/architecture decision cannot safely be inferred;",
@@ -707,7 +732,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Stop only when",
-        "line": 68,
+        "line": 70,
         "kind": "acceptance"
       },
       "summary": "the complete source-level phase exit gate is satisfied",
@@ -732,7 +757,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Durable progress artifacts",
-        "line": 95,
+        "line": 97,
         "kind": "decision"
       },
       "summary": ".hermes/reconciliation/decision-register.md",
@@ -757,7 +782,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 114,
+        "line": 116,
         "kind": "task"
       },
       "summary": "Fetch `origin`, confirm the intended branch, and record divergence",
@@ -782,7 +807,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 115,
+        "line": 117,
         "kind": "task"
       },
       "summary": "Confirm the two 2026-08-04 plans are present; commit them as a documentation-only baseline if still untracked",
@@ -807,7 +832,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 116,
+        "line": 118,
         "kind": "task"
       },
       "summary": "Enumerate every tracked backlog-bearing document, including linked plans/PRDs/reports not listed in `docs/documentation-inventory.json`",
@@ -832,7 +857,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 117,
+        "line": 119,
         "kind": "task"
       },
       "summary": "Generate source hashes and authority/status metadata",
@@ -857,7 +882,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 118,
+        "line": 120,
         "kind": "task"
       },
       "summary": "Implement the ledger schema and validator skeleton",
@@ -882,7 +907,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 119,
+        "line": 121,
         "kind": "task"
       },
       "summary": "Extract all checkboxes, acceptance criteria, definitions of done, explicit remaining/partial/deferred/blocked statements, open questions, and audit findings",
@@ -907,7 +932,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 120,
+        "line": 122,
         "kind": "task"
       },
       "summary": "Add extraction coverage tests",
@@ -932,7 +957,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 121,
+        "line": 123,
         "kind": "task"
       },
       "summary": "Do not assign completion dispositions yet",
@@ -957,7 +982,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 123,
+        "line": 125,
         "kind": "requirement"
       },
       "summary": "Required verification:",
@@ -982,7 +1007,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 0 \u2014 Baseline, branch safety, and reconciliation scaffolding",
-        "line": 136,
+        "line": 138,
         "kind": "acceptance"
       },
       "summary": "Exit gate:",
@@ -1007,7 +1032,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 148,
+        "line": 150,
         "kind": "task"
       },
       "summary": "Deduplicate overlapping PRD, tracker, audit, and operator statements without losing source provenance",
@@ -1032,7 +1057,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 149,
+        "line": 151,
         "kind": "task"
       },
       "summary": "Record supersession chains, especially `site.json` \u2192 `site.yaml`, legacy values \u2192 generated projections, old secret namespaces \u2192 catalog contracts, and temporary onramp ownership",
@@ -1057,7 +1082,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 150,
+        "line": 152,
         "kind": "task"
       },
       "summary": "Classify each document as current authority, operator guidance, active tracker, working design, acceptance evidence, historical reference, or superseded",
@@ -1082,7 +1107,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 151,
+        "line": 153,
         "kind": "task"
       },
       "summary": "Populate the contradiction register",
@@ -1107,7 +1132,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 152,
+        "line": 154,
         "kind": "task"
       },
       "summary": "Populate the decision register for genuinely unresolved product choices",
@@ -1132,7 +1157,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 153,
+        "line": 155,
         "kind": "task"
       },
       "summary": "Mark known source-level defects as `outstanding`, not `unreconciled`",
@@ -1157,7 +1182,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 154,
+        "line": 156,
         "kind": "task"
       },
       "summary": "Mark provider/live/recovery acceptance items `implemented-unverified` or `evidence-required` as appropriate",
@@ -1182,7 +1207,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 155,
+        "line": 157,
         "kind": "task"
       },
       "summary": "Generate the initial canonical backlog and dependency graph",
@@ -1207,7 +1232,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 168,
+        "line": 170,
         "kind": "requirement"
       },
       "summary": "Required verification:",
@@ -1232,7 +1257,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 1 \u2014 Reconcile authority, duplicates, contradictions, and decisions",
-        "line": 182,
+        "line": 184,
         "kind": "acceptance"
       },
       "summary": "Exit gate:",
@@ -1257,7 +1282,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 198,
+        "line": 200,
         "kind": "task"
       },
       "summary": "Emit one canonical enabled service per line",
@@ -1282,7 +1307,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 199,
+        "line": 201,
         "kind": "task"
       },
       "summary": "Derive state-capable targets from catalog/state definitions; remove the shell-maintained allowlist",
@@ -1307,7 +1332,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 200,
+        "line": 202,
         "kind": "task"
       },
       "summary": "Include SSSF",
@@ -1332,7 +1357,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 201,
+        "line": 203,
         "kind": "task"
       },
       "summary": "Consume the verified paired canonical inventory and Ansible vars projection",
@@ -1357,7 +1382,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 202,
+        "line": 204,
         "kind": "task"
       },
       "summary": "Ensure Forgejo PostgreSQL backup cannot silently fall back to SQLite",
@@ -1382,7 +1407,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 203,
+        "line": 205,
         "kind": "task"
       },
       "summary": "Fail restore when managed services fail to restart, after attempting all required cleanup/restarts",
@@ -1407,7 +1432,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 204,
+        "line": 206,
         "kind": "task"
       },
       "summary": "Correct site-context and site-local archive examples",
@@ -1432,7 +1457,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 205,
+        "line": 207,
         "kind": "task"
       },
       "summary": "Add CLI tests for multi-service sites, individual selection, `backup all`, disabled services, SSSF, Forgejo PostgreSQL, and restart failures",
@@ -1457,7 +1482,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R1 \u2014 Canonical service-state recovery correctness",
-        "line": 206,
+        "line": 208,
         "kind": "task"
       },
       "summary": "Add structural coverage proving every catalog state-capable service is reachable or explicitly exempt",
@@ -1482,7 +1507,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R2 \u2014 Fresh-site validation and scaffold correctness",
-        "line": 226,
+        "line": 228,
         "kind": "task"
       },
       "summary": "Add a non-provider canonical render/verify path for fresh sites",
@@ -1507,7 +1532,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R2 \u2014 Fresh-site validation and scaffold correctness",
-        "line": 227,
+        "line": 229,
         "kind": "task"
       },
       "summary": "Make `just validate` succeed before provider planning when canonical inputs are structurally complete",
@@ -1532,7 +1557,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R2 \u2014 Fresh-site validation and scaffold correctness",
-        "line": 228,
+        "line": 230,
         "kind": "task"
       },
       "summary": "Keep generated projections private, complete, atomic, and identity-verified",
@@ -1557,7 +1582,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R2 \u2014 Fresh-site validation and scaffold correctness",
-        "line": 229,
+        "line": 231,
         "kind": "task"
       },
       "summary": "Ensure failed first render removes invalid generated output",
@@ -1582,7 +1607,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R2 \u2014 Fresh-site validation and scaffold correctness",
-        "line": 230,
+        "line": 232,
         "kind": "task"
       },
       "summary": "Change documentation inventory tests to enumerate tracked Markdown only",
@@ -1607,7 +1632,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R2 \u2014 Fresh-site validation and scaffold correctness",
-        "line": 231,
+        "line": 233,
         "kind": "task"
       },
       "summary": "Validate links in the installed scaffold destination",
@@ -1632,7 +1657,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R2 \u2014 Fresh-site validation and scaffold correctness",
-        "line": 232,
+        "line": 234,
         "kind": "task"
       },
       "summary": "Fix scaffold URLs and document host/tool/architecture prerequisites",
@@ -1657,7 +1682,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package R2 \u2014 Fresh-site validation and scaffold correctness",
-        "line": 233,
+        "line": 235,
         "kind": "task"
       },
       "summary": "Add command-level fresh-site setup \u2192 validate tests without provider contact",
@@ -1682,7 +1707,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S1 \u2014 Canonical service and stateful ownership",
-        "line": 263,
+        "line": 265,
         "kind": "task"
       },
       "summary": "Derive stateful address classification from verified canonical `site.yaml` plus catalog",
@@ -1707,7 +1732,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S1 \u2014 Canonical service and stateful ownership",
-        "line": 264,
+        "line": 266,
         "kind": "task"
       },
       "summary": "Classify disable/removal plans for all state-capable services, including non-default services and shared resources",
@@ -1732,7 +1757,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S1 \u2014 Canonical service and stateful ownership",
-        "line": 265,
+        "line": 267,
         "kind": "task"
       },
       "summary": "Remove the Tailscale legacy double gate; canonical selection is authoritative",
@@ -1757,7 +1782,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S1 \u2014 Canonical service and stateful ownership",
-        "line": 266,
+        "line": 268,
         "kind": "task"
       },
       "summary": "Add canonical enabled/disabled tests for every state-capable service and Tailscale runtime type",
@@ -1782,7 +1807,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S1 \u2014 Canonical service and stateful ownership",
-        "line": 267,
+        "line": 269,
         "kind": "task"
       },
       "summary": "Represent retain/destroy acknowledgement at the strongest practical OpenTofu precondition/resource boundary",
@@ -1807,7 +1832,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S1 \u2014 Canonical service and stateful ownership",
-        "line": 268,
+        "line": 270,
         "kind": "task"
       },
       "summary": "Document direct OpenTofu execution as unsupported if wrapper-independent enforcement cannot be complete",
@@ -1832,7 +1857,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 280,
+        "line": 282,
         "kind": "task"
       },
       "summary": "Select and implement one provider namespace and one operator namespace",
@@ -1857,7 +1882,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 281,
+        "line": 283,
         "kind": "task"
       },
       "summary": "Update catalog, canonical model, migration, fixtures, docs, and consumers atomically",
@@ -1882,7 +1907,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 282,
+        "line": 284,
         "kind": "task"
       },
       "summary": "Keep legacy aliases only inside explicit migration/import boundaries and fail on conflicts",
@@ -1907,7 +1932,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 283,
+        "line": 285,
         "kind": "task"
       },
       "summary": "Derive the complete apply-phase required secret set before mutation: provider, SSH identity, operator password, default and host-specific root passwords, selected service requirements",
@@ -1932,7 +1957,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 284,
+        "line": 286,
         "kind": "task"
       },
       "summary": "Resolve site-local `.sops.yaml` by default and fail closed under `--require-secrets` when exact recipient policy cannot be established",
@@ -1957,7 +1982,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 285,
+        "line": 287,
         "kind": "task"
       },
       "summary": "Separate bootstrap/host-identity secret environments from ordinary service subprocess environments",
@@ -1982,7 +2007,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 286,
+        "line": 288,
         "kind": "task"
       },
       "summary": "Mark every sensitive Ansible argument spec `no_log` and test catalog-to-spec parity",
@@ -2007,7 +2032,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 287,
+        "line": 289,
         "kind": "task"
       },
       "summary": "Replace arbitrary secret-risk override shapes with typed/catalog-declared allowlists where source ownership is known; retain key scanning only as defense in depth",
@@ -2032,7 +2057,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S2 \u2014 Unified secret contract and preflight",
-        "line": 288,
+        "line": 290,
         "kind": "task"
       },
       "summary": "Add negative tests proving unauthorized consumers never receive provider/root/operator secrets",
@@ -2057,7 +2082,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 306,
+        "line": 308,
         "kind": "task"
       },
       "summary": "Implement a metadata-bound destroy planner/apply helper using plan hash, age, site, model/projection digest, Git commit, scope, input hashes, destructive summary, and explicit approval",
@@ -2082,7 +2107,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 307,
+        "line": 309,
         "kind": "task"
       },
       "summary": "Remove raw destroy/apply commands from operator documentation",
@@ -2107,7 +2132,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 308,
+        "line": 310,
         "kind": "task"
       },
       "summary": "Hold a site-scoped lock from pre-apply verification through storage preparation, OpenTofu apply, and Ansible orchestration",
@@ -2132,7 +2157,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 309,
+        "line": 311,
         "kind": "task"
       },
       "summary": "Consume an immutable private execution snapshot of plan, metadata, projections, and protected-input identity",
@@ -2157,7 +2182,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 310,
+        "line": 312,
         "kind": "task"
       },
       "summary": "Make post-apply verification diagnostic rather than the first drift detection",
@@ -2182,7 +2207,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 311,
+        "line": 313,
         "kind": "task"
       },
       "summary": "Implement source-level local-state backup primitives: restrictive permissions, checksum, atomic snapshot, retention, and tested restore validation against disposable fixtures",
@@ -2207,7 +2232,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 312,
+        "line": 314,
         "kind": "task"
       },
       "summary": "Do not choose a remote backend without an approved decision",
@@ -2232,7 +2257,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 313,
+        "line": 315,
         "kind": "task"
       },
       "summary": "Document/enforce single-controller operation until distributed locking is approved",
@@ -2257,7 +2282,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package S3 \u2014 Plan/apply/teardown integrity and state protection",
-        "line": 314,
+        "line": 316,
         "kind": "task"
       },
       "summary": "Add race/change tests around verification and use boundaries",
@@ -2282,7 +2307,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O1 \u2014 Hermes Control readiness and role contracts",
-        "line": 344,
+        "line": 346,
         "kind": "task"
       },
       "summary": "Correct the HTTPS diagnostics authorization header",
@@ -2307,7 +2332,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O1 \u2014 Hermes Control readiness and role contracts",
-        "line": 345,
+        "line": 347,
         "kind": "task"
       },
       "summary": "Add a non-secret structural/render test proving variable use without exposing token contents",
@@ -2332,7 +2357,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O1 \u2014 Hermes Control readiness and role contracts",
-        "line": 346,
+        "line": 348,
         "kind": "task"
       },
       "summary": "Add `argument_specs` for Hermes Control and reconcile parent-role inputs",
@@ -2357,7 +2382,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O1 \u2014 Hermes Control readiness and role contracts",
-        "line": 347,
+        "line": 349,
         "kind": "task"
       },
       "summary": "Reconcile all Hermes Control tracker items against current source; implement outstanding source-level tasks that do not require live deployment",
@@ -2382,7 +2407,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O1 \u2014 Hermes Control readiness and role contracts",
-        "line": 348,
+        "line": 350,
         "kind": "task"
       },
       "summary": "Keep live guest and service acceptance explicitly unverified",
@@ -2407,7 +2432,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O2 \u2014 Host-aware Ansible scheduling",
-        "line": 360,
+        "line": 362,
         "kind": "task"
       },
       "summary": "Add a canonical execution-resource key using resource ID/inventory host",
@@ -2432,7 +2457,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O2 \u2014 Host-aware Ansible scheduling",
-        "line": 361,
+        "line": 363,
         "kind": "task"
       },
       "summary": "Serialize services sharing the same execution resource while retaining parallelism across distinct hosts",
@@ -2457,7 +2482,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O2 \u2014 Host-aware Ansible scheduling",
-        "line": 362,
+        "line": 364,
         "kind": "task"
       },
       "summary": "Test onramp applications, independent guests, failures, and dependency ordering",
@@ -2482,7 +2507,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O2 \u2014 Host-aware Ansible scheduling",
-        "line": 363,
+        "line": 365,
         "kind": "task"
       },
       "summary": "Remove, guard, or clearly quarantine `site.yml` so it cannot act as a competing orchestration authority",
@@ -2507,7 +2532,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O3 \u2014 Immutable runtime and image supply chain",
-        "line": 375,
+        "line": 377,
         "kind": "task"
       },
       "summary": "Require checksum fields whenever the generic VM module downloads an image",
@@ -2532,7 +2557,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O3 \u2014 Immutable runtime and image supply chain",
-        "line": 376,
+        "line": 378,
         "kind": "task"
       },
       "summary": "Prefer verified top-level image acquisition and pass immutable file IDs to modules",
@@ -2557,7 +2582,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O3 \u2014 Immutable runtime and image supply chain",
-        "line": 377,
+        "line": 379,
         "kind": "task"
       },
       "summary": "Ensure Forgejo VM creation always verifies image content",
@@ -2582,7 +2607,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O3 \u2014 Immutable runtime and image supply chain",
-        "line": 378,
+        "line": 380,
         "kind": "task"
       },
       "summary": "Pin Infisical PostgreSQL and Redis images by digest in both deployment modes",
@@ -2607,7 +2632,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O3 \u2014 Immutable runtime and image supply chain",
-        "line": 379,
+        "line": 381,
         "kind": "task"
       },
       "summary": "Replace Tailscale/uv/Pi/Bun network installers with signed repositories or immutable checksum-pinned artifacts",
@@ -2632,7 +2657,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O3 \u2014 Immutable runtime and image supply chain",
-        "line": 380,
+        "line": 382,
         "kind": "task"
       },
       "summary": "Report changes accurately",
@@ -2657,7 +2682,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O3 \u2014 Immutable runtime and image supply chain",
-        "line": 381,
+        "line": 383,
         "kind": "task"
       },
       "summary": "Add an integrity contract test covering every production image and network installer",
@@ -2682,7 +2707,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package O3 \u2014 Immutable runtime and image supply chain",
-        "line": 382,
+        "line": 384,
         "kind": "task"
       },
       "summary": "Add managed update paths for newly pinned artifacts",
@@ -2707,7 +2732,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 407,
+        "line": 409,
         "kind": "task"
       },
       "summary": "Re-enable `no-changed-when`; add narrow task-level exceptions",
@@ -2732,7 +2757,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 408,
+        "line": 410,
         "kind": "task"
       },
       "summary": "Replace imperative command paths with modules where practical",
@@ -2757,7 +2782,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 409,
+        "line": 411,
         "kind": "task"
       },
       "summary": "Correct false `changed_when` reporting",
@@ -2782,7 +2807,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 410,
+        "line": 412,
         "kind": "task"
       },
       "summary": "Use stable host-specific password hashes/salts and test second-run behavior",
@@ -2807,7 +2832,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 411,
+        "line": 413,
         "kind": "task"
       },
       "summary": "Establish tags: `validation`, `packages`, `config`, `service`, `health`, `backup`, `restore`",
@@ -2832,7 +2857,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 412,
+        "line": 414,
         "kind": "task"
       },
       "summary": "Add safe check-mode behavior or explicit skip reasons",
@@ -2857,7 +2882,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 413,
+        "line": 415,
         "kind": "task"
       },
       "summary": "Fix the static checker to understand `args.creates/removes`",
@@ -2882,7 +2907,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 414,
+        "line": 416,
         "kind": "task"
       },
       "summary": "Add complete argument specs/default/spec/projection parity tests",
@@ -2907,7 +2932,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q1 \u2014 Ansible idempotence, credentials, tags, and check mode",
-        "line": 415,
+        "line": 417,
         "kind": "task"
       },
       "summary": "Document broad provisioning sudo as an intentional trust boundary or narrow it if safely supported",
@@ -2932,7 +2957,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q2 \u2014 OpenTofu module and canonical projection contracts",
-        "line": 425,
+        "line": 427,
         "kind": "requirement"
       },
       "summary": "Audit coverage: **M6, M7, L7**, outstanding W1/W3/W5 items",
@@ -2957,7 +2982,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q2 \u2014 OpenTofu module and canonical projection contracts",
-        "line": 427,
+        "line": 429,
         "kind": "task"
       },
       "summary": "Add reusable module validation for VMID, CPU, memory, disk, address/gateway, MAC, VLAN, mount paths, and unique disk interfaces",
@@ -2982,7 +3007,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q2 \u2014 OpenTofu module and canonical projection contracts",
-        "line": 428,
+        "line": 430,
         "kind": "task"
       },
       "summary": "Add projection completeness checks for conditionally required root variables",
@@ -3007,7 +3032,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q2 \u2014 OpenTofu module and canonical projection contracts",
-        "line": 429,
+        "line": 431,
         "kind": "task"
       },
       "summary": "Align the provider compatibility constraint to the reviewed pre-1.0 series",
@@ -3032,7 +3057,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q2 \u2014 OpenTofu module and canonical projection contracts",
-        "line": 430,
+        "line": 432,
         "kind": "task"
       },
       "summary": "Update stale HCL descriptions that direct edits to generated/legacy files",
@@ -3057,7 +3082,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q2 \u2014 OpenTofu module and canonical projection contracts",
-        "line": 431,
+        "line": 433,
         "kind": "task"
       },
       "summary": "Reduce compatibility aliases through typed resource/service objects without changing resource addresses",
@@ -3082,7 +3107,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q2 \u2014 OpenTofu module and canonical projection contracts",
-        "line": 432,
+        "line": 434,
         "kind": "task"
       },
       "summary": "Preserve moved blocks and add state-address contract tests",
@@ -3107,7 +3132,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q2 \u2014 OpenTofu module and canonical projection contracts",
-        "line": 433,
+        "line": 435,
         "kind": "task"
       },
       "summary": "Reconcile all mapping-matrix claims against live producers and consumers; do not mark provider/live equivalence complete",
@@ -3132,7 +3157,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q3 \u2014 Update workflow parity",
-        "line": 445,
+        "line": 447,
         "kind": "task"
       },
       "summary": "Process repository-owned tool pins regardless of canonical site mode",
@@ -3157,7 +3182,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q3 \u2014 Update workflow parity",
-        "line": 446,
+        "line": 448,
         "kind": "task"
       },
       "summary": "Derive service release/update status from the catalog",
@@ -3182,7 +3207,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q3 \u2014 Update workflow parity",
-        "line": 447,
+        "line": 449,
         "kind": "task"
       },
       "summary": "Remove stale Technitium output",
@@ -3207,7 +3232,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q3 \u2014 Update workflow parity",
-        "line": 448,
+        "line": 450,
         "kind": "task"
       },
       "summary": "Add end-to-end update dry-run/output tests",
@@ -3232,7 +3257,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Package Q3 \u2014 Update workflow parity",
-        "line": 449,
+        "line": 451,
         "kind": "task"
       },
       "summary": "Ensure newly immutable runtime dependencies participate in managed update policy",
@@ -3257,7 +3282,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 473,
+        "line": 475,
         "kind": "task"
       },
       "summary": "Expand documentation classifications to current authority, operator guidance, working design, implementation tracker, acceptance evidence, historical reference, and superseded",
@@ -3282,7 +3307,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 474,
+        "line": 476,
         "kind": "task"
       },
       "summary": "Update status headers and checkboxes from the ledger only after evidence exists",
@@ -3307,7 +3332,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 475,
+        "line": 477,
         "kind": "task"
       },
       "summary": "Separate implemented source from provider/live/recovery evidence",
@@ -3332,7 +3357,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 476,
+        "line": 478,
         "kind": "task"
       },
       "summary": "Add one service operations page or generated matrix entry for every first-class service: health, logs, credentials, update/rollback, backup, restore verification, and failure recovery",
@@ -3357,7 +3382,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 477,
+        "line": 479,
         "kind": "task"
       },
       "summary": "Add executable migration/recovery instructions and explicit compatibility boundaries",
@@ -3382,7 +3407,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 478,
+        "line": 480,
         "kind": "task"
       },
       "summary": "Add anchor and command-snippet validation",
@@ -3407,7 +3432,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 479,
+        "line": 481,
         "kind": "task"
       },
       "summary": "Add a diagnostic validation mode or named stage summary while retaining fail-fast CI behavior",
@@ -3432,7 +3457,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 480,
+        "line": 482,
         "kind": "task"
       },
       "summary": "Clarify supported entry points and prohibit direct `site.yml`/raw OpenTofu lifecycle use",
@@ -3457,7 +3482,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 481,
+        "line": 483,
         "kind": "task"
       },
       "summary": "Reclassify stale design documents and link successors without deleting useful history",
@@ -3482,7 +3507,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 482,
+        "line": 484,
         "kind": "task"
       },
       "summary": "Reconcile Hermes operator PRD open questions and retain unresolved decisions in the decision register",
@@ -3507,7 +3532,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 6 \u2014 Documentation authority and day-two operations",
-        "line": 490,
+        "line": 492,
         "kind": "acceptance"
       },
       "summary": "Exit gate:",
@@ -3532,7 +3557,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 505,
+        "line": 507,
         "kind": "task"
       },
       "summary": "Pin the tooling base image by digest",
@@ -3557,7 +3582,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 506,
+        "line": 508,
         "kind": "task"
       },
       "summary": "Generate a hash-locked Python requirements input and install with hash verification",
@@ -3582,7 +3607,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 507,
+        "line": 509,
         "kind": "task"
       },
       "summary": "Define apt reproducibility policy or dated snapshot strategy",
@@ -3607,7 +3632,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 508,
+        "line": 510,
         "kind": "task"
       },
       "summary": "Support `TARGETARCH` with per-architecture checksums or explicitly enforce/document amd64",
@@ -3632,7 +3657,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 509,
+        "line": 511,
         "kind": "task"
       },
       "summary": "Add SBOM generation and dependency/container advisory scanning with a severity/exception policy",
@@ -3657,7 +3682,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 510,
+        "line": 512,
         "kind": "task"
       },
       "summary": "Enforce Python format and lint; add typing where practical",
@@ -3682,7 +3707,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 511,
+        "line": 513,
         "kind": "task"
       },
       "summary": "Generate coverage and establish an observed, ratcheted threshold",
@@ -3707,7 +3732,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 512,
+        "line": 514,
         "kind": "task"
       },
       "summary": "Direct bytecode/cache output outside the source tree",
@@ -3732,7 +3757,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 513,
+        "line": 515,
         "kind": "task"
       },
       "summary": "Restrict ownership repair to known public paths; never recurse through private values",
@@ -3757,7 +3782,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 514,
+        "line": 516,
         "kind": "task"
       },
       "summary": "Replace critical source-text tests with parsed/rendered/behavioral contracts while retaining useful policy sentinels",
@@ -3782,7 +3807,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 515,
+        "line": 517,
         "kind": "task"
       },
       "summary": "Add scheduled/manual read-only verification for dependency and build freshness",
@@ -3807,7 +3832,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 7 \u2014 Tooling, CI, and quality gates",
-        "line": 516,
+        "line": 518,
         "kind": "task"
       },
       "summary": "Print validation stage boundaries and an end summary",
@@ -3832,7 +3857,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 539,
+        "line": 541,
         "kind": "task"
       },
       "summary": "Re-run reconciliation extraction against the final source tree",
@@ -3857,7 +3882,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 540,
+        "line": 542,
         "kind": "task"
       },
       "summary": "Ensure every source item and audit finding has a final disposition",
@@ -3882,7 +3907,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 541,
+        "line": 543,
         "kind": "task"
       },
       "summary": "Regenerate the canonical backlog and dependency graph",
@@ -3907,7 +3932,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 542,
+        "line": 544,
         "kind": "task"
       },
       "summary": "Update active trackers and documentation statuses from evidence",
@@ -3932,7 +3957,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 543,
+        "line": 545,
         "kind": "task"
       },
       "summary": "Mark provider/live/recovery tasks explicitly outstanding where not executed",
@@ -3957,7 +3982,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 544,
+        "line": 546,
         "kind": "task"
       },
       "summary": "Run all reconciliation validators and documentation contracts",
@@ -3982,7 +4007,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 545,
+        "line": 547,
         "kind": "task"
       },
       "summary": "Run `scripts/validate-public.sh` in a fresh detached worktree",
@@ -4007,7 +4032,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 546,
+        "line": 548,
         "kind": "task"
       },
       "summary": "Run public-safety checks and secret-pattern scans",
@@ -4032,7 +4057,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 547,
+        "line": 549,
         "kind": "task"
       },
       "summary": "Run `git diff --check` and inspect commit history for coherent packages",
@@ -4057,7 +4082,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 548,
+        "line": 550,
         "kind": "task"
       },
       "summary": "Push the completed source-level branch",
@@ -4082,7 +4107,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Phase 8 \u2014 Tracker closure and source-level acceptance",
-        "line": 560,
+        "line": 562,
         "kind": "acceptance"
       },
       "summary": "Exit gate:",
@@ -4107,7 +4132,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 620,
+        "line": 622,
         "kind": "requirement"
       },
       "summary": "## Final definition of done",
@@ -4132,7 +4157,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 624,
+        "line": 626,
         "kind": "task"
       },
       "summary": "All backlog-bearing sources are registered and hashed",
@@ -4157,7 +4182,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 625,
+        "line": 627,
         "kind": "task"
       },
       "summary": "Every extracted item has a stable ledger record",
@@ -4182,7 +4207,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 626,
+        "line": 628,
         "kind": "task"
       },
       "summary": "Every audit finding has a package and disposition",
@@ -4207,7 +4232,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 627,
+        "line": 629,
         "kind": "task"
       },
       "summary": "No unresolved duplicate, supersession, contradiction, or dependency remains",
@@ -4232,7 +4257,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 628,
+        "line": 630,
         "kind": "task"
       },
       "summary": "All authorized source-level packages are implemented and verified",
@@ -4257,7 +4282,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 629,
+        "line": 631,
         "kind": "task"
       },
       "summary": "All tracked documentation has an accurate authority classification",
@@ -4282,7 +4307,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 630,
+        "line": 632,
         "kind": "task"
       },
       "summary": "The canonical backlog is generated and validated",
@@ -4307,7 +4332,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 631,
+        "line": 633,
         "kind": "task"
       },
       "summary": "Public safety passes",
@@ -4332,7 +4357,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 632,
+        "line": 634,
         "kind": "task"
       },
       "summary": "A clean detached worktree passes the full public suite",
@@ -4357,7 +4382,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 633,
+        "line": 635,
         "kind": "task"
       },
       "summary": "No private values, plans, state, credentials, identities, or live endpoints were accessed or emitted",
@@ -4382,7 +4407,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 634,
+        "line": 636,
         "kind": "task"
       },
       "summary": "Provider/live/recovery evidence is clearly separated and remains open unless separately approved",
@@ -4407,7 +4432,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "section": "Final definition of done",
-        "line": 635,
+        "line": 637,
         "kind": "task"
       },
       "summary": "All completed work is committed and pushed, with a clean worktree and matching upstream revision",

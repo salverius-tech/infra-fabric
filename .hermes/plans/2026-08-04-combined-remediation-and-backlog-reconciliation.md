@@ -7,6 +7,8 @@
 **Starting commit:** `f5b4b48192f3ff36771f3c8e14528e6bcd904407`
 **Recommended execution model:** `gpt-5.6-terra`
 
+**Implementation progress (2026-08-05):** Package S2 is source-complete with focused regression evidence. Package S3 is in progress: site-scoped locking, immutable reviewed-input execution, immediate pre-mutation re-verification, and local-state snapshot/restore primitives are implemented; guarded teardown remains outstanding. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses.
+
 ## Model recommendation
 
 Use **`gpt-5.6-terra`** as the primary execution model. This effort is dominated by repository-scale implementation, shell/Python/Ansible/OpenTofu changes, test repair, evidence tracking, and many cohesive commits. Terra is the better fit for sustained tool-driven engineering execution. This recommendation is based on task fit rather than a repository-specific benchmark of Terra versus Luna.
@@ -277,15 +279,15 @@ fix: align resource safety with canonical service authority
 
 Audit coverage: **H7, H10, M10, M11, M13, M16**.
 
-- [ ] Select and implement one provider namespace and one operator namespace.
-- [ ] Update catalog, canonical model, migration, fixtures, docs, and consumers atomically.
-- [ ] Keep legacy aliases only inside explicit migration/import boundaries and fail on conflicts.
-- [ ] Derive the complete apply-phase required secret set before mutation: provider, SSH identity, operator password, default and host-specific root passwords, selected service requirements.
-- [ ] Resolve site-local `.sops.yaml` by default and fail closed under `--require-secrets` when exact recipient policy cannot be established.
-- [ ] Separate bootstrap/host-identity secret environments from ordinary service subprocess environments.
-- [ ] Mark every sensitive Ansible argument spec `no_log` and test catalog-to-spec parity.
-- [ ] Replace arbitrary secret-risk override shapes with typed/catalog-declared allowlists where source ownership is known; retain key scanning only as defense in depth.
-- [ ] Add negative tests proving unauthorized consumers never receive provider/root/operator secrets.
+- [x] Select and implement one provider namespace and one operator namespace.
+- [x] Update catalog, canonical model, migration, fixtures, docs, and consumers atomically.
+- [x] Keep legacy aliases only inside explicit migration/import boundaries and fail on conflicts.
+- [x] Derive the complete apply-phase required secret set before mutation: provider, SSH identity, operator password, default and host-specific root passwords, selected service requirements.
+- [x] Resolve site-local `.sops.yaml` by default and fail closed under `--require-secrets` when exact recipient policy cannot be established.
+- [x] Separate bootstrap/host-identity secret environments from ordinary service subprocess environments.
+- [x] Mark every sensitive Ansible argument spec `no_log` and test catalog-to-spec parity.
+- [x] Replace arbitrary secret-risk override shapes with typed/catalog-declared allowlists where source ownership is known; retain key scanning only as defense in depth.
+- [x] Add negative tests proving unauthorized consumers never receive provider/root/operator secrets.
 
 Safety constraints:
 
@@ -305,13 +307,13 @@ Audit coverage: **H8, H12, M3**, parts of **M15**.
 
 - [ ] Implement a metadata-bound destroy planner/apply helper using plan hash, age, site, model/projection digest, Git commit, scope, input hashes, destructive summary, and explicit approval.
 - [ ] Remove raw destroy/apply commands from operator documentation.
-- [ ] Hold a site-scoped lock from pre-apply verification through storage preparation, OpenTofu apply, and Ansible orchestration.
-- [ ] Consume an immutable private execution snapshot of plan, metadata, projections, and protected-input identity.
-- [ ] Make post-apply verification diagnostic rather than the first drift detection.
-- [ ] Implement source-level local-state backup primitives: restrictive permissions, checksum, atomic snapshot, retention, and tested restore validation against disposable fixtures.
+- [x] Hold a site-scoped lock from pre-apply verification through storage preparation, OpenTofu apply, and Ansible orchestration.
+- [x] Consume an immutable private execution snapshot of plan, metadata, projections, and protected-input identity.
+- [x] Make post-apply verification diagnostic rather than the first drift detection.
+- [x] Implement source-level local-state backup primitives: restrictive permissions, checksum, atomic snapshot, retention, and tested restore validation against disposable fixtures.
 - [ ] Do not choose a remote backend without an approved decision.
-- [ ] Document/enforce single-controller operation until distributed locking is approved.
-- [ ] Add race/change tests around verification and use boundaries.
+- [x] Document/enforce single-controller operation until distributed locking is approved.
+- [x] Add race/change tests around verification and use boundaries.
 
 Safety constraints:
 

@@ -32,10 +32,10 @@
     },
     {
       "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-      "sha256": "e0bd743db93256f26b2a639bc6630e4abb2ea1616bb3bdab6dd0e825d71e53b1",
+      "sha256": "4bec87b4b743a8885b95ece22b7a06a9a0e771e023a6b5607470c3b79e6db5ce",
       "authority": "active-implementation-tracker",
       "stated_status": "Approved for source-level execution; infrastructure mutation remains prohibited without separate explicit approval",
-      "extracted_item_count": 152
+      "extracted_item_count": 153
     },
     {
       "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",

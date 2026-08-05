@@ -8,7 +8,7 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `.hermes/plans/2026-08-03_071330-canonical-cutover-audit.md` | historical-report | `ab78c40b2f039ae9edfa207f08905f0392837fb318a6cd354dc95b921550a09d` | 4 |
 | `.hermes/plans/2026-08-03_135649-canonical-first-documentation-and-authoring.md` | active-implementation-tracker | `14befd4041dcddd0b651ab3b7774e01d6d8a037339fecec475f3f39f3fdb89e5` | 8 |
 | `.hermes/plans/2026-08-03_174531-super-simple-software-factory-vm.md` | active-implementation-tracker | `71ebb21b4ed5ef2ceb9189ee5af48eb4dae5fe3bc0c7595ac0bfd1f4d8e70c0c` | 0 |
-| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | active-implementation-tracker | `e0bd743db93256f26b2a639bc6630e4abb2ea1616bb3bdab6dd0e825d71e53b1` | 152 |
+| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | active-implementation-tracker | `4bec87b4b743a8885b95ece22b7a06a9a0e771e023a6b5607470c3b79e6db5ce` | 153 |
 | `.hermes/plans/2026-08-04-comprehensive-project-audit.md` | historical-report | `d95f2616909de0fc044c381a037c39d251789849231ae97d11bbc0823fabab52` | 41 |
 | `.hermes/plans/2026-08-04-design-to-implementation-backlog-reconciliation.md` | active-implementation-tracker | `95a69404dc9cb2d291b42e871562edcbe8f5d533430445e185c264dcb3d9c47e` | 31 |
 | `.hermes/plans/canonical-values-model-implementation.md` | active-implementation-tracker | `84dd88cf4609203e1d651d1883901fd8c35ae283102e8f0c4fe6dfa67d4af553` | 273 |
