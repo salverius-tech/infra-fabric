@@ -84,7 +84,7 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `docs/onramp-app-platform-contract.md` | operator-current | `ac3ea674420b8d26861026be7e9ac67845b42e633d0637173fd1b40a01acf772` | 0 |
 | `docs/onramp-host-runbook.md` | operator-current | `0c440c7c4fd9983d27afeb5b6f82333e741c7d49d6a0e97e58efc3e852a1b92e` | 0 |
 | `docs/onramp-searxng-handoff.md` | operator-current | `7b548efd4786d503d1cb65411fffc87999de3cf2d883f7876957a9309dadde0a` | 0 |
-| `docs/service-catalog.md` | architecture-current | `cc0f7558c8c70528fa78fa55be37bfaa8a586c12c296f7765c68f414dbd33b47` | 0 |
+| `docs/service-catalog.md` | architecture-current | `8a4a0a2c2694543165d4d095d9860726b8320ebd7f59f7d5fb455b1c467e0ad4` | 0 |
 | `docs/service-state-backup.md` | operator-current | `2475fd5cb6913e3ee4b13c3c57f6d36db3f223933ca7c427fb978d70f89ba36a` | 0 |
 | `docs/service-update-policy.md` | operator-current | `6e6a82416e48f69f1f57ea46734ce38fa3d87315398ea7c05410018a443dfc0f` | 0 |
 | `docs/sssf.md` | operator-current | `50dd0b720ed09703932c6ced2d1ad2e80005fda1f597bb0545017ab78d02a464` | 0 |

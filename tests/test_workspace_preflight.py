@@ -135,7 +135,18 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        scaffold = (source_root / "scaffold" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8")
+        (site / "site.yaml").write_text(
+            scaffold.replace(
+                "bootstrap:\n  ssh:\n",
+                "bootstrap:\n"
+                "  root_password:\n"
+                "    host_overrides:\n"
+                "      forgejo: secrets.bootstrap.hosts.forgejo.root_password\n"
+                "  ssh:\n",
+            ),
+            encoding="utf-8",
+        )
         shutil.copy2(source_root / "infra" / "services.json", root / "infra" / "services.json")
         (site / "secrets.sops.yaml").write_text("encrypted-metadata-only\n", encoding="utf-8")
         policy = site / ".sops.yaml"
@@ -158,8 +169,11 @@ class WorkspacePreflightTests(unittest.TestCase):
         required = provider.validate_required.call_args.args[0]
         self.assertIn("secrets.bootstrap.ssh_private_key", required)
         self.assertIn("secrets.providers.proxmox.api_token", required)
+        self.assertIn("secrets.providers.cloudflare.api_token", required)
         self.assertIn("secrets.operator.password", required)
         self.assertIn("secrets.bootstrap.root_password", required)
+        self.assertIn("secrets.bootstrap.hosts.forgejo.root_password", required)
+        self.assertIn("services.forgejo.secrets.secret_key", required)
 
     def test_canonical_secret_check_passes_private_policy_inputs_without_exposing_recipients(self) -> None:
         temp, root = self.make_repo()
