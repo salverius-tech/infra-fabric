@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
 
 permissions:
   contents: read
@@ -17,3 +20,28 @@ jobs:
         run: docker compose build infra
       - name: Validate public runbook
         run: scripts/validate-public.sh
+
+  supply-chain-evidence:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Build pinned tooling image
+        run: docker build -f tools/Dockerfile -t infra-fabric-tools:ci .
+      - name: Generate tooling image SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: infra-fabric-tools:ci
+          format: spdx-json
+          output-file: tooling.spdx.json
+          artifact-name: tooling-image-sbom
+          upload-artifact: true
+      - name: Scan tooling image for high-severity vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: infra-fabric-tools:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: table
