@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "scope": "Tracked public production deployment source and the setup-time values checkout: OpenTofu image authorities, Ansible remote artifact/source/container consumers, the tooling-image build, and the operator-selected private values Git clone. Health probes, documentation, test fixtures, and update metadata lookups are not installer consumers.",
+  "consumers": [
+    {
+      "source": "infra/ansible/roles/caddy_proxy/tasks/main.yml",
+      "consumer": "Caddy DNS-module build",
+      "acquisitions": [
+        {"name": "Go archive and xcaddy/module resolution", "contract": "unresolved", "evidence": "curl downloads Go then go install/build resolves xcaddy and cloudflare module", "disposition": "Unresolved: version pins exist but no archive/module checksums or reviewed artifact cache."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/forgejo/tasks/caddy.yml",
+      "consumer": "Forgejo-local Caddy DNS-module build",
+      "acquisitions": [
+        {"name": "Go archive and xcaddy/module resolution", "contract": "unresolved", "evidence": "curl downloads Go then go install/build resolves xcaddy and cloudflare module", "disposition": "Unresolved: duplicate direct network build has version pins only."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/forgejo_runner/tasks/main.yml",
+      "consumer": "Forgejo Actions runner bootstrap",
+      "acquisitions": [
+        {"name": "Debian packages", "contract": "distro-package-policy", "evidence": "apt-get installs named Debian packages", "disposition": "Covered by the configured Debian signed repository policy; package versions are not artifact-pinned."},
+        {"name": "Docker Compose CLI plugin", "contract": "unresolved", "evidence": "versioned GitHub release curl download", "disposition": "Unresolved: version is selected but the downloaded binary has no checksum/signature verification."},
+        {"name": "just command runner", "contract": "unresolved", "evidence": "versioned GitHub release curl archive", "disposition": "Unresolved: version is selected but the archive has no checksum/signature verification."},
+        {"name": "Forgejo runner binary", "contract": "unresolved", "evidence": "versioned Forgejo release curl download", "disposition": "Unresolved: version is selected but the binary has no checksum/signature verification."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/hermes/tasks/main.yml",
+      "consumer": "Hermes guest runtime bootstrap",
+      "acquisitions": [
+        {"name": "Debian packages", "contract": "distro-package-policy", "evidence": "apt-get installs named Debian packages", "disposition": "Covered by the configured Debian signed repository policy; package versions are not artifact-pinned."},
+        {"name": "Docker Compose CLI plugin and just", "contract": "unresolved", "evidence": "versioned GitHub release curl downloads", "disposition": "Unresolved: version pins have no checksum/signature verification."},
+        {"name": "Caddy DNS-module build", "contract": "unresolved", "evidence": "curl Go archive and go install/build", "disposition": "Unresolved: no archive/module checksums or reviewed artifact cache."},
+        {"name": "managed Node.js", "contract": "checksum", "evidence": "canonical amd64/arm64 SHA-256 is verified with sha256sum before extraction", "disposition": "Source-verified checksum contract."},
+        {"name": "legacy Hermes installer and pnpm", "contract": "unresolved", "evidence": "explicit legacy-only install.sh pipe-to-bash and npm tarball curl path", "disposition": "Unresolved: legacy opt-in path remains a remote installer and pnpm download lacks checksum verification."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/hermes_control/tasks/main.yml",
+      "consumer": "Hermes Control source checkout",
+      "acquisitions": [
+        {"name": "Hermes Control Git source", "contract": "immutable-commit", "evidence": "argument assertion requires 40-hex ref; git checkout is verified with rev-parse HEAD", "disposition": "Source-verified immutable commit contract."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/host_identity/tasks/main.yml",
+      "consumer": "operator identity tooling and dotfiles",
+      "acquisitions": [
+        {"name": "chezmoi archive", "contract": "checksum", "evidence": "get_url uses canonical SHA-256 checksum", "disposition": "Source-verified checksum contract."},
+        {"name": "operator dotfiles", "contract": "immutable-commit", "evidence": "Ansible git uses canonical reviewed revision", "disposition": "Source-verified reviewed-revision contract; Git transport/signature policy is not asserted here."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/infisical/tasks/main.yml",
+      "consumer": "Infisical guest bootstrap",
+      "acquisitions": [
+        {"name": "Debian packages", "contract": "distro-package-policy", "evidence": "apt-get installs named Debian packages", "disposition": "Covered by the configured Debian signed repository policy; package versions are not artifact-pinned."},
+        {"name": "Docker Compose CLI plugin", "contract": "unresolved", "evidence": "versioned GitHub release curl download", "disposition": "Unresolved: no checksum/signature verification."},
+        {"name": "Caddy DNS-module build", "contract": "unresolved", "evidence": "curl Go archive and go install/build", "disposition": "Unresolved: no archive/module checksums or reviewed artifact cache."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/infisical/templates/docker-compose.yml.j2",
+      "consumer": "Infisical standalone Compose images",
+      "acquisitions": [
+        {"name": "PostgreSQL, Redis, and Infisical images", "contract": "immutable-digest", "evidence": "all rendered image references include a sha256 digest", "disposition": "Source-verified digest contract."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/infisical_onramp/templates/docker-compose.yml.j2",
+      "consumer": "Infisical onramp Compose images",
+      "acquisitions": [
+        {"name": "PostgreSQL and Redis images", "contract": "immutable-digest", "evidence": "literal image references include sha256 digests", "disposition": "Source-verified digest contract."},
+        {"name": "Infisical application image", "contract": "canonical-digest-contract", "evidence": "template forwards infisical_onramp_version; canonical release validation requires a repository@sha256 digest", "disposition": "Source-verified through the canonical model/projection contract, not a template literal."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/onramp_host/tasks/main.yml",
+      "consumer": "onramp host Caddy DNS-module build",
+      "acquisitions": [
+        {"name": "Go archive and xcaddy/module resolution", "contract": "unresolved", "evidence": "curl downloads Go then go install/build resolves xcaddy and cloudflare module", "disposition": "Unresolved: version pins exist but no archive/module checksums or reviewed artifact cache."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/searxng_onramp/templates/docker-compose.yml.j2",
+      "consumer": "SearXNG onramp Compose image",
+      "acquisitions": [
+        {"name": "SearXNG image", "contract": "canonical-digest-contract", "evidence": "template forwards searxng_onramp_container_image; canonical model validates repository@sha256 digest", "disposition": "Source-verified through the canonical model/projection contract, not a template literal."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/sssf/tasks/main.yml",
+      "consumer": "SSSF runtime and source bootstrap",
+      "acquisitions": [
+        {"name": "NodeSource Node.js repository", "contract": "unresolved", "evidence": "remote key is piped to gpg and a NodeSource apt repository is configured", "disposition": "Unresolved: repository signing is used after bootstrap, but the downloaded key has no pinned checksum/fingerprint assertion."},
+        {"name": "uv, Pi, and optional Bun archives", "contract": "checksum", "evidence": "controller cache stat SHA-256 is compared to tracked pins before guest extraction", "disposition": "Source-verified reviewed-artifact cache contract."},
+        {"name": "SSSF upstream Git source", "contract": "immutable-commit", "evidence": "fetch and checkout use the tracked 40-hex commit", "disposition": "Source-verified immutable commit contract."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/sssf/templates/sssf-init",
+      "consumer": "operator-approved SSSF workspace clone",
+      "acquisitions": [
+        {"name": "workspace repository", "contract": "unresolved", "evidence": "git clone receives an allow-listed operator repository URL without a ref", "disposition": "Unresolved by design: this is an operator-selected workload clone, not a repository-managed release; allow-list validation does not pin a commit."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/tailscale_client/tasks/main.yml",
+      "consumer": "Tailscale client repository bootstrap",
+      "acquisitions": [
+        {"name": "Tailscale signing key and apt repository", "contract": "signed-repository", "evidence": "get_url checksum verifies the key and apt source uses signed-by keyring", "disposition": "Source-verified signed-repository/key-checksum contract."}
+      ]
+    },
+    {
+      "source": "infra/ansible/roles/technitium/tasks/main.yml",
+      "consumer": "Technitium DNS runtime bootstrap",
+      "acquisitions": [
+        {"name": "Microsoft Debian repository package", "contract": "checksum", "evidence": "get_url verifies canonical SHA-256 before apt installs ASP.NET runtime", "disposition": "Source-verified checksum contract."},
+        {"name": "Technitium portable archive", "contract": "checksum", "evidence": "get_url and post-stage stat compare canonical SHA-256 before archive validation/extraction", "disposition": "Source-verified checksum contract."}
+      ]
+    },
+    {
+      "source": "infra/opentofu/onramp-host.tf",
+      "consumer": "Proxmox onramp VM cloud-image download",
+      "acquisitions": [
+        {"name": "onramp Debian cloud image", "contract": "canonical-digest-contract", "evidence": "proxmox_download_file receives URL, checksum, and checksum_algorithm from validated root variables", "disposition": "Source-verified through the root variable checksum contract."}
+      ]
+    },
+    {
+      "source": "infra/opentofu/services.tf",
+      "consumer": "Proxmox LXC template and shared VM cloud-image downloads",
+      "acquisitions": [
+        {"name": "Debian LXC template and service VM image", "contract": "canonical-digest-contract", "evidence": "proxmox_download_file resources use validated URL/checksum variables and modules receive their immutable file IDs", "disposition": "Source-verified through the root variable checksum contract."}
+      ]
+    },
+    {
+      "source": "infra/opentofu/variables.tf",
+      "consumer": "OpenTofu image and projected container-image integrity authority",
+      "acquisitions": [
+        {"name": "Debian LXC and VM cloud images", "contract": "checksum", "evidence": "validated checksum algorithm and lowercase SHA-256/SHA-512 fields accompany pinned HTTPS URLs", "disposition": "Source-verified checksum contract."},
+        {"name": "projected SearXNG container image", "contract": "canonical-digest-contract", "evidence": "variable describes pinned image; canonical model requires repository@sha256 digest", "disposition": "Source-verified through the canonical model/projection contract."}
+      ]
+    },
+    {
+      "source": "scripts/values.sh",
+      "consumer": "setup-time private values repository clone",
+      "acquisitions": [
+        {"name": "operator-selected values Git remote", "contract": "unresolved", "evidence": "setup invokes git clone with a discovered operator remote", "disposition": "Unresolved by design: the remote and its trust policy are private/operator-controlled and cannot be pinned by this public repository."}
+      ]
+    },
+    {
+      "source": "tools/Dockerfile",
+      "consumer": "repository tooling image build",
+      "acquisitions": [
+        {"name": "Debian base image", "contract": "immutable-digest", "evidence": "FROM reference is sha256 digest-qualified", "disposition": "Source-verified digest contract."},
+        {"name": "OpenTofu, TFLint, and SOPS binaries", "contract": "checksum", "evidence": "each curl download is verified by tracked SHA-256 ARG using sha256sum -c", "disposition": "Source-verified checksum contract."},
+        {"name": "Debian build packages", "contract": "distro-package-policy", "evidence": "apt-get installs named Debian packages", "disposition": "Covered by the base image's configured Debian repository policy; package versions are not artifact-pinned."}
+      ]
+    }
+  ]
+}

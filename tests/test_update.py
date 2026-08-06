@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -19,10 +21,29 @@ spec.loader.exec_module(update_script)
 
 
 class UpdateTests(unittest.TestCase):
-    def test_technitium_update_status_matches_manual_checksum_pin_policy(self) -> None:
-        status = "\n".join(update_script.UNMANAGED)
-        self.assertIn("version/checksum changes are operator-reviewed manual pins", status)
-        self.assertNotIn("installed by upstream install script", status)
+    def test_catalog_update_statuses_are_public_safe_and_deterministic(self) -> None:
+        statuses = update_script.catalog_update_statuses(Path(__file__).resolve().parents[1])
+
+        self.assertEqual([entry["service"] for entry in statuses], sorted(entry["service"] for entry in statuses))
+        technitium = next(entry for entry in statuses if entry["service"] == "technitium")
+        forgejo = next(entry for entry in statuses if entry["service"] == "forgejo")
+        self.assertEqual(technitium["status"], "manual")
+        self.assertIn("version/checksum", technitium["detail"])
+        self.assertEqual(forgejo["status"], "managed")
+        self.assertNotIn("installed by upstream install script", repr(statuses))
+
+    def test_dry_run_output_includes_catalog_derived_service_statuses(self) -> None:
+        output = io.StringIO()
+        with patch.object(update_script, "run", return_value=[]), redirect_stdout(output):
+            exit_code = update_script.main(["--root", str(Path(__file__).resolve().parents[1]), "--dry-run"])
+
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Service update policy (catalog):", rendered)
+        self.assertIn("MANAGED   forgejo:", rendered)
+        self.assertIn("MANUAL    technitium:", rendered)
+        self.assertIn("UNMANAGED tailscale_client:", rendered)
+        self.assertIn("Dry run: no pins or canonical values were written.", rendered)
 
     def fake_release(self, version: str, published_at: datetime) -> bytes:
         return json.dumps(

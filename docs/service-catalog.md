@@ -23,7 +23,7 @@ A service with runtime owner `none` does not own a separate guest. Its resource 
 
 A first-class service change is incomplete until the relevant contract is covered in all applicable layers:
 
-1. **Catalog** — add the service to `infra/services.json`, including runtime owner, dependencies, state capability, release source, playbooks, resource addresses, secret classification, and typed configuration schema.
+1. **Catalog** — add the service to `infra/services.json`, including runtime owner, dependencies, state capability, release source, update policy/status, playbooks, resource addresses, secret classification, and typed configuration schema.
 2. **Canonical schema** — define the typed `site.yaml` configuration and endpoint/release/state fields. Opaque per-consumer override maps are unsupported; add a typed configuration field and explicit projection instead.
 3. **Projection** — emit only the compatibility variables required by consumers and identity-bind them to the canonical service/resource.
 4. **OpenTofu** — declare or bind the resource lifecycle, storage, network, release inputs, and outputs.

@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -17,6 +18,8 @@ CATALOG_PATH = ROOT / "infra/services.json"
 SERVICES_TF = ROOT / "infra/opentofu/services.tf"
 TAILSCALE_TF = ROOT / "infra/opentofu/tailscale.tf"
 PLAN_SCRIPT = ROOT / "scripts/plan-infra.sh"
+VARIABLES_TF = ROOT / "infra/opentofu/variables.tf"
+ONRAMP_CHECKS_TF = ROOT / "infra/opentofu/onramp-host-checks.tf"
 
 
 class CanonicalServiceAuthorityTests(unittest.TestCase):
@@ -69,6 +72,63 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
         plan_script = PLAN_SCRIPT.read_text(encoding="utf-8")
         self.assertIn('INFRA_ALLOW_DESTROY:-0', plan_script)
         self.assertIn('-var="stateful_destroy_acknowledged=${stateful_destroy_acknowledged}"', plan_script)
+
+    def test_conditional_service_root_inputs_are_optional_until_canonical_enablement_requires_them(self) -> None:
+        model = load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
+        projected = render_opentofu_variables(model, load_catalog(CATALOG_PATH))
+        variables = VARIABLES_TF.read_text(encoding="utf-8")
+        services = SERVICES_TF.read_text(encoding="utf-8")
+        onramp_checks = ONRAMP_CHECKS_TF.read_text(encoding="utf-8")
+
+        required_when_enabled = {
+            "technitium": {
+                "technitium_container_vmid",
+                "technitium_container_hostname",
+                "technitium_container_ipv4_address",
+                "technitium_container_dns_servers",
+                "technitium_container_search_domain",
+                "technitium_container_bridge",
+                "technitium_container_cores",
+                "technitium_container_memory_mb",
+                "technitium_container_disk_gb",
+                "technitium_container_swap_mb",
+                "technitium_container_ipv4_gateway",
+            },
+            "forgejo": {
+                "forgejo_container_vmid",
+                "forgejo_container_hostname",
+                "forgejo_container_ipv4_address",
+                "forgejo_container_dns_servers",
+                "forgejo_container_search_domain",
+                "forgejo_container_bridge",
+                "forgejo_container_cores",
+                "forgejo_container_memory_mb",
+                "forgejo_container_disk_gb",
+                "forgejo_container_swap_mb",
+                "forgejo_lan_ip",
+                "forgejo_server_name",
+            },
+        }
+        for service, names in required_when_enabled.items():
+            with self.subTest(service=service):
+                self.assertTrue(names <= set(projected))
+                self.assertIn(f"{service}_required_root_inputs", services)
+                self.assertIn(f"Canonical projections must provide all {service.title()} root inputs", services)
+            for name in names:
+                block = re.search(rf'variable "{name}" \{{(.*?)^\}}', variables, re.MULTILINE | re.DOTALL)
+                self.assertIsNotNone(block, name)
+                assert block is not None
+                self.assertIn("default     = null", block.group(1), name)
+
+        disabled = model.model_copy(deep=True)
+        disabled.services["technitium"].enabled = False
+        disabled.services["forgejo"].enabled = False
+        disabled_projection = render_opentofu_variables(disabled, load_catalog(CATALOG_PATH))
+        self.assertFalse(any(name.startswith("technitium_container_") for name in disabled_projection))
+        self.assertFalse(any(name.startswith("forgejo_container_") for name in disabled_projection))
+
+        self.assertIn("local.technitium_enabled ? tostring(var.technitium_container_vmid) : null", onramp_checks)
+        self.assertIn("local.forgejo_enabled ? tostring(var.forgejo_container_vmid) : null", onramp_checks)
 
 
 if __name__ == "__main__":

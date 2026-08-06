@@ -32,7 +32,7 @@
     },
     {
       "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-      "sha256": "b3c0f3e357429d7c611440cf656d88959183a793ec513828ace6ab8bf4212a57",
+      "sha256": "6c505a7bd6d2cfddbb4fd9f2c6da61fc320efba45d9cc32f24c43d794f3380f0",
       "authority": "active-implementation-tracker",
       "stated_status": "Approved for source-level execution; infrastructure mutation remains prohibited without separate explicit approval",
       "extracted_item_count": 152
@@ -403,7 +403,7 @@
     },
     {
       "path": "docs/README.md",
-      "sha256": "98e678d36d191d724efa4e60ad00b6b2eb7298205336250f216ac113349e05e3",
+      "sha256": "fb680694591ab0ec9f9a9158246e4f085366ffc23337e0ce8b7322058ec157c1",
       "authority": "contributor-current",
       "stated_status": null,
       "extracted_item_count": 0
@@ -564,7 +564,7 @@
     },
     {
       "path": "docs/service-catalog.md",
-      "sha256": "8a4a0a2c2694543165d4d095d9860726b8320ebd7f59f7d5fb455b1c467e0ad4",
+      "sha256": "96489bc2aaa7d76c6dbf06fae4ad88738425ef383756a299d9f18a4fee4dbe2b",
       "authority": "architecture-current",
       "stated_status": null,
       "extracted_item_count": 0
@@ -578,7 +578,7 @@
     },
     {
       "path": "docs/service-update-policy.md",
-      "sha256": "8bba81ecb7536ddedb84c96cbf103c16cdf63b2db8ee107e6d2161c20a360f45",
+      "sha256": "5bbf311404dd4be12b2c174c01af636b2a8b9abc245de8f0af4375fb01257820",
       "authority": "operator-current",
       "stated_status": null,
       "extracted_item_count": 0

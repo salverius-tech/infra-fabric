@@ -1,5 +1,5 @@
 variable "enabled_services" {
-  description = "Services OpenTofu should build and maintain. Canonical generated inputs are authoritative; null retains explicit legacy compatibility."
+  description = "Services OpenTofu should build and maintain. Canonical projections set this value; null uses the catalog default service set."
   type        = list(string)
   default     = null
 }
@@ -61,11 +61,13 @@ variable "proxmox_node_name" {
 variable "technitium_container_vmid" {
   description = "Proxmox VMID for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "technitium_container_hostname" {
   description = "Hostname for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "technitium_container_description" {
@@ -77,31 +79,36 @@ variable "technitium_container_description" {
 variable "technitium_container_ipv4_address" {
   description = "Static IPv4 address/CIDR for the Technitium DNS LXC. Use an address outside DHCP scope. Set in terraform.tfvars."
   type        = string
+  default     = null
 
   validation {
-    condition     = can(cidrhost(var.technitium_container_ipv4_address, 0))
-    error_message = "technitium_container_ipv4_address must be a valid IPv4 CIDR address, for example 192.0.2.10/24."
+    condition     = var.technitium_container_ipv4_address == null || can(cidrhost(var.technitium_container_ipv4_address, 0))
+    error_message = "technitium_container_ipv4_address must be null or a valid IPv4 CIDR address, for example 192.0.2.10/24."
   }
 }
 
 variable "technitium_container_ipv4_gateway" {
   description = "IPv4 gateway for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "technitium_container_dns_servers" {
   description = "DNS servers used by the LXC before it becomes the primary resolver. Set in terraform.tfvars."
   type        = list(string)
+  default     = null
 }
 
 variable "technitium_container_search_domain" {
   description = "DNS search domain for the LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "technitium_container_bridge" {
   description = "Proxmox bridge for the LXC interface. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "technitium_container_vlan_id" {
@@ -232,31 +239,37 @@ variable "operator_chezmoi_sha256" {
 variable "technitium_container_cores" {
   description = "CPU cores for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "technitium_container_memory_mb" {
   description = "Dedicated memory for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "technitium_container_swap_mb" {
   description = "Swap for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "technitium_container_disk_gb" {
   description = "Root filesystem size in GB. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_vmid" {
   description = "Proxmox VMID for the Forgejo LXC. Set in terraform.tfvars. Import existing CTs before applying this resource."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_hostname" {
   description = "Hostname for the Forgejo LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "forgejo_container_description" {
@@ -268,10 +281,11 @@ variable "forgejo_container_description" {
 variable "forgejo_container_ipv4_address" {
   description = "IPv4 address/CIDR for the Forgejo LXC, or dhcp when the router supplies a static DHCP reservation."
   type        = string
+  default     = null
 
   validation {
-    condition     = var.forgejo_container_ipv4_address == "dhcp" || can(cidrhost(var.forgejo_container_ipv4_address, 0))
-    error_message = "forgejo_container_ipv4_address must be dhcp or a valid IPv4 CIDR address."
+    condition     = var.forgejo_container_ipv4_address == null || var.forgejo_container_ipv4_address == "dhcp" || can(cidrhost(var.forgejo_container_ipv4_address, 0))
+    error_message = "forgejo_container_ipv4_address must be null, dhcp, or a valid IPv4 CIDR address."
   }
 }
 
@@ -284,36 +298,42 @@ variable "forgejo_container_ipv4_gateway" {
 variable "forgejo_container_mac_address" {
   description = "MAC address for the Forgejo LXC, used by the router static DHCP reservation."
   type        = string
+  default     = null
 
   validation {
-    condition     = can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.forgejo_container_mac_address))
-    error_message = "forgejo_container_mac_address must use colon-separated hex octets, for example BC:24:11:00:00:00."
+    condition     = var.forgejo_container_mac_address == null || can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.forgejo_container_mac_address))
+    error_message = "forgejo_container_mac_address must be null or use colon-separated hex octets, for example BC:24:11:00:00:00."
   }
 }
 
 variable "forgejo_lan_ip" {
   description = "Expected LAN IP for Forgejo, without CIDR. Used for outputs and DNS/proxy documentation when the LXC uses DHCP reservation."
   type        = string
+  default     = null
 }
 
 variable "forgejo_server_name" {
   description = "DNS hostname users should use for Forgejo. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "forgejo_container_dns_servers" {
   description = "DNS servers used by the Forgejo LXC. Set in terraform.tfvars."
   type        = list(string)
+  default     = null
 }
 
 variable "forgejo_container_search_domain" {
   description = "DNS search domain for the Forgejo LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "forgejo_container_bridge" {
   description = "Proxmox bridge for the Forgejo LXC interface. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "forgejo_container_vlan_id" {
@@ -330,21 +350,25 @@ variable "forgejo_container_vlan_id" {
 variable "forgejo_container_cores" {
   description = "CPU cores for the Forgejo LXC."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_memory_mb" {
   description = "Dedicated memory for the Forgejo LXC."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_swap_mb" {
   description = "Swap for the Forgejo LXC."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_disk_gb" {
   description = "Root filesystem size in GB for the Forgejo guest."
   type        = number
+  default     = null
 }
 
 variable "service_runtime" {

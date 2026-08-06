@@ -9,11 +9,11 @@ VALUES_SITE=<site> just plan
 VALUES_SITE=<site> just apply
 ```
 
-`just update` applies the release-age safety hold before changing supported pins. After any update, review the diff and plan before applying.
+`just update` applies the release-age safety hold before changing supported pins. Its output includes a deterministic, public-safe **Service update policy (catalog)** status section. Those service statuses are derived from the `update_policy` entry in `infra/services.json`, rather than a second hard-coded list in the updater. After any update, review the diff and plan before applying.
 
 ## Managed pins
 
-A service belongs in `just update` when the repo can identify a specific upstream release and update a deterministic local pin. Examples include Forgejo and Forgejo runner.
+A service belongs in `just update` when the repo can identify a specific upstream release and update a deterministic local pin. The catalog marks Forgejo and Forgejo runner as `MANAGED`; the runner status also covers its repository-owned Docker Compose and `just` pins. The catalog marks SSSF `MANAGED` for its repository-owned uv, Pi, and Bun version/checksum pins; its upstream application commit remains an operator-reviewed change.
 
 For downloadable tools or archives, prefer a version plus checksum. If upstream artifacts are mutable or unversioned, cache the reviewed artifact in ignored private storage and install from that cache during `just apply`.
 
@@ -30,9 +30,19 @@ Technitium DNS is managed by Ansible and must not be upgraded by rerunning an up
 
 Technitium is not currently a target of `just update`. To change it, update the private version/checksum together, then run `just validate`, review `just plan`, and apply only after approval. Do not use the upstream installer as a routine update mechanism.
 
+## Catalog status meanings
+
+Every cataloged service must declare one update policy with a public-safe detail string:
+
+- `MANAGED` — `just update` checks the declared repository or canonical release pins after the release-age hold. It never applies infrastructure or service changes.
+- `MANUAL` — an operator changes the reviewed immutable image, release, or paired checksum through the normal `validate` → `plan` → approved `apply` workflow.
+- `UNMANAGED` — the repository has no package-update implementation for that service. Currently this applies to the Tailscale client, which is installed only when missing.
+
+The catalog status is an update-policy boundary, not a claim that a service is healthy or operational. It contains no private values, endpoints, or release lookup results.
+
 ## Other update boundaries
 
-`just update` manages repository-owned SSSF uv, Pi, and Bun version/checksum pins in addition to OpenTofu, TFLint, Forgejo, Forgejo runner, Docker Compose, and just pins. Updating an SSSF pin does not download a guest artifact: before apply, an operator must review and place the matching archive in `/var/lib/infra-fabric/artifacts/sssf/`. Caddy build inputs are version-pinned but do not yet have an automated update target. Tailscale package updates and general guest OS upgrades are also outside the `just update` workflow.
+`just update` manages repository-owned SSSF uv, Pi, and Bun version/checksum pins in addition to OpenTofu, TFLint, Forgejo, Forgejo runner, Docker Compose, and just pins. Updating an SSSF pin does not download a guest artifact: before apply, an operator must review and place the matching archive in `/var/lib/infra-fabric/artifacts/sssf/`. Caddy build inputs are version-pinned but do not yet have an automated update target. General guest OS upgrades are also outside the `just update` workflow; the Tailscale client status is cataloged as `UNMANAGED`.
 
 For components not managed by `just update`, document the reviewed pin or package policy explicitly and avoid ad hoc production upgrades.
 

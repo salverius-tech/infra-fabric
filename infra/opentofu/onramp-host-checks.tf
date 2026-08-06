@@ -1,7 +1,7 @@
 locals {
   service_vmids = compact([
-    tostring(var.technitium_container_vmid),
-    tostring(var.forgejo_container_vmid),
+    local.technitium_enabled ? tostring(var.technitium_container_vmid) : null,
+    local.forgejo_enabled ? tostring(var.forgejo_container_vmid) : null,
     tostring(var.forgejo_runner_vmid),
     tostring(var.infisical_container_vmid),
     tostring(var.hermes_container_vmid),
@@ -10,8 +10,8 @@ locals {
   ])
 
   service_static_ipv4_addresses = compact([
-    var.technitium_container_ipv4_address == "dhcp" ? null : split("/", var.technitium_container_ipv4_address)[0],
-    var.forgejo_container_ipv4_address == "dhcp" ? null : split("/", var.forgejo_container_ipv4_address)[0],
+    local.technitium_enabled && var.technitium_container_ipv4_address != "dhcp" ? split("/", var.technitium_container_ipv4_address)[0] : null,
+    local.forgejo_enabled && var.forgejo_container_ipv4_address != "dhcp" ? split("/", var.forgejo_container_ipv4_address)[0] : null,
     var.forgejo_runner_ipv4_address == "dhcp" ? null : split("/", var.forgejo_runner_ipv4_address)[0],
     var.infisical_container_ipv4_address == "dhcp" ? null : split("/", var.infisical_container_ipv4_address)[0],
     var.hermes_container_ipv4_address == "dhcp" ? null : split("/", var.hermes_container_ipv4_address)[0],

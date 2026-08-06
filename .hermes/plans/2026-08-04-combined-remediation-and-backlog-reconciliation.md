@@ -379,8 +379,8 @@ Audit coverage: **H2, H11, M8**, parts of **L3**.
 - [x] Ensure Forgejo VM creation always verifies image content.
 - [x] Pin Infisical PostgreSQL and Redis images by digest in both deployment modes.
 - [x] Replace Tailscale/uv/Pi/Bun network installers with signed repositories or immutable checksum-pinned artifacts.
-- [ ] Report changes accurately.
-- [ ] Add an integrity contract test covering every production image and network installer.
+- [x] Report changes accurately.
+- [x] Add an integrity contract test covering every production image and network installer.
 - [x] Add managed update paths for newly pinned artifacts.
 
 Commit boundary:
@@ -426,12 +426,12 @@ refactor: strengthen ansible convergence contracts
 
 Audit coverage: **M6, M7, L7**, outstanding W1/W3/W5 items.
 
-- [ ] Add reusable module validation for VMID, CPU, memory, disk, address/gateway, MAC, VLAN, mount paths, and unique disk interfaces.
-- [ ] Add projection completeness checks for conditionally required root variables.
+- [x] Add reusable module validation for VMID, CPU, memory, disk, address/gateway, MAC, VLAN, mount paths, and unique disk interfaces.
+- [x] Add projection completeness checks for conditionally required root variables.
 - [x] Align the provider compatibility constraint to the reviewed pre-1.0 series.
-- [ ] Update stale HCL descriptions that direct edits to generated/legacy files.
+- [x] Update stale HCL descriptions that direct edits to generated/legacy files.
 - [ ] Reduce compatibility aliases through typed resource/service objects without changing resource addresses.
-- [ ] Preserve moved blocks and add state-address contract tests.
+- [x] Preserve moved blocks and add state-address contract tests.
 - [ ] Reconcile all mapping-matrix claims against live producers and consumers; do not mark provider/live equivalence complete.
 
 Commit boundary:
@@ -445,9 +445,9 @@ refactor: tighten canonical opentofu contracts
 Audit coverage: **M9**.
 
 - [x] Process repository-owned tool pins regardless of canonical site mode.
-- [ ] Derive service release/update status from the catalog.
+- [x] Derive service release/update status from the catalog.
 - [x] Remove stale Technitium output.
-- [ ] Add end-to-end update dry-run/output tests.
+- [x] Add end-to-end update dry-run/output tests.
 - [x] Ensure newly immutable runtime dependencies participate in managed update policy.
 
 Commit boundary:

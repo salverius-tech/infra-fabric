@@ -39,6 +39,51 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(catalog.get("searxng_onramp").runtime_owner, "none")
         self.assertEqual(catalog.get("sssf").runtime_owner, "guest")
 
+    def test_update_policy_report_is_catalog_derived_and_ordered(self) -> None:
+        catalog = load_catalog(
+            self.write_catalog(
+                {
+                    "services": {
+                        "manual": {
+                            "dependencies": [],
+                            "update_policy": {
+                                "status": "manual",
+                                "detail": "operator reviews the paired pin and checksum",
+                            },
+                        },
+                        "managed": {
+                            "dependencies": [],
+                            "update_policy": {
+                                "status": "managed",
+                                "detail": "just update checks the upstream release after the hold",
+                            },
+                        },
+                    }
+                }
+            )
+        )
+
+        self.assertEqual(
+            catalog.update_policy_report(),
+            (
+                {
+                    "service": "managed",
+                    "status": "managed",
+                    "detail": "just update checks the upstream release after the hold",
+                },
+                {
+                    "service": "manual",
+                    "status": "manual",
+                    "detail": "operator reviews the paired pin and checksum",
+                },
+            ),
+        )
+
+    def test_invalid_update_policy_fails_at_load(self) -> None:
+        for policy in ({"status": "managed"}, {"status": "automatic", "detail": "unsupported"}):
+            with self.subTest(policy=policy), self.assertRaisesRegex(ServiceCatalogError, "update_policy"):
+                load_catalog(self.write_catalog({"services": {"app": {"dependencies": [], "update_policy": policy}}}))
+
     def test_required_field_report_is_value_free_and_ordered(self) -> None:
         catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
         forgejo = SimpleNamespace(

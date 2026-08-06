@@ -16,8 +16,10 @@ class ServiceCatalogError(ValueError):
 _LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
 SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "generated"]
 RuntimeOwner = Literal["guest", "shared_host", "none"]
+UpdatePolicyStatus = Literal["managed", "manual", "unmanaged"]
 _SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))  # public-safety: allow-secret
 _RUNTIME_OWNERS = frozenset(("guest", "shared_host", "none"))
+_UPDATE_POLICY_STATUSES = frozenset(("managed", "manual", "unmanaged"))
 _SCHEMA_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,127}$")
 _RELEASE_SOURCES = frozenset(("package", "container", "binary", "image"))
 
@@ -73,6 +75,7 @@ class ServiceCapability:
     secret_classifications: dict[str, SecretClassification]
     secret_environment: dict[str, str]
     conditional_required_secrets: dict[str, tuple[str, ...]]
+    update_policy: tuple[UpdatePolicyStatus, str] | None
     inventory: dict[str, object]
     raw: dict[str, object]
 
@@ -106,6 +109,20 @@ class ServiceCatalog:
                 )
             if not capability.required_fields:
                 raise ServiceCatalogError(f"service {name} must declare at least one required canonical field")
+            if capability.update_policy is None:
+                raise ServiceCatalogError(f"service {name} is missing registry metadata: update_policy")
+
+    def update_policy_report(self) -> tuple[dict[str, str], ...]:
+        """Return a deterministic, value-free service update-policy report."""
+        return tuple(
+            {
+                "service": name,
+                "status": capability.update_policy[0],
+                "detail": capability.update_policy[1],
+            }
+            for name, capability in sorted(self._capabilities.items())
+            if capability.update_policy is not None
+        )
 
     def validate_selection(self, enabled: set[str]) -> None:
         unknown = sorted(enabled - self.names)
@@ -373,6 +390,17 @@ def load_catalog(path: Path) -> ServiceCatalog:
         runtime_owner = raw.get("runtime_owner", "guest")
         if runtime_owner not in _RUNTIME_OWNERS:
             raise ServiceCatalogError(f"service {name} runtime_owner must be one of: {', '.join(sorted(_RUNTIME_OWNERS))}")
+        update_policy = raw.get("update_policy")
+        if update_policy is not None and (
+            not isinstance(update_policy, dict)
+            or set(update_policy) != {"status", "detail"}
+            or update_policy.get("status") not in _UPDATE_POLICY_STATUSES
+            or not isinstance(update_policy.get("detail"), str)
+            or not update_policy["detail"].strip()
+        ):
+            raise ServiceCatalogError(
+                f"service {name} update_policy must declare a supported status and non-empty detail"
+            )
         capabilities[name] = ServiceCapability(
             name=name,
             state_capable=raw.get("state_capable") is True,
@@ -385,6 +413,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
             secret_classifications=dict(secret_classifications),
             secret_environment=dict(secret_environment),
             conditional_required_secrets=conditional_paths,
+            update_policy=(update_policy["status"], update_policy["detail"]) if update_policy is not None else None,
             inventory=inventory,
             raw=raw,
         )
@@ -393,4 +422,4 @@ def load_catalog(path: Path) -> ServiceCatalog:
     return catalog
 
 
-__all__ = ["SecretClassification", "ServiceCapability", "ServiceCatalog", "ServiceCatalogError", "load_catalog"]
+__all__ = ["SecretClassification", "ServiceCapability", "ServiceCatalog", "ServiceCatalogError", "UpdatePolicyStatus", "load_catalog"]

@@ -23,6 +23,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from values_context import from_environment
 
 from canonical_values import CanonicalValuesError, load_site
+from service_catalog import ServiceCatalogError, load_catalog
 
 DEFAULT_MIN_AGE_HOURS = 48
 USER_AGENT = "homelab-infra-update/1.0"
@@ -499,10 +500,23 @@ def print_results(results: list[UpdateResult]) -> None:
             print(f"SKIP    {result.name}: {result.detail} ({result.path})")
 
 
+def catalog_update_statuses(root: Path) -> tuple[dict[str, str], ...]:
+    """Read public-safe service update statuses from the authoritative catalog."""
+    try:
+        catalog = load_catalog(root / "infra" / "services.json")
+        catalog.validate_registry_completeness()
+        return catalog.update_policy_report()
+    except ServiceCatalogError as error:
+        raise UpdateError(f"cannot load service update policy: {error}") from error
+
+
+def print_catalog_update_statuses(statuses: tuple[dict[str, str], ...]) -> None:
+    print("\nService update policy (catalog):")
+    for entry in statuses:
+        print(f"- {entry['status'].upper():<9} {entry['service']}: {entry['detail']}")
+
+
 UNMANAGED = (
-    "Technitium: version/checksum changes are operator-reviewed manual pins; "
-    "just update does not mutate this protected runtime artifact.",
-    "Tailscale: installed only when missing; package upgrade policy is not defined yet.",
     "Caddy: apt/custom xcaddy rebuild upgrade policy is not defined yet.",
     "Debian LXC OS packages: required packages are installed during playbooks, "
     "but full OS upgrades are not managed.",
@@ -523,6 +537,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print_results(results)
+    print_catalog_update_statuses(catalog_update_statuses(args.root))
     if args.dry_run:
         print("\nDry run: no pins or canonical values were written.")
     print("\nUnmanaged by just update:")

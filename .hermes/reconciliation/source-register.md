@@ -8,7 +8,7 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `.hermes/plans/2026-08-03_071330-canonical-cutover-audit.md` | historical-report | `ab78c40b2f039ae9edfa207f08905f0392837fb318a6cd354dc95b921550a09d` | 4 |
 | `.hermes/plans/2026-08-03_135649-canonical-first-documentation-and-authoring.md` | active-implementation-tracker | `14befd4041dcddd0b651ab3b7774e01d6d8a037339fecec475f3f39f3fdb89e5` | 8 |
 | `.hermes/plans/2026-08-03_174531-super-simple-software-factory-vm.md` | active-implementation-tracker | `71ebb21b4ed5ef2ceb9189ee5af48eb4dae5fe3bc0c7595ac0bfd1f4d8e70c0c` | 0 |
-| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | active-implementation-tracker | `b3c0f3e357429d7c611440cf656d88959183a793ec513828ace6ab8bf4212a57` | 152 |
+| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | active-implementation-tracker | `6c505a7bd6d2cfddbb4fd9f2c6da61fc320efba45d9cc32f24c43d794f3380f0` | 152 |
 | `.hermes/plans/2026-08-04-comprehensive-project-audit.md` | historical-report | `d95f2616909de0fc044c381a037c39d251789849231ae97d11bbc0823fabab52` | 41 |
 | `.hermes/plans/2026-08-04-design-to-implementation-backlog-reconciliation.md` | active-implementation-tracker | `95a69404dc9cb2d291b42e871562edcbe8f5d533430445e185c264dcb3d9c47e` | 31 |
 | `.hermes/plans/canonical-values-model-implementation.md` | active-implementation-tracker | `84dd88cf4609203e1d651d1883901fd8c35ae283102e8f0c4fe6dfa67d4af553` | 273 |
@@ -61,7 +61,7 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `.specs/direct-hermes-ansible/plan.md` | unclassified | `69844d03f7a8ef714d1aec5696103bfd5f6f581f800f94e7553213a85df66320` | 32 |
 | `AGENTS.md` | contributor-current | `478c19103b5def78605cd643d3319d81e7b75740ff0c95b3912246c9c60bae6a` | 0 |
 | `README.md` | operator-current | `40a0f5a597f70aa6a9aae0e3b8718a4754a92813536777d4e701e1c687a19a97` | 0 |
-| `docs/README.md` | contributor-current | `98e678d36d191d724efa4e60ad00b6b2eb7298205336250f216ac113349e05e3` | 0 |
+| `docs/README.md` | contributor-current | `fb680694591ab0ec9f9a9158246e4f085366ffc23337e0ce8b7322058ec157c1` | 0 |
 | `docs/canonical-architecture.md` | architecture-current | `833dcd4c180326ce9f6f3bc348c9c7a97e6ffc8f0013da6f252a44e95653ae2b` | 0 |
 | `docs/canonical-quick-start.md` | operator-current | `a90d2de2c3b67c730bad478bd9551c1b80ae646b97fbb40a531a639c2e4942e5` | 0 |
 | `docs/canonical-readiness.md` | operator-current | `a9454fce68c757db734713126f35e83bd495031ac4ea93205faa30fa22f94cf0` | 0 |
@@ -84,9 +84,9 @@ Generated from tracked public sources. Hashes make the extraction baseline repro
 | `docs/onramp-app-platform-contract.md` | operator-current | `ac3ea674420b8d26861026be7e9ac67845b42e633d0637173fd1b40a01acf772` | 0 |
 | `docs/onramp-host-runbook.md` | operator-current | `0c440c7c4fd9983d27afeb5b6f82333e741c7d49d6a0e97e58efc3e852a1b92e` | 0 |
 | `docs/onramp-searxng-handoff.md` | operator-current | `7b548efd4786d503d1cb65411fffc87999de3cf2d883f7876957a9309dadde0a` | 0 |
-| `docs/service-catalog.md` | architecture-current | `8a4a0a2c2694543165d4d095d9860726b8320ebd7f59f7d5fb455b1c467e0ad4` | 0 |
+| `docs/service-catalog.md` | architecture-current | `96489bc2aaa7d76c6dbf06fae4ad88738425ef383756a299d9f18a4fee4dbe2b` | 0 |
 | `docs/service-state-backup.md` | operator-current | `2475fd5cb6913e3ee4b13c3c57f6d36db3f223933ca7c427fb978d70f89ba36a` | 0 |
-| `docs/service-update-policy.md` | operator-current | `8bba81ecb7536ddedb84c96cbf103c16cdf63b2db8ee107e6d2161c20a360f45` | 0 |
+| `docs/service-update-policy.md` | operator-current | `5bbf311404dd4be12b2c174c01af636b2a8b9abc245de8f0af4375fb01257820` | 0 |
 | `docs/sssf.md` | operator-current | `0c786675fbbbafc4b6d2fc252f56a87d3a6409951b281ce1ab63b558a65ee6e8` | 0 |
 | `scaffold/README.md` | contributor-current | `851c9198663b2efb2e7bf35e29c8e9aa35b9450b53629fdbd480b564f54de801` | 0 |
 | `scaffold/sites/_template/README.md` | contributor-current | `6b7337e4dc19a5268c2f37d4d2b717cc2cffed592c66c85f8a92bd2db6f3682d` | 0 |

@@ -142,6 +142,11 @@ variable "ipv4_address" {
 variable "ipv4_gateway" {
   description = "IPv4 gateway for the LXC."
   type        = string
+
+  validation {
+    condition     = can(cidrhost("${var.ipv4_gateway}/32", 0))
+    error_message = "ipv4_gateway must be an IPv4 address."
+  }
 }
 
 variable "ssh_public_keys" {

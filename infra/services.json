@@ -10,6 +10,10 @@
       "configuration_schema": "TechnitiumConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "required_fields": ["resource", "state.capable", "release.version", "release.checksum"],
+      "update_policy": {
+        "status": "manual",
+        "detail": "operator reviews the paired version/checksum pin; just update does not mutate this protected runtime artifact"
+      },
       "state_order": 3,
       "terraform_addresses": [
         "module.technitium_dns[",
@@ -48,6 +52,10 @@
       "configuration_schema": "ForgejoConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "required_fields": ["resource", "state.capable", "release.version"],
+      "update_policy": {
+        "status": "managed",
+        "detail": "just update checks the canonical release.version after the release-age hold"
+      },
       "state_order": 2,
       "terraform_addresses": [
         "module.forgejo[",
@@ -130,6 +138,10 @@
       "configuration_schema": "TailscaleConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "required_fields": ["resource"],
+      "update_policy": {
+        "status": "unmanaged",
+        "detail": "installed only when missing; package upgrade policy is not defined"
+      },
       "terraform_addresses": [
         "module.tailscale_client[",
         "module.tailscale_client_vm["
@@ -168,6 +180,10 @@
       "configuration_schema": "ForgejoRunnerConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "required_fields": ["resource", "configuration.url", "configuration.scope", "configuration.label"],
+      "update_policy": {
+        "status": "managed",
+        "detail": "just update checks the canonical runner release and repository-owned Compose and just pins after the release-age hold"
+      },
       "terraform_addresses": [
         "module.forgejo_runner[",
         "module.forgejo_runner_vm["
@@ -208,6 +224,10 @@
       "configuration_schema": "InfisicalConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "required_fields": ["resource", "state.capable"],
+      "update_policy": {
+        "status": "manual",
+        "detail": "review immutable image or release changes with the normal validate, plan, and approved apply workflow"
+      },
       "state_order": 5,
       "terraform_addresses": [
         "module.infisical[",
@@ -262,6 +282,10 @@
       "configuration_schema": "InfisicalOnrampConfiguration",
       "release_sources": [],
       "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
+      "update_policy": {
+        "status": "manual",
+        "detail": "review shared-host application image or release changes with the normal validate, plan, and approved apply workflow"
+      },
       "state_order": 5,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["
@@ -310,6 +334,10 @@
       "configuration_schema": "HermesConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "required_fields": ["resource", "state.capable"],
+      "update_policy": {
+        "status": "manual",
+        "detail": "review immutable application release inputs before the normal validate, plan, and approved apply workflow"
+      },
       "state_order": 1,
       "terraform_addresses": [
         "module.hermes[",
@@ -404,6 +432,10 @@
       "configuration_schema": "SssfConfiguration",
       "release_sources": ["binary"],
       "required_fields": ["resource", "state.capable", "release.commit"],
+      "update_policy": {
+        "status": "managed",
+        "detail": "just update checks repository-owned uv, Pi, and Bun version/checksum pins; upstream commit changes remain reviewed"
+      },
       "state_order": 7,
       "terraform_addresses": [
         "module.sssf[",
@@ -467,6 +499,10 @@
       "configuration_schema": "ResourceOwnedConfiguration",
       "release_sources": [],
       "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
+      "update_policy": {
+        "status": "manual",
+        "detail": "review shared-host package and configuration changes through the normal validate, plan, and approved apply workflow"
+      },
       "state_order": 4,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["
@@ -512,6 +548,10 @@
       "configuration_schema": "SearxngConfiguration",
       "release_sources": ["package", "container", "binary", "image"],
       "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
+      "update_policy": {
+        "status": "manual",
+        "detail": "review the immutable container image and digest together before the normal validate, plan, and approved apply workflow"
+      },
       "state_order": 6,
       "terraform_addresses": [
         "proxmox_virtual_environment_vm.onramp_host["

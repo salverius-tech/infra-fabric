@@ -57,9 +57,23 @@ class DebianVmImageContractTests(unittest.TestCase):
             "disk requires a non-empty datastore_id and a positive size_gb.",
             "mount_points require non-empty volumes and absolute unique guest paths.",
             "ipv4_address must be dhcp or an IPv4 CIDR address.",
+            "ipv4_gateway must be an IPv4 address.",
             "vlan_id must be 1 through 4094.",
         ):
             self.assertIn(contract, variables)
+
+    def test_service_refactor_preserves_legacy_state_addresses(self) -> None:
+        services = (ROOT / "infra/opentofu/services.tf").read_text(encoding="utf-8")
+        for source, destination in (
+            ("proxmox_virtual_environment_container.technitium_dns[0]", "module.technitium_dns[0].proxmox_virtual_environment_container.this"),
+            ("proxmox_virtual_environment_container.forgejo[0]", "module.forgejo[0].proxmox_virtual_environment_container.this"),
+            ("proxmox_virtual_environment_container.tailscale_client[0]", "module.tailscale_client[0].proxmox_virtual_environment_container.this"),
+            ("proxmox_virtual_environment_container.forgejo_runner[0]", "module.forgejo_runner[0].proxmox_virtual_environment_container.this"),
+            ("proxmox_virtual_environment_container.infisical[0]", "module.infisical[0].proxmox_virtual_environment_container.this"),
+            ("proxmox_virtual_environment_container.hermes[0]", "module.hermes[0].proxmox_virtual_environment_container.this"),
+        ):
+            self.assertIn(f"from = {source}", services)
+            self.assertIn(f"to   = {destination}", services)
 
 
 if __name__ == "__main__":
