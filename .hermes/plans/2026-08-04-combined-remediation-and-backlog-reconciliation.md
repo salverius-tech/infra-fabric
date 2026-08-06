@@ -634,4 +634,4 @@ Source-level remediation is complete only when all of the following are true:
 - [x] A fresh detached worktree passes the full public suite.
 - [x] No private-value contents, plans, state, credentials, identities, or live endpoints were accessed or emitted; one read-only review traversed private path names without reading contents.
 - [x] Provider/live/recovery evidence is clearly separated and remains open unless separately approved.
-- [ ] All completed work is committed and pushed, with a clean worktree and matching upstream revision.
+- [x] All completed work is committed and pushed, with a clean worktree and matching upstream revision.
