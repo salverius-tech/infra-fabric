@@ -1,5 +1,6 @@
 ---
 - name: Validate Tailscale client variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - tailscale_client_vmid is defined
@@ -7,6 +8,7 @@
     fail_msg: tailscale_client_vmid is required, and tailscale_client_backup_archive is required when restore is enabled.
   when: tailscale_client_enabled | default(false) | bool
 - name: Install Tailscale repository prerequisites
+  tags: [packages]
   ansible.builtin.apt:
     name:
       - ca-certificates
@@ -14,6 +16,7 @@
     update_cache: true
   when: tailscale_client_enabled | default(false) | bool
 - name: Install checksum-verified Tailscale repository key
+  tags: [packages]
   ansible.builtin.get_url:
     url: "https://pkgs.tailscale.com/stable/debian/{{ ansible_distribution_release }}.noarmor.gpg"
     dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
@@ -23,6 +26,7 @@
     mode: '0644'
   when: tailscale_client_enabled | default(false) | bool
 - name: Configure signed Tailscale apt repository
+  tags: [config]
   ansible.builtin.apt_repository:
     repo: "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/debian {{ ansible_distribution_release }} main"
     filename: tailscale
@@ -30,21 +34,49 @@
     update_cache: true
   when: tailscale_client_enabled | default(false) | bool
 - name: Install Tailscale package
+  tags: [packages]
   ansible.builtin.apt:
     name: tailscale
     state: present
   when: tailscale_client_enabled | default(false) | bool
-- name: Enable IPv4 forwarding in Tailscale client LXC
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - install -d -m 0755 /etc/sysctl.d && printf '%s\n' 'net.ipv4.ip_forward = 1' > /etc/sysctl.d/99-tailscale-client.conf && sysctl -p /etc/sysctl.d/99-tailscale-client.conf >/dev/null  # yamllint disable-line rule:line-length
-  changed_when: false
+- name: Configure IPv4 forwarding in Tailscale client LXC
+  tags: [config]
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-tailscale-client.conf
+    content: "net.ipv4.ip_forward = 1\n"
+    owner: root
+    group: root
+    mode: '0644'
   when:
     - tailscale_client_enabled | default(false) | bool
     - tailscale_client_enable_ip_forwarding | default(true) | bool
+- name: Read active IPv4 forwarding state in Tailscale client LXC
+  tags: [config]
+  ansible.builtin.command:
+    argv:
+      - sysctl
+      - -n
+      - net.ipv4.ip_forward
+  register: tailscale_client_ipv4_forwarding
+  changed_when: false
+  check_mode: false
+  when:
+    - tailscale_client_enabled | default(false) | bool
+    - tailscale_client_enable_ip_forwarding | default(true) | bool
+- name: Converge active IPv4 forwarding state in Tailscale client LXC
+  tags: [config]
+  ansible.builtin.command:
+    argv:
+      - sysctl
+      - -w
+      - net.ipv4.ip_forward=1
+  changed_when: tailscale_client_ipv4_forwarding.stdout | default('') | trim != '1'
+  when:
+    - tailscale_client_enabled | default(false) | bool
+    - tailscale_client_enable_ip_forwarding | default(true) | bool
+    - tailscale_client_ipv4_forwarding.stdout | default('') | trim != '1'
 - name: Install Tailscale backup archive
+  tags: [backup]
   ansible.builtin.copy:
     src: '{{ tailscale_client_backup_archive }}'
     dest: /tmp/tailscale-client-backup.tgz
@@ -56,6 +88,7 @@
     - tailscale_client_enabled | default(false) | bool
     - tailscale_client_restore_backup | default(false) | bool
 - name: Restore Tailscale state and selected OS config from backup
+  tags: [restore]
   ansible.builtin.command:
     argv:
       - bash
@@ -68,15 +101,14 @@
     - tailscale_client_enabled | default(false) | bool
     - tailscale_client_restore_backup | default(false) | bool
 - name: Ensure tailscaled is enabled and running
-  ansible.builtin.command:
-    argv:
-      - systemctl
-      - enable
-      - --now
-      - tailscaled
-  changed_when: false
+  tags: [service]
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started
   when: tailscale_client_enabled | default(false) | bool
 - name: Authenticate Tailscale client with auth key when requested
+  tags: [config]
   ansible.builtin.command:
     argv: "{{\n  [\n    'tailscale', 'up', '--authkey', tailscale_client_auth_key,\n  ] + (tailscale_client_up_args | default([]))\n}}"
   no_log: true
@@ -87,9 +119,11 @@
     - tailscale_client_auth_key is defined
     - tailscale_client_auth_key | length > 0
 - name: Flush Tailscale restart before service checks
+  tags: [service]
   ansible.builtin.meta: flush_handlers
   when: tailscale_client_enabled | default(false) | bool
 - name: Verify tailscaled service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -102,6 +136,7 @@
   until: tailscale_client_active.rc == 0
   when: tailscale_client_enabled | default(false) | bool
 - name: Check Tailscale client status
+  tags: [health]
   ansible.builtin.command:
     argv:
       - tailscale

@@ -393,7 +393,8 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(canonical.services["forgejo"].release.source, "package")
         self.assertEqual(catalog.get("forgejo").required_fields, ("resource", "state.capable", "release.version"))
         self.assertEqual(catalog.get("technitium").required_fields, ("resource", "state.capable", "release.version", "release.checksum"))
-        self.assertEqual(catalog.get("forgejo_runner").required_fields, ("resource", "configuration.url", "configuration.scope", "configuration.label"))
+        self.assertIn("release.version", catalog.get("forgejo_runner").required_fields)
+        self.assertIn("configuration.compose_artifact.version", catalog.get("forgejo_runner").required_fields)
         self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
 
     def test_full_catalog_cross_field_failure_matrix(self) -> None:
@@ -486,6 +487,8 @@ class CanonicalValuesTests(unittest.TestCase):
                     "domain": "Control.Hermes.Example.Internal.",
                     "source_url": "https://github.com/example/hermes-control.git",
                     "source_ref": "c" * 40,
+                    "workspace_root": "/srv/hermes",
+                    "project_roots": ["/srv/hermes/projects", "/opt/shared"],
                 },
             }
         )
@@ -496,6 +499,8 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(configuration.control.domain, "control.hermes.example.internal")
         self.assertEqual(configuration.control.api_host, "127.0.0.1")
         self.assertEqual(configuration.control.api_port, 8787)
+        self.assertEqual(configuration.control.workspace_root, "/srv/hermes")
+        self.assertEqual(configuration.control.project_roots, ["/srv/hermes/projects", "/opt/shared"])
         with self.assertRaises(ValueError):
             HermesConfiguration.model_validate({"runtime_user": "root"})
         with self.assertRaises(ValueError):
@@ -516,6 +521,10 @@ class CanonicalValuesTests(unittest.TestCase):
             HermesConfiguration.model_validate({"control": {"source_url": "http://example.internal/control"}})
         with self.assertRaises(ValueError):
             HermesConfiguration.model_validate({"control": {"plugin_socket": "/run/../tmp.sock"}})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"control": {"workspace_root": "/srv/../tmp"}})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"control": {"project_roots": ["/srv/project", "/srv/project"]}})
 
     def test_hermes_compose_version_is_a_managed_semantic_version(self) -> None:
         configuration = HermesConfiguration.model_validate({"compose_version": "2.40.3"})
@@ -558,6 +567,10 @@ class CanonicalValuesTests(unittest.TestCase):
                 "upstream": {"host": "127.0.0.1", "port": 5380},
                 "tls": {"dns_provider": "cloudflare"},
                 "extra_vhosts": [],
+                "artifact": {
+                    "version": "2.8.4",
+                    "checksums": {"amd64": "a" * 64, "arm64": "b" * 64},
+                },
             }
         )
         self.assertEqual(configuration.server_names, ["dns.example.internal"])
@@ -945,6 +958,16 @@ class CanonicalValuesTests(unittest.TestCase):
             "      data_dir: /var/lib/infisical\n"
             "      postgres_user: infisical\n"
             "      postgres_db: infisical\n"
+            "      caddy_artifact:\n"
+            "        version: 2.8.4\n"
+            "        checksums:\n"
+            "          amd64: '" + "b" * 64 + "'\n"
+            "          arm64: '" + "c" * 64 + "'\n"
+            "      compose_artifact:\n"
+            "        version: 2.29.7\n"
+            "        checksums:\n"
+            "          amd64: '" + "d" * 64 + "'\n"
+            "          arm64: '" + "e" * 64 + "'\n"
             "    endpoints:\n"
             "      public_names: [infisical.example.internal]\n"
             "    release:\n"

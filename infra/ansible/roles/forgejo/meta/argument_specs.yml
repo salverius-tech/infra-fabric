@@ -95,3 +95,19 @@ argument_specs:
         required: false
         no_log: true
         description: "Forgejo application secret key."
+      forgejo_caddy_cloudflare_version:
+        type: str
+        required: false
+        description: "Reviewed Caddy artifact version."
+      forgejo_caddy_cloudflare_sha256_amd64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed amd64 Caddy artifact."
+      forgejo_caddy_cloudflare_sha256_arm64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed arm64 Caddy artifact."
+      forgejo_artifact_cache_root:
+        type: str
+        required: false
+        description: "Controller-side reviewed artifact cache root."

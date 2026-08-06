@@ -1,5 +1,6 @@
 ---
 - name: Validate Forgejo managed PostgreSQL variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - forgejo_database.name is defined
@@ -12,6 +13,7 @@
   no_log: true
 
 - name: Install Forgejo PostgreSQL packages
+  tags: [packages]
   ansible.builtin.apt:
     name:
       - postgresql
@@ -20,12 +22,14 @@
     update_cache: true
 
 - name: Enable PostgreSQL service
+  tags: [service]
   ansible.builtin.systemd:
     name: postgresql
     state: started
     enabled: true
 
 - name: Check Forgejo PostgreSQL role
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -41,6 +45,7 @@
   no_log: true
 
 - name: Create Forgejo PostgreSQL role
+  tags: [config]
   ansible.builtin.command:
     argv:
       - runuser
@@ -58,6 +63,7 @@
   no_log: true
 
 - name: Check Forgejo PostgreSQL database
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -73,6 +79,7 @@
   no_log: true
 
 - name: Create Forgejo PostgreSQL database
+  tags: [config]
   ansible.builtin.command:
     argv:
       - runuser
@@ -87,6 +94,7 @@
   no_log: true
 
 - name: Update Forgejo PostgreSQL role password
+  tags: [config]
   ansible.builtin.command:
     argv:
       - runuser

@@ -1,17 +1,20 @@
 ---
 - name: Install host NFS client packages
+  tags: [packages]
   ansible.builtin.apt:
     name: nfs-common
     state: present
     update_cache: true
 
 - name: Create host NFS mountpoint
+  tags: [config]
   ansible.builtin.file:
     path: "{{ storage_bind_mount.host_prepare.mountpoint }}"
     state: directory
     mode: "{{ storage_bind_mount.mode | default('0750') }}"
 
 - name: Build host NFS mount options
+  tags: [packages]
   ansible.builtin.set_fact:
     storage_host_mount_options: >-
       {{ storage_bind_mount.host_prepare.options
@@ -19,6 +22,7 @@
          else ['rw', '_netdev', 'nofail'] }}
 
 - name: Manage host NFS fstab entry
+  tags: [config]
   ansible.builtin.lineinfile:
     path: /etc/fstab
     regexp: "^{{ (storage_bind_mount.host_prepare.server ~ ':' ~ storage_bind_mount.host_prepare.export) | regex_escape() }}\\s+"
@@ -30,6 +34,7 @@
     group: root
 
 - name: Mount host NFS storage
+  tags: [config]
   ansible.builtin.command:
     argv:
       - mount
@@ -39,6 +44,7 @@
   failed_when: storage_host_nfs_mount.rc not in [0, 32]
 
 - name: Set initial host NFS storage ownership
+  tags: [config]
   ansible.builtin.file:
     path: "{{ storage_bind_mount.host_prepare.mountpoint }}"
     state: directory

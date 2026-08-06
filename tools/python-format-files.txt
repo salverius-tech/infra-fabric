@@ -1,0 +1,5 @@
+# Ratcheted Black scope; expand only after the added files are formatted and reviewed.
+tests/test_ansible_convergence_contract.py
+tests/test_design_reconciliation.py
+tests/test_hermes_control_role.py
+tests/test_phase7_tooling_contract.py

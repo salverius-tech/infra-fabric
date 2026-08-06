@@ -49,3 +49,16 @@ Required protected paths are declared by the catalog and delivered transiently t
 Canonical site creation is an explicit operation that preserves the selected site’s source files and protected bundle. Review all model, projection, secret, provider, state, and operational requirements before using a site for live planning. Recovery and restoration use disposable restricted workspaces and value-free manifests, then return to the canonical site workflow after verification.
 
 Passing model validation is not live health evidence. Passing a plan is not approval to apply. Passing apply is not a substitute for direct service smoke tests, repeat-plan drift checks, or state restore rehearsal.
+
+### Executable compatibility boundary
+
+Compatibility/import helpers are development or migration-only boundaries, not a normal operator fallback. Preserve legacy inputs while the explicitly documented parity and retirement decision gates are open; do not hand-copy them into `site.yaml`, `generated/`, or a new plan. The normal recovery sequence is:
+
+```bash
+VALUES_SITE=<site> just validate
+VALUES_SITE=<site> just plan
+# After explicit approval of this fresh reviewed plan only:
+VALUES_SITE=<site> just apply
+```
+
+Do not recover with direct `site.yml`, raw OpenTofu/Terraform lifecycle commands, a legacy `.env`, or manually edited projections. Those paths bypass the selected-site and immutable-plan checks. For state-capable services, use the managed, separately authorized archive workflow in [service operations](service-operations.md#managed-state-recovery), validate its archive, and record post-restore health as external evidence.

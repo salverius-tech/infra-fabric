@@ -26,10 +26,27 @@ services:
   forgejo_runner:
     enabled: true
     resource: example-lxc
+    release:
+      version: 12.7.3
     configuration:
       url: https://git.example.internal
       scope: example
       label: forgejo-runner
+      compose_artifact:
+        version: 2.29.7
+        checksums:
+          amd64: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          arm64: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      just_artifact:
+        version: 1.36.0
+        checksums:
+          amd64: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          arm64: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      runner_artifact:
+        version: 12.7.3
+        checksums:
+          amd64: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          arm64: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     dependencies:
       - forgejo
   infisical:
@@ -38,6 +55,17 @@ services:
     state:
       capable: true
       disable_policy: retain
+    configuration:
+      caddy_artifact:
+        version: 2.8.4
+        checksums:
+          amd64: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          arm64: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      compose_artifact:
+        version: 2.29.7
+        checksums:
+          amd64: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          arm64: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
   infisical_onramp:
     enabled: true
     resource: onramp-host
@@ -52,6 +80,22 @@ services:
     state:
       capable: true
       disable_policy: retain
+    configuration:
+      caddy_artifact:
+        version: 2.8.4
+        checksums:
+          amd64: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          arm64: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      compose_artifact:
+        version: 2.29.7
+        checksums:
+          amd64: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          arm64: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      just_artifact:
+        version: 1.36.0
+        checksums:
+          amd64: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          arm64: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
   onramp_host:
     enabled: true
     resource: onramp-host

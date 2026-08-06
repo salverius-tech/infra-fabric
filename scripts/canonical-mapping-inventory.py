@@ -243,6 +243,26 @@ def load_consumer_contract(repo: Path) -> dict[str, Any]:
     }
 
 
+def retired_alias_contract(repo: Path) -> dict[str, Any]:
+    """Verify retired OpenTofu aliases reach an explicit fail-closed boundary."""
+    aliases = ("forgejo_runtime", "tailscale_client_enabled")
+    variables = (repo / "infra/opentofu/variables.tf").read_text(encoding="utf-8")
+    services = (repo / "infra/opentofu/services.tf").read_text(encoding="utf-8")
+    scaffold_inputs = set(_assignment_keys(repo / "scaffold/terraform.tfvars"))
+    declared_nullable = all(
+        re.search(rf'(?s)variable "{re.escape(alias)}" {{.*?default\s*=\s*null', variables)
+        for alias in aliases
+    )
+    rejected_by_precondition = all(f"var.{alias} == null" in services for alias in aliases)
+    scaffold_absent = not (set(aliases) & scaffold_inputs)
+    return {
+        "aliases": list(aliases),
+        "opentofu_boundary": "explicit-null-preconditions" if declared_nullable and rejected_by_precondition else "incomplete",
+        "scaffold_inputs": "absent" if scaffold_absent else "present",
+        "status": "complete" if declared_nullable and rejected_by_precondition and scaffold_absent else "review-required",
+    }
+
+
 def load_mapping_matrix(path: Path) -> dict[str, Any]:
     lines = path.read_text(encoding="utf-8").splitlines()
     header_index = next((index for index, line in enumerate(lines) if line.startswith("| Canonical path |")), None)
@@ -459,6 +479,7 @@ def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
     }
     corpus = "\n".join("\n".join(lines) for lines in contents.values())
     dynamic_rules = (
+        (re.compile(r"^service_runtime\."), "canonical_projections.render_opentofu_variables"),
         (re.compile(r"^(?:technitium|forgejo|forgejo_runner|infisical|hermes|tailscale_client|onramp_host)_container_"), "canonical_projections._resource_variables"),
         (re.compile(r"^service_storage\."), "canonical_projections._resource_variables"),
         (re.compile(r"^dns-records\.json\."), "canonical_projections.render_dns_records"),
@@ -860,6 +881,7 @@ def build_report(repo: Path) -> dict[str, Any]:
     catalog_contract = _catalog_contract(repo / "infra/services.json")
     canonical_path_coverage = catalog_path_coverage(repo / "infra/services.json", catalog)
     consumer_contract = load_consumer_contract(repo)
+    retired_aliases = retired_alias_contract(repo)
     return {
         "schema": 1,
         "purpose": "phase-0-source-inventory",
@@ -873,6 +895,13 @@ def build_report(repo: Path) -> dict[str, Any]:
         "service_contracts": catalog_contract,
         "canonical_path_coverage": canonical_path_coverage,
         "mapping_matrix": matrix,
+        "mapping_contract_evidence": {
+            "scope": "tracked-public-repository-producers-and-consumers",
+            "source_producer_consumer_status": "complete" if matrix["status"] == "semantic-coverage-complete" else "review-required",
+            "provider_plan_equivalence": "not-claimed",
+            "live_infrastructure_equivalence": "not-claimed",
+        },
+        "retired_alias_contract": retired_aliases,
         "matrix_path_coverage": matrix_path_status,
         "matrix_classification_coverage": matrix_classification_status,
         "consumer_evidence": consumer_evidence_status,

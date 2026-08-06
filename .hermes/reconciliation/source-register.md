@@ -1,92 +1,94 @@
 # Reconciliation source register
 
-Generated from tracked public sources. Hashes make the extraction baseline reproducible.
+Hashes and source totals are generated from the tracked public source universe.
 
 | Source | Authority | SHA-256 | Extracted |
 | --- | --- | --- | ---: |
-| `.hermes/plans/2026-08-03_071330-canonical-cutover-audit-report.md` | historical-report | `0df5d9f7da7273dc3fb23affb87d571bfd35fd7678cdb2708d934921bc75e46a` | 13 |
-| `.hermes/plans/2026-08-03_071330-canonical-cutover-audit.md` | historical-report | `ab78c40b2f039ae9edfa207f08905f0392837fb318a6cd354dc95b921550a09d` | 4 |
-| `.hermes/plans/2026-08-03_135649-canonical-first-documentation-and-authoring.md` | active-implementation-tracker | `14befd4041dcddd0b651ab3b7774e01d6d8a037339fecec475f3f39f3fdb89e5` | 8 |
-| `.hermes/plans/2026-08-03_174531-super-simple-software-factory-vm.md` | active-implementation-tracker | `71ebb21b4ed5ef2ceb9189ee5af48eb4dae5fe3bc0c7595ac0bfd1f4d8e70c0c` | 0 |
-| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | active-implementation-tracker | `6c505a7bd6d2cfddbb4fd9f2c6da61fc320efba45d9cc32f24c43d794f3380f0` | 152 |
-| `.hermes/plans/2026-08-04-comprehensive-project-audit.md` | historical-report | `d95f2616909de0fc044c381a037c39d251789849231ae97d11bbc0823fabab52` | 41 |
-| `.hermes/plans/2026-08-04-design-to-implementation-backlog-reconciliation.md` | active-implementation-tracker | `95a69404dc9cb2d291b42e871562edcbe8f5d533430445e185c264dcb3d9c47e` | 31 |
-| `.hermes/plans/canonical-values-model-implementation.md` | active-implementation-tracker | `84dd88cf4609203e1d651d1883901fd8c35ae283102e8f0c4fe6dfa67d4af553` | 273 |
-| `.hermes/plans/canonical-values-model-prd.md` | active-implementation-tracker | `d0ddf7b246c406c621b3b1b0b98d816476971c25f9982c6af97fc36cfc206aa8` | 5 |
-| `.hermes/plans/hermes-control-integration.md` | active-implementation-tracker | `3c46f4d428e12fc9d455b642e847c3d3b1e02b5d49a6fcf13e0e369b7fdd95cd` | 39 |
-| `.hermes/plans/site-aware-values-migration.md` | active-implementation-tracker | `11baea5dea69da294d3467b5a62ca27a67f6b34d7826f0a163ac9ffcaae22232` | 0 |
-| `.hermes/plans/upstream-capability-adoption.md` | active-implementation-tracker | `684208c7e162d04de86d8d7db6507b40bd7dcf932a85da93dcdcfce4e706ffd0` | 36 |
-| `.hermes/prompts/2026-08-04-luna-adversarial-remediation-review.md` | unclassified | `a702d8801f8fc5548667e20ed6d3a19afb175f0f4858a7082abb0d74dbdf04c5` | 10 |
-| `.specs/archive/direct-service-ansible/evidence/python-inspection.md` | unclassified | `045a8dd005429e50d15b640131189d45429f197074e5938747488be5cbdfea63` | 0 |
-| `.specs/archive/direct-service-ansible/plan.md` | unclassified | `5e89c4ccb3a6de7cc81a2b682fa7e44e5ffe4ac69215099106c7cf46910dd1ee` | 57 |
-| `.specs/archive/direct-service-ansible/review-1/applied-fixes.md` | unclassified | `8b918c330f9ef07423b230a19718bd39e0b1bc8506463d35357c3464d5f8a9ad` | 7 |
-| `.specs/archive/direct-service-ansible/review-1/devops-pro.md` | unclassified | `5d045a7cbd42f900b2792476988b3f9439182b21f9c89ef7c6dc5f5f48dd6666` | 4 |
-| `.specs/archive/direct-service-ansible/review-1/product-manager.md` | unclassified | `fec1536b4a70b67e51684981e82342a89a251ba6292a79c8e0f5ab1df165fe59` | 5 |
-| `.specs/archive/direct-service-ansible/review-1/python-pro.md` | unclassified | `6ba07748e30fe27d232ee7a03e0e708de832a26432048294bd2443afdbed2db6` | 4 |
-| `.specs/archive/direct-service-ansible/review-1/qa-engineer.md` | unclassified | `ce11a20df29a31a300403db6013747add3a959bdf71befd44b327d24f3f5de12` | 1 |
-| `.specs/archive/direct-service-ansible/review-1/reviewer.md` | unclassified | `7dcb55de5b5d91982a65e5d0b214d3addc8f02ae7e5be6800570e30a639bc176` | 2 |
-| `.specs/archive/direct-service-ansible/review-1/security-reviewer.md` | unclassified | `58fcb4e965cdad1dfd4350141cd12d3136df726b8aa757c40c8b00bdac742df8` | 1 |
-| `.specs/archive/direct-service-ansible/review-1/synthesis.md` | unclassified | `796894852b4ea1b880a7f488be66152e57a59ba36a7e03316f462f8734921325` | 2 |
-| `.specs/archive/direct-service-ansible/review-1/terraform-pro.md` | unclassified | `4cf9fe352f914e0d7f383f5b2c3c8216e19bac1b2c6a3abee1e5de5c62aeaf56` | 0 |
-| `.specs/archive/direct-service-ansible/review-2/ansible-implementation-reviewer.md` | unclassified | `ababdb35137ede60b13035343cfe5d7aabf7b371b54ccc2348924da93a6efe75` | 1 |
-| `.specs/archive/direct-service-ansible/review-2/applied-fixes.md` | unclassified | `200f8a35ef2e73508402baa3bc5ef2c3f1a82a79a406a34aa02f286d148e677a` | 9 |
-| `.specs/archive/direct-service-ansible/review-2/devops-pro.md` | unclassified | `4caf0b8608297dc24d436faa641bcba7968d1d0d7b675fab11365aecaf929088` | 0 |
-| `.specs/archive/direct-service-ansible/review-2/product-manager.md` | unclassified | `b991e989d530b1f735b069d9940d1d0a880ba773385627ab722115e482f3cba1` | 0 |
-| `.specs/archive/direct-service-ansible/review-2/python-pro.md` | unclassified | `036ffda7840c63f81bcf3dcacbb837cf36ea86fb21d49c40e24cf7effce7168c` | 1 |
-| `.specs/archive/direct-service-ansible/review-2/qa-engineer.md` | unclassified | `03167d0721daef602198c1e97a7544783639865cee0c29439979de2e08553845` | 1 |
-| `.specs/archive/direct-service-ansible/review-2/reviewer.md` | unclassified | `8efbdea3185cff8ba18b8b305174252b89c660e332b365620bb5efa8a082d752` | 0 |
-| `.specs/archive/direct-service-ansible/review-2/security-reviewer.md` | unclassified | `61283e799d201df026fa0bc7a4a2fea8bb484930268365d6246ada0e88e5a223` | 2 |
-| `.specs/archive/direct-service-ansible/review-2/synthesis.md` | unclassified | `f81a8e708bde8a4ca5fb53e8706fb5ece433de597239469d8bd0f91925c30c88` | 3 |
-| `.specs/archive/onramp-host-pilot/plan.md` | unclassified | `8c3519093e8e575d7238c5e7f0fa8bd64162114698c3f7b6d1570287649b531f` | 47 |
-| `.specs/archive/onramp-host-pilot/review-1/applied-fixes.md` | unclassified | `f741b6fb79b83df26e6d3ffc136f21a1529ce2fc74838bf030f00042a7a77c68` | 5 |
-| `.specs/archive/onramp-host-pilot/review-1/devops-pro.md` | unclassified | `99b9f6b1af9e34b579b2c6b6ec7db812eacfe7f3a8cda160706908f26a1429dc` | 3 |
-| `.specs/archive/onramp-host-pilot/review-1/product-manager.md` | unclassified | `998a42cffb10b3152fcf421d9099b60490e7af57662f7b94cbb3e10564ee41cf` | 4 |
-| `.specs/archive/onramp-host-pilot/review-1/qa-engineer.md` | unclassified | `397b6d0085aa6b6018cfe950a5ae9183d4e2776263cdabfd39e8e8d639b7b3a9` | 1 |
-| `.specs/archive/onramp-host-pilot/review-1/reviewer.md` | unclassified | `5b3d0cac3a4b62378b73940f1eadaa4658268667dd457a50a239a1c151bcbd56` | 1 |
-| `.specs/archive/onramp-host-pilot/review-1/security-reviewer.md` | unclassified | `039fc88f54b3265c474a41bd690bbe9cf66e98b9c5c1a1639e59cf7c1ca4abe3` | 0 |
-| `.specs/archive/onramp-host-pilot/review-1/synthesis.md` | unclassified | `fdb556f4b377fe3e8b44c6f5eea3ea9d3a83eccf6725831d1c13f18cf86f8e6c` | 6 |
-| `.specs/archive/onramp-host-pilot/review-1/terraform-pro.md` | unclassified | `04e4b58ee8b59d2bbb3cf75526d080db7b3f4e63796a3cded8cc184faa9569f7` | 4 |
-| `.specs/archive/searxng-onramp/plan.md` | unclassified | `161c85ba998f9b7a8aae48db82807bfcc47d5de9474b36854f4f73b6e6687eb7` | 16 |
-| `.specs/archive/searxng-podman-runtime/plan.md` | unclassified | `006bb6505088defcea2ac079677dbdea15df2e4c758577c3c571b8a46d8b99cf` | 44 |
-| `.specs/archive/searxng-podman-runtime/review-1/applied-fixes.md` | unclassified | `407b9007cb4bf664b45871c270c0fc962ee1be719ceec45f11e29e392817eec3` | 6 |
-| `.specs/archive/searxng-podman-runtime/review-1/devops-pro.md` | unclassified | `ccd85081fcdd13fb54853b762f1a919adf7e7d3915fa03539f51d9155a15b5d6` | 0 |
-| `.specs/archive/searxng-podman-runtime/review-1/known-blocker-fixes.md` | unclassified | `3b377b488f3d9f6ec6ea800ff57875bf501b8b09d15c976b3f6f43c9b902ddef` | 0 |
-| `.specs/archive/searxng-podman-runtime/review-1/product-manager.md` | unclassified | `32a0623e7eb5e1df9f9bcde016b7a8c49044d3d6a768b4b170b65d79c34154e6` | 3 |
-| `.specs/archive/searxng-podman-runtime/review-1/python-pro.md` | unclassified | `040f7355df581b181fec257a0c17a88d14af2e73261a3f2d62a77c3148dc5fc1` | 0 |
-| `.specs/archive/searxng-podman-runtime/review-1/qa-engineer.md` | unclassified | `b9122ec83e3bff2687dba8fe068387330a25c6d739d33f80532de946122e4b12` | 1 |
-| `.specs/archive/searxng-podman-runtime/review-1/reviewer.md` | unclassified | `0287ce21ddcb5209966cfc74627544eeb991d03d0d29361b45d8abdfca6cd742` | 1 |
-| `.specs/archive/searxng-podman-runtime/review-1/security-reviewer.md` | unclassified | `cbf810c2ab80cb33e4e2c518c2975c5b1c823342cc74a4a58457823993471b23` | 4 |
-| `.specs/archive/searxng-podman-runtime/review-1/synthesis.md` | unclassified | `a188b3d9135abdc7c5d7b5a9fee16905d00e44556f60bf44278486510e6c26c8` | 0 |
-| `.specs/archive/searxng-podman-runtime/review-1/terraform-pro.md` | unclassified | `ea20f3d89c0b92aa2c67ad0b90b54cbdb97012df8dfee5ebe5b6c091f0c572f2` | 2 |
-| `.specs/direct-hermes-ansible/plan.md` | unclassified | `69844d03f7a8ef714d1aec5696103bfd5f6f581f800f94e7553213a85df66320` | 32 |
-| `AGENTS.md` | contributor-current | `478c19103b5def78605cd643d3319d81e7b75740ff0c95b3912246c9c60bae6a` | 0 |
-| `README.md` | operator-current | `40a0f5a597f70aa6a9aae0e3b8718a4754a92813536777d4e701e1c687a19a97` | 0 |
-| `docs/README.md` | contributor-current | `fb680694591ab0ec9f9a9158246e4f085366ffc23337e0ce8b7322058ec157c1` | 0 |
-| `docs/canonical-architecture.md` | architecture-current | `833dcd4c180326ce9f6f3bc348c9c7a97e6ffc8f0013da6f252a44e95653ae2b` | 0 |
-| `docs/canonical-quick-start.md` | operator-current | `a90d2de2c3b67c730bad478bd9551c1b80ae646b97fbb40a531a639c2e4942e5` | 0 |
-| `docs/canonical-readiness.md` | operator-current | `a9454fce68c757db734713126f35e83bd495031ac4ea93205faa30fa22f94cf0` | 0 |
-| `docs/canonical-service-authoring.md` | contributor-current | `8fb1e5b5ad75385a1ef6bd7c4ed6bd78590a8fbe7c4a8eee95cb9e1014d9e3f7` | 0 |
-| `docs/canonical-teardown.md` | operator-current | `757c6213e940bb29b60f18b4cf18fda15d804c15c028e86fffa675c1be029d74` | 0 |
-| `docs/canonical-troubleshooting.md` | operator-current | `a071fdbe575952ba6b24e858984fa9898dc55965989db1edb1333930a1e9d0d9` | 0 |
-| `docs/canonical-values-mapping-v1.md` | architecture-current | `43f75b19e77290d6c612e74e3f733f1160afb8970e924ed63f3f91f594f87ab8` | 4 |
-| `docs/canonical-values-migration.md` | architecture-current | `3cfc5ad7df0acbd17dd6b7a27042befa7f80546ebdbbf0c5d66ec362a4a738b3` | 0 |
-| `docs/canonical-values-model-blockers.md` | architecture-current | `c94a50d1bd1b9b60f38baf8ead87cef314b7f43fb24af8a92dea965c32c49c5d` | 0 |
-| `docs/canonical-values-secret-operations.md` | operator-current | `3763de55f19ae42fe4a0765861fe05e25fc6e688660b5fa9b92b51ee886e00ff` | 0 |
-| `docs/debian-baseline.md` | architecture-current | `daf6009d472ae46aab424a1c6482f61f05edb8dd2508062a0a3610978de724fb` | 0 |
-| `docs/development-environment.md` | contributor-current | `6177801ff7e11de33d090dc679c009d8f3642fcf368210f023aa63e49d70e2e2` | 0 |
-| `docs/documentation-inventory.json` | unclassified | `b578abb656ed422dc846c3407b2be1ef60187408f61399708c46c0e4fdc491e1` | 0 |
-| `docs/hermes-control-operations.md` | operator-current | `0bc95ec6a3dfaec791f9ef2e79bd65bcd55f0b4bb653d1a9c38b524f1e81b0da` | 0 |
-| `docs/hermes-operator-pilot-prd.md` | architecture-current | `b9fd32d005fb5c2d38d0a718f611256b1f40c51f48cdb21fecd79b596f5fb428` | 7 |
-| `docs/hermes-state-backup.md` | operator-current | `5400e099e4a8f08a82ac9cdd5a89b9311d3c717226d515edd2e1121914f66cd0` | 0 |
-| `docs/hermes-tuning.md` | operator-current | `1df917be5bcadc73c7ab16313dac55374624706fae43ce53d202fd4649f888e4` | 0 |
-| `docs/just-recipes.md` | operator-current | `94e105456c46dbaade35dbff6f04b8fdc54de0544312028cf345470d4c24a669` | 0 |
-| `docs/normalized-plan-equivalence.md` | architecture-current | `36ec1125b6ca8630db5d9ab221b0341f9b4473d189de9537b1cd714df7717131` | 1 |
-| `docs/onramp-app-platform-contract.md` | operator-current | `ac3ea674420b8d26861026be7e9ac67845b42e633d0637173fd1b40a01acf772` | 0 |
-| `docs/onramp-host-runbook.md` | operator-current | `0c440c7c4fd9983d27afeb5b6f82333e741c7d49d6a0e97e58efc3e852a1b92e` | 0 |
-| `docs/onramp-searxng-handoff.md` | operator-current | `7b548efd4786d503d1cb65411fffc87999de3cf2d883f7876957a9309dadde0a` | 0 |
-| `docs/service-catalog.md` | architecture-current | `96489bc2aaa7d76c6dbf06fae4ad88738425ef383756a299d9f18a4fee4dbe2b` | 0 |
-| `docs/service-state-backup.md` | operator-current | `2475fd5cb6913e3ee4b13c3c57f6d36db3f223933ca7c427fb978d70f89ba36a` | 0 |
-| `docs/service-update-policy.md` | operator-current | `5bbf311404dd4be12b2c174c01af636b2a8b9abc245de8f0af4375fb01257820` | 0 |
-| `docs/sssf.md` | operator-current | `0c786675fbbbafc4b6d2fc252f56a87d3a6409951b281ce1ab63b558a65ee6e8` | 0 |
-| `scaffold/README.md` | contributor-current | `851c9198663b2efb2e7bf35e29c8e9aa35b9450b53629fdbd480b564f54de801` | 0 |
-| `scaffold/sites/_template/README.md` | contributor-current | `6b7337e4dc19a5268c2f37d4d2b717cc2cffed592c66c85f8a92bd2db6f3682d` | 0 |
+| `.hermes/plans/2026-08-03_071330-canonical-cutover-audit-report.md` | historical reference | `0df5d9f7da7273dc3fb23affb87d571bfd35fd7678cdb2708d934921bc75e46a` | 13 |
+| `.hermes/plans/2026-08-03_071330-canonical-cutover-audit.md` | historical reference | `ab78c40b2f039ae9edfa207f08905f0392837fb318a6cd354dc95b921550a09d` | 4 |
+| `.hermes/plans/2026-08-03_135649-canonical-first-documentation-and-authoring.md` | historical reference | `14befd4041dcddd0b651ab3b7774e01d6d8a037339fecec475f3f39f3fdb89e5` | 8 |
+| `.hermes/plans/2026-08-03_174531-super-simple-software-factory-vm.md` | historical reference | `71ebb21b4ed5ef2ceb9189ee5af48eb4dae5fe3bc0c7595ac0bfd1f4d8e70c0c` | 0 |
+| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | implementation tracker | `64aefec7fdd8765ab857ebfc80c79651cdcdc6c16ba8ae5db39fc38f925476e4` | 158 |
+| `.hermes/plans/2026-08-04-comprehensive-project-audit.md` | historical reference | `d95f2616909de0fc044c381a037c39d251789849231ae97d11bbc0823fabab52` | 41 |
+| `.hermes/plans/2026-08-04-design-to-implementation-backlog-reconciliation.md` | historical reference | `465f5a3f355c83e371e775815cef2c03fd47ffccc1e17f7d23db4027e50c4c7b` | 31 |
+| `.hermes/plans/canonical-values-model-implementation.md` | implementation tracker | `84dd88cf4609203e1d651d1883901fd8c35ae283102e8f0c4fe6dfa67d4af553` | 273 |
+| `.hermes/plans/canonical-values-model-prd.md` | historical reference | `d0ddf7b246c406c621b3b1b0b98d816476971c25f9982c6af97fc36cfc206aa8` | 5 |
+| `.hermes/plans/hermes-control-integration.md` | implementation tracker | `3c46f4d428e12fc9d455b642e847c3d3b1e02b5d49a6fcf13e0e369b7fdd95cd` | 39 |
+| `.hermes/plans/site-aware-values-migration.md` | implementation tracker | `11baea5dea69da294d3467b5a62ca27a67f6b34d7826f0a163ac9ffcaae22232` | 0 |
+| `.hermes/plans/upstream-capability-adoption.md` | implementation tracker | `edffb905c5673eabd66cb6c738702f0befd7d2eaa19b2608a36fc2cfbaaa4f9e` | 36 |
+| `.hermes/prompts/2026-08-04-luna-adversarial-remediation-review.md` | historical reference | `2c5cd6d0710a8c19de092058ead48cf1abaceab868776e97797c7bd38b9e23da` | 10 |
+| `.specs/archive/direct-service-ansible/evidence/python-inspection.md` | acceptance evidence | `045a8dd005429e50d15b640131189d45429f197074e5938747488be5cbdfea63` | 0 |
+| `.specs/archive/direct-service-ansible/plan.md` | acceptance evidence | `5e89c4ccb3a6de7cc81a2b682fa7e44e5ffe4ac69215099106c7cf46910dd1ee` | 57 |
+| `.specs/archive/direct-service-ansible/review-1/applied-fixes.md` | acceptance evidence | `8b918c330f9ef07423b230a19718bd39e0b1bc8506463d35357c3464d5f8a9ad` | 7 |
+| `.specs/archive/direct-service-ansible/review-1/devops-pro.md` | acceptance evidence | `5d045a7cbd42f900b2792476988b3f9439182b21f9c89ef7c6dc5f5f48dd6666` | 4 |
+| `.specs/archive/direct-service-ansible/review-1/product-manager.md` | acceptance evidence | `fec1536b4a70b67e51684981e82342a89a251ba6292a79c8e0f5ab1df165fe59` | 5 |
+| `.specs/archive/direct-service-ansible/review-1/python-pro.md` | acceptance evidence | `6ba07748e30fe27d232ee7a03e0e708de832a26432048294bd2443afdbed2db6` | 4 |
+| `.specs/archive/direct-service-ansible/review-1/qa-engineer.md` | acceptance evidence | `ce11a20df29a31a300403db6013747add3a959bdf71befd44b327d24f3f5de12` | 1 |
+| `.specs/archive/direct-service-ansible/review-1/reviewer.md` | acceptance evidence | `7dcb55de5b5d91982a65e5d0b214d3addc8f02ae7e5be6800570e30a639bc176` | 2 |
+| `.specs/archive/direct-service-ansible/review-1/security-reviewer.md` | acceptance evidence | `58fcb4e965cdad1dfd4350141cd12d3136df726b8aa757c40c8b00bdac742df8` | 1 |
+| `.specs/archive/direct-service-ansible/review-1/synthesis.md` | acceptance evidence | `796894852b4ea1b880a7f488be66152e57a59ba36a7e03316f462f8734921325` | 2 |
+| `.specs/archive/direct-service-ansible/review-1/terraform-pro.md` | acceptance evidence | `4cf9fe352f914e0d7f383f5b2c3c8216e19bac1b2c6a3abee1e5de5c62aeaf56` | 0 |
+| `.specs/archive/direct-service-ansible/review-2/ansible-implementation-reviewer.md` | acceptance evidence | `ababdb35137ede60b13035343cfe5d7aabf7b371b54ccc2348924da93a6efe75` | 1 |
+| `.specs/archive/direct-service-ansible/review-2/applied-fixes.md` | acceptance evidence | `200f8a35ef2e73508402baa3bc5ef2c3f1a82a79a406a34aa02f286d148e677a` | 9 |
+| `.specs/archive/direct-service-ansible/review-2/devops-pro.md` | acceptance evidence | `4caf0b8608297dc24d436faa641bcba7968d1d0d7b675fab11365aecaf929088` | 0 |
+| `.specs/archive/direct-service-ansible/review-2/product-manager.md` | acceptance evidence | `b991e989d530b1f735b069d9940d1d0a880ba773385627ab722115e482f3cba1` | 0 |
+| `.specs/archive/direct-service-ansible/review-2/python-pro.md` | acceptance evidence | `036ffda7840c63f81bcf3dcacbb837cf36ea86fb21d49c40e24cf7effce7168c` | 1 |
+| `.specs/archive/direct-service-ansible/review-2/qa-engineer.md` | acceptance evidence | `03167d0721daef602198c1e97a7544783639865cee0c29439979de2e08553845` | 1 |
+| `.specs/archive/direct-service-ansible/review-2/reviewer.md` | acceptance evidence | `8efbdea3185cff8ba18b8b305174252b89c660e332b365620bb5efa8a082d752` | 0 |
+| `.specs/archive/direct-service-ansible/review-2/security-reviewer.md` | acceptance evidence | `61283e799d201df026fa0bc7a4a2fea8bb484930268365d6246ada0e88e5a223` | 2 |
+| `.specs/archive/direct-service-ansible/review-2/synthesis.md` | acceptance evidence | `f81a8e708bde8a4ca5fb53e8706fb5ece433de597239469d8bd0f91925c30c88` | 3 |
+| `.specs/archive/onramp-host-pilot/plan.md` | acceptance evidence | `8c3519093e8e575d7238c5e7f0fa8bd64162114698c3f7b6d1570287649b531f` | 47 |
+| `.specs/archive/onramp-host-pilot/review-1/applied-fixes.md` | acceptance evidence | `f741b6fb79b83df26e6d3ffc136f21a1529ce2fc74838bf030f00042a7a77c68` | 5 |
+| `.specs/archive/onramp-host-pilot/review-1/devops-pro.md` | acceptance evidence | `99b9f6b1af9e34b579b2c6b6ec7db812eacfe7f3a8cda160706908f26a1429dc` | 3 |
+| `.specs/archive/onramp-host-pilot/review-1/product-manager.md` | acceptance evidence | `998a42cffb10b3152fcf421d9099b60490e7af57662f7b94cbb3e10564ee41cf` | 4 |
+| `.specs/archive/onramp-host-pilot/review-1/qa-engineer.md` | acceptance evidence | `397b6d0085aa6b6018cfe950a5ae9183d4e2776263cdabfd39e8e8d639b7b3a9` | 1 |
+| `.specs/archive/onramp-host-pilot/review-1/reviewer.md` | acceptance evidence | `5b3d0cac3a4b62378b73940f1eadaa4658268667dd457a50a239a1c151bcbd56` | 1 |
+| `.specs/archive/onramp-host-pilot/review-1/security-reviewer.md` | acceptance evidence | `039fc88f54b3265c474a41bd690bbe9cf66e98b9c5c1a1639e59cf7c1ca4abe3` | 0 |
+| `.specs/archive/onramp-host-pilot/review-1/synthesis.md` | acceptance evidence | `fdb556f4b377fe3e8b44c6f5eea3ea9d3a83eccf6725831d1c13f18cf86f8e6c` | 6 |
+| `.specs/archive/onramp-host-pilot/review-1/terraform-pro.md` | acceptance evidence | `04e4b58ee8b59d2bbb3cf75526d080db7b3f4e63796a3cded8cc184faa9569f7` | 4 |
+| `.specs/archive/searxng-onramp/plan.md` | acceptance evidence | `161c85ba998f9b7a8aae48db82807bfcc47d5de9474b36854f4f73b6e6687eb7` | 16 |
+| `.specs/archive/searxng-podman-runtime/plan.md` | acceptance evidence | `006bb6505088defcea2ac079677dbdea15df2e4c758577c3c571b8a46d8b99cf` | 44 |
+| `.specs/archive/searxng-podman-runtime/review-1/applied-fixes.md` | acceptance evidence | `407b9007cb4bf664b45871c270c0fc962ee1be719ceec45f11e29e392817eec3` | 6 |
+| `.specs/archive/searxng-podman-runtime/review-1/devops-pro.md` | acceptance evidence | `ccd85081fcdd13fb54853b762f1a919adf7e7d3915fa03539f51d9155a15b5d6` | 0 |
+| `.specs/archive/searxng-podman-runtime/review-1/known-blocker-fixes.md` | acceptance evidence | `3b377b488f3d9f6ec6ea800ff57875bf501b8b09d15c976b3f6f43c9b902ddef` | 0 |
+| `.specs/archive/searxng-podman-runtime/review-1/product-manager.md` | acceptance evidence | `32a0623e7eb5e1df9f9bcde016b7a8c49044d3d6a768b4b170b65d79c34154e6` | 3 |
+| `.specs/archive/searxng-podman-runtime/review-1/python-pro.md` | acceptance evidence | `040f7355df581b181fec257a0c17a88d14af2e73261a3f2d62a77c3148dc5fc1` | 0 |
+| `.specs/archive/searxng-podman-runtime/review-1/qa-engineer.md` | acceptance evidence | `b9122ec83e3bff2687dba8fe068387330a25c6d739d33f80532de946122e4b12` | 1 |
+| `.specs/archive/searxng-podman-runtime/review-1/reviewer.md` | acceptance evidence | `0287ce21ddcb5209966cfc74627544eeb991d03d0d29361b45d8abdfca6cd742` | 1 |
+| `.specs/archive/searxng-podman-runtime/review-1/security-reviewer.md` | acceptance evidence | `cbf810c2ab80cb33e4e2c518c2975c5b1c823342cc74a4a58457823993471b23` | 4 |
+| `.specs/archive/searxng-podman-runtime/review-1/synthesis.md` | acceptance evidence | `a188b3d9135abdc7c5d7b5a9fee16905d00e44556f60bf44278486510e6c26c8` | 0 |
+| `.specs/archive/searxng-podman-runtime/review-1/terraform-pro.md` | acceptance evidence | `ea20f3d89c0b92aa2c67ad0b90b54cbdb97012df8dfee5ebe5b6c091f0c572f2` | 2 |
+| `.specs/direct-hermes-ansible/plan.md` | historical reference | `69844d03f7a8ef714d1aec5696103bfd5f6f581f800f94e7553213a85df66320` | 32 |
+| `AGENTS.md` | current authority | `478c19103b5def78605cd643d3319d81e7b75740ff0c95b3912246c9c60bae6a` | 0 |
+| `README.md` | current authority | `b606d37bd996e0765f7a81939a8f62851e727e1d4f24250f3e9195e3e6035f48` | 0 |
+| `docs/README.md` | current authority | `ef1734cfae8c0b0e0a622d2d11940e9b2e20a61c313689b98496708005f82cf0` | 0 |
+| `docs/canonical-architecture.md` | current authority | `833dcd4c180326ce9f6f3bc348c9c7a97e6ffc8f0013da6f252a44e95653ae2b` | 0 |
+| `docs/canonical-quick-start.md` | operator guidance | `a90d2de2c3b67c730bad478bd9551c1b80ae646b97fbb40a531a639c2e4942e5` | 0 |
+| `docs/canonical-readiness.md` | operator guidance | `a9454fce68c757db734713126f35e83bd495031ac4ea93205faa30fa22f94cf0` | 0 |
+| `docs/canonical-service-authoring.md` | working design | `8fb1e5b5ad75385a1ef6bd7c4ed6bd78590a8fbe7c4a8eee95cb9e1014d9e3f7` | 0 |
+| `docs/canonical-teardown.md` | operator guidance | `757c6213e940bb29b60f18b4cf18fda15d804c15c028e86fffa675c1be029d74` | 0 |
+| `docs/canonical-troubleshooting.md` | operator guidance | `47e3d14ff30deef44db44cfbb506354006a32ddcef330319440fc19232fd6610` | 0 |
+| `docs/canonical-values-mapping-v1.md` | current authority | `7c7a60508fd4a02d483b94f5b9b1fb876c8b750b5dfea146f63268ffb87caf73` | 3 |
+| `docs/canonical-values-migration.md` | operator guidance | `7769bb637118a27d688c575a246fcb4f8a0978c286bf3541b8df0aa7bc6cfb95` | 1 |
+| `docs/canonical-values-model-blockers.md` | working design | `c94a50d1bd1b9b60f38baf8ead87cef314b7f43fb24af8a92dea965c32c49c5d` | 0 |
+| `docs/canonical-values-secret-operations.md` | operator guidance | `3763de55f19ae42fe4a0765861fe05e25fc6e688660b5fa9b92b51ee886e00ff` | 0 |
+| `docs/debian-baseline.md` | working design | `bee93782e007e310159082922236a3e21ec1d0344c792f471456623917ec9827` | 0 |
+| `docs/development-environment.md` | working design | `6177801ff7e11de33d090dc679c009d8f3642fcf368210f023aa63e49d70e2e2` | 0 |
+| `docs/documentation-inventory.json` | unclassified | `1f255ca3c3a6f9f40166fb8e209199c9743d95efa172b170ce81ae91395e2917` | 0 |
+| `docs/hermes-control-operations.md` | operator guidance | `63c4284b16d1780389c64fe9c8c570704bb661515fa6dfc07e9607b68854c280` | 0 |
+| `docs/hermes-operator-pilot-prd.md` | working design | `5f5a511070272019c99b12dd5a039d0950498a759482a7953b1ed128e471cd35` | 13 |
+| `docs/hermes-state-backup.md` | operator guidance | `5400e099e4a8f08a82ac9cdd5a89b9311d3c717226d515edd2e1121914f66cd0` | 0 |
+| `docs/hermes-tuning.md` | operator guidance | `1df917be5bcadc73c7ab16313dac55374624706fae43ce53d202fd4649f888e4` | 0 |
+| `docs/just-recipes.md` | operator guidance | `94e105456c46dbaade35dbff6f04b8fdc54de0544312028cf345470d4c24a669` | 0 |
+| `docs/normalized-plan-equivalence.md` | working design | `36ec1125b6ca8630db5d9ab221b0341f9b4473d189de9537b1cd714df7717131` | 1 |
+| `docs/onramp-app-platform-contract.md` | operator guidance | `ac3ea674420b8d26861026be7e9ac67845b42e633d0637173fd1b40a01acf772` | 0 |
+| `docs/onramp-host-runbook.md` | operator guidance | `0c440c7c4fd9983d27afeb5b6f82333e741c7d49d6a0e97e58efc3e852a1b92e` | 0 |
+| `docs/onramp-searxng-handoff.md` | operator guidance | `7b548efd4786d503d1cb65411fffc87999de3cf2d883f7876957a9309dadde0a` | 0 |
+| `docs/service-catalog.md` | current authority | `96489bc2aaa7d76c6dbf06fae4ad88738425ef383756a299d9f18a4fee4dbe2b` | 0 |
+| `docs/service-operations.md` | operator guidance | `927ea8d255e0bb444ad12e0fa953b01e8b0adebf24824bf66cb0adc2054ae0c1` | 1 |
+| `docs/service-state-backup.md` | operator guidance | `2475fd5cb6913e3ee4b13c3c57f6d36db3f223933ca7c427fb978d70f89ba36a` | 0 |
+| `docs/service-update-policy.md` | operator guidance | `5bbf311404dd4be12b2c174c01af636b2a8b9abc245de8f0af4375fb01257820` | 0 |
+| `docs/sssf.md` | operator guidance | `0c786675fbbbafc4b6d2fc252f56a87d3a6409951b281ce1ab63b558a65ee6e8` | 0 |
+| `docs/tooling-reproducibility.md` | current authority | `97ddc2b8264aa9c7a9596f976b80ef76da919e2b85a616aa01ee20dffbbd85dd` | 0 |
+| `scaffold/README.md` | working design | `851c9198663b2efb2e7bf35e29c8e9aa35b9450b53629fdbd480b564f54de801` | 0 |
+| `scaffold/sites/_template/README.md` | working design | `6b7337e4dc19a5268c2f37d4d2b717cc2cffed592c66c85f8a92bd2db6f3682d` | 0 |

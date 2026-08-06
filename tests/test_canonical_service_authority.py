@@ -1,12 +1,25 @@
 """Canonical service selection remains the sole resource enablement authority."""
 
 from copy import deepcopy
+import os
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 
 import yaml
+
+ROOT = Path(__file__).resolve().parents[1]
+TOFU_PLUGIN_CACHE = os.environ.get("TF_PLUGIN_CACHE_DIR")
+TOFU_RUNTIME_AVAILABLE = bool(
+    shutil.which("tofu")
+    and TOFU_PLUGIN_CACHE
+    and any(Path(TOFU_PLUGIN_CACHE).rglob("terraform-provider-proxmox*"))
+)
+sys.path.insert(0, str(ROOT / "scripts"))
 
 from scripts.canonical_projections import render_ansible_inventory, render_opentofu_variables
 from scripts.canonical_values import load_site
@@ -23,6 +36,23 @@ ONRAMP_CHECKS_TF = ROOT / "infra/opentofu/onramp-host-checks.tf"
 
 
 class CanonicalServiceAuthorityTests(unittest.TestCase):
+    @staticmethod
+    def tofu_console(expression: str, *variables: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                "tofu",
+                "-chdir=infra/opentofu",
+                "console",
+                "-var-file=../../scaffold/terraform.tfvars",
+                *variables,
+            ],
+            cwd=ROOT,
+            input=f"{expression}\n",
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
     def test_tailscale_selection_projects_to_tofu_and_inventory_without_legacy_gate(self) -> None:
         data = yaml.safe_load((ROOT / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8"))
         resource = deepcopy(data["resources"]["guests"]["technitium"])
@@ -49,9 +79,100 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
 
         self.assertIn("tailscale_client", tofu["enabled_services"])
         self.assertIn("tailscale_client", inventory)
-        self.assertIn('tailscale_client_enabled = contains(local.enabled_services, "tailscale_client")', services_tf)
+        self.assertIn('tailscale_client_enabled = local.service_enabled.tailscale_client', services_tf)
         self.assertNotIn('&& var.tailscale_client_enabled', services_tf)
         self.assertIn("local.tailscale_client_enabled", tailscale_tf)
+
+    def test_retired_opentofu_selection_aliases_fail_closed(self) -> None:
+        variables = VARIABLES_TF.read_text(encoding="utf-8")
+        services = SERVICES_TF.read_text(encoding="utf-8")
+        scaffold = (ROOT / "scaffold/terraform.tfvars").read_text(encoding="utf-8")
+
+        self.assertRegex(variables, r'(?s)variable "forgejo_runtime" \{.*?default\s+=\s+null')
+        self.assertRegex(variables, r'(?s)variable "tailscale_client_enabled" \{.*?default\s+=\s+null')
+        self.assertIn("var.forgejo_runtime == null", services)
+        self.assertIn("var.tailscale_client_enabled == null", services)
+        self.assertNotIn("tailscale_client_enabled", scaffold)
+
+    def test_runtime_selection_defaults_and_acceptance_are_catalog_backed(self) -> None:
+        catalog = load_catalog(CATALOG_PATH)
+        services = SERVICES_TF.read_text(encoding="utf-8")
+
+        self.assertEqual(catalog.get("forgejo").runtime.default_type, "lxc")
+        self.assertEqual(catalog.get("onramp_host").runtime.default_type, "vm")
+        self.assertEqual(catalog.get("onramp_host").runtime.supported_types, ("vm",))
+        self.assertEqual(catalog.get("searxng_onramp").runtime, None)
+        self.assertIn("entry.runtime", services)
+        self.assertIn("metadata.default_type", services)
+        self.assertIn("runtime_service_metadata[service_name].supported_types", services)
+        self.assertNotIn("service_runtime_defaults = {", services)
+
+    def test_forgejo_vm_selects_the_checksum_verified_service_image(self) -> None:
+        services = SERVICES_TF.read_text(encoding="utf-8")
+        main = (ROOT / "infra/opentofu/main.tf").read_text(encoding="utf-8")
+        forgejo = (ROOT / "infra/opentofu/forgejo.tf").read_text(encoding="utf-8")
+
+        self.assertIn("local.forgejo_enabled && local.forgejo_runtime_type == \"vm\"", services)
+        self.assertRegex(
+            main,
+            r'(?s)resource "proxmox_download_file" "debian_13_service_vm_image" \{.*?count\s+=\s+local\.service_vm_image_enabled.*?checksum\s+=\s+var\.guest_vm_image_checksum',
+        )
+        self.assertRegex(
+            forgejo,
+            r'(?s)module "forgejo_vm" \{.*?count\s+=\s+local\.forgejo_enabled && local\.forgejo_runtime_type == "vm".*?file_id\s+=\s+.*?proxmox_download_file\.debian_13_service_vm_image\[0\]\.id',
+        )
+
+    @unittest.skipUnless(TOFU_RUNTIME_AVAILABLE, "OpenTofu runtime plugins are available in the infra tooling container")
+    def test_hcl_evaluates_forgejo_vm_as_requiring_the_service_image(self) -> None:
+        result = self.tofu_console(
+            "local.service_vm_image_enabled",
+            '-var=enabled_services=["forgejo"]',
+            '-var=service_runtime={forgejo={type="vm"}}',
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip().splitlines()[-1], "true")
+
+    @unittest.skipUnless(TOFU_RUNTIME_AVAILABLE, "OpenTofu runtime plugins are available in the infra tooling container")
+    def test_hcl_runtime_defaults_apply_when_service_runtime_is_omitted_or_partial(self) -> None:
+        omitted = self.tofu_console("local.forgejo_runtime.type", "-var=service_runtime={}")
+        partial = self.tofu_console(
+            "local.forgejo_runtime.type",
+            '-var=service_runtime={forgejo={cloud_init_user="forgejo"}}',
+        )
+        for result in (omitted, partial):
+            with self.subTest(output=result.stdout):
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip().splitlines()[-1], '"lxc"')
+
+    @unittest.skipUnless(TOFU_RUNTIME_AVAILABLE, "OpenTofu runtime plugins are available in the infra tooling container")
+    def test_hcl_rejects_unsupported_runtime_choices_and_retired_aliases(self) -> None:
+        cases = (
+            ('-var=service_runtime={forgejo={type="baremetal"}}', "service_runtime entries must use type lxc or vm."),
+            ('-var=service_runtime={onramp_host={type="lxc"}}', "onramp_host is VM-only"),
+            ('-var=forgejo_runtime={type="vm"}', "forgejo_runtime is a retired OpenTofu alias"),
+            ('-var=tailscale_client_enabled=true', "tailscale_client_enabled is a retired OpenTofu alias"),
+        )
+        for variable, expected in cases:
+            with self.subTest(variable=variable):
+                result = subprocess.run(
+                    [
+                        "tofu",
+                        "-chdir=infra/opentofu",
+                        "plan",
+                        "-refresh=false",
+                        "-input=false",
+                        "-lock=false",
+                        "-var-file=../../scaffold/terraform.tfvars",
+                        '-var=enabled_services=[]',
+                        variable,
+                    ],
+                    cwd=ROOT,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, result.stdout + result.stderr)
 
     def test_retained_stateful_disable_policy_is_projected_to_tofu_precondition(self) -> None:
         data = yaml.safe_load((ROOT / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8"))

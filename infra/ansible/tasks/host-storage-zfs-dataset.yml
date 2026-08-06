@@ -1,5 +1,6 @@
 ---
 - name: Check ZFS dataset {{ storage_bind_mount.host_prepare.dataset }}
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - zfs
@@ -13,6 +14,7 @@
   failed_when: storage_zfs_list.rc not in [0, 1]
 
 - name: Create ZFS dataset {{ storage_bind_mount.host_prepare.dataset }}
+  tags: [config]
   ansible.builtin.command:
     argv:
       - zfs
@@ -24,6 +26,7 @@
   changed_when: true
 
 - name: Read ZFS mountpoint {{ storage_bind_mount.host_prepare.dataset }}
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - zfs
@@ -37,6 +40,7 @@
   changed_when: false
 
 - name: Set ZFS mountpoint {{ storage_bind_mount.host_prepare.dataset }}
+  tags: [config]
   ansible.builtin.command:
     argv:
       - zfs
@@ -47,6 +51,7 @@
   changed_when: true
 
 - name: Mount ZFS dataset {{ storage_bind_mount.host_prepare.dataset }}
+  tags: [config]
   ansible.builtin.command:
     argv:
       - zfs
@@ -57,6 +62,7 @@
   failed_when: storage_zfs_mount.rc not in [0, 1]
 
 - name: Set initial host storage ownership {{ storage_bind_mount.host_prepare.mountpoint }}
+  tags: [config]
   ansible.builtin.file:
     path: "{{ storage_bind_mount.host_prepare.mountpoint }}"
     state: directory

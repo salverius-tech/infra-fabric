@@ -138,12 +138,12 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertTrue(hostvars["ansible_become"])
         self.assertEqual(hostvars["hermes_runtime"], {"type": "vm", "cloud_init_user": "hermes-admin"})
 
-    def test_forgejo_lxc_ignores_vm_cloud_init_user(self) -> None:
+    def test_forgejo_lxc_uses_typed_runtime_and_ignores_vm_cloud_init_user(self) -> None:
         inventory = tfvars_inventory.build_inventory(
             {
                 "forgejo_container_vmid": 107,
                 "forgejo_lan_ip": "192.0.2.62",
-                "forgejo_runtime": {"type": "lxc"},
+                "service_runtime": {"forgejo": {"type": "lxc"}},
                 "forgejo_vm_cloud_init_user": "forgejo-admin",
             },
             ["forgejo"],
@@ -171,13 +171,12 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertNotIn("hermes_ssh_public_keys", inventory["all"]["vars"])
         self.assertNotIn("hermes_ssh_public_keys", inventory["_meta"]["hostvars"]["hermes_lxc"])
 
-    def test_conflicting_canonical_and_legacy_runtime_fails_closed(self) -> None:
-        with self.assertRaisesRegex(tfvars_inventory.InventoryError, "conflicting canonical and legacy runtime"):
+    def test_retired_runtime_alias_is_rejected(self) -> None:
+        with self.assertRaisesRegex(tfvars_inventory.InventoryError, "retired runtime alias is not accepted"):
             tfvars_inventory.build_inventory(
                 {
                     "forgejo_container_vmid": 107,
                     "forgejo_lan_ip": "192.0.2.62",
-                    "service_runtime": {"forgejo": {"type": "vm"}},
                     "forgejo_runtime": {"type": "lxc"},
                 },
                 ["forgejo"],
@@ -197,19 +196,16 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(inventory["all"]["vars"]["forgejo_runtime"], runtime)
         self.assertEqual(inventory["_meta"]["hostvars"]["forgejo_lxc"]["forgejo_runtime"], runtime)
 
-    def test_legacy_forgejo_runtime_is_promoted_to_service_play_vars(self) -> None:
-        runtime = {"type": "vm"}
-        inventory = tfvars_inventory.build_inventory(
-            {
-                "forgejo_container_vmid": 107,
-                "forgejo_lan_ip": "192.0.2.62",
-                "forgejo_runtime": runtime,
-            },
-            ["forgejo"],
-        )
-
-        self.assertEqual(inventory["all"]["vars"]["forgejo_runtime"], runtime)
-        self.assertEqual(inventory["_meta"]["hostvars"]["forgejo_lxc"]["forgejo_runtime"], runtime)
+    def test_retired_forgejo_runtime_alias_is_rejected(self) -> None:
+        with self.assertRaisesRegex(tfvars_inventory.InventoryError, "retired runtime alias is not accepted"):
+            tfvars_inventory.build_inventory(
+                {
+                    "forgejo_container_vmid": 107,
+                    "forgejo_lan_ip": "192.0.2.62",
+                    "forgejo_runtime": {"type": "vm"},
+                },
+                ["forgejo"],
+            )
 
     def test_forgejo_database_is_promoted_to_play_vars(self) -> None:
         database = {"type": "postgres", "managed": True, "name": "forgejo", "user": "forgejo"}
@@ -225,18 +221,19 @@ class TfvarsInventoryTests(unittest.TestCase):
         self.assertEqual(inventory["all"]["vars"]["forgejo_database"], database)
         self.assertEqual(inventory["_meta"]["hostvars"]["forgejo_lxc"]["forgejo_database"], database)
 
-    def test_tailscale_enabled_is_promoted_to_all_vars(self) -> None:
+    def test_tailscale_enabled_is_derived_from_service_selection(self) -> None:
         inventory = tfvars_inventory.build_inventory(
             {
                 "tailscale_client_vmid": 108,
                 "tailscale_client_ipv4_address": "192.0.2.63",
-                "tailscale_client_enabled": False,
             },
             ["tailscale_client"],
         )
 
-        self.assertFalse(inventory["all"]["vars"]["tailscale_client_enabled"])
+        self.assertTrue(inventory["all"]["vars"]["tailscale_client_enabled"])
         self.assertEqual(inventory["all"]["vars"]["tailscale_client_vmid"], 108)
+        disabled = tfvars_inventory.build_inventory({}, [])
+        self.assertFalse(disabled["all"]["vars"]["tailscale_client_enabled"])
 
     def test_load_tfvars_uses_python_hcl2(self) -> None:
         fake_file = mock.mock_open(read_data='technitium_container_vmid = 106\n')

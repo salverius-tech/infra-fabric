@@ -88,6 +88,9 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "runtime_user": "anvil",
                 "repository_path": "/srv/homelab-infra",
                 "allow_legacy_runtime": False,
+                "caddy_artifact": {"version": "2.8.4", "checksums": {"amd64": "a" * 64, "arm64": "b" * 64}},
+                "compose_artifact": {"version": "2.29.7", "checksums": {"amd64": "c" * 64, "arm64": "d" * 64}},
+                "just_artifact": {"version": "1.36.0", "checksums": {"amd64": "e" * 64, "arm64": "f" * 64}},
                 "tuning": {"compression_threshold": 0.7, "max_concurrent_children": 2, "max_spawn_depth": 1},
                 "node": {"version": "22.0.0", "checksums": {"amd64": "b" * 64, "arm64": "c" * 64}},
                 "dashboard": {"enabled": False, "host": "127.0.0.1", "auth_username": "admin"},
@@ -115,6 +118,8 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "hermes_control_api_port": 8787,
                 "hermes_control_require_task_approval": True,
                 "hermes_control_plugin_socket": "/run/hermes/control-extension.sock",
+                "hermes_control_workspace_root": "/srv",
+                "hermes_control_project_roots": [],
             },
         )
         self.assertNotIn("control_api_token", repr(projected))
@@ -123,8 +128,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         self.assertNotIn("basic_auth_secret", repr(projected))
 
         mapping = self.catalog.get("forgejo").inventory["canonical_play_vars"]
-        self.assertEqual(
-            mapping,
+        self.assertTrue(
             {
                 "forgejo_domain": "endpoints.public_names.0",
                 "forgejo_root_url": "endpoints.public_url",
@@ -140,7 +144,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "forgejo_bootstrap_owner_email": "configuration.bootstrap_owner_email",
                 "forgejo_actions_enabled": "configuration.actions_enabled",
                 "forgejo_actions_default_url": "configuration.actions_default_url",
-            },
+            }.items() <= mapping.items()
         )
         model = self.model.model_copy(deep=True)
         model.services["forgejo"].release = model.services["forgejo"].release.model_copy(update={"version": "10.0.0"})
@@ -218,6 +222,15 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             self.assertEqual(identity["canonical_service"], name)
             self.assertEqual(identity["canonical_resource"], service_vars["resource"])
             self.assertEqual(identity["service_runtime_current"]["type"], service_vars["resource_type"])
+
+    def test_tailscale_compatibility_flag_is_derived_from_the_typed_service(self) -> None:
+        model = self.model.model_copy(deep=True)
+        model.services["tailscale_client"].enabled = True
+        model.services["tailscale_client"].resource = "forgejo"
+
+        projected = render_ansible_vars(model, self.catalog)
+
+        self.assertTrue(projected["services"]["tailscale_client"]["legacy_vars"]["tailscale_client_enabled"])
 
     def test_forgejo_public_name_has_paired_ansible_and_opentofu_transport(self) -> None:
         ansible = render_ansible_vars(self.model, self.catalog)

@@ -66,6 +66,8 @@ scripts/python.sh scripts/service-author.py \
 
 ## Documentation
 
+Start with the [documentation index](docs/README.md), then use the [service operations matrix](docs/service-operations.md) for catalog-derived day-two health, credential, update, backup, restore, and recovery boundaries. Supported lifecycle commands are the `just` recipes; direct `site.yml` and raw OpenTofu/Terraform lifecycle use are unsupported.
+
 - [Canonical site quick start](docs/canonical-quick-start.md)
 - [Canonical architecture and ownership](docs/canonical-architecture.md)
 - [Public Just recipes](docs/just-recipes.md)

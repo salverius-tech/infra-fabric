@@ -1,5 +1,6 @@
 ---
 - name: Restart sssf visualizer
+  tags: [service]
   ansible.builtin.systemd:
     name: sssf-visualizer
     state: restarted

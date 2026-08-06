@@ -26,8 +26,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Build pinned tooling image
-        run: docker build -f tools/Dockerfile -t infra-fabric-tools:ci .
+      - name: Build pinned tooling image without cache
+        run: docker build --no-cache -f tools/Dockerfile -t infra-fabric-tools:ci .
+      - name: Scan hash-locked Python dependencies for high-severity vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: tools
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: table
       - name: Generate tooling image SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:

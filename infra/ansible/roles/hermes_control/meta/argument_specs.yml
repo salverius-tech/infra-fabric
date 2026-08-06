@@ -65,3 +65,12 @@ argument_specs:
         type: str
         required: false
         description: "Local Unix socket for the Hermes Control bridge (default: /run/hermes/control-extension.sock)."
+      hermes_control_workspace_root:
+        type: str
+        required: false
+        description: "Normalized absolute workspace root available to the Control API (default: /srv)."
+      hermes_control_project_roots:
+        type: list
+        elements: str
+        required: false
+        description: "Approved normalized absolute project roots available to the Control API (default: [])."

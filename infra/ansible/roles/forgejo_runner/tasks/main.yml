@@ -1,5 +1,6 @@
 ---
 - name: Validate Forgejo Actions runner variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - forgejo_runner_vmid is defined
@@ -11,7 +12,64 @@
       - forgejo_runner_label is defined
     fail_msg: forgejo_runner_vmid, forgejo_vmid, forgejo_runner_url, forgejo_runner_scope, forgejo_runner_registration_secret, and forgejo_runner_label are required.  # yamllint disable-line rule:line-length
   no_log: true
+- name: Require reviewed Forgejo runner artifacts before guest mutation
+  tags: [always]
+  ansible.builtin.include_tasks: ../../../tasks/reviewed-artifact-cache.yml
+  vars:
+    reviewed_artifact_cache_root: "{{ forgejo_runner_artifact_cache_root | default('/var/lib/infra-fabric/artifacts') }}"
+    reviewed_artifact_stage_root: /var/tmp/infra-fabric-artifacts
+    reviewed_artifacts:
+      - name: docker-compose
+        version: "{{ forgejo_runner_compose_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "docker-compose-{{ forgejo_runner_compose_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ forgejo_runner_compose_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else forgejo_runner_compose_sha256_arm64 }}
+      - name: just
+        version: "{{ forgejo_runner_just_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "just-{{ forgejo_runner_just_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ forgejo_runner_just_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else forgejo_runner_just_sha256_arm64 }}
+      - name: forgejo-runner
+        version: "{{ forgejo_runner_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "forgejo-runner-{{ forgejo_runner_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ forgejo_runner_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else forgejo_runner_sha256_arm64 }}
+
+- name: Ensure Forgejo runner executable install parents exist
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /usr/local/lib/docker/cli-plugins
+    - /usr/local/bin
+
+- name: Install reviewed Forgejo runner tooling
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/{{ item.name }}/{{ item.version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/{{ item.filename }}"
+    dest: "{{ item.dest }}"
+    remote_src: true
+    mode: '0755'
+  loop:
+    - { name: docker-compose, version: "{{ forgejo_runner_compose_version }}", filename: "docker-compose-{{ forgejo_runner_compose_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}", dest: /usr/local/lib/docker/cli-plugins/docker-compose }  # yamllint disable-line rule:line-length
+    - { name: just, version: "{{ forgejo_runner_just_version }}", filename: "just-{{ forgejo_runner_just_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}", dest: /usr/local/bin/just }  # yamllint disable-line rule:line-length
+    - { name: forgejo-runner, version: "{{ forgejo_runner_version }}", filename: "forgejo-runner-{{ forgejo_runner_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}", dest: /usr/local/bin/forgejo-runner }  # yamllint disable-line rule:line-length
+
 - name: Install Forgejo Actions runner dependencies in LXC
+  tags: [packages]
   ansible.builtin.command:
     argv:
       - bash
@@ -19,6 +77,7 @@
       - "set -euo pipefail; packages=\"ca-certificates curl docker.io fuse-overlayfs git gnupg jq nodejs npm openssh-client python3 rsync tar\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Configure Forgejo runner resolver
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -29,6 +88,7 @@
   failed_when: forgejo_runner_resolver.rc not in [0, 1]
   when: forgejo_runner_dns_servers is defined and forgejo_runner_dns_servers | length > 0
 - name: Configure Forgejo runner host aliases
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -37,21 +97,10 @@
   register: forgejo_runner_hosts_config
   changed_when: forgejo_runner_hosts_config.rc == 1
   failed_when: forgejo_runner_hosts_config.rc not in [0, 1]
-- name: Install Docker Compose CLI plugin
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - "set -euo pipefail; version=\"{{ forgejo_runner_compose_version | default('5.3.0') }}\"; current=\"$(docker compose version --short 2>/dev/null || true)\"; if [[ \"${current}\" != \"${version}\" ]]; then\n  arch=\"$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/')\";\n  install -d -m 0755 /usr/local/lib/docker/cli-plugins;\n  compose_url=\"https://github.com/docker/compose/releases/download/v${version}/docker-compose-linux-${arch}\";\n  curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-compose \"${compose_url}\";\n  chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose;\nfi"  # yamllint disable-line rule:line-length
-  changed_when: false
-- name: Install just command runner
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - "set -euo pipefail; version=\"{{ forgejo_runner_just_version | default('1.55.1') }}\"; current=\"$(just --version 2>/dev/null | awk '{print $2}' || true)\"; if [[ \"${current}\" != \"${version}\" ]]; then\n  arch=\"$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/')\";\n  target=\"${arch}-unknown-linux-musl\";\n  tmp=\"$(mktemp -d)\";\n  trap 'rm -rf \"${tmp}\"' EXIT;\n  curl -fsSL -o \"${tmp}/just.tar.gz\" \"https://github.com/casey/just/releases/download/${version}/just-${version}-${target}.tar.gz\";\n  tar -xzf \"${tmp}/just.tar.gz\" -C \"${tmp}\" just;\n  install -m 0755 \"${tmp}/just\" /usr/local/bin/just;\nfi"  # yamllint disable-line rule:line-length
-  changed_when: false
+
+
 - name: Ensure runner user and directories exist
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -59,6 +108,7 @@
       - "set -euo pipefail; if ! id runner >/dev/null 2>&1; then\n  useradd --system --home-dir /var/lib/forgejo-runner --shell /bin/bash --user-group --comment 'Forgejo Actions Runner' runner;\nfi; usermod -aG docker runner; install -d -m 0750 -o runner -g runner /var/lib/forgejo-runner /var/lib/forgejo-runner/work /var/lib/forgejo-runner/cache; install -d -m 0750 -o root -g runner /etc/forgejo-runner"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Ensure Forgejo runner SSH key exists
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -66,6 +116,7 @@
       - "set -euo pipefail; install -d -m 0700 -o runner -g runner /var/lib/forgejo-runner/.ssh; if [[ ! -f /var/lib/forgejo-runner/.ssh/id_ed25519 ]]; then\n  key_comment=\"forgejo-runner@{{ forgejo_runner_hostname | default('forgejo-runner') }}\";\n  runuser -u runner -- ssh-keygen -t ed25519 -N '' -C \"${key_comment}\" -f /var/lib/forgejo-runner/.ssh/id_ed25519 >/dev/null;\nfi; chmod 0700 /var/lib/forgejo-runner/.ssh; chmod 0600 /var/lib/forgejo-runner/.ssh/id_ed25519; chmod 0644 /var/lib/forgejo-runner/.ssh/id_ed25519.pub"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Read Forgejo runner SSH public key
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - cat
@@ -73,6 +124,7 @@
   register: forgejo_runner_ssh_public_key
   changed_when: false
 - name: Ensure root SSH directory exists on Proxmox host
+  tags: [config]
   ansible.builtin.file:
     path: /root/.ssh
     state: directory
@@ -81,6 +133,7 @@
     mode: '0700'
   delegate_to: pve
 - name: Authorize Forgejo runner SSH key on Proxmox host
+  tags: [config]
   ansible.builtin.lineinfile:
     path: /root/.ssh/authorized_keys
     line: '{{ forgejo_runner_ssh_public_key.stdout }}'
@@ -91,6 +144,7 @@
     state: present
   delegate_to: pve
 - name: Read Proxmox host SSH public keys
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - bash
@@ -105,31 +159,17 @@
   delegate_to: pve
 
 - name: Trust Proxmox host key in Forgejo runner LXC
+  tags: [config]
   ansible.builtin.copy:
     dest: /var/lib/forgejo-runner/.ssh/known_hosts
     content: "{{ forgejo_runner_proxmox_host_keys.stdout }}\n"
     owner: runner
     group: runner
     mode: '0644'
-- name: Check installed Forgejo runner version
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - /usr/local/bin/forgejo-runner --version 2>/dev/null | grep -oE 'v?[0-9]+[.][0-9]+[.][0-9]+' | head -n1 | sed 's/^v//'
-  register: forgejo_runner_installed_version
-  changed_when: false
-  failed_when: false
-- name: Install requested Forgejo runner binary
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - set -euo pipefail; arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"; version="{{ forgejo_runner_version | default('12.7.3') }}"; base="https://code.forgejo.org/forgejo/runner/releases/download/v${version}"; tmp="$(mktemp)"; trap 'rm -f "${tmp}"' EXIT; curl -fsSL -o "${tmp}" "${base}/forgejo-runner-${version}-linux-${arch}"; install -m 0755 "${tmp}" /usr/local/bin/forgejo-runner  # yamllint disable-line rule:line-length
-  when: forgejo_runner_installed_version.stdout | trim != forgejo_runner_version | default('12.7.3')
-  changed_when: true
-  notify: Restart forgejo-runner
+
+
 - name: Check existing Forgejo Actions runner registration in SQLite
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -148,6 +188,7 @@
   no_log: true
   when: forgejo_database.type | default('sqlite') == 'sqlite'
 - name: Check existing Forgejo Actions runner registration in PostgreSQL
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -169,11 +210,13 @@
   no_log: true
   when: forgejo_database.type | default('sqlite') == 'postgres'
 - name: Set existing Forgejo Actions runner registration result
+  tags: [config]
   ansible.builtin.set_fact:
     forgejo_runner_existing_registration_stdout: >-
       {{ forgejo_runner_existing_registration_postgres.stdout | default(forgejo_runner_existing_registration_sqlite.stdout | default('')) }}
   no_log: true
 - name: Register Forgejo Actions runner with Forgejo
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -190,10 +233,12 @@
   no_log: true
   when: forgejo_runner_existing_registration_stdout | trim == ""
 - name: Set Forgejo runner UUID
+  tags: [config]
   ansible.builtin.set_fact:
     forgejo_runner_uuid: "{{\n  forgejo_runner_existing_registration_stdout | trim\n  if forgejo_runner_existing_registration_stdout | trim != \"\"\n  else forgejo_runner_registration.stdout | trim\n}}"  # yamllint disable-line rule:line-length
   no_log: true
 - name: Validate Forgejo runner UUID was resolved
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - forgejo_runner_uuid is defined
@@ -201,6 +246,7 @@
     fail_msg: Forgejo runner UUID could not be resolved.
   no_log: true
 - name: Normalize Forgejo repository-scoped runner ownership in SQLite
+  tags: [config]
   ansible.builtin.command:
     argv:
       - runuser
@@ -214,6 +260,7 @@
   delegate_to: "{{ groups['forgejo'][0] }}"
   when: forgejo_database.type | default('sqlite') == 'sqlite'
 - name: Normalize Forgejo repository-scoped runner ownership in PostgreSQL
+  tags: [config]
   ansible.builtin.command:
     argv:
       - runuser
@@ -230,6 +277,7 @@
   delegate_to: "{{ groups['forgejo'][0] }}"
   when: forgejo_database.type | default('sqlite') == 'postgres'
 - name: Install Forgejo runner env
+  tags: [packages]
   ansible.builtin.template:
     src: runner.env.j2
     dest: /etc/forgejo-runner/env
@@ -238,6 +286,7 @@
     group: runner
   no_log: true
 - name: Install Forgejo runner config
+  tags: [packages]
   ansible.builtin.template:
     src: runner-config.yml.j2
     dest: /etc/forgejo-runner/config.yml
@@ -246,6 +295,7 @@
     group: runner
   no_log: true
 - name: Install Forgejo runner systemd service
+  tags: [packages]
   ansible.builtin.template:
     src: forgejo-runner.service.j2
     dest: /etc/systemd/system/forgejo-runner.service
@@ -253,6 +303,7 @@
     owner: root
     group: root
 - name: Enable Forgejo runner service
+  tags: [service]
   ansible.builtin.command:
     argv:
       - bash
@@ -260,8 +311,10 @@
       - systemctl daemon-reload && systemctl enable --now forgejo-runner
   changed_when: false
 - name: Flush Forgejo runner restart before service checks
+  tags: [service]
   ansible.builtin.meta: flush_handlers
 - name: Verify Forgejo runner service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -273,6 +326,7 @@
   delay: 5
   until: forgejo_runner_active.rc == 0
 - name: Verify Forgejo Actions runner registration remains present in SQLite
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -289,6 +343,7 @@
   no_log: true
   when: forgejo_database.type | default('sqlite') == 'sqlite'
 - name: Verify Forgejo Actions runner registration remains present in PostgreSQL
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser

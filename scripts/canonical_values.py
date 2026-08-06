@@ -43,6 +43,7 @@ _HERMES_USER_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
 _SSH_PUBLIC_KEY_RE = re.compile(r"^(?:ssh-(?:ed25519|rsa)|ecdsa-sha2-nistp(?:256|384|521))\s+\S+(?:\s+.*)?$")
 _GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 _SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+_ARTIFACT_VERSION_RE = re.compile(r"^v?[0-9]+(?:\.[0-9]+){1,3}(?:[-+][0-9a-z][0-9a-z.-]*)?$")
 
 
 def normalize_container_image_reference(reference: str) -> tuple[str, str]:
@@ -447,6 +448,31 @@ class ResourceSecurity(StrictModel):
     ssh_public_keys: list[StrictStr] = Field(default_factory=list)
 
 
+class ReviewedArtifactPin(StrictModel):
+    """A reviewed, architecture-specific executable cache identity."""
+
+    version: StrictStr
+    checksums: dict[Literal["amd64", "arm64"], StrictStr]
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str) -> str:
+        if not _ARTIFACT_VERSION_RE.fullmatch(value):
+            raise ValueError("reviewed artifact version must be a lowercase semantic version")
+        return value
+
+    @field_validator("checksums")
+    @classmethod
+    def validate_checksums(cls, value: dict[str, str]) -> dict[str, str]:
+        if set(value) != {"amd64", "arm64"} or any(not _SHA256_HEX_RE.fullmatch(digest) for digest in value.values()):
+            raise ValueError("reviewed artifact pins require lowercase amd64 and arm64 SHA-256 checksums")
+        return value
+
+
+class SharedHostArtifacts(StrictModel):
+    caddy_cloudflare: ReviewedArtifactPin | None = None
+
+
 class Resource(StrictModel):
     type: Literal["lxc", "vm"]
     identity: ResourceIdentity
@@ -455,6 +481,7 @@ class Resource(StrictModel):
     storage: ResourceStorage
     runtime: ResourceRuntime
     security: ResourceSecurity = Field(default_factory=ResourceSecurity)
+    artifacts: SharedHostArtifacts = Field(default_factory=SharedHostArtifacts)
 
     @model_validator(mode="after")
     def validate_runtime_fields(self) -> "Resource":
@@ -482,7 +509,7 @@ class Resources(StrictModel):
         hostnames = [resource.identity.hostname for _, resource in all_items]
         if len(hostnames) != len(set(hostnames)):
             raise ValueError("resource hostnames must be unique")
-        addresses = []
+        addresses: list[tuple[str, ipaddress.IPv4Address]] = []
         for name, resource in all_items:
             if resource.network.address == "dhcp":
                 continue
@@ -576,6 +603,7 @@ class CaddyConfiguration(StrictModel):
     upstream: CaddyUpstream
     extra_vhosts: list[CaddyVHost] = Field(default_factory=list)
     tls: CaddyTLS
+    artifact: ReviewedArtifactPin | None = None
 
     @field_validator("server_names")
     @classmethod
@@ -586,6 +614,12 @@ class CaddyConfiguration(StrictModel):
         if len(normalized) != len(set(normalized)):
             raise ValueError("Caddy server_names must be unique")
         return normalized
+
+    @model_validator(mode="after")
+    def require_reviewed_artifact_when_enabled(self) -> "CaddyConfiguration":
+        if self.enabled and self.artifact is None:
+            raise ValueError("enabled Caddy configuration requires a reviewed artifact pin")
+        return self
 
 
 class TechnitiumConfiguration(StrictModel):
@@ -647,6 +681,9 @@ class ForgejoRunnerConfiguration(StrictModel):
     label: StrictStr | None = None
     labels: list[StrictStr] | None = None
     hosts: list[ForgejoRunnerHost] | None = None
+    compose_artifact: ReviewedArtifactPin | None = None
+    just_artifact: ReviewedArtifactPin | None = None
+    runner_artifact: ReviewedArtifactPin | None = None
 
     @field_validator("url")
     @classmethod
@@ -677,6 +714,8 @@ class InfisicalConfiguration(StrictModel):
     data_dir: StrictStr | None = None
     postgres_user: StrictStr | None = None
     postgres_db: StrictStr | None = None
+    caddy_artifact: ReviewedArtifactPin | None = None
+    compose_artifact: ReviewedArtifactPin | None = None
 
 
 class InfisicalOnrampConfiguration(StrictModel):
@@ -761,6 +800,7 @@ class ForgejoConfiguration(StrictModel):
     bootstrap_owner_email: StrictStr | None = None
     actions_enabled: StrictBool | None = None
     actions_default_url: StrictStr | None = None
+    caddy_artifact: ReviewedArtifactPin | None = None
 
     @field_validator("actions_default_url")
     @classmethod
@@ -770,6 +810,12 @@ class ForgejoConfiguration(StrictModel):
             if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
                 raise ValueError("Forgejo Actions default URL must be an HTTPS URL without credentials")
         return value
+
+    @model_validator(mode="after")
+    def require_reviewed_caddy_artifact(self) -> "ForgejoConfiguration":
+        if self.enable_caddy and self.caddy_artifact is None:
+            raise ValueError("Forgejo Caddy requires a reviewed artifact pin")
+        return self
 
 
 class SssfConfiguration(StrictModel):
@@ -1008,6 +1054,8 @@ class HermesControlConfiguration(StrictModel):
     api_port: StrictInt = 8787
     require_task_approval: StrictBool = True
     plugin_socket: StrictStr = "/run/hermes/control-extension.sock"
+    workspace_root: StrictStr = "/srv"
+    project_roots: list[StrictStr] = Field(default_factory=list)
 
     @field_validator("domain")
     @classmethod
@@ -1065,6 +1113,25 @@ class HermesControlConfiguration(StrictModel):
             raise ValueError("Hermes Control plugin_socket must be a normalized absolute POSIX path")
         return value
 
+    @field_validator("workspace_root")
+    @classmethod
+    def validate_workspace_root(cls, value: str) -> str:
+        path = PurePosixPath(value)
+        if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("Hermes Control workspace_root must be a normalized absolute POSIX path")
+        return value
+
+    @field_validator("project_roots")
+    @classmethod
+    def validate_project_roots(cls, values: list[str]) -> list[str]:
+        for value in values:
+            path = PurePosixPath(value)
+            if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+                raise ValueError("Hermes Control project_roots must contain normalized absolute POSIX paths")
+        if len(set(values)) != len(values):
+            raise ValueError("Hermes Control project_roots must not contain duplicates")
+        return values
+
     @model_validator(mode="after")
     def validate_enabled_requirements(self) -> "HermesControlConfiguration":
         if self.enabled:
@@ -1079,6 +1146,9 @@ class HermesConfiguration(StrictModel):
     repository_path: StrictStr | None = None
     allow_legacy_runtime: StrictBool | None = None
     compose_version: StrictStr | None = None
+    caddy_artifact: ReviewedArtifactPin | None = None
+    compose_artifact: ReviewedArtifactPin | None = None
+    just_artifact: ReviewedArtifactPin | None = None
     tuning: HermesTuning = Field(default_factory=HermesTuning)
     node: HermesRuntimeNode = Field(default_factory=HermesRuntimeNode)
     dashboard: HermesDashboard = Field(default_factory=HermesDashboard)

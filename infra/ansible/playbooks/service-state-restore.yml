@@ -10,6 +10,7 @@
     service_state_restore_file: "{{ lookup('env', 'SERVICE_STATE_RESTORE_FILE') | default('', true) }}"
   tasks:
     - name: Validate service-state restore input
+      tags: [restore]
       ansible.builtin.assert:
         that:
           - service_state_service is defined
@@ -25,11 +26,13 @@
           {{ service_state_backup_root }}/<service>/<archive>.tar.gz are required.
 
     - name: Select managed service-state definition
+      tags: [config]
       ansible.builtin.set_fact:
         service_state_definition: "{{ managed_service_state_catalog[service_state_service] }}"
         service_state_timestamp: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
 
     - name: Set service-state restore archive paths
+      tags: [restore]
       ansible.builtin.set_fact:
         service_state_local_dir: "{{ service_state_backup_root }}/{{ service_state_service }}"
         service_state_remote_restore: "/tmp/{{ service_state_service }}-state-restore-{{ service_state_timestamp }}.tar.gz"
@@ -38,6 +41,7 @@
           {{ service_state_backup_root }}/{{ service_state_service }}/{{ service_state_service }}-state-pre-restore-{{ service_state_timestamp }}.tar.gz
 
     - name: Check local service-state restore archive exists
+      tags: [restore]
       ansible.builtin.stat:
         path: "{{ service_state_restore_file }}"
       register: service_state_restore_stat
@@ -45,11 +49,13 @@
       become: false
 
     - name: Fail when local service-state restore archive is missing
+      tags: [restore]
       ansible.builtin.fail:
         msg: "Service-state restore archive {{ service_state_restore_file }} does not exist."
       when: not service_state_restore_stat.stat.exists
 
     - name: Validate service-state restore archive checksum when present
+      tags: [restore]
       ansible.builtin.command:
         argv:
           - sha256sum
@@ -64,6 +70,7 @@
       when: lookup('ansible.builtin.fileglob', service_state_restore_file ~ '.sha256', wantlist=True) | length > 0
 
     - name: Validate service-state restore archive structure and target
+      tags: [restore]
       ansible.builtin.command:
         argv:
           - python3
@@ -79,6 +86,7 @@
       become: false
 
     - name: Ensure local service-state backup directory exists
+      tags: [backup]
       ansible.builtin.file:
         path: "{{ service_state_local_dir }}"
         state: directory
@@ -87,6 +95,7 @@
       become: false
 
     - name: Preflight service-state restore capacity before stopping services
+      tags: [restore]
       ansible.builtin.script:
         cmd: >-
           ../scripts/service-state-capacity-preflight.py
@@ -103,12 +112,14 @@
     - name: Restore service state with failure-safe service recovery
       block:
         - name: Stop managed system services before restore
+          tags: [restore]
           ansible.builtin.systemd_service:
             name: "{{ item }}"
             state: stopped
           loop: "{{ service_state_definition.services | default([]) }}"
 
         - name: Resolve service-state user service owner UID
+          tags: [validation]
           ansible.builtin.command:
             argv:
               - id
@@ -119,6 +130,7 @@
           when: service_state_definition.user_services | default([]) | length > 0
 
         - name: Stop managed user services before restore
+          tags: [restore]
           become: true
           become_user: "{{ service_state_definition.user_service_owner }}"
           ansible.builtin.systemd_service:
@@ -131,18 +143,21 @@
           when: service_state_definition.user_services | default([]) | length > 0
 
         - name: Create temporary pre-restore service-state snapshot directory
+          tags: [restore]
           ansible.builtin.tempfile:
             state: directory
             suffix: "{{ service_state_service }}-pre-restore"
           register: service_state_pre_restore_snapshot_dir
 
         - name: Check existing managed service-state paths before restore
+          tags: [restore]
           ansible.builtin.stat:
             path: "{{ item }}"
           loop: "{{ service_state_definition.paths }}"
           register: service_state_existing_path_stats
 
         - name: Build existing pre-restore path list
+          tags: [restore]
           ansible.builtin.set_fact:
             service_state_existing_paths: >-
               {{ service_state_existing_path_stats.results
@@ -151,6 +166,7 @@
                  | list }}
 
         - name: Snapshot current managed service-state paths before restore
+          tags: [restore]
           ansible.builtin.command:
             argv:
               - rsync
@@ -162,6 +178,7 @@
           when: service_state_existing_paths | length > 0
 
         - name: Create pre-restore service-state archive on service host
+          tags: [restore]
           ansible.builtin.command:
             argv:
               - tar
@@ -175,6 +192,7 @@
           when: service_state_existing_paths | length > 0
 
         - name: Stream pre-restore service-state archive into private values
+          tags: [restore]
           ansible.builtin.command:
             argv:
               - python3
@@ -200,24 +218,28 @@
           when: service_state_existing_paths | length > 0
 
         - name: Copy service-state restore archive to service host
+          tags: [restore]
           ansible.builtin.copy:
             src: "{{ service_state_restore_file }}"
             dest: "{{ service_state_remote_restore }}"
             mode: "0600"
 
         - name: Remove existing managed service-state paths before restore
+          tags: [restore]
           ansible.builtin.file:
             path: "{{ item }}"
             state: absent
           loop: "{{ service_state_definition.paths }}"
 
         - name: Restore managed service-state archive
+          tags: [restore]
           ansible.builtin.unarchive:
             src: "{{ service_state_remote_restore }}"
             dest: /
             remote_src: true
 
         - name: Check restored Forgejo PostgreSQL database dump
+          tags: [restore]
           ansible.builtin.stat:
             path: /.service-state/forgejo-postgres.dump
           register: forgejo_state_postgres_dump
@@ -226,6 +248,7 @@
             - forgejo_database.type == "postgres"
 
         - name: Restore managed Forgejo PostgreSQL database
+          tags: [restore]
           ansible.builtin.command:
             argv:
               - runuser
@@ -246,12 +269,14 @@
 
       always:
         - name: Remove restored service-state database artifacts
+          tags: [restore]
           ansible.builtin.file:
             path: /.service-state
             state: absent
           when: service_state_service == "forgejo"
 
         - name: Remove temporary service-state restore artifacts from service host
+          tags: [restore]
           ansible.builtin.file:
             path: "{{ item }}"
             state: absent
@@ -262,6 +287,7 @@
           when: service_state_pre_restore_snapshot_dir is defined
 
         - name: Restart managed user services after restore
+          tags: [restore]
           become: true
           become_user: "{{ service_state_definition.user_service_owner }}"
           ansible.builtin.systemd_service:
@@ -278,6 +304,7 @@
           when: service_state_definition.user_services | default([]) | length > 0
 
         - name: Restart managed system services after restore
+          tags: [restore]
           ansible.builtin.systemd_service:
             name: "{{ item }}"
             state: started
@@ -288,6 +315,7 @@
           failed_when: false
 
     - name: Fail after attempting all managed service restarts
+      tags: [config]
       ansible.builtin.assert:
         that:
           - (service_state_user_restart.results | default([]) | selectattr('failed', 'defined') | selectattr('failed') | list | length) == 0
@@ -295,6 +323,7 @@
         fail_msg: Managed services did not restart successfully after service-state restore.
 
     - name: Report service-state restore result
+      tags: [restore]
       ansible.builtin.debug:
         msg: >-
           {{ service_state_service }} state restored from {{ service_state_restore_file }};

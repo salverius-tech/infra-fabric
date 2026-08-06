@@ -21,62 +21,80 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
     def test_current_sources_are_fully_classified(self) -> None:
         report = MODULE.build_report(ROOT)
 
-        self.assertEqual(report["opentofu"]["variable_count"], 207)
-        self.assertEqual(len(report["opentofu"]["variables"]), 207)
+        self.assertEqual(report["opentofu"]["variable_count"], 204)
+        self.assertEqual(len(report["opentofu"]["variables"]), 204)
         self.assertEqual(report["classification"]["unclassified_variables"], [])
         self.assertEqual(len(report["service_catalog"]["services"]), 10)
-        self.assertEqual(report["canonical_path_coverage"]["checked_count"], 86)
-        self.assertEqual(report["canonical_path_coverage"]["valid_count"], 86)
+        self.assertEqual(report["canonical_path_coverage"]["checked_count"], 121)
+        self.assertEqual(report["canonical_path_coverage"]["valid_count"], 121)
         self.assertEqual(report["canonical_path_coverage"]["invalid_count"], 0)
         self.assertEqual(report["canonical_path_coverage"]["status"], "complete")
-        self.assertEqual(report["matrix_path_coverage"]["checked_count"], 248)
-        self.assertEqual(report["matrix_path_coverage"]["valid_count"], 248)
+        self.assertEqual(report["matrix_path_coverage"]["checked_count"], 250)
+        self.assertEqual(report["matrix_path_coverage"]["valid_count"], 250)
         self.assertEqual(report["matrix_path_coverage"]["invalid_count"], 0)
         self.assertEqual(report["matrix_path_coverage"]["excluded_count"], 60)
         self.assertEqual(report["matrix_path_coverage"]["status"], "complete")
-        self.assertEqual(report["matrix_classification_coverage"]["checked_count"], 308)
-        self.assertEqual(report["matrix_classification_coverage"]["valid_count"], 308)
+        self.assertEqual(report["matrix_classification_coverage"]["checked_count"], 310)
+        self.assertEqual(report["matrix_classification_coverage"]["valid_count"], 310)
         self.assertEqual(report["matrix_classification_coverage"]["invalid_count"], 0)
         self.assertEqual(report["matrix_classification_coverage"]["status"], "complete")
-        self.assertEqual(report["consumer_evidence"]["token_count"], 251)
-        self.assertEqual(report["consumer_evidence"]["exact_evidence_count"], 203)
+        self.assertEqual(report["consumer_evidence"]["token_count"], 254)
+        self.assertEqual(report["consumer_evidence"]["exact_evidence_count"], 206)
         self.assertEqual(report["consumer_evidence"]["dynamic_evidence_count"], 48)
         self.assertEqual(report["consumer_evidence"]["missing_exact_evidence_count"], 0)
         self.assertEqual(report["consumer_evidence"]["status"], "complete")
-        self.assertEqual(report["consumer_evidence"]["row_count"], 246)
-        self.assertEqual(report["consumer_evidence"]["evidenced_row_count"], 246)
+        self.assertEqual(report["consumer_evidence"]["row_count"], 248)
+        self.assertEqual(report["consumer_evidence"]["evidenced_row_count"], 248)
         self.assertEqual(report["consumer_evidence"]["rows_without_evidence"], [])
         self.assertEqual(report["consumer_evidence"]["semantic_status"], "complete")
         first_evidence = report["consumer_evidence"]["row_evidence"][0]
         self.assertEqual(first_evidence["status"], "complete")
         self.assertTrue(first_evidence["exact"][0]["references"])
         self.assertTrue(all(reference["file"] and reference["lines"] for reference in first_evidence["exact"][0]["references"]))
-        self.assertEqual(report["source_reconciliation"]["source_identity_count"], 374)
-        self.assertEqual(report["source_reconciliation"]["accounted_identity_count"], 374)
+        self.assertEqual(report["source_reconciliation"]["source_identity_count"], 373)
+        self.assertEqual(report["source_reconciliation"]["accounted_identity_count"], 373)
         self.assertEqual(report["source_reconciliation"]["missing"], [])
         self.assertEqual(report["source_reconciliation"]["unexpected"], [])
         self.assertEqual(report["source_reconciliation"]["reasons"], [])
         self.assertEqual(report["source_reconciliation"]["status"], "complete")
         self.assertEqual(report["source_inventory"]["source_count"], 16)
         self.assertTrue(report["source_inventory"]["coverage"]["source_files_present"])
-        self.assertEqual(report["source_inventory"]["coverage"]["opentofu_variables_inventoried"], 207)
+        self.assertEqual(report["source_inventory"]["coverage"]["opentofu_variables_inventoried"], 204)
         self.assertGreater(report["source_inventory"]["scaffold"]["terraform_assignment_count"], 0)
         self.assertIn("a_records", report["source_inventory"]["scaffold"]["dns"]["top_level_keys"])
         self.assertIn("tf_vmid", report["source_inventory"]["ansible"]["inventory_fields"])
-        self.assertEqual(report["source_inputs"]["input_count"], 374)
-        self.assertEqual(report["source_inputs"]["unique_identities"], 374)
+        self.assertEqual(report["source_inputs"]["input_count"], 373)
+        self.assertEqual(report["source_inputs"]["unique_identities"], 373)
         self.assertEqual(
             set(report["source_inputs"]["disposition_counts"]),
             {"ansible-only", "deprecated", "generated-projection", "operational-artifact", "retired-input", "unsupported"},
         )
         self.assertEqual(report["source_inputs"]["status"], "classification-complete-with-review-dispositions")
-        self.assertEqual(report["mapping_matrix"]["row_count"], 308)
+        self.assertEqual(report["mapping_matrix"]["row_count"], 310)
         self.assertEqual(report["mapping_matrix"]["status"], "semantic-coverage-complete")
-        self.assertEqual(report["matrix_coverage"]["input_count"], 361)
-        self.assertEqual(report["matrix_coverage"]["source_input_count"], 374)
+        self.assertEqual(
+            report["mapping_contract_evidence"],
+            {
+                "scope": "tracked-public-repository-producers-and-consumers",
+                "source_producer_consumer_status": "complete",
+                "provider_plan_equivalence": "not-claimed",
+                "live_infrastructure_equivalence": "not-claimed",
+            },
+        )
+        self.assertEqual(
+            report["retired_alias_contract"],
+            {
+                "aliases": ["forgejo_runtime", "tailscale_client_enabled"],
+                "opentofu_boundary": "explicit-null-preconditions",
+                "scaffold_inputs": "absent",
+                "status": "complete",
+            },
+        )
+        self.assertEqual(report["matrix_coverage"]["input_count"], 360)
+        self.assertEqual(report["matrix_coverage"]["source_input_count"], 373)
         self.assertEqual(report["matrix_coverage"]["excluded_count"], 13)
-        self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 361)
-        self.assertEqual(report["matrix_coverage"]["matched_count"], 361)
+        self.assertEqual(report["matrix_coverage"]["matched_count"] + report["matrix_coverage"]["unmatched_count"], 360)
+        self.assertEqual(report["matrix_coverage"]["matched_count"], 360)
         self.assertEqual(report["matrix_coverage"]["unmatched_count"], 0)
         self.assertEqual(report["matrix_coverage"]["status"], "complete")
         self.assertFalse(report["matrix_coverage"]["unmatched"])
@@ -366,14 +384,11 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
             report["matrix_coverage"]["matched"],
         )
 
-        for source, key in (
-            ("scaffold/terraform.tfvars", "tailscale_client_enabled"),
-            ("scaffold/ansible/inventory/local.yml", "tailscale_client_enabled"),
-        ):
-            self.assertIn(
-                {"source": source, "key": key, "canonical_path": "services.tailscale_client.enabled"},
-                report["matrix_coverage"]["matched"],
-            )
+        source = "scaffold/ansible/inventory/local.yml"
+        self.assertIn(
+            {"source": source, "key": "tailscale_client_enabled", "canonical_path": "services.tailscale_client.enabled"},
+            report["matrix_coverage"]["matched"],
+        )
         self.assertIn(
             {
                 "source": "scaffold/ansible/inventory/local.yml",
@@ -519,7 +534,7 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertNotIn("REPLACE_WITH_A_LONG_RANDOM_PASSWORD", encoded)
         self.assertNotIn("ssh-ed25519 AAAA", encoded)
         self.assertEqual(report["schema"], 1)
-        self.assertEqual(report["opentofu"]["variable_count"], 207)
+        self.assertEqual(report["opentofu"]["variable_count"], 204)
         blockers = (ROOT / "docs" / "canonical-values-model-blockers.md").read_text(encoding="utf-8")
         for heading in (
             "## Secret or protected inputs",

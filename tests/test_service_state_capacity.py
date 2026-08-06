@@ -65,6 +65,7 @@ class CapacityPreflightTests(unittest.TestCase):
         self.assertNotIn("failed_when: false", restore[:restore.index("Create temporary pre-restore")])
         self.assertNotIn("tar -tzf", restore)
         self.assertIn("- name: Restore service state with failure-safe service recovery\n      block:", restore)
+        self.assertNotIn("- name: Restore service state with failure-safe service recovery\n      tags:", restore)
         self.assertIn("      always:\n", restore)
         self.assertLess(restore.index("      always:"), restore.index("Report service-state restore result"))
         self.assertLess(

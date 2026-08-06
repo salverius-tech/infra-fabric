@@ -7,9 +7,26 @@
     "technitium": {
       "state_capable": true,
       "runtime_owner": "guest",
+      "runtime": {
+        "default_type": "lxc",
+        "supported_types": [
+          "lxc",
+          "vm"
+        ]
+      },
       "configuration_schema": "TechnitiumConfiguration",
-      "release_sources": ["package", "container", "binary", "image"],
-      "required_fields": ["resource", "state.capable", "release.version", "release.checksum"],
+      "release_sources": [
+        "package",
+        "container",
+        "binary",
+        "image"
+      ],
+      "required_fields": [
+        "resource",
+        "state.capable",
+        "release.version",
+        "release.checksum"
+      ],
       "update_policy": {
         "status": "manual",
         "detail": "operator reviews the paired version/checksum pin; just update does not mutate this protected runtime artifact"
@@ -20,8 +37,12 @@
         "module.technitium_dns_vm["
       ],
       "terraform_replace_addresses": {
-        "lxc": ["module.technitium_dns[0].proxmox_virtual_environment_container.this"],
-        "vm": ["module.technitium_dns_vm[0].proxmox_virtual_environment_vm.this"]
+        "lxc": [
+          "module.technitium_dns[0].proxmox_virtual_environment_container.this"
+        ],
+        "vm": [
+          "module.technitium_dns_vm[0].proxmox_virtual_environment_vm.this"
+        ]
       },
       "playbooks": [
         "infra/ansible/playbooks/technitium.yml",
@@ -29,9 +50,15 @@
         "infra/ansible/playbooks/technitium-dns.yml"
       ],
       "dependencies": [],
-      "required_secrets": ["secrets.providers.cloudflare.api_token"],
-      "secret_classifications": {"secrets.providers.cloudflare.api_token": "provider"},
-      "secret_environment": {"secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"},
+      "required_secrets": [
+        "secrets.providers.cloudflare.api_token"
+      ],
+      "secret_classifications": {
+        "secrets.providers.cloudflare.api_token": "provider"
+      },
+      "secret_environment": {
+        "secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"
+      },
       "inventory": {
         "host": "technitium_dns",
         "group": "technitium",
@@ -42,16 +69,35 @@
           "technitium_api_url": "configuration.api_url",
           "technitium_admin_user": "configuration.admin_user",
           "technitium_discovery_version": "release.version",
-          "technitium_portable_sha256": "release.checksum"
+          "technitium_portable_sha256": "release.checksum",
+          "caddy_proxy_caddy_cloudflare_version": "configuration.caddy.artifact.version",
+          "caddy_proxy_caddy_cloudflare_sha256_amd64": "configuration.caddy.artifact.checksums.amd64",
+          "caddy_proxy_caddy_cloudflare_sha256_arm64": "configuration.caddy.artifact.checksums.arm64"
         }
       }
     },
     "forgejo": {
       "state_capable": true,
       "runtime_owner": "guest",
+      "runtime": {
+        "default_type": "lxc",
+        "supported_types": [
+          "lxc",
+          "vm"
+        ]
+      },
       "configuration_schema": "ForgejoConfiguration",
-      "release_sources": ["package", "container", "binary", "image"],
-      "required_fields": ["resource", "state.capable", "release.version"],
+      "release_sources": [
+        "package",
+        "container",
+        "binary",
+        "image"
+      ],
+      "required_fields": [
+        "resource",
+        "state.capable",
+        "release.version"
+      ],
       "update_policy": {
         "status": "managed",
         "detail": "just update checks the canonical release.version after the release-age hold"
@@ -63,8 +109,12 @@
         "terraform_data.forgejo_storage_validation["
       ],
       "terraform_replace_addresses": {
-        "lxc": ["module.forgejo[0].proxmox_virtual_environment_container.this"],
-        "vm": ["module.forgejo_vm[0].proxmox_virtual_environment_vm.this"]
+        "lxc": [
+          "module.forgejo[0].proxmox_virtual_environment_container.this"
+        ],
+        "vm": [
+          "module.forgejo_vm[0].proxmox_virtual_environment_vm.this"
+        ]
       },
       "playbooks": [
         "infra/ansible/playbooks/forgejo.yml"
@@ -128,16 +178,33 @@
           "forgejo_bootstrap_admin_email": "configuration.bootstrap_admin_email",
           "forgejo_bootstrap_owner_email": "configuration.bootstrap_owner_email",
           "forgejo_actions_enabled": "configuration.actions_enabled",
-          "forgejo_actions_default_url": "configuration.actions_default_url"
+          "forgejo_actions_default_url": "configuration.actions_default_url",
+          "forgejo_caddy_cloudflare_version": "configuration.caddy_artifact.version",
+          "forgejo_caddy_cloudflare_sha256_amd64": "configuration.caddy_artifact.checksums.amd64",
+          "forgejo_caddy_cloudflare_sha256_arm64": "configuration.caddy_artifact.checksums.arm64"
         }
       }
     },
     "tailscale_client": {
       "state_capable": false,
       "runtime_owner": "guest",
+      "runtime": {
+        "default_type": "lxc",
+        "supported_types": [
+          "lxc",
+          "vm"
+        ]
+      },
       "configuration_schema": "TailscaleConfiguration",
-      "release_sources": ["package", "container", "binary", "image"],
-      "required_fields": ["resource"],
+      "release_sources": [
+        "package",
+        "container",
+        "binary",
+        "image"
+      ],
+      "required_fields": [
+        "resource"
+      ],
       "update_policy": {
         "status": "unmanaged",
         "detail": "installed only when missing; package upgrade policy is not defined"
@@ -147,16 +214,26 @@
         "module.tailscale_client_vm["
       ],
       "terraform_replace_addresses": {
-        "lxc": ["module.tailscale_client[0].proxmox_virtual_environment_container.this"],
-        "vm": ["module.tailscale_client_vm[0].proxmox_virtual_environment_vm.this"]
+        "lxc": [
+          "module.tailscale_client[0].proxmox_virtual_environment_container.this"
+        ],
+        "vm": [
+          "module.tailscale_client_vm[0].proxmox_virtual_environment_vm.this"
+        ]
       },
       "playbooks": [
         "infra/ansible/playbooks/tailscale-client.yml"
       ],
       "dependencies": [],
-      "required_secrets": ["services.tailscale_client.secrets.auth_key"],
-      "secret_classifications": {"services.tailscale_client.secrets.auth_key": "runtime"},
-      "secret_environment": {"services.tailscale_client.secrets.auth_key": "TS_AUTHKEY"},
+      "required_secrets": [
+        "services.tailscale_client.secrets.auth_key"
+      ],
+      "secret_classifications": {
+        "services.tailscale_client.secrets.auth_key": "runtime"
+      },
+      "secret_environment": {
+        "services.tailscale_client.secrets.auth_key": "TS_AUTHKEY"
+      },
       "inventory": {
         "host": "tailscale_client",
         "group": "tailscale_client",
@@ -167,19 +244,43 @@
           "tailscale_client_restore_backup": "configuration.restore_backup",
           "tailscale_client_backup_archive": "configuration.backup_archive",
           "tailscale_client_enable_ip_forwarding": "configuration.enable_ip_forwarding",
-          "tailscale_client_up_args": "configuration.up_args"
-        },
-        "extra_play_vars": {
-          "tailscale_client_enabled": "tailscale_client_enabled"
+          "tailscale_client_up_args": "configuration.up_args",
+          "tailscale_client_enabled": "enabled"
         }
       }
     },
     "forgejo_runner": {
       "state_capable": false,
       "runtime_owner": "guest",
+      "runtime": {
+        "default_type": "lxc",
+        "supported_types": [
+          "lxc",
+          "vm"
+        ]
+      },
       "configuration_schema": "ForgejoRunnerConfiguration",
-      "release_sources": ["package", "container", "binary", "image"],
-      "required_fields": ["resource", "configuration.url", "configuration.scope", "configuration.label"],
+      "release_sources": [
+        "package",
+        "container",
+        "binary",
+        "image"
+      ],
+      "required_fields": [
+        "resource",
+        "release.version",
+        "configuration.url",
+        "configuration.scope",
+        "configuration.label",
+        "configuration.compose_artifact.version",
+        "configuration.compose_artifact.checksums.amd64",
+        "configuration.compose_artifact.checksums.arm64",
+        "configuration.just_artifact.version",
+        "configuration.just_artifact.checksums.amd64",
+        "configuration.just_artifact.checksums.arm64",
+        "configuration.runner_artifact.checksums.amd64",
+        "configuration.runner_artifact.checksums.arm64"
+      ],
       "update_policy": {
         "status": "managed",
         "detail": "just update checks the canonical runner release and repository-owned Compose and just pins after the release-age hold"
@@ -189,8 +290,12 @@
         "module.forgejo_runner_vm["
       ],
       "terraform_replace_addresses": {
-        "lxc": ["module.forgejo_runner[0].proxmox_virtual_environment_container.this"],
-        "vm": ["module.forgejo_runner_vm[0].proxmox_virtual_environment_vm.this"]
+        "lxc": [
+          "module.forgejo_runner[0].proxmox_virtual_environment_container.this"
+        ],
+        "vm": [
+          "module.forgejo_runner_vm[0].proxmox_virtual_environment_vm.this"
+        ]
       },
       "playbooks": [
         "infra/ansible/playbooks/forgejo-runner.yml"
@@ -198,9 +303,15 @@
       "dependencies": [
         "forgejo"
       ],
-      "required_secrets": ["services.forgejo_runner.secrets.registration_secret"],
-      "secret_classifications": {"services.forgejo_runner.secrets.registration_secret": "runtime"},
-      "secret_environment": {"services.forgejo_runner.secrets.registration_secret": "FORGEJO_RUNNER_REGISTRATION_SECRET"},
+      "required_secrets": [
+        "services.forgejo_runner.secrets.registration_secret"
+      ],
+      "secret_classifications": {
+        "services.forgejo_runner.secrets.registration_secret": "runtime"
+      },
+      "secret_environment": {
+        "services.forgejo_runner.secrets.registration_secret": "FORGEJO_RUNNER_REGISTRATION_SECRET"
+      },
       "inventory": {
         "host": "forgejo_runner_lxc",
         "group": "forgejo_runner",
@@ -214,16 +325,45 @@
           "forgejo_runner_scope": "configuration.scope",
           "forgejo_runner_label": "configuration.label",
           "forgejo_runner_labels": "configuration.labels",
-          "forgejo_runner_hosts": "configuration.hosts"
+          "forgejo_runner_hosts": "configuration.hosts",
+          "forgejo_runner_compose_version": "configuration.compose_artifact.version",
+          "forgejo_runner_compose_sha256_amd64": "configuration.compose_artifact.checksums.amd64",
+          "forgejo_runner_compose_sha256_arm64": "configuration.compose_artifact.checksums.arm64",
+          "forgejo_runner_just_version": "configuration.just_artifact.version",
+          "forgejo_runner_just_sha256_amd64": "configuration.just_artifact.checksums.amd64",
+          "forgejo_runner_just_sha256_arm64": "configuration.just_artifact.checksums.arm64",
+          "forgejo_runner_sha256_amd64": "configuration.runner_artifact.checksums.amd64",
+          "forgejo_runner_sha256_arm64": "configuration.runner_artifact.checksums.arm64"
         }
       }
     },
     "infisical": {
       "state_capable": true,
       "runtime_owner": "guest",
+      "runtime": {
+        "default_type": "lxc",
+        "supported_types": [
+          "lxc",
+          "vm"
+        ]
+      },
       "configuration_schema": "InfisicalConfiguration",
-      "release_sources": ["package", "container", "binary", "image"],
-      "required_fields": ["resource", "state.capable"],
+      "release_sources": [
+        "package",
+        "container",
+        "binary",
+        "image"
+      ],
+      "required_fields": [
+        "resource",
+        "state.capable",
+        "configuration.caddy_artifact.version",
+        "configuration.caddy_artifact.checksums.amd64",
+        "configuration.caddy_artifact.checksums.arm64",
+        "configuration.compose_artifact.version",
+        "configuration.compose_artifact.checksums.amd64",
+        "configuration.compose_artifact.checksums.arm64"
+      ],
       "update_policy": {
         "status": "manual",
         "detail": "review immutable image or release changes with the normal validate, plan, and approved apply workflow"
@@ -234,8 +374,12 @@
         "module.infisical_vm["
       ],
       "terraform_replace_addresses": {
-        "lxc": ["module.infisical[0].proxmox_virtual_environment_container.this"],
-        "vm": ["module.infisical_vm[0].proxmox_virtual_environment_vm.this"]
+        "lxc": [
+          "module.infisical[0].proxmox_virtual_environment_container.this"
+        ],
+        "vm": [
+          "module.infisical_vm[0].proxmox_virtual_environment_vm.this"
+        ]
       },
       "playbooks": [
         "infra/ansible/playbooks/infisical.yml"
@@ -271,7 +415,13 @@
           "infisical_version": "release.version",
           "infisical_data_dir": "configuration.data_dir",
           "infisical_postgres_user": "configuration.postgres_user",
-          "infisical_postgres_db": "configuration.postgres_db"
+          "infisical_postgres_db": "configuration.postgres_db",
+          "infisical_caddy_cloudflare_version": "configuration.caddy_artifact.version",
+          "infisical_caddy_cloudflare_sha256_amd64": "configuration.caddy_artifact.checksums.amd64",
+          "infisical_caddy_cloudflare_sha256_arm64": "configuration.caddy_artifact.checksums.arm64",
+          "infisical_compose_version": "configuration.compose_artifact.version",
+          "infisical_compose_sha256_amd64": "configuration.compose_artifact.checksums.amd64",
+          "infisical_compose_sha256_arm64": "configuration.compose_artifact.checksums.arm64"
         },
         "tf_domain": "infisical_server_name"
       }
@@ -279,9 +429,15 @@
     "infisical_onramp": {
       "state_capable": true,
       "runtime_owner": "none",
+      "runtime": null,
       "configuration_schema": "InfisicalOnrampConfiguration",
       "release_sources": [],
-      "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
+      "required_fields": [
+        "resource",
+        "state.capable",
+        "resource.security.deploy_user",
+        "resource.security.deploy_dir"
+      ],
       "update_policy": {
         "status": "manual",
         "detail": "review shared-host application image or release changes with the normal validate, plan, and approved apply workflow"
@@ -331,9 +487,33 @@
     "hermes": {
       "state_capable": true,
       "runtime_owner": "guest",
+      "runtime": {
+        "default_type": "lxc",
+        "supported_types": [
+          "lxc",
+          "vm"
+        ]
+      },
       "configuration_schema": "HermesConfiguration",
-      "release_sources": ["package", "container", "binary", "image"],
-      "required_fields": ["resource", "state.capable"],
+      "release_sources": [
+        "package",
+        "container",
+        "binary",
+        "image"
+      ],
+      "required_fields": [
+        "resource",
+        "state.capable",
+        "configuration.caddy_artifact.version",
+        "configuration.caddy_artifact.checksums.amd64",
+        "configuration.caddy_artifact.checksums.arm64",
+        "configuration.compose_artifact.version",
+        "configuration.compose_artifact.checksums.amd64",
+        "configuration.compose_artifact.checksums.arm64",
+        "configuration.just_artifact.version",
+        "configuration.just_artifact.checksums.amd64",
+        "configuration.just_artifact.checksums.arm64"
+      ],
       "update_policy": {
         "status": "manual",
         "detail": "review immutable application release inputs before the normal validate, plan, and approved apply workflow"
@@ -344,8 +524,12 @@
         "module.hermes_vm["
       ],
       "terraform_replace_addresses": {
-        "lxc": ["module.hermes[0].proxmox_virtual_environment_container.this"],
-        "vm": ["module.hermes_vm[0].proxmox_virtual_environment_vm.this"]
+        "lxc": [
+          "module.hermes[0].proxmox_virtual_environment_container.this"
+        ],
+        "vm": [
+          "module.hermes_vm[0].proxmox_virtual_environment_vm.this"
+        ]
       },
       "playbooks": [
         "infra/ansible/playbooks/hermes.yml"
@@ -406,6 +590,8 @@
           "hermes_control_api_port": "configuration.control.api_port",
           "hermes_control_require_task_approval": "configuration.control.require_task_approval",
           "hermes_control_plugin_socket": "configuration.control.plugin_socket",
+          "hermes_control_workspace_root": "configuration.control.workspace_root",
+          "hermes_control_project_roots": "configuration.control.project_roots",
           "hermes_runtime_passwordless_sudo": "resources.guests.hermes.security.allow_passwordless_sudo",
           "hermes_allow_legacy_runtime": "configuration.allow_legacy_runtime",
           "hermes_compression_threshold": "configuration.tuning.compression_threshold",
@@ -422,16 +608,38 @@
           "hermes_dashboard_port": "endpoints.ports.dashboard",
           "hermes_dashboard_host": "configuration.dashboard.host",
           "hermes_dashboard_basic_auth_username": "configuration.dashboard.auth_username",
-          "hermes_web_searxng_url": "configuration.web.searxng_url"
+          "hermes_web_searxng_url": "configuration.web.searxng_url",
+          "hermes_caddy_cloudflare_version": "configuration.caddy_artifact.version",
+          "hermes_caddy_cloudflare_sha256_amd64": "configuration.caddy_artifact.checksums.amd64",
+          "hermes_caddy_cloudflare_sha256_arm64": "configuration.caddy_artifact.checksums.arm64",
+          "hermes_compose_version": "configuration.compose_artifact.version",
+          "hermes_compose_sha256_amd64": "configuration.compose_artifact.checksums.amd64",
+          "hermes_compose_sha256_arm64": "configuration.compose_artifact.checksums.arm64",
+          "hermes_just_version": "configuration.just_artifact.version",
+          "hermes_just_sha256_amd64": "configuration.just_artifact.checksums.amd64",
+          "hermes_just_sha256_arm64": "configuration.just_artifact.checksums.arm64"
         }
       }
     },
     "sssf": {
       "state_capable": true,
       "runtime_owner": "guest",
+      "runtime": {
+        "default_type": "vm",
+        "supported_types": [
+          "lxc",
+          "vm"
+        ]
+      },
       "configuration_schema": "SssfConfiguration",
-      "release_sources": ["binary"],
-      "required_fields": ["resource", "state.capable", "release.commit"],
+      "release_sources": [
+        "binary"
+      ],
+      "required_fields": [
+        "resource",
+        "state.capable",
+        "release.commit"
+      ],
       "update_policy": {
         "status": "managed",
         "detail": "just update checks repository-owned uv, Pi, and Bun version/checksum pins; upstream commit changes remain reviewed"
@@ -442,10 +650,16 @@
         "module.sssf_vm["
       ],
       "terraform_replace_addresses": {
-        "lxc": ["module.sssf[0].proxmox_virtual_environment_container.this"],
-        "vm": ["module.sssf_vm[0].proxmox_virtual_environment_vm.this"]
+        "lxc": [
+          "module.sssf[0].proxmox_virtual_environment_container.this"
+        ],
+        "vm": [
+          "module.sssf_vm[0].proxmox_virtual_environment_vm.this"
+        ]
       },
-      "playbooks": ["infra/ansible/playbooks/sssf.yml"],
+      "playbooks": [
+        "infra/ansible/playbooks/sssf.yml"
+      ],
       "dependencies": [],
       "required_secrets": [
         "services.sssf.secrets.openrouter_api_key",
@@ -453,9 +667,15 @@
         "services.sssf.secrets.fireworks_api_key"
       ],
       "conditional_required_secrets": {
-        "configuration.provider=openrouter": ["services.sssf.secrets.openrouter_api_key"],
-        "configuration.provider=openai": ["services.sssf.secrets.openai_api_key"],
-        "configuration.provider=fireworks": ["services.sssf.secrets.fireworks_api_key"]
+        "configuration.provider=openrouter": [
+          "services.sssf.secrets.openrouter_api_key"
+        ],
+        "configuration.provider=openai": [
+          "services.sssf.secrets.openai_api_key"
+        ],
+        "configuration.provider=fireworks": [
+          "services.sssf.secrets.fireworks_api_key"
+        ]
       },
       "secret_classifications": {
         "services.sssf.secrets.openrouter_api_key": "provider",
@@ -496,9 +716,23 @@
     "onramp_host": {
       "state_capable": true,
       "runtime_owner": "shared_host",
+      "runtime": {
+        "default_type": "vm",
+        "supported_types": [
+          "vm"
+        ]
+      },
       "configuration_schema": "ResourceOwnedConfiguration",
       "release_sources": [],
-      "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
+      "required_fields": [
+        "resource",
+        "state.capable",
+        "resource.security.deploy_user",
+        "resource.security.deploy_dir",
+        "resource.artifacts.caddy_cloudflare.version",
+        "resource.artifacts.caddy_cloudflare.checksums.amd64",
+        "resource.artifacts.caddy_cloudflare.checksums.arm64"
+      ],
       "update_policy": {
         "status": "manual",
         "detail": "review shared-host package and configuration changes through the normal validate, plan, and approved apply workflow"
@@ -511,9 +745,15 @@
         "infra/ansible/playbooks/onramp-host.yml"
       ],
       "dependencies": [],
-      "required_secrets": ["secrets.providers.cloudflare.api_token"],
-      "secret_classifications": {"secrets.providers.cloudflare.api_token": "provider"},
-      "secret_environment": {"secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"},
+      "required_secrets": [
+        "secrets.providers.cloudflare.api_token"
+      ],
+      "secret_classifications": {
+        "secrets.providers.cloudflare.api_token": "provider"
+      },
+      "secret_environment": {
+        "secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"
+      },
       "inventory": {
         "host": "onramp_host_vm",
         "group": "onramp_host",
@@ -528,7 +768,10 @@
           "onramp_host_deploy_user": "resources.shared_hosts.onramp_host.security.deploy_user",
           "onramp_host_deploy_dir": "resources.shared_hosts.onramp_host.security.deploy_dir",
           "onramp_host_allow_passwordless_sudo": "resources.shared_hosts.onramp_host.security.allow_passwordless_sudo",
-          "onramp_host_allowed_ssh_cidrs": "resources.shared_hosts.onramp_host.security.allowed_ssh_cidrs"
+          "onramp_host_allowed_ssh_cidrs": "resources.shared_hosts.onramp_host.security.allowed_ssh_cidrs",
+          "onramp_host_caddy_cloudflare_version": "resources.shared_hosts.onramp_host.artifacts.caddy_cloudflare.version",
+          "onramp_host_caddy_cloudflare_sha256_amd64": "resources.shared_hosts.onramp_host.artifacts.caddy_cloudflare.checksums.amd64",
+          "onramp_host_caddy_cloudflare_sha256_arm64": "resources.shared_hosts.onramp_host.artifacts.caddy_cloudflare.checksums.arm64"
         },
         "user_var": "onramp_host_deploy_user",
         "tf_user": "onramp_host_deploy_user",
@@ -545,9 +788,20 @@
     "searxng_onramp": {
       "state_capable": true,
       "runtime_owner": "none",
+      "runtime": null,
       "configuration_schema": "SearxngConfiguration",
-      "release_sources": ["package", "container", "binary", "image"],
-      "required_fields": ["resource", "state.capable", "resource.security.deploy_user", "resource.security.deploy_dir"],
+      "release_sources": [
+        "package",
+        "container",
+        "binary",
+        "image"
+      ],
+      "required_fields": [
+        "resource",
+        "state.capable",
+        "resource.security.deploy_user",
+        "resource.security.deploy_dir"
+      ],
       "update_policy": {
         "status": "manual",
         "detail": "review the immutable container image and digest together before the normal validate, plan, and approved apply workflow"
@@ -562,13 +816,22 @@
       "dependencies": [
         "onramp_host"
       ],
-      "required_secrets": ["services.searxng_onramp.secrets.secret_key"],
-      "secret_classifications": {"services.searxng_onramp.secrets.secret_key": "runtime"},
-      "secret_environment": {"services.searxng_onramp.secrets.secret_key": "SEARXNG_SECRET_KEY"},
+      "required_secrets": [
+        "services.searxng_onramp.secrets.secret_key"
+      ],
+      "secret_classifications": {
+        "services.searxng_onramp.secrets.secret_key": "runtime"
+      },
+      "secret_environment": {
+        "services.searxng_onramp.secrets.secret_key": "SEARXNG_SECRET_KEY"
+      },
       "release": {
         "source": "container",
         "legacy_image_var": "searxng_container_image",
-        "canonical_fields": ["release.image", "release.digest"],
+        "canonical_fields": [
+          "release.image",
+          "release.digest"
+        ],
         "immutable_reference": true
       },
       "inventory": {

@@ -1,18 +1,21 @@
 FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
 
+ARG TARGETARCH
 ARG OPENTOFU_VERSION=1.12.3
 ARG OPENTOFU_LINUX_AMD64_SHA256=46b48c3438c65cf479fc076c9281422ffa2f493548d1e813d154c835c5986a08
 ARG TFLINT_VERSION=0.63.1
 ARG TFLINT_LINUX_AMD64_SHA256=8441a7d97df20431f19c9b9d27ff4c63e308c964e86660bc7cc0cf7bbe0725e8
-ARG PIP_VERSION=26.1.2
 ARG SOPS_VERSION=3.13.3
 ARG SOPS_LINUX_AMD64_SHA256=e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
 
-COPY tools/requirements.txt /tmp/requirements.txt
+COPY tools/pip-bootstrap.lock tools/requirements.lock /tmp/
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     TF_PLUGIN_CACHE_DIR=/root/.terraform.d/plugin-cache
+
+RUN test "${TARGETARCH}" = "amd64" \
+    || (printf '%s\n' "The tooling image supports only TARGETARCH=amd64; see docs/tooling-reproducibility.md." >&2; exit 64)
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -46,8 +49,8 @@ RUN apt-get update \
     && printf '%s  %s\n' "${SOPS_LINUX_AMD64_SHA256}" /usr/local/bin/sops | sha256sum -c - \
     && chmod 0755 /usr/local/bin/sops \
     && python3 -m venv /opt/ansible \
-    && /opt/ansible/bin/pip install --no-cache-dir --upgrade "pip==${PIP_VERSION}" \
-    && /opt/ansible/bin/pip install --no-cache-dir -r /tmp/requirements.txt \
+    && /opt/ansible/bin/pip install --no-cache-dir --require-hashes --upgrade -r /tmp/pip-bootstrap.lock \
+    && /opt/ansible/bin/pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
     && useradd --create-home --shell /bin/bash --uid 1000 anvil \
     && mkdir -p /home/anvil/.terraform.d/plugin-cache /home/anvil/.ansible /workspace \
     && chown -R anvil:anvil /home/anvil /workspace \

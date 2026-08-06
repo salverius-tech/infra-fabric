@@ -4,6 +4,7 @@
   gather_facts: false
   tasks:
     - name: Describe direct access handoff boundary
+      tags: [config]
       ansible.builtin.debug:
         msg:
           - Proxmox guest lifecycle readiness runs before this handoff when required.
@@ -16,6 +17,7 @@
   gather_facts: false
   tasks:
     - name: Verify or enroll controller known_hosts for direct service endpoints  # noqa: run-once[task]
+      tags: [health]
       ansible.builtin.shell: |
         set -euo pipefail
         host={{ hostvars[service_inventory_host].ansible_host | quote }}
@@ -72,11 +74,14 @@
       when: not (direct_access_ready_enroll_only | default(false) | bool)
       block:
         - name: Wait for direct service SSH
+          tags: [config]
           ansible.builtin.wait_for_connection:
             timeout: "{{ direct_access_ready_connection_timeout | default(180) }}"
         - name: Probe direct service Python execution
+          tags: [health]
           ansible.builtin.ping:
         - name: Wait for VM cloud-init completion before steady-state roles
+          tags: [config]
           ansible.builtin.command: cloud-init status --wait
           become: true
           register: direct_access_ready_cloud_init

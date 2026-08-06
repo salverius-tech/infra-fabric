@@ -1,20 +1,24 @@
 - name: Restart Hermes Control API
+  tags: [service]
   ansible.builtin.systemd:
     name: hermes-mobile-control-api
     state: restarted
     daemon_reload: true
 
 - name: Restart Hermes Control bridge
+  tags: [service]
   ansible.builtin.systemd:
     name: hermes-control-bridge
     state: restarted
     daemon_reload: true
 
 - name: Restart hermes gateway
+  tags: [service]
   ansible.builtin.systemd:
     name: hermes-gateway
     state: restarted
 
 - name: Reload systemd
+  tags: [service]
   ansible.builtin.systemd:
     daemon_reload: true

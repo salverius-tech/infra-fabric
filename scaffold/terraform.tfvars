@@ -140,8 +140,7 @@ hermes_runtime_user            = "anvil"
 hermes_started                 = true
 hermes_start_on_boot           = true
 
-# Tailscale client LXC
-tailscale_client_enabled       = false
+# Tailscale client LXC (select it with enabled_services)
 tailscale_client_vmid          = 108
 tailscale_client_hostname      = "tailscale-client"
 tailscale_client_description   = "Tailscale client LXC managed by OpenTofu."

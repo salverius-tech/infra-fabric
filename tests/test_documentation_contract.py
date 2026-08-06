@@ -39,18 +39,29 @@ def _document_anchors(path: Path) -> set[str]:
 class DocumentationContractTests(unittest.TestCase):
     def test_documentation_inventory_covers_every_tracked_markdown_file(self) -> None:
         inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
-        self.assertEqual(inventory["schema_version"], 1)
+        self.assertEqual(inventory["schema_version"], 2)
+        self.assertEqual(
+            inventory["classifications"],
+            [
+                "current authority",
+                "operator guidance",
+                "working design",
+                "implementation tracker",
+                "acceptance evidence",
+                "historical reference",
+                "superseded",
+            ],
+        )
         documents = inventory["documents"]
         if shutil.which("git"):
-            tracked = {
-                path
-                for path in subprocess.check_output(
-                    ["git", "-C", str(ROOT), "ls-files", "--", "*.md"], text=True
+            tracked = set(
+                subprocess.check_output(
+                    ["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.md"],
+                    text=True,
                 ).splitlines()
-                if not {".hermes", ".specs", "values"}.intersection(Path(path).parts)
-            }
+            )
         else:
-            ignored_roots = {".git", ".hermes", ".specs", "values", ".venv", ".tmp", ".terraform"}
+            ignored_roots = {".git", "values", ".venv", ".tmp", ".terraform"}
             tracked = {
                 path.relative_to(ROOT).as_posix()
                 for path in ROOT.rglob("*.md")
@@ -61,13 +72,23 @@ class DocumentationContractTests(unittest.TestCase):
         for relative, classification in documents.items():
             self.assertIn(classification, inventory["classifications"], relative)
             self.assertTrue((ROOT / relative).is_file(), relative)
+        for relative, replacement in inventory["successors"].items():
+            self.assertIn(relative, documents)
+            self.assertIn(replacement, documents)
+            self.assertNotEqual(relative, replacement)
+        for relative, classification in documents.items():
+            if classification == "superseded":
+                self.assertIn(relative, inventory["successors"])
         for relative, replacement in inventory["historical_remove"].items():
             self.assertFalse((ROOT / relative).exists(), relative)
             self.assertTrue((ROOT / replacement).is_file(), replacement)
 
     def test_tracked_markdown_relative_links_and_anchors_resolve(self) -> None:
         inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
-        for relative in inventory["documents"]:
+        maintained = {"current authority", "operator guidance", "working design", "implementation tracker"}
+        for relative, classification in inventory["documents"].items():
+            if classification not in maintained:
+                continue
             source = ROOT / relative
             for raw_link in MARKDOWN_LINK.findall(source.read_text(encoding="utf-8")):
                 if "://" in raw_link or raw_link.startswith(("mailto:", "#")):
@@ -172,7 +193,7 @@ class DocumentationContractTests(unittest.TestCase):
     def test_operator_bash_lifecycle_examples_establish_site_context(self) -> None:
         inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
         for relative, classification in inventory["documents"].items():
-            if classification != "operator-current":
+            if classification != "operator guidance":
                 continue
             lines = (ROOT / relative).read_text(encoding="utf-8").splitlines()
             in_bash = False
@@ -191,6 +212,36 @@ class DocumentationContractTests(unittest.TestCase):
                     has_context = True
                 if re.search(r"\bjust (validate|plan|apply|update)\b", line):
                     self.assertTrue(has_context, f"missing site context in {relative}: {line.strip()}")
+
+    def test_service_operations_matrix_covers_the_catalog_and_day_two_contract(self) -> None:
+        catalog = json.loads((ROOT / "infra" / "services.json").read_text(encoding="utf-8"))["services"]
+        matrix = (ROOT / "docs" / "service-operations.md").read_text(encoding="utf-8")
+        self.assertIn("infra/services.json", matrix)
+        self.assertIn("external evidence required", matrix)
+        self.assertIn("Health and logs", matrix)
+        for service, metadata in catalog.items():
+            rows = [line for line in matrix.splitlines() if line.startswith(f"| `{service}` |")]
+            self.assertEqual(len(rows), 1, service)
+            row = rows[0]
+            self.assertIn("catalog:", row.lower(), service)
+            if metadata["state_capable"]:
+                self.assertIn("state-capable", row, service)
+            else:
+                self.assertIn("N/A/unsupported", row, service)
+
+    def test_operator_command_snippets_preserve_supported_boundaries(self) -> None:
+        matrix = (ROOT / "docs" / "service-operations.md").read_text(encoding="utf-8")
+        migration = (ROOT / "docs" / "canonical-values-migration.md").read_text(encoding="utf-8")
+        troubleshooting = (ROOT / "docs" / "canonical-troubleshooting.md").read_text(encoding="utf-8")
+        for command in ("VALUES_SITE=<site> just validate", "VALUES_SITE=<site> just plan", "VALUES_SITE=<site> just apply"):
+            self.assertIn(command, matrix)
+            self.assertIn(command, migration)
+        for prohibited in ("raw OpenTofu/Terraform", "site.yml"):
+            self.assertIn(prohibited, matrix)
+            self.assertIn(prohibited, migration)
+        for stage in ("canonical-input", "provider-plan", "host-trust", "service-health", "state-recovery"):
+            self.assertIn(stage, matrix)
+            self.assertIn(stage, troubleshooting)
 
 
 if __name__ == "__main__":

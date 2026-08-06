@@ -1,15 +1,18 @@
 ---
 - name: Restart hermes dashboard
+  tags: [service]
   ansible.builtin.systemd:
     name: hermes-dashboard
     state: restarted
     daemon_reload: true
 - name: Restart hermes gateway
+  tags: [service]
   ansible.builtin.systemd:
     name: hermes-gateway
     state: restarted
     daemon_reload: true
 - name: Restart caddy
+  tags: [service]
   ansible.builtin.systemd:
     name: caddy
     state: restarted

@@ -1,5 +1,6 @@
 ---
 - name: Validate Forgejo required variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - forgejo_domain is defined
@@ -20,10 +21,12 @@
       Forgejo requires domain, version, persistent security secrets, supported database settings,
       and bootstrap admin/repo values when bootstrap is enabled.
 - name: Set Forgejo database defaults
+  tags: [config]
   ansible.builtin.set_fact:
     forgejo_database: "{{ {'type': 'sqlite'} | combine(forgejo_database | default({}), recursive=True) }}"
 
 - name: Install Forgejo OS dependencies in LXC
+  tags: [packages]
   ansible.builtin.command:
     argv:
       - bash
@@ -31,6 +34,7 @@
       - "set -euo pipefail; packages=\"ca-certificates curl git git-lfs openssh-server{% if forgejo_database.type | default('sqlite') == 'sqlite' %} sqlite3{% endif %}\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Enable Git LFS system hooks
+  tags: [service]
   ansible.builtin.command:
     argv:
       - git
@@ -39,6 +43,7 @@
       - --system
   changed_when: false
 - name: Ensure git user exists
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -46,11 +51,13 @@
       - if ! id git >/dev/null 2>&1; then adduser --system --shell /bin/bash --gecos 'Git Version Control' --group --disabled-password --home /var/lib/forgejo git; fi  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Configure managed Forgejo PostgreSQL
+  tags: [always]
   ansible.builtin.include_tasks: postgres.yml
   when:
     - forgejo_database.type | default('sqlite') == 'postgres'
     - forgejo_database.managed | default(true) | bool
 - name: Configure Forgejo guest-managed storage
+  tags: [always]
   ansible.builtin.include_tasks: guest-storage.yml
   vars:
     storage_mount: "{{ forgejo_storage.data }}"
@@ -59,6 +66,7 @@
     - forgejo_storage.data is defined
     - forgejo_storage.data.type in ['guest_nfs', 'guest_cifs']
 - name: Ensure Forgejo directories exist
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -66,6 +74,7 @@
       - install -d -m 0750 -o git -g git /var/lib/forgejo /var/lib/forgejo/custom /var/lib/forgejo/data /var/lib/forgejo/log && install -d -m 0770 -o root -g git /etc/forgejo  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Check installed Forgejo version
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - bash
@@ -75,6 +84,7 @@
   changed_when: false
   failed_when: false
 - name: Install requested Forgejo binary
+  tags: [packages]
   ansible.builtin.command:
     argv:
       - bash
@@ -84,6 +94,7 @@
   changed_when: true
   notify: Restart forgejo
 - name: Install Forgejo systemd service
+  tags: [packages]
   ansible.builtin.template:
     src: forgejo.service.j2
     dest: /etc/systemd/system/forgejo.service
@@ -91,6 +102,7 @@
     owner: root
     group: root
 - name: Check Forgejo app.ini presence
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - test
@@ -100,6 +112,7 @@
   changed_when: false
   failed_when: false
 - name: Install initial Forgejo app.ini
+  tags: [packages]
   ansible.builtin.template:
     src: app.ini.j2
     dest: /etc/forgejo/app.ini
@@ -110,6 +123,7 @@
   no_log: true
   notify: Restart forgejo
 - name: Mark Forgejo app.ini as installed for non-interactive service startup
+  tags: [packages]
   ansible.builtin.command:
     argv:
       - python3
@@ -154,6 +168,7 @@
   notify: Restart forgejo
 
 - name: Configure Forgejo Actions settings
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -165,6 +180,7 @@
   notify: Restart forgejo
   when: forgejo_actions_enabled | default(true) | bool
 - name: Install Forgejo SSH integration config
+  tags: [packages]
   ansible.builtin.template:
     src: forgejo-sshd.conf.j2
     dest: /etc/ssh/sshd_config.d/forgejo.conf
@@ -173,9 +189,11 @@
     group: root
   when: forgejo_configure_system_ssh | default(true) | bool
 - name: Configure Caddy on Forgejo LXC
+  tags: [always]
   ansible.builtin.include_tasks: caddy.yml
   when: forgejo_enable_caddy | default(false) | bool
 - name: Enable Forgejo service
+  tags: [service]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -184,8 +202,10 @@
       - forgejo
   changed_when: false
 - name: Flush Forgejo service restarts before endpoint checks
+  tags: [health]
   ansible.builtin.meta: flush_handlers
 - name: Verify Forgejo service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -197,6 +217,7 @@
   delay: 5
   until: forgejo_active.rc == 0
 - name: Verify Forgejo health endpoint on loopback
+  tags: [health]
   ansible.builtin.uri:
     url: http://127.0.0.1:3000/api/healthz
     status_code: 200
@@ -207,12 +228,14 @@
   until: forgejo_health_check.status == 200
 
 - name: Derive Forgejo bootstrap repository scope
+  tags: [config]
   ansible.builtin.set_fact:
     forgejo_bootstrap_repo_owner: "{{ forgejo_runner_scope.split('/')[0] }}"
     forgejo_bootstrap_repo_name: "{{ forgejo_runner_scope.split('/')[1] }}"
   when: forgejo_bootstrap_enabled | default(false) | bool
 
 - name: Validate Forgejo bootstrap repository scope
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - forgejo_runner_scope.split('/') | length == 2
@@ -222,6 +245,7 @@
   when: forgejo_bootstrap_enabled | default(false) | bool
 
 - name: Check Forgejo bootstrap admin user in SQLite
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -239,6 +263,7 @@
     - forgejo_database.type | default('sqlite') == 'sqlite'
 
 - name: Check Forgejo bootstrap admin user in PostgreSQL
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -259,6 +284,7 @@
     - forgejo_database.type | default('sqlite') == 'postgres'
 
 - name: Set Forgejo bootstrap admin user check result
+  tags: [validation]
   ansible.builtin.set_fact:
     forgejo_bootstrap_admin_exists: >-
       {{ (forgejo_bootstrap_admin_check_postgres.stdout | default(forgejo_bootstrap_admin_check_sqlite.stdout | default(''))) | trim != '' }}
@@ -266,6 +292,7 @@
   when: forgejo_bootstrap_enabled | default(false) | bool
 
 - name: Create Forgejo bootstrap admin user
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -286,6 +313,7 @@
     - not forgejo_bootstrap_admin_exists
 
 - name: Check Forgejo bootstrap repository owner user in SQLite
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -303,6 +331,7 @@
     - forgejo_database.type | default('sqlite') == 'sqlite'
 
 - name: Check Forgejo bootstrap repository owner user in PostgreSQL
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -323,6 +352,7 @@
     - forgejo_database.type | default('sqlite') == 'postgres'
 
 - name: Set Forgejo bootstrap repository owner check result
+  tags: [validation]
   ansible.builtin.set_fact:
     forgejo_bootstrap_owner_exists: >-
       {{ (forgejo_bootstrap_owner_check_postgres.stdout | default(forgejo_bootstrap_owner_check_sqlite.stdout | default(''))) | trim != '' }}
@@ -330,6 +360,7 @@
   when: forgejo_bootstrap_enabled | default(false) | bool
 
 - name: Create Forgejo bootstrap repository owner user
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -350,6 +381,7 @@
     - not forgejo_bootstrap_owner_exists
 
 - name: Check Forgejo bootstrap repository in SQLite
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -370,6 +402,7 @@
     - forgejo_database.type | default('sqlite') == 'sqlite'
 
 - name: Check Forgejo bootstrap repository in PostgreSQL
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - runuser
@@ -393,6 +426,7 @@
     - forgejo_database.type | default('sqlite') == 'postgres'
 
 - name: Set Forgejo bootstrap repository check result
+  tags: [validation]
   ansible.builtin.set_fact:
     forgejo_bootstrap_repo_exists: >-
       {{ (forgejo_bootstrap_repo_check_postgres.stdout | default(forgejo_bootstrap_repo_check_sqlite.stdout | default(''))) | trim != '' }}
@@ -400,6 +434,7 @@
   when: forgejo_bootstrap_enabled | default(false) | bool
 
 - name: Set Forgejo bootstrap repository filesystem paths
+  tags: [config]
   ansible.builtin.set_fact:
     forgejo_bootstrap_repo_path: >-
       /var/lib/forgejo/data/gitea-repositories/{{ forgejo_bootstrap_repo_owner }}/{{ forgejo_bootstrap_repo_name }}.git
@@ -410,6 +445,7 @@
     - not forgejo_bootstrap_repo_exists
 
 - name: Check existing Forgejo bootstrap repository files
+  tags: [validation]
   ansible.builtin.stat:
     path: "{{ forgejo_bootstrap_repo_path }}"
   register: forgejo_bootstrap_repo_files
@@ -418,6 +454,7 @@
     - not forgejo_bootstrap_repo_exists
 
 - name: Check preserved Forgejo bootstrap repository files
+  tags: [validation]
   ansible.builtin.stat:
     path: "{{ forgejo_bootstrap_repo_preserved_path }}"
   register: forgejo_bootstrap_repo_preserved_files
@@ -426,6 +463,7 @@
     - not forgejo_bootstrap_repo_exists
 
 - name: Preserve existing Forgejo bootstrap repository files before DB bootstrap
+  tags: [config]
   ansible.builtin.command:
     argv:
       - mv
@@ -439,6 +477,7 @@
     - not forgejo_bootstrap_repo_preserved_files.stat.exists | default(false)
 
 - name: Create Forgejo bootstrap repository
+  tags: [config]
   ansible.builtin.uri:
     url: "http://127.0.0.1:3000/api/v1/admin/users/{{ forgejo_bootstrap_repo_owner }}/repos"
     method: POST
@@ -457,6 +496,7 @@
     - not forgejo_bootstrap_repo_exists
 
 - name: Re-check preserved Forgejo bootstrap repository files
+  tags: [validation]
   ansible.builtin.stat:
     path: "{{ forgejo_bootstrap_repo_preserved_path }}"
   register: forgejo_bootstrap_repo_preserved_after_create
@@ -465,6 +505,7 @@
     - not forgejo_bootstrap_repo_exists
 
 - name: Stop Forgejo before restoring preserved bootstrap repository files
+  tags: [config]
   ansible.builtin.systemd:
     name: forgejo
     state: stopped
@@ -474,6 +515,7 @@
     - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
 
 - name: Restore preserved Forgejo bootstrap repository files
+  tags: [restore]
   ansible.builtin.shell: |
     set -euo pipefail
     rm -rf {{ forgejo_bootstrap_repo_path | quote }}
@@ -487,6 +529,7 @@
     - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
 
 - name: Ensure restored Forgejo bootstrap repository file ownership
+  tags: [restore]
   ansible.builtin.file:
     path: "{{ forgejo_bootstrap_repo_path }}"
     owner: git
@@ -498,6 +541,7 @@
     - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
 
 - name: Regenerate Forgejo repository hooks after restoring bootstrap repository files
+  tags: [config]
   ansible.builtin.command:
     argv:
       - runuser
@@ -519,6 +563,7 @@
     - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
 
 - name: Start Forgejo after restoring preserved bootstrap repository files
+  tags: [service]
   ansible.builtin.systemd:
     name: forgejo
     state: started
@@ -527,6 +572,7 @@
     - not forgejo_bootstrap_repo_exists
     - forgejo_bootstrap_repo_preserved_after_create.stat.exists | default(false)
 - name: Verify Forgejo Caddy service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -539,6 +585,7 @@
   until: forgejo_caddy_active.rc == 0
   when: forgejo_enable_caddy | default(false) | bool
 - name: Verify Forgejo HTTPS health route locally
+  tags: [health]
   ansible.builtin.command:
     argv:
       - curl

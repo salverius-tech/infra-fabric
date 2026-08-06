@@ -2,7 +2,7 @@
 
 **Status:** Implementation in progress — approved fork-native work; no live infrastructure mutation, plan, or apply has been performed.
 
-**Source decision record:** [`docs/upstream-gap-review-2026-07-19.md`](../../docs/upstream-gap-review-2026-07-19.md)
+**Historical source decision record:** the retired upstream-gap review is succeeded by [canonical readiness](../../docs/canonical-readiness.md).
 
 ## Objective
 

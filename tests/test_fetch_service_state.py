@@ -102,6 +102,7 @@ class FetchServiceStateTests(unittest.TestCase):
         self.assertIn("service_state_stream.stdout | from_json", backup)
         self.assertIn("service_state_checksum.sha256", backup)
         self.assertIn("- name: Create and stream service-state backup transaction\n      block:", backup)
+        self.assertNotIn("- name: Create and stream service-state backup transaction\n      tags:", backup)
         self.assertIn("      always:\n", backup)
         self.assertLess(backup.index("      always:"), backup.index("Record streamed service-state archive checksum"))
         self.assertNotIn("sha256sum", backup)

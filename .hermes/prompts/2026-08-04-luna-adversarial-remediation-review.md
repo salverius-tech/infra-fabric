@@ -204,7 +204,7 @@ Do not limit the review to original findings. Look for:
 - stale documentation created by the fixes;
 - tests that mock away the contract under review;
 - platform-specific assumptions presented as portable behavior;
-- changes that require private/live evidence but were marked source-complete.
+- changes that require private or live evidence but were marked source-complete.
 
 Any new defect receives a new review finding ID prefixed `LR-` and must not be hidden in prose.
 
@@ -247,7 +247,7 @@ Use this structure:
 2. **Scope and evidence boundaries**
    - files/plans reviewed;
    - checks run;
-   - private/provider/live/recovery checks not run.
+   - private, provider, live, and recovery checks not run.
 3. **Blocking findings**
    - Critical/High first, each with exact path and line evidence, impact, violated requirement, and remediation.
 4. **Other findings**
@@ -279,7 +279,7 @@ Return **reject** when any of the following is true:
 - the reviewed state is not committed/reproducible when Terra claimed completion;
 - safety boundaries were weakened or bypassed;
 - public validation fails because of repository behavior;
-- private/provider/live/recovery completion was claimed without evidence.
+- private, provider, live, or recovery completion was claimed without evidence.
 
 Return **conditionally accept** when all authorized source-level work is sound but explicit operator decisions or separately authorized provider/live/recovery evidence remains. List every condition.
 

@@ -319,7 +319,7 @@ Required evidence:
 - exact path-contract parity tests;
 - negative delivery tests;
 - dry-run migration tests;
-- private/live evidence left as explicit acceptance backlog.
+- private or live evidence left as explicit acceptance backlog.
 
 #### Wave 3C — OpenTofu, plan/apply, state, destruction, and equivalence
 
@@ -425,7 +425,7 @@ Required evidence:
 
 - clean detached-worktree validation;
 - exact CI workflow coverage;
-- clear distinction between static CI and private/live acceptance.
+- clear distinction between static CI and private or live acceptance.
 
 Wave output:
 

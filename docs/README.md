@@ -17,6 +17,7 @@ Public-safe documentation for canonical site infrastructure.
 - [Canonical secret operations](canonical-values-secret-operations.md) — SOPS/age policy, bootstrap identity, rotation, backup, recovery, and restore rehearsal.
 - [Canonical teardown and site retirement](canonical-teardown.md) — reviewed destroy plans, state handling, artifact cleanup, and retirement boundaries.
 - [Service update policy](service-update-policy.md) — managed releases, pins, checksums, rollback, and maintenance windows.
+- [Service operations matrix](service-operations.md) — catalog-derived health, logs, credentials, update/rollback, state, and recovery routing for every registered service.
 - [Hermes tuning](hermes-tuning.md) — managed Hermes runtime tuning.
 - [Hermes Control operations](hermes-control-operations.md) — companion-stack operation and verification.
 - [Managed service-state backup and restore](service-state-backup.md) — state backup and restore contracts.

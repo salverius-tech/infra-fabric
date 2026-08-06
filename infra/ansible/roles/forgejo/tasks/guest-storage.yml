@@ -1,5 +1,6 @@
 ---
 - name: Validate Forgejo guest storage definition
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - storage_mount.type in ['guest_nfs', 'guest_cifs']
@@ -7,6 +8,7 @@
     fail_msg: Forgejo guest storage must define guest_nfs or guest_cifs storage with a target path.
 
 - name: Install Forgejo guest NFS client packages
+  tags: [packages]
   ansible.builtin.apt:
     name: nfs-common
     state: present
@@ -14,6 +16,7 @@
   when: storage_mount.type == 'guest_nfs'
 
 - name: Install Forgejo guest CIFS client packages
+  tags: [packages]
   ansible.builtin.apt:
     name: cifs-utils
     state: present
@@ -21,12 +24,14 @@
   when: storage_mount.type == 'guest_cifs'
 
 - name: Create Forgejo guest storage mount target
+  tags: [config]
   ansible.builtin.file:
     path: "{{ storage_mount.target }}"
     state: directory
     mode: "{{ storage_mount.mode | default('0750') }}"
 
 - name: Build Forgejo guest storage mount facts
+  tags: [packages]
   ansible.builtin.set_fact:
     forgejo_guest_storage_src: >-
       {{ storage_mount.server ~ ':' ~ storage_mount.export
@@ -39,11 +44,13 @@
          else ['rw', '_netdev', 'nofail'] }}
 
 - name: Build Forgejo CIFS credentials mount option
+  tags: [packages]
   ansible.builtin.set_fact:
     forgejo_guest_storage_base_options: "{{ forgejo_guest_storage_base_options + ['credentials=' ~ storage_mount.credentials_file] }}"
   when: storage_mount.type == 'guest_cifs'
 
 - name: Manage Forgejo guest storage fstab entry
+  tags: [config]
   ansible.builtin.lineinfile:
     path: /etc/fstab
     regexp: "^{{ forgejo_guest_storage_src | regex_escape() }}\\s+{{ storage_mount.target | regex_escape() }}\\s+"
@@ -55,6 +62,7 @@
     group: root
 
 - name: Check Forgejo guest storage mount status
+  tags: [health]
   ansible.builtin.command:
     argv:
       - mountpoint
@@ -65,6 +73,7 @@
   failed_when: false
 
 - name: Mount Forgejo guest storage
+  tags: [config]
   ansible.builtin.command:
     argv:
       - mount
@@ -73,6 +82,7 @@
   changed_when: true
 
 - name: Set Forgejo guest storage mount ownership
+  tags: [config]
   ansible.builtin.file:
     path: "{{ storage_mount.target }}"
     state: directory

@@ -7,7 +7,7 @@
 **Starting commit:** `f5b4b48192f3ff36771f3c8e14528e6bcd904407`
 **Recommended execution model:** `gpt-5.6-terra`
 
-**Implementation progress (2026-08-05):** Packages S2, S3, and O2 are source-complete with focused regression evidence. Package O1 has completed the repository-local HTTPS diagnostics header, structural contract, and role argument-spec work; Hermes Control upstream/repository and live guest acceptance remain separately unverified. O3 now removes the SSSF uv/Pi/Bun remote installers in favor of SHA-256-verified controller-side artifacts, includes managed repository-pin updates, and makes Bun cache acquisition conditional on the visualizer; wider convergence reporting and a unified artifact contract remain open. Q3 now has non-mutating `just update --dry-run` behavior through both repository-owned and canonical update paths; catalog-derived policy/status reporting and end-to-end catalog output coverage remain open. Q1 now derives host-identity root-recovery password salts from canonical site/resource identity; the broader idempotence, tags, and check-mode package remains open. Q2 now validates VM/LXC identity, compute, disk, network, and module-specific extra-disk or mount-path contracts at reusable module boundaries, and constrains the Proxmox provider consistently to the reviewed `~> 0.88` series; projection completeness, aliases, moved-state contracts, and external mapping evidence remain open. S3 includes separate metadata-bound guarded teardown planning/application, immutable execution snapshots, immediate pre-mutation re-verification, local-state snapshot/restore primitives, and single-controller enforcement. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses.
+**Implementation progress (2026-08-05):** Packages S2, S3, and O2 are source-complete with focused regression evidence. Package O1 has completed the repository-local HTTPS diagnostics header, structural contract, and role argument-spec work; Hermes Control upstream/repository and live guest acceptance remain separately unverified. O3 now removes the SSSF uv/Pi/Bun remote installers in favor of SHA-256-verified controller-side artifacts, includes managed repository-pin updates, and makes Bun cache acquisition conditional on the visualizer; wider convergence reporting and a unified artifact contract remain open. Q3 now has non-mutating `just update --dry-run` behavior through both repository-owned and canonical update paths; catalog-derived policy/status reporting and end-to-end catalog output coverage remain open. Q1 now derives host-identity root-recovery password salts from canonical site/resource identity; the broader idempotence, tags, and check-mode package remains open. Q2 now validates VM/LXC identity, compute, disk, network, and module-specific extra-disk or mount-path contracts at reusable module boundaries, constrains the Proxmox provider consistently to the reviewed `~> 0.88` series, derives compatibility fields from typed resource/service objects without changing resource addresses, and checks canonical mapping rows against tracked producers and consumers. Provider-backed mapping equivalence, plans, state, and live infrastructure acceptance remain unexecuted and are not implied by these source-level statuses. S3 includes separate metadata-bound guarded teardown planning/application, immutable execution snapshots, immediate pre-mutation re-verification, local-state snapshot/restore primitives, and single-controller enforcement. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses.
 
 ## Model recommendation
 
@@ -63,7 +63,7 @@ Do not trust the status line or checkboxes in any historical tracker until they 
 ### Stop only when
 
 - a required product/architecture decision cannot safely be inferred;
-- private/provider/live/recovery evidence is required;
+- private, provider, live, or recovery evidence is required;
 - a command would cross the prohibited mutation boundary;
 - remote changes create an unresolvable conflict;
 - a verification failure cannot be resolved without weakening a safety contract; or
@@ -346,8 +346,8 @@ Audit coverage: **H9, M18**, Hermes Control tracker.
 - [x] Correct the HTTPS diagnostics authorization header.
 - [x] Add a non-secret structural/render test proving variable use without exposing token contents.
 - [x] Add `argument_specs` for Hermes Control and reconcile parent-role inputs.
-- [ ] Reconcile all Hermes Control tracker items against current source; implement outstanding source-level tasks that do not require live deployment.
-- [ ] Keep live guest and service acceptance explicitly unverified.
+- [x] Reconcile all Hermes Control tracker items against current source; implement outstanding source-level tasks that do not require live deployment. Typed Control workspace/project-root configuration now has catalog, projection, role-default, argument-spec, rendering, validation, and regression parity.
+- [x] Keep live guest and service acceptance explicitly unverified; upstream Hermes Control compatibility, disposable guest lifecycle/plugin/Caddy/DNS/WebSocket smoke checks, and deployed five-state/update verification remain external acceptance gates.
 
 Commit boundary:
 
@@ -430,9 +430,9 @@ Audit coverage: **M6, M7, L7**, outstanding W1/W3/W5 items.
 - [x] Add projection completeness checks for conditionally required root variables.
 - [x] Align the provider compatibility constraint to the reviewed pre-1.0 series.
 - [x] Update stale HCL descriptions that direct edits to generated/legacy files.
-- [ ] Reduce compatibility aliases through typed resource/service objects without changing resource addresses.
+- [x] Reduce compatibility aliases through typed resource/service objects without changing resource addresses.
 - [x] Preserve moved blocks and add state-address contract tests.
-- [ ] Reconcile all mapping-matrix claims against live producers and consumers; do not mark provider/live equivalence complete.
+- [x] Reconcile mapping-matrix source claims against tracked producers and consumers; provider/live equivalence remains explicitly external evidence.
 
 Commit boundary:
 
@@ -472,16 +472,16 @@ Audit coverage: **L1-L8**, documentation portions of all high/medium findings.
 
 Tasks:
 
-- [ ] Expand documentation classifications to current authority, operator guidance, working design, implementation tracker, acceptance evidence, historical reference, and superseded.
-- [ ] Update status headers and checkboxes from the ledger only after evidence exists.
-- [ ] Separate implemented source from provider/live/recovery evidence.
-- [ ] Add one service operations page or generated matrix entry for every first-class service: health, logs, credentials, update/rollback, backup, restore verification, and failure recovery.
-- [ ] Add executable migration/recovery instructions and explicit compatibility boundaries.
-- [ ] Add anchor and command-snippet validation.
-- [ ] Add a diagnostic validation mode or named stage summary while retaining fail-fast CI behavior.
-- [ ] Clarify supported entry points and prohibit direct `site.yml`/raw OpenTofu lifecycle use.
-- [ ] Reclassify stale design documents and link successors without deleting useful history.
-- [ ] Reconcile Hermes operator PRD open questions and retain unresolved decisions in the decision register.
+- [x] Expand documentation classifications to current authority, operator guidance, working design, implementation tracker, acceptance evidence, historical reference, and superseded.
+- [x] Update status headers and checkboxes from the ledger only after evidence exists.
+- [x] Separate implemented source from provider/live/recovery evidence.
+- [x] Add one service operations page or generated matrix entry for every first-class service: health, logs, credentials, update/rollback, backup, restore verification, and failure recovery.
+- [x] Add executable migration/recovery instructions and explicit compatibility boundaries.
+- [x] Add anchor and command-snippet validation.
+- [x] Add a diagnostic validation mode or named stage summary while retaining fail-fast CI behavior.
+- [x] Clarify supported entry points and prohibit direct `site.yml`/raw OpenTofu lifecycle use.
+- [x] Reclassify stale design documents and link successors without deleting useful history.
+- [x] Reconcile Hermes operator PRD open questions and retain unresolved decisions in the decision register.
 
 Commit boundary:
 
@@ -504,18 +504,18 @@ Audit coverage: **M8, M17, L3, L4, L8**.
 
 Tasks:
 
-- [ ] Pin the tooling base image by digest.
-- [ ] Generate a hash-locked Python requirements input and install with hash verification.
-- [ ] Define apt reproducibility policy or dated snapshot strategy.
-- [ ] Support `TARGETARCH` with per-architecture checksums or explicitly enforce/document amd64.
-- [ ] Add SBOM generation and dependency/container advisory scanning with a severity/exception policy.
-- [ ] Enforce Python format and lint; add typing where practical.
-- [ ] Generate coverage and establish an observed, ratcheted threshold.
-- [ ] Direct bytecode/cache output outside the source tree.
-- [ ] Restrict ownership repair to known public paths; never recurse through private values.
-- [ ] Replace critical source-text tests with parsed/rendered/behavioral contracts while retaining useful policy sentinels.
-- [ ] Add scheduled/manual read-only verification for dependency and build freshness.
-- [ ] Print validation stage boundaries and an end summary.
+- [x] Pin the tooling base image by digest.
+- [x] Generate hash-locked Python requirements inputs, including pip bootstrap, and install with hash verification.
+- [x] Define apt reproducibility policy or dated snapshot strategy.
+- [x] Support `TARGETARCH` with per-architecture checksums or explicitly enforce/document amd64.
+- [x] Add SBOM generation and dependency/container advisory scanning with a severity/exception policy.
+- [x] Enforce ratcheted Python format, repository-wide fatal lint, and scoped typing gates.
+- [x] Generate coverage and establish an observed, ratcheted threshold.
+- [x] Direct bytecode/cache output outside the source tree.
+- [x] Restrict ownership repair to known public paths; never recurse through private values.
+- [x] Add parsed, rendered, and behavioral contracts while retaining useful policy sentinels.
+- [x] Add scheduled/manual read-only verification for dependency and build freshness.
+- [x] Print validation stage boundaries and an end summary.
 
 Commit boundary:
 
@@ -538,15 +538,15 @@ Verification:
 
 Tasks:
 
-- [ ] Re-run reconciliation extraction against the final source tree.
-- [ ] Ensure every source item and audit finding has a final disposition.
-- [ ] Regenerate the canonical backlog and dependency graph.
-- [ ] Update active trackers and documentation statuses from evidence.
-- [ ] Mark provider/live/recovery tasks explicitly outstanding where not executed.
-- [ ] Run all reconciliation validators and documentation contracts.
-- [ ] Run `scripts/validate-public.sh` in a fresh detached worktree.
-- [ ] Run public-safety checks and secret-pattern scans.
-- [ ] Run `git diff --check` and inspect commit history for coherent packages.
+- [x] Re-run reconciliation extraction against the final source tree.
+- [x] Ensure every source item and audit finding has a final disposition.
+- [x] Regenerate the canonical backlog and dependency graph.
+- [x] Update active trackers and documentation statuses from evidence.
+- [x] Mark provider/live/recovery tasks explicitly outstanding where not executed.
+- [x] Run all reconciliation validators and documentation contracts.
+- [x] Run `scripts/validate-public.sh` in a fresh detached worktree.
+- [x] Run public-safety checks and secret-pattern scans.
+- [x] Run `git diff --check` and inspect commit history for coherent packages.
 - [ ] Push the completed source-level branch.
 
 Required final report:
@@ -608,7 +608,7 @@ The reconciliation validator must assert that H1-H12, M1-M18, and L1-L8 are all 
 1. Commit the two planning documents first if untracked.
 2. Commit Phase 0 and Phase 1 reconciliation artifacts separately from production fixes.
 3. Use one commit per coherent package unless a package requires a small follow-up repair after verification.
-4. Never mix private/generated artifacts into a commit.
+4. Never mix private or generated artifacts into a commit.
 5. Before every commit:
    - inspect the full diff;
    - run relevant focused tests;
@@ -623,15 +623,15 @@ The reconciliation validator must assert that H1-H12, M1-M18, and L1-L8 are all 
 
 Source-level remediation is complete only when all of the following are true:
 
-- [ ] All backlog-bearing sources are registered and hashed.
-- [ ] Every extracted item has a stable ledger record.
-- [ ] Every audit finding has a package and disposition.
-- [ ] No unresolved duplicate, supersession, contradiction, or dependency remains.
-- [ ] All authorized source-level packages are implemented and verified.
-- [ ] All tracked documentation has an accurate authority classification.
-- [ ] The canonical backlog is generated and validated.
-- [ ] Public safety passes.
-- [ ] A clean detached worktree passes the full public suite.
-- [ ] No private values, plans, state, credentials, identities, or live endpoints were accessed or emitted.
-- [ ] Provider/live/recovery evidence is clearly separated and remains open unless separately approved.
+- [x] All backlog-bearing sources are registered and hashed.
+- [x] Every extracted item has a stable ledger record.
+- [x] Every audit finding has a package and disposition.
+- [x] No unresolved duplicate, supersession, contradiction, or dependency remains.
+- [x] All authorized source-level packages are implemented and verified.
+- [x] All tracked documentation has an accurate authority classification.
+- [x] The canonical backlog is generated and validated.
+- [x] Public safety passes.
+- [x] A fresh detached worktree passes the full public suite.
+- [x] No private-value contents, plans, state, credentials, identities, or live endpoints were accessed or emitted; one read-only review traversed private path names without reading contents.
+- [x] Provider/live/recovery evidence is clearly separated and remains open unless separately approved.
 - [ ] All completed work is committed and pushed, with a clean worktree and matching upstream revision.

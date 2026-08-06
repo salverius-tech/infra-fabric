@@ -1,10 +1,32 @@
 locals {
-  service_registry                 = jsondecode(file("${path.module}/../services.json"))
-  service_names                    = keys(local.service_registry.services)
-  runtime_service_names            = ["technitium", "forgejo", "tailscale_client", "forgejo_runner", "infisical", "hermes", "sssf", "onramp_host"]
-  enabled_services                 = toset(coalesce(var.enabled_services, local.service_registry.default_services))
+  service_registry = jsondecode(file("${path.module}/../services.json"))
+  service_names    = keys(local.service_registry.services)
+  # Canonical selection and runtime are the only root-level service adapters.
+  # Individual service aliases stay at consumer boundaries and are derived below.
+  runtime_service_metadata = {
+    for service_name, entry in local.service_registry.services :
+    service_name => entry.runtime
+    if entry.runtime_owner != "none" && entry.runtime != null
+  }
+  runtime_service_names = keys(local.runtime_service_metadata)
+  enabled_services      = toset(coalesce(var.enabled_services, local.service_registry.default_services))
+  service_enabled = {
+    for service_name in local.service_names : service_name => contains(local.enabled_services, service_name)
+  }
+  service_runtime_by_service = {
+    for service_name, metadata in local.runtime_service_metadata :
+    service_name => merge(
+      { type = metadata.default_type, cloud_init_user = null },
+      { for key, value in try(var.service_runtime[service_name], {}) : key => value if value != null },
+    )
+  }
   invalid_enabled_services         = setsubtract(local.enabled_services, toset(local.service_names))
   invalid_service_runtime_services = setsubtract(toset(keys(var.service_runtime)), toset(local.runtime_service_names))
+  invalid_service_runtime_types = {
+    for service_name, runtime in local.service_runtime_by_service :
+    service_name => runtime.type
+    if !contains(local.runtime_service_metadata[service_name].supported_types, runtime.type)
+  }
   retained_disabled_services = toset([
     for name, policy in var.stateful_service_disable_policies : name
     if policy == "retain" && !contains(local.enabled_services, name)
@@ -35,22 +57,23 @@ locals {
   ]
   onramp_host_runtime_lxc_requested = contains(keys(var.service_runtime), "onramp_host") && local.onramp_host_runtime_type == "lxc"
 
-  technitium_enabled       = contains(local.enabled_services, "technitium")
-  forgejo_enabled          = contains(local.enabled_services, "forgejo")
-  tailscale_client_enabled = contains(local.enabled_services, "tailscale_client")
-  forgejo_runner_enabled   = contains(local.enabled_services, "forgejo_runner")
-  infisical_enabled        = contains(local.enabled_services, "infisical")
-  hermes_enabled           = contains(local.enabled_services, "hermes")
-  sssf_enabled             = contains(local.enabled_services, "sssf")
-  onramp_host_enabled      = contains(local.enabled_services, "onramp_host")
+  technitium_enabled       = local.service_enabled.technitium
+  forgejo_enabled          = local.service_enabled.forgejo
+  tailscale_client_enabled = local.service_enabled.tailscale_client
+  forgejo_runner_enabled   = local.service_enabled.forgejo_runner
+  infisical_enabled        = local.service_enabled.infisical
+  hermes_enabled           = local.service_enabled.hermes
+  sssf_enabled             = local.service_enabled.sssf
+  onramp_host_enabled      = local.service_enabled.onramp_host
 
-  technitium_runtime       = lookup(var.service_runtime, "technitium", { type = "lxc", cloud_init_user = null })
-  tailscale_client_runtime = lookup(var.service_runtime, "tailscale_client", { type = "lxc", cloud_init_user = null })
-  forgejo_runner_runtime   = lookup(var.service_runtime, "forgejo_runner", { type = "lxc", cloud_init_user = null })
-  infisical_runtime        = lookup(var.service_runtime, "infisical", { type = "lxc", cloud_init_user = null })
-  hermes_runtime           = lookup(var.service_runtime, "hermes", { type = "lxc", cloud_init_user = null })
-  sssf_runtime             = lookup(var.service_runtime, "sssf", { type = "vm", cloud_init_user = null })
-  onramp_host_runtime      = lookup(var.service_runtime, "onramp_host", { type = "vm", cloud_init_user = null })
+  technitium_runtime       = local.service_runtime_by_service.technitium
+  forgejo_runtime          = local.service_runtime_by_service.forgejo
+  tailscale_client_runtime = local.service_runtime_by_service.tailscale_client
+  forgejo_runner_runtime   = local.service_runtime_by_service.forgejo_runner
+  infisical_runtime        = local.service_runtime_by_service.infisical
+  hermes_runtime           = local.service_runtime_by_service.hermes
+  sssf_runtime             = local.service_runtime_by_service.sssf
+  onramp_host_runtime      = local.service_runtime_by_service.onramp_host
 
   canonical_operator_access = {
     user        = var.operator_user
@@ -70,13 +93,14 @@ locals {
   onramp_host_runtime_type      = local.onramp_host_runtime.type
 
   technitium_lxc_enabled       = local.technitium_enabled && local.technitium_runtime_type == "lxc"
+  forgejo_lxc_enabled          = local.forgejo_enabled && local.forgejo_runtime_type == "lxc"
   tailscale_client_lxc_enabled = local.tailscale_client_enabled && local.tailscale_client_runtime_type == "lxc"
   forgejo_runner_lxc_enabled   = local.forgejo_runner_enabled && local.forgejo_runner_runtime_type == "lxc"
   infisical_lxc_enabled        = local.infisical_enabled && local.infisical_runtime_type == "lxc"
   hermes_lxc_enabled           = local.hermes_enabled && local.hermes_runtime_type == "lxc"
   sssf_lxc_enabled             = local.sssf_enabled && local.sssf_runtime_type == "lxc"
 
-  service_vm_image_enabled = (local.technitium_enabled && local.technitium_runtime_type == "vm") || (local.tailscale_client_enabled && local.tailscale_client_runtime_type == "vm") || (local.forgejo_runner_enabled && local.forgejo_runner_runtime_type == "vm") || (local.infisical_enabled && local.infisical_runtime_type == "vm") || (local.hermes_enabled && local.hermes_runtime_type == "vm") || (local.sssf_enabled && local.sssf_runtime_type == "vm")
+  service_vm_image_enabled = (local.technitium_enabled && local.technitium_runtime_type == "vm") || (local.forgejo_enabled && local.forgejo_runtime_type == "vm") || (local.tailscale_client_enabled && local.tailscale_client_runtime_type == "vm") || (local.forgejo_runner_enabled && local.forgejo_runner_runtime_type == "vm") || (local.infisical_enabled && local.infisical_runtime_type == "vm") || (local.hermes_enabled && local.hermes_runtime_type == "vm") || (local.sssf_enabled && local.sssf_runtime_type == "vm")
   lxc_template_enabled     = local.technitium_lxc_enabled || (local.forgejo_enabled && local.forgejo_runtime_type == "lxc") || local.tailscale_client_lxc_enabled || local.forgejo_runner_lxc_enabled || local.infisical_lxc_enabled || local.hermes_lxc_enabled || local.sssf_lxc_enabled
 }
 
@@ -94,7 +118,22 @@ resource "terraform_data" "enabled_services_validation" {
 
     precondition {
       condition     = length(local.invalid_service_runtime_services) == 0
-      error_message = "service_runtime may contain only guest services: ${join(", ", local.runtime_service_names)}."
+      error_message = "service_runtime may contain only catalog runtime-owning services: ${join(", ", local.runtime_service_names)}."
+    }
+
+    precondition {
+      condition     = length(local.invalid_service_runtime_types) == 0
+      error_message = "service_runtime types must be supported by the catalog: ${jsonencode(local.invalid_service_runtime_types)}."
+    }
+
+    precondition {
+      condition     = var.forgejo_runtime == null
+      error_message = "forgejo_runtime is a retired OpenTofu alias; use service_runtime.forgejo."
+    }
+
+    precondition {
+      condition     = var.tailscale_client_enabled == null
+      error_message = "tailscale_client_enabled is a retired OpenTofu alias; use enabled_services."
     }
 
     precondition {

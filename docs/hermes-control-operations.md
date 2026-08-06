@@ -19,7 +19,7 @@ Apply only after explicit approval:
 VALUES_SITE=<site> just apply
 ```
 
-The API is loopback-only inside the guest; service-local Caddy is the HTTPS exposure path. Use direct service endpoints and redact all tokens from checks and logs.
+The API is loopback-only inside the guest; service-local Caddy is the HTTPS exposure path. The typed Control configuration also declares the managed workspace root and the explicit approved project-root list passed to the API. Use direct service endpoints and redact all tokens from checks and logs.
 
 ## Five-state verification
 

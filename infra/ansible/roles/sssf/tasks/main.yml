@@ -1,5 +1,6 @@
 ---
 - name: Validate SSSF required variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - sssf_vmid is defined
@@ -24,6 +25,8 @@
       - sssf_uv_sha256 is match('^[0-9a-f]{64}$')
       - sssf_pi_sha256 is match('^[0-9a-f]{64}$')
       - sssf_bun_sha256 is match('^[0-9a-f]{64}$')
+      - sssf_nodesource_key_sha256 is match('^[0-9a-f]{64}$')
+      - sssf_nodesource_key_fingerprint is match('^[0-9A-F]{40}$')
       - >-
         (sssf_provider == 'openrouter' and sssf_openrouter_api_key | length > 0) or
         (sssf_provider == 'openai' and sssf_openai_api_key | length > 0) or
@@ -34,6 +37,7 @@
       and at least one provider key.
 
 - name: Install SSSF operating-system dependencies
+  tags: [packages]
   ansible.builtin.apt:
     name:
       - ca-certificates
@@ -50,6 +54,7 @@
     cache_valid_time: 3600
 
 - name: Ensure SSSF runtime user exists
+  tags: [config]
   ansible.builtin.user:
     name: "{{ sssf_runtime_user }}"
     shell: /bin/bash
@@ -58,6 +63,7 @@
     append: true
 
 - name: Ensure SSSF data mount point exists
+  tags: [config]
   ansible.builtin.file:
     path: "{{ sssf_data_dir }}"
     state: directory
@@ -66,6 +72,7 @@
     mode: '0750'
 
 - name: Detect SSSF data disk filesystem
+  tags: [config]
   ansible.builtin.command:
     argv: [blkid, -s, TYPE, -o, value, "{{ sssf_data_device }}"]
   register: sssf_data_filesystem
@@ -73,12 +80,14 @@
   failed_when: false
 
 - name: Create SSSF data disk filesystem when absent
+  tags: [config]
   ansible.builtin.command:
     argv: [mkfs.ext4, -F, "{{ sssf_data_device }}"]
   when: sssf_data_filesystem.stdout | trim == ''
   changed_when: true
 
 - name: Persist SSSF data disk mount
+  tags: [config]
   ansible.builtin.lineinfile:
     path: /etc/fstab
     regexp: "^{{ sssf_data_device | regex_escape }}\\s"
@@ -88,6 +97,7 @@
     mode: '0644'
 
 - name: Mount SSSF data disk
+  tags: [config]
   ansible.builtin.command:
     argv: [mount, "{{ sssf_data_dir }}"]
   register: sssf_mount_result
@@ -95,6 +105,7 @@
   failed_when: false
 
 - name: Ensure SSSF directories exist
+  tags: [config]
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
@@ -109,6 +120,7 @@
     - { path: /etc/sssf, owner: root, group: root, mode: '0755' }
 
 - name: Ensure Node.js 22 is available for the Pi coding agent
+  tags: [config]
   ansible.builtin.shell: |
     set -euo pipefail
     required_version='22.19.0'
@@ -120,8 +132,12 @@
       fi
     fi
     install -d -m 0755 /etc/apt/keyrings
-    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-      | gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg
+    key="$(mktemp)"
+    trap 'rm -f "${key}"' EXIT
+    curl -fsSL -o "${key}" https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    printf '%s  %s\n' {{ sssf_nodesource_key_sha256 | quote }} "${key}" | sha256sum -c -
+    [[ "$(gpg --show-keys --with-colons "${key}" | awk -F: '$1 == "fpr" { print $10; exit }')" = {{ sssf_nodesource_key_fingerprint | quote }} ]]
+    gpg --dearmor --yes -o /etc/apt/keyrings/nodesource.gpg "${key}"
     printf '%s\n' \
       'deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main' \
       > /etc/apt/sources.list.d/nodesource.list
@@ -133,6 +149,7 @@
   changed_when: sssf_node_install.rc == 0 and 'node-current' not in sssf_node_install.stdout
 
 - name: Validate Node.js version for the Pi coding agent
+  tags: [validation]
   ansible.builtin.command: node --version
   register: sssf_node_version
   changed_when: false
@@ -141,6 +158,7 @@
     (sssf_node_version.stdout | trim | regex_replace('^v', '')) is version('22.19.0', '<')
 
 - name: Check reviewed SSSF runtime artifacts on the controller
+  tags: [validation]
   ansible.builtin.stat:
     path: "{{ sssf_artifact_path }}/{{ item.tool }}/{{ item.version }}/{{ item.filename }}"
     checksum_algorithm: sha256
@@ -154,6 +172,7 @@
   when: item.tool != 'bun' or sssf_visualizer_enabled | bool
 
 - name: Require reviewed SSSF runtime artifacts
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - item.stat.exists
@@ -163,6 +182,7 @@
   when: not item.skipped | default(false)
 
 - name: Stage reviewed SSSF runtime artifacts
+  tags: [packages]
   ansible.builtin.copy:
     src: "{{ sssf_artifact_path }}/{{ item.tool }}/{{ item.version }}/{{ item.filename }}"
     dest: "/var/tmp/sssf-{{ item.tool }}-{{ item.version }}.{{ item.filename.split('.')[-1] }}"
@@ -176,6 +196,7 @@
   when: item.tool != 'bun' or sssf_visualizer_enabled | bool
 
 - name: Install checksum-verified uv runtime
+  tags: [packages]
   ansible.builtin.file:
     path: "/opt/sssf/runtimes/uv/{{ sssf_uv_version }}"
     state: directory
@@ -184,6 +205,7 @@
     mode: '0755'
 
 - name: Extract checksum-verified uv runtime
+  tags: [packages]
   ansible.builtin.unarchive:
     src: "/var/tmp/sssf-uv-{{ sssf_uv_version }}.gz"
     dest: "/opt/sssf/runtimes/uv/{{ sssf_uv_version }}"
@@ -192,6 +214,7 @@
     creates: "/opt/sssf/runtimes/uv/{{ sssf_uv_version }}/uv"
 
 - name: Expose checksum-verified uv runtime
+  tags: [config]
   ansible.builtin.file:
     src: "/opt/sssf/runtimes/uv/{{ sssf_uv_version }}/uv"
     dest: "{{ sssf_uv_path }}"
@@ -199,6 +222,7 @@
     force: true
 
 - name: Create Pi runtime release directory
+  tags: [config]
   ansible.builtin.file:
     path: "/opt/sssf/runtimes/pi/{{ sssf_pi_version }}"
     state: directory
@@ -207,6 +231,7 @@
     mode: '0755'
 
 - name: Extract checksum-verified Pi runtime
+  tags: [packages]
   ansible.builtin.unarchive:
     src: "/var/tmp/sssf-pi-{{ sssf_pi_version }}.gz"
     dest: "/opt/sssf/runtimes/pi/{{ sssf_pi_version }}"
@@ -214,6 +239,7 @@
     creates: "/opt/sssf/runtimes/pi/{{ sssf_pi_version }}/pi/pi"
 
 - name: Expose checksum-verified Pi runtime
+  tags: [config]
   ansible.builtin.file:
     src: "/opt/sssf/runtimes/pi/{{ sssf_pi_version }}/pi/pi"
     dest: "{{ sssf_pi_path }}"
@@ -222,6 +248,7 @@
 
 
 - name: Initialize SSSF upstream checkout
+  tags: [packages]
   ansible.builtin.shell: |
     set -euo pipefail
     if [ ! -d {{ (sssf_data_dir ~ '/upstream/.git') | quote }} ]; then
@@ -237,6 +264,7 @@
   changed_when: true
 
 - name: Install SSSF config
+  tags: [packages]
   ansible.builtin.template:
     src: sssf.config.yaml.j2
     dest: "{{ sssf_config_path }}"
@@ -246,6 +274,7 @@
   notify: Restart sssf visualizer
 
 - name: Install SSSF environment file
+  tags: [packages]
   ansible.builtin.template:
     src: sssf.env.j2
     dest: /etc/sssf/env
@@ -256,6 +285,7 @@
   notify: Restart sssf visualizer
 
 - name: Install SSSF workspace initialization helper
+  tags: [packages]
   ansible.builtin.template:
     src: sssf-init
     dest: /usr/local/bin/sssf-init
@@ -264,6 +294,7 @@
     mode: '0755'
 
 - name: Install SSSF health check
+  tags: [health]
   ansible.builtin.template:
     src: sssf-health
     dest: /usr/local/bin/sssf-health
@@ -272,6 +303,7 @@
     mode: '0755'
 
 - name: Install SSSF visualizer unit
+  tags: [packages]
   ansible.builtin.template:
     src: sssf-visualizer.service.j2
     dest: /etc/systemd/system/sssf-visualizer.service
@@ -282,6 +314,7 @@
   notify: Restart sssf visualizer
 
 - name: Install Bun for the optional SSSF visualizer
+  tags: [packages]
   ansible.builtin.file:
     path: "/opt/sssf/runtimes/bun/{{ sssf_bun_version }}"
     state: directory
@@ -291,6 +324,7 @@
   when: sssf_visualizer_enabled | bool
 
 - name: Extract checksum-verified Bun runtime
+  tags: [packages]
   ansible.builtin.unarchive:
     src: "/var/tmp/sssf-bun-{{ sssf_bun_version }}.zip"
     dest: "/opt/sssf/runtimes/bun/{{ sssf_bun_version }}"
@@ -299,6 +333,7 @@
   when: sssf_visualizer_enabled | bool
 
 - name: Expose checksum-verified Bun runtime
+  tags: [config]
   ansible.builtin.file:
     src: "/opt/sssf/runtimes/bun/{{ sssf_bun_version }}/bun-linux-x64/bun"
     dest: /usr/local/bin/bun
@@ -307,6 +342,7 @@
   when: sssf_visualizer_enabled | bool
 
 - name: Install SSSF visualizer dependencies from its lockfile
+  tags: [packages]
   ansible.builtin.command:
     argv:
       - bun
@@ -320,6 +356,7 @@
   changed_when: true
 
 - name: Remove SSSF visualizer unit when disabled
+  tags: [config]
   ansible.builtin.file:
     path: /etc/systemd/system/sssf-visualizer.service
     state: absent
@@ -327,6 +364,7 @@
   notify: Restart sssf visualizer
 
 - name: Enable SSSF visualizer
+  tags: [service]
   ansible.builtin.systemd:
     name: sssf-visualizer
     enabled: true
@@ -335,6 +373,7 @@
   when: sssf_visualizer_enabled | bool
 
 - name: Verify SSSF source revision
+  tags: [validation]
   ansible.builtin.command:
     argv: [git, -c, "safe.directory={{ sssf_data_dir }}/upstream", -C, "{{ sssf_data_dir }}/upstream", rev-parse, HEAD]
   register: sssf_revision

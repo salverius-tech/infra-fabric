@@ -55,3 +55,23 @@ argument_specs:
         type: list
         required: false
         description: "Ports allowed through UFW for reverse-proxy ingress (default: 80 and 443)."
+      onramp_host_allow_passwordless_sudo:
+        type: bool
+        required: false
+        description: "Canonical policy flag retained for projection parity; this role never installs broad sudo by default."
+      onramp_host_caddy_cloudflare_version:
+        type: str
+        required: false
+        description: "Reviewed Caddy artifact version."
+      onramp_host_caddy_cloudflare_sha256_amd64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed amd64 Caddy artifact."
+      onramp_host_caddy_cloudflare_sha256_arm64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed arm64 Caddy artifact."
+      onramp_host_artifact_cache_root:
+        type: str
+        required: false
+        description: "Controller-side reviewed artifact cache root."

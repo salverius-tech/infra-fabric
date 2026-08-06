@@ -22,6 +22,7 @@ _RUNTIME_OWNERS = frozenset(("guest", "shared_host", "none"))
 _UPDATE_POLICY_STATUSES = frozenset(("managed", "manual", "unmanaged"))
 _SCHEMA_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,127}$")
 _RELEASE_SOURCES = frozenset(("package", "container", "binary", "image"))
+_RUNTIME_TYPES = frozenset(("lxc", "vm"))
 
 
 def _path_value(value: Any, path: str) -> Any:
@@ -67,6 +68,7 @@ class ServiceCapability:
     name: str
     state_capable: bool
     runtime_owner: RuntimeOwner
+    runtime: "RuntimeMetadata | None"
     configuration_schema: str | None
     release_sources: tuple[str, ...]
     required_fields: tuple[str, ...]
@@ -78,6 +80,14 @@ class ServiceCapability:
     update_policy: tuple[UpdatePolicyStatus, str] | None
     inventory: dict[str, object]
     raw: dict[str, object]
+
+
+@dataclass(frozen=True)
+class RuntimeMetadata:
+    """Catalog-owned OpenTofu runtime defaults and accepted runtime types."""
+
+    default_type: str
+    supported_types: tuple[str, ...]
 
 
 class ServiceCatalog:
@@ -100,6 +110,7 @@ class ServiceCatalog:
             "release_sources",
             "required_fields",
             "runtime_owner",
+            "runtime",
         }
         for name, capability in self._capabilities.items():
             missing = sorted(required_keys - capability.raw.keys())
@@ -275,7 +286,12 @@ class ServiceCatalog:
                 }
                 resource = resource_map.get(resource_name)
                 if resource is not None:
-                    supported = set(self.get(name).raw.get("terraform_replace_addresses", {}))
+                    replacement_addresses = self.get(name).raw.get("terraform_replace_addresses", {})
+                    supported: set[str] = (
+                        {str(runtime) for runtime in replacement_addresses}
+                        if isinstance(replacement_addresses, Mapping)
+                        else set()
+                    )
                     if supported and getattr(resource, "type", None) not in supported:
                         raise ServiceCatalogError(
                             f"service {name} resource type {getattr(resource, 'type', None)!r} is not supported by catalog"
@@ -390,6 +406,31 @@ def load_catalog(path: Path) -> ServiceCatalog:
         runtime_owner = raw.get("runtime_owner", "guest")
         if runtime_owner not in _RUNTIME_OWNERS:
             raise ServiceCatalogError(f"service {name} runtime_owner must be one of: {', '.join(sorted(_RUNTIME_OWNERS))}")
+        runtime_raw = raw.get("runtime")
+        runtime: RuntimeMetadata | None = None
+        if runtime_owner == "none":
+            if runtime_raw is not None:
+                raise ServiceCatalogError(f"service {name} runtime must be null or omitted when runtime_owner is none")
+        elif runtime_raw is None:
+            raise ServiceCatalogError(f"service {name} runtime is required when runtime_owner is {runtime_owner}")
+        elif (
+            not isinstance(runtime_raw, dict)
+            or set(runtime_raw) != {"default_type", "supported_types"}
+            or runtime_raw.get("default_type") not in _RUNTIME_TYPES
+            or not isinstance(runtime_raw.get("supported_types"), list)
+            or not runtime_raw["supported_types"]
+            or any(item not in _RUNTIME_TYPES for item in runtime_raw["supported_types"])
+            or len(runtime_raw["supported_types"]) != len(set(runtime_raw["supported_types"]))
+            or runtime_raw["default_type"] not in runtime_raw["supported_types"]
+        ):
+            raise ServiceCatalogError(
+                f"service {name} runtime must declare a supported default_type and unique supported_types"
+            )
+        else:
+            runtime = RuntimeMetadata(
+                default_type=runtime_raw["default_type"],
+                supported_types=tuple(runtime_raw["supported_types"]),
+            )
         update_policy = raw.get("update_policy")
         if update_policy is not None and (
             not isinstance(update_policy, dict)
@@ -405,6 +446,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
             name=name,
             state_capable=raw.get("state_capable") is True,
             runtime_owner=runtime_owner,
+            runtime=runtime,
             configuration_schema=configuration_schema,
             release_sources=tuple(release_sources),
             required_fields=tuple(required_fields),
@@ -422,4 +464,4 @@ def load_catalog(path: Path) -> ServiceCatalog:
     return catalog
 
 
-__all__ = ["SecretClassification", "ServiceCapability", "ServiceCatalog", "ServiceCatalogError", "UpdatePolicyStatus", "load_catalog"]
+__all__ = ["RuntimeMetadata", "SecretClassification", "ServiceCapability", "ServiceCatalog", "ServiceCatalogError", "UpdatePolicyStatus", "load_catalog"]

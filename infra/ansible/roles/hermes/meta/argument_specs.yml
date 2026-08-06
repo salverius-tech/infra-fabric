@@ -80,6 +80,11 @@ argument_specs:
         type: list
         required: false
         description: "Authorized key entries installed for the Hermes runtime user (default: [])."
+      hermes_default_soul_sha256:
+        type: list
+        elements: str
+        required: false
+        description: "Accepted SHA-256 digests for the default managed Hermes soul artifact."
       hermes_compression_threshold:
         type: float
         required: false
@@ -176,3 +181,44 @@ argument_specs:
         type: str
         required: false
         description: "Local Unix socket for the Hermes Control bridge."
+      hermes_control_workspace_root:
+        type: str
+        required: false
+        description: "Normalized absolute workspace root available to the Control API."
+      hermes_control_project_roots:
+        type: list
+        elements: str
+        required: false
+        description: "Approved normalized absolute project roots available to the Control API."
+      hermes_compose_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed Docker Compose SHA-256 for amd64."
+      hermes_compose_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed Docker Compose SHA-256 for arm64."
+      hermes_just_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed just SHA-256 for amd64."
+      hermes_just_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed just SHA-256 for arm64."
+      hermes_caddy_cloudflare_version:
+        type: str
+        required: false
+        description: "Reviewed artifact pin supplied by the canonical projection."
+      hermes_caddy_cloudflare_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed Caddy SHA-256 for amd64."
+      hermes_caddy_cloudflare_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed Caddy SHA-256 for arm64."
+      hermes_artifact_cache_root:
+        type: str
+        required: false
+        description: "Reviewed artifact pin supplied by the canonical projection."

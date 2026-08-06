@@ -1,0 +1,254 @@
+{
+  "schema_version": 1,
+  "policy": "source-complete requires current production-path and focused verification citations; provider/live/recovery are blocked-external",
+  "packages": [
+    {
+      "id": "R1",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "scripts/service-state.sh",
+          "lines": "1-80",
+          "claim": "Canonical service-state selection and recovery entry point."
+        },
+        "verification": {
+          "path": "tests/test_service_state.py",
+          "lines": "1-80",
+          "claim": "Focused service-state regression coverage."
+        }
+      }
+    },
+    {
+      "id": "R2",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "scripts/workspace-preflight.py",
+          "lines": "1-80",
+          "claim": "Canonical fresh-site preflight and projection handling."
+        },
+        "verification": {
+          "path": "tests/test_workspace_preflight.py",
+          "lines": "1-100",
+          "claim": "Focused fresh-site preflight regression coverage."
+        }
+      }
+    },
+    {
+      "id": "S1",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "scripts/tfplan-metadata.py",
+          "lines": "1-120",
+          "claim": "Canonical plan metadata and stateful selection boundary."
+        },
+        "verification": {
+          "path": "tests/test_tfplan_metadata.py",
+          "lines": "1-140",
+          "claim": "Focused plan metadata and canonical selection regression coverage."
+        }
+      }
+    },
+    {
+      "id": "S2",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "scripts/secret_delivery.py",
+          "lines": "1-120",
+          "claim": "Scoped canonical secret delivery boundary."
+        },
+        "verification": {
+          "path": "tests/test_secret_delivery.py",
+          "lines": "1-210",
+          "claim": "Focused secret-delivery and least-privilege regression coverage."
+        }
+      }
+    },
+    {
+      "id": "S3",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "scripts/execution-snapshot.py",
+          "lines": "1-120",
+          "claim": "Immutable execution snapshot verification boundary."
+        },
+        "verification": {
+          "path": "tests/test_tfplan_metadata.py",
+          "lines": "180-300",
+          "claim": "Focused immutable plan and execution metadata regression coverage."
+        }
+      }
+    },
+    {
+      "id": "O1",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "infra/ansible/roles/hermes_control/tasks/main.yml",
+          "lines": "1-120",
+          "claim": "Hermes Control role readiness and typed contract path."
+        },
+        "verification": {
+          "path": "tests/test_hermes_control_role.py",
+          "lines": "1-130",
+          "claim": "Focused Hermes Control role regression coverage."
+        }
+      }
+    },
+    {
+      "id": "O2",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "scripts/apply-ansible-services.py",
+          "lines": "84-155",
+          "claim": "Execution-resource-aware Ansible scheduling."
+        },
+        "verification": {
+          "path": "tests/test_apply_ansible_services.py",
+          "lines": "20-70",
+          "claim": "Focused shared-host scheduling regression coverage."
+        }
+      }
+    },
+    {
+      "id": "O3",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "infra/ansible/tasks/reviewed-artifact-cache.yml",
+          "lines": "1-62",
+          "claim": "Fail-closed controller checksum verification and versioned staging contract."
+        },
+        "verification": {
+          "path": "tests/test_artifact_projection.py",
+          "lines": "1-130",
+          "claim": "Typed canonical artifact ownership, catalog projection, and role-input regression coverage."
+        }
+      }
+    },
+    {
+      "id": "Q1",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "scripts/check-direct-service-ansible.py",
+          "lines": "1-120",
+          "claim": "Static Ansible convergence contract enforcement."
+        },
+        "verification": {
+          "path": "tests/test_ansible_convergence_contract.py",
+          "lines": "1-100",
+          "claim": "Focused tags, idempotence, and check-mode regression coverage."
+        }
+      }
+    },
+    {
+      "id": "Q2",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "infra/opentofu/services.tf",
+          "lines": "1-170",
+          "claim": "Typed service-runtime and OpenTofu precondition contract."
+        },
+        "verification": {
+          "path": "tests/test_canonical_mapping_inventory.py",
+          "lines": "1-100",
+          "claim": "Focused mapping and consumer parity regression coverage."
+        }
+      }
+    },
+    {
+      "id": "Q3",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "scripts/update.py",
+          "lines": "1-100",
+          "claim": "Catalog-driven non-mutating update workflow."
+        },
+        "verification": {
+          "path": "tests/test_update.py",
+          "lines": "1-230",
+          "claim": "Focused update dry-run and managed-pin regression coverage."
+        }
+      }
+    },
+    {
+      "id": "DOCS",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "docs/service-operations.md",
+          "lines": "1-70",
+          "claim": "Catalog-derived day-two operations guidance."
+        },
+        "verification": {
+          "path": "tests/test_documentation_contract.py",
+          "lines": "39-245",
+          "claim": "Focused documentation inventory, link, command, and operations-matrix coverage."
+        }
+      }
+    },
+    {
+      "id": "CI",
+      "source_status": "source-complete",
+      "source_disposition": "implemented-static",
+      "external_status": "blocked-external",
+      "evidence": {
+        "production": {
+          "path": "tools/Dockerfile",
+          "lines": "1-60",
+          "claim": "Hash-locked tooling image contract."
+        },
+        "verification": {
+          "path": "tests/test_phase7_tooling_contract.py",
+          "lines": "1-80",
+          "claim": "Focused tooling reproducibility regression coverage."
+        }
+      }
+    },
+    {
+      "id": "DECISIONS",
+      "source_status": "evidence-required",
+      "source_disposition": "blocked-external",
+      "external_status": "blocked-external",
+      "evidence": {}
+    },
+    {
+      "id": "ACCEPTANCE",
+      "source_status": "evidence-required",
+      "source_disposition": "blocked-external",
+      "external_status": "blocked-external",
+      "evidence": {}
+    }
+  ]
+}

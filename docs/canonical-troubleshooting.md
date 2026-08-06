@@ -1,5 +1,9 @@
 # Canonical troubleshooting
 
+## Diagnostic stage summary
+
+Use the named order in [service operations](service-operations.md#standard-diagnostic-stages): `canonical-input`, `provider-plan`, `host-trust`, `service-health`, then `state-recovery`. The stages are intentionally fail-fast in CI and in operator diagnosis: do not skip to direct service intervention, raw OpenTofu/Terraform, or `site.yml` because an earlier boundary failed. A passing static check is source evidence only; provider, live-health, backup/restore, and recovery evidence require separately authorized execution.
+
 Use the selected site context for every diagnostic. Do not print protected values, decrypted bundles, state, plans, hostnames, addresses, or tokens.
 
 ## Site and schema errors

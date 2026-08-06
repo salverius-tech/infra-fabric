@@ -25,3 +25,5 @@ sssf_visualizer_command: bun run --cwd .claude/skills/sssf/apps/visualizer dev -
 sssf_openrouter_api_key: ""
 sssf_openai_api_key: ""
 sssf_fireworks_api_key: ""
+sssf_nodesource_key_sha256: b42e0321dabdc24e892115da705cf061167eac12a317f23d329862d0aa0a271d
+sssf_nodesource_key_fingerprint: 6F71F525282841EEDAF851B42F59B5F99B1BE0B4

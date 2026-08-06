@@ -10,6 +10,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import settings
+from service_catalog import ServiceCatalogError, load_catalog
 from values_context import from_environment
 
 try:
@@ -19,6 +20,7 @@ except ImportError as error:  # pragma: no cover - exercised in tooling containe
     raise SystemExit(1) from error
 
 DEFAULT_TFVARS = from_environment().path("terraform.tfvars")
+CATALOG_PATH = Path(__file__).resolve().parents[1] / "infra" / "services.json"
 
 
 class ServiceRuntimeError(ValueError):
@@ -49,15 +51,21 @@ def load_projection(path: Path) -> dict[str, Any]:
 
 
 def runtime_type(service: str, tfvars: dict[str, Any]) -> str:
+    retired_alias = f"{service}_runtime"
+    if retired_alias in tfvars:
+        raise ServiceRuntimeError(f"retired runtime alias is not accepted: {retired_alias}; use service_runtime.{service}")
     runtimes = tfvars.get("service_runtime", {})
     runtime = runtimes.get(service) if isinstance(runtimes, dict) else None
     if not isinstance(runtime, dict):
-        runtime = tfvars.get(f"{service}_runtime", {})
-    if not isinstance(runtime, dict):
         runtime = {}
-    default = "vm" if service == "onramp_host" else "lxc"
-    selected = runtime.get("type", default)
-    if selected not in {"lxc", "vm"}:
+    try:
+        metadata = load_catalog(CATALOG_PATH).get(service).runtime
+    except ServiceCatalogError as error:
+        raise ServiceRuntimeError(f"unknown runtime service: {service}") from error
+    if metadata is None:
+        raise ServiceRuntimeError(f"service does not own a runtime: {service}")
+    selected = runtime.get("type", metadata.default_type)
+    if selected not in metadata.supported_types:
         raise ServiceRuntimeError(f"unsupported runtime for {service}: {selected}")
     return selected
 

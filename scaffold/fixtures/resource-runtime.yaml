@@ -105,3 +105,9 @@ shared_hosts:
         - 192.0.2.0/24
       ssh_public_keys:
         - ssh-ed25519 AAAAexamplepublickey operator@example.internal
+    artifacts:
+      caddy_cloudflare:
+        version: 2.8.4
+        checksums:
+          amd64: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          arm64: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"

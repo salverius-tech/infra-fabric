@@ -1,4 +1,5 @@
 ---
 - name: Reload Technitium systemd
+  tags: [service]
   ansible.builtin.systemd:
     daemon_reload: true

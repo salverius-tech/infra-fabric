@@ -55,3 +55,27 @@ argument_specs:
         type: str
         required: false
         description: "Infisical container image tag and optional digest to deploy."
+      infisical_caddy_cloudflare_version:
+        type: str
+        required: false
+        description: "Reviewed Caddy artifact version."
+      infisical_caddy_cloudflare_sha256_amd64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed amd64 Caddy artifact."
+      infisical_caddy_cloudflare_sha256_arm64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed arm64 Caddy artifact."
+      infisical_artifact_cache_root:
+        type: str
+        required: false
+        description: "Controller-side reviewed artifact cache root."
+      infisical_compose_sha256_amd64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed amd64 Docker Compose plugin."
+      infisical_compose_sha256_arm64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed arm64 Docker Compose plugin."

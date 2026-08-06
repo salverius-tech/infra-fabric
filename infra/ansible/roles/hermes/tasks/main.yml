@@ -1,5 +1,6 @@
 ---
 - name: Validate Hermes required variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - hermes_vmid is defined
@@ -27,7 +28,112 @@
       hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token,
       non-empty dashboard auth variables, sane Hermes tuning values, a
       non-root runtime user, and complete managed Node.js pins are required.
+- name: Check whether Hermes Caddy has Cloudflare DNS module
+  tags: [validation]
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
+  register: hermes_caddy_cloudflare_module
+  changed_when: false
+  failed_when: false
+
+- name: Require reviewed Hermes Caddy artifact before guest mutation
+  tags: [always]
+  ansible.builtin.include_tasks: ../../../tasks/reviewed-artifact-cache.yml
+  vars:
+    reviewed_artifact_cache_root: "{{ hermes_artifact_cache_root | default('/var/lib/infra-fabric/artifacts') }}"
+    reviewed_artifact_stage_root: /var/tmp/infra-fabric-artifacts
+    reviewed_artifacts:
+      - name: caddy-cloudflare
+        version: "{{ hermes_caddy_cloudflare_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "caddy-cloudflare-{{ hermes_caddy_cloudflare_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ hermes_caddy_cloudflare_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else hermes_caddy_cloudflare_sha256_arm64 }}
+
+
+- name: Install Caddy package and service prerequisites
+  tags: [packages]
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+    update_cache: true
+
+- name: Ensure Caddy service account exists
+  tags: [config]
+  ansible.builtin.user:
+    name: caddy
+    system: true
+    state: present
+
+- name: Install reviewed Hermes Caddy with Cloudflare DNS module
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/caddy-cloudflare/{{ hermes_caddy_cloudflare_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/caddy-cloudflare-{{ hermes_caddy_cloudflare_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/bin/caddy
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
+  notify: Restart caddy
+- name: Require reviewed Hermes tooling artifacts before guest mutation
+  tags: [always]
+  ansible.builtin.include_tasks: ../../../tasks/reviewed-artifact-cache.yml
+  vars:
+    reviewed_artifact_cache_root: "{{ hermes_artifact_cache_root | default('/var/lib/infra-fabric/artifacts') }}"
+    reviewed_artifact_stage_root: /var/tmp/infra-fabric-artifacts
+    reviewed_artifacts:
+      - name: docker-compose
+        version: "{{ hermes_compose_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "docker-compose-{{ hermes_compose_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ hermes_compose_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else hermes_compose_sha256_arm64 }}
+      - name: just
+        version: "{{ hermes_just_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "just-{{ hermes_just_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ hermes_just_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else hermes_just_sha256_arm64 }}
+
+- name: Ensure Hermes executable install parents exist
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /usr/local/lib/docker/cli-plugins
+    - /usr/local/bin
+
+- name: Install reviewed Hermes Docker Compose plugin
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/docker-compose/{{ hermes_compose_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/docker-compose-{{ hermes_compose_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/local/lib/docker/cli-plugins/docker-compose
+    remote_src: true
+    mode: '0755'
+
+- name: Install reviewed Hermes just binary
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/just/{{ hermes_just_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/just-{{ hermes_just_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/local/bin/just
+    remote_src: true
+    mode: '0755'
+
 - name: Ensure Hermes runtime user exists
+  tags: [config]
   ansible.builtin.user:
     name: "{{ hermes_runtime_user | default('anvil') }}"
     shell: /bin/bash
@@ -36,15 +142,18 @@
     append: true
 
 - name: Ensure home directory is traversable by non-root service users
+  tags: [config]
   ansible.builtin.file:
     path: /home
     state: directory
     mode: "0755"
 
 - name: Restore guarded private Hermes state during bootstrap
+  tags: [always]
   ansible.builtin.include_tasks: bootstrap-state.yml
 
 - name: Ensure Hermes runtime home directory is traversable by the runtime user
+  tags: [config]
   ansible.builtin.file:
     path: "/home/{{ hermes_runtime_user | default('anvil') }}"
     state: directory
@@ -53,6 +162,7 @@
     mode: "0750"
 
 - name: Ensure Hermes runtime state directory exists
+  tags: [config]
   ansible.builtin.file:
     path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
     state: directory
@@ -61,6 +171,7 @@
     mode: '0700'
 
 - name: Enable linger for Hermes runtime user services
+  tags: [service]
   ansible.builtin.command:
     argv:
       - loginctl
@@ -69,6 +180,7 @@
   changed_when: false
 
 - name: Ensure Hermes runtime SSH directory exists
+  tags: [config]
   ansible.builtin.file:
     path: "/home/{{ hermes_runtime_user | default('anvil') }}/.ssh"
     state: directory
@@ -77,6 +189,7 @@
     mode: "0700"
 
 - name: Install Hermes runtime authorized keys
+  tags: [packages]
   ansible.builtin.copy:
     dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.ssh/authorized_keys"
     owner: "{{ hermes_runtime_user | default('anvil') }}"
@@ -87,19 +200,22 @@
 
 
 - name: Install Hermes OS dependencies in LXC
+  tags: [packages]
   ansible.builtin.command:
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; packages=\"build-essential ca-certificates caddy curl docker.io gh git gnupg jq openssh-client python3 python3-pip python3-venv rsync sudo tar unzip xz-utils\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
+      - "set -euo pipefail; packages=\"build-essential ca-certificates curl docker.io gh git gnupg jq openssh-client python3 python3-pip python3-venv rsync sudo tar unzip xz-utils\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Grant Hermes runtime user access to Docker
+  tags: [config]
   ansible.builtin.user:
     name: "{{ hermes_runtime_user | default('anvil') }}"
     groups: docker
     append: true
   notify: Restart hermes gateway
 - name: Install passwordless sudo policy for Hermes runtime user
+  tags: [packages]
   ansible.builtin.copy:
     dest: /etc/sudoers.d/hermes-runtime
     owner: root
@@ -110,26 +226,14 @@
   when: hermes_runtime_passwordless_sudo | default(false) | bool
 
 - name: Remove Hermes runtime passwordless sudo policy when disabled
+  tags: [config]
   ansible.builtin.file:
     path: /etc/sudoers.d/hermes-runtime
     state: absent
   when: not (hermes_runtime_passwordless_sudo | default(false) | bool)
 
-- name: Install Docker Compose CLI plugin in Hermes LXC
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - "set -euo pipefail; version=\"{{ hermes_compose_version | default('5.3.0') }}\"; current=\"$(docker compose version --short 2>/dev/null || true)\"; if [[ \"${current}\" != \"${version}\" ]]; then\n  arch=\"$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/')\";\n  install -d -m 0755 /usr/local/lib/docker/cli-plugins;\n  compose_url=\"https://github.com/docker/compose/releases/download/v${version}/docker-compose-linux-${arch}\";\n  curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-compose \"${compose_url}\";\n  chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose;\nfi"  # yamllint disable-line rule:line-length
-  changed_when: false
-- name: Install just command runner in Hermes LXC
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - "set -euo pipefail; version=\"{{ hermes_just_version | default('1.55.1') }}\"; current=\"$(just --version 2>/dev/null | awk '{print $2}' || true)\"; if [[ \"${current}\" != \"${version}\" ]]; then\n  arch=\"$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/')\";\n  target=\"${arch}-unknown-linux-musl\";\n  tmp=\"$(mktemp -d)\";\n  trap 'rm -rf \"${tmp}\"' EXIT;\n  curl -fsSL -o \"${tmp}/just.tar.gz\" \"https://github.com/casey/just/releases/download/${version}/just-${version}-${target}.tar.gz\";\n  tar -xzf \"${tmp}/just.tar.gz\" -C \"${tmp}\" just;\n  install -m 0755 \"${tmp}/just\" /usr/local/bin/just;\nfi"  # yamllint disable-line rule:line-length
-  changed_when: false
 - name: Ensure Hermes directories exist
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -137,31 +241,16 @@
       - "install -d -m 0755 /srv /var/www/hermes; install -d -m 0755 -o {{ (hermes_runtime_user | default('anvil')) | quote }} -g {{ (hermes_runtime_user | default('anvil')) | quote }} {{ hermes_repo_path | default('/srv/homelab-infra') | quote }}"  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Install Hermes landing page
+  tags: [packages]
   ansible.builtin.template:
     src: index.html.j2
     dest: /var/www/hermes/index.html
     mode: '0644'
     owner: root
     group: root
-- name: Check whether Hermes Caddy has Cloudflare DNS module
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
-  register: hermes_caddy_cloudflare_module
-  changed_when: false
-  failed_when: false
-- name: Build Hermes Caddy with Cloudflare DNS module
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz && PATH=/usr/local/go/bin:${PATH} GOBIN=/usr/local/bin /usr/local/go/bin/go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.6 && PATH=/usr/local/go/bin:${PATH} /usr/local/bin/xcaddy build --with github.com/caddy-dns/cloudflare@v0.2.4 --output /tmp/caddy-cloudflare && install -m 0755 /tmp/caddy-cloudflare /usr/bin/caddy  # yamllint disable-line rule:line-length
-  when: hermes_caddy_cloudflare_module.rc != 0
-  changed_when: true
-  notify: Restart caddy
+
 - name: Install Hermes Caddy env
+  tags: [packages]
   ansible.builtin.template:
     src: caddy.env.j2
     dest: /etc/caddy/env
@@ -171,6 +260,7 @@
   no_log: true
   notify: Restart caddy
 - name: Select Hermes managed Node.js artifact
+  tags: [packages]
   ansible.builtin.set_fact:
     hermes_node_arch: "{{ 'x64' if ansible_architecture == 'x86_64' else 'arm64' }}"
     hermes_node_sha256: >-
@@ -180,12 +270,14 @@
   when: ansible_architecture in ['x86_64', 'aarch64']
 
 - name: Reject unsupported Hermes managed Node.js architecture
+  tags: [config]
   ansible.builtin.assert:
     that:
       - ansible_architecture in ['x86_64', 'aarch64']
     fail_msg: Hermes managed Node.js supports only amd64 and arm64.
 
 - name: Detect Hermes managed wheel runtime support
+  tags: [config]
   ansible.builtin.set_fact:
     hermes_managed_runtime_supported: >-
       {{ ansible_distribution == 'Debian' and
@@ -194,15 +286,15 @@
          ansible_python.version.major == 3 and
          ansible_python.version.minor == 13 }}
 
-- name: Reject unsupported Hermes runtime without explicit legacy opt-in
+- name: Reject unsupported Hermes managed runtime
+  tags: [config]
   ansible.builtin.assert:
     that:
-      - hermes_managed_runtime_supported | bool or hermes_allow_legacy_runtime | default(false) | bool
-    fail_msg: >-
-      Hermes requires Debian 13 amd64 with Python 3.13 for the managed runtime.
-      Set hermes_allow_legacy_runtime=true only for an explicitly accepted legacy installer exception.
+      - hermes_managed_runtime_supported | bool
+    fail_msg: Hermes requires Debian 13 amd64 with Python 3.13 for its checksum-verified managed runtime.
 
 - name: Install verified managed Node.js runtime
+  tags: [packages]
   ansible.builtin.command:
     argv:
       - bash
@@ -254,19 +346,9 @@
   changed_when: "'changed' in hermes_node_install.stdout_lines"
   when: hermes_dashboard_enabled | default(true) | bool
 
-- name: Install legacy Hermes Agent CLI and dashboard dependencies
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - "set -euo pipefail; if ! command -v hermes >/dev/null 2>&1; then\n  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser;\nfi; pnpm_version=\"{{ hermes_pnpm_version | default('10.24.0') }}\"; if [[ \"$(pnpm --version 2>/dev/null || true)\" != \"${pnpm_version}\" ]]; then\n  tmp=\"$(mktemp -d)\"; trap 'rm -rf \"${tmp}\"' EXIT; curl -fsSL -o \"${tmp}/pnpm.tgz\" \"https://registry.npmjs.org/pnpm/-/pnpm-${pnpm_version}.tgz\"; rm -rf /usr/local/lib/pnpm; install -d -m 0755 /usr/local/lib/pnpm; tar -xzf \"${tmp}/pnpm.tgz\" -C /usr/local/lib/pnpm --strip-components=1; ln -sf /usr/local/lib/pnpm/bin/pnpm.cjs /usr/local/bin/pnpm;\nfi; cd /usr/local/lib/hermes-agent; python3 -m venv --upgrade-deps venv; venv/bin/python -m pip install -e \".[web,pty]\"; cd /usr/local/lib/hermes-agent/web; pnpm install --frozen-lockfile; pnpm run build"  # yamllint disable-line rule:line-length
-  when:
-    - hermes_dashboard_enabled | default(true) | bool
-    - not hermes_managed_runtime_supported | default(false) | bool
-    - hermes_allow_legacy_runtime | default(false) | bool
-  changed_when: false
 
 - name: Ensure local libexec directory exists
+  tags: [config]
   ansible.builtin.file:
     path: /usr/local/libexec
     state: directory
@@ -278,6 +360,7 @@
     - hermes_managed_runtime_supported | default(false) | bool
 
 - name: Install Hermes dashboard preflight
+  tags: [packages]
   ansible.builtin.template:
     src: hermes-dashboard-preflight.sh.j2
     dest: /usr/local/libexec/hermes-dashboard-preflight
@@ -290,6 +373,7 @@
   notify: Restart hermes dashboard
 
 - name: Install Hermes dashboard env
+  tags: [packages]
   ansible.builtin.template:
     src: hermes-dashboard.env.j2
     dest: /etc/hermes-dashboard.env
@@ -301,6 +385,7 @@
   notify: Restart hermes dashboard
 
 - name: Install Hermes dashboard systemd unit
+  tags: [packages]
   ansible.builtin.template:
     src: hermes-dashboard.service.j2
     dest: /etc/systemd/system/hermes-dashboard.service
@@ -311,6 +396,7 @@
   notify: Restart hermes dashboard
 
 - name: Install Hermes gateway systemd unit
+  tags: [packages]
   ansible.builtin.template:
     src: hermes-gateway.service.j2
     dest: /etc/systemd/system/hermes-gateway.service
@@ -323,6 +409,7 @@
   notify: Restart hermes gateway
 
 - name: Ensure Hermes TUI bundle directory exists
+  tags: [config]
   ansible.builtin.file:
     path: /usr/local/lib/hermes-agent/tui/dist
     state: directory
@@ -334,12 +421,14 @@
     - hermes_managed_runtime_supported | default(false) | bool
 
 - name: Install managed Hermes Agent runtime
+  tags: [always]
   ansible.builtin.include_tasks: managed-runtime.yml
   when:
     - hermes_dashboard_enabled | default(true) | bool
     - hermes_managed_runtime_supported | default(false) | bool
 
 - name: Ensure homelab-infra operator plugin directory exists
+  tags: [config]
   ansible.builtin.file:
     path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator"
     state: directory
@@ -349,6 +438,7 @@
   when: hermes_dashboard_enabled | default(true) | bool
 
 - name: Install homelab-infra operator plugin manifest
+  tags: [packages]
   ansible.builtin.copy:
     src: homelab-infra-operator/plugin.yaml
     dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator/plugin.yaml"
@@ -361,6 +451,7 @@
     - Restart hermes gateway
 
 - name: Install homelab-infra operator plugin implementation
+  tags: [packages]
   ansible.builtin.copy:
     src: homelab-infra-operator/__init__.py
     dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator/__init__.py"
@@ -373,6 +464,7 @@
     - Restart hermes gateway
 
 - name: Install homelab-infra operator dashboard plugin
+  tags: [packages]
   ansible.builtin.copy:
     src: homelab-infra-operator/dashboard/
     dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator/dashboard/"
@@ -386,6 +478,7 @@
     - Restart hermes gateway
 
 - name: Enable homelab-infra operator plugin
+  tags: [service]
   ansible.builtin.command:
     argv:
       - runuser
@@ -406,6 +499,7 @@
     - Restart hermes gateway
 
 - name: Link Hermes dashboard TUI bundle to the active release
+  tags: [config]
   ansible.builtin.file:
     src: /usr/local/lib/hermes-agent/venv/lib/python3.13/site-packages/hermes_cli/tui_dist/entry.js
     dest: /usr/local/lib/hermes-agent/tui/dist/entry.js
@@ -419,6 +513,7 @@
   notify: Restart hermes dashboard
 
 - name: Verify active Hermes messaging imports
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - /usr/local/lib/hermes-agent/venv/bin/python
@@ -430,6 +525,7 @@
     - hermes_managed_runtime_supported | default(false) | bool
 
 - name: Configure Hermes context compression and delegation limits
+  tags: [config]
   ansible.builtin.command:
     argv:
       - runuser
@@ -456,6 +552,7 @@
   when: hermes_dashboard_enabled | default(true) | bool
 
 - name: Configure Hermes SearXNG web-search backend
+  tags: [config]
   ansible.builtin.command:
     argv:
       - runuser
@@ -475,6 +572,7 @@
     - hermes_web_searxng_url | default('') | length > 0
 
 - name: Record Hermes startup journal boundary
+  tags: [config]
   ansible.builtin.command:
     argv:
       - date
@@ -483,6 +581,7 @@
   changed_when: false
 
 - name: Enable Hermes dashboard service
+  tags: [service]
   ansible.builtin.command:
     argv:
       - bash
@@ -491,6 +590,7 @@
   when: hermes_dashboard_enabled | default(true) | bool
   changed_when: false
 - name: Enable Hermes gateway service
+  tags: [service]
   ansible.builtin.systemd:
     name: hermes-gateway
     enabled: true
@@ -500,6 +600,7 @@
     - hermes_dashboard_enabled | default(true) | bool
     - hermes_managed_runtime_supported | default(false) | bool
 - name: Install Hermes Caddyfile
+  tags: [packages]
   ansible.builtin.template:
     src: Caddyfile.j2
     dest: /etc/caddy/Caddyfile
@@ -508,6 +609,7 @@
     group: root
   notify: Restart caddy
 - name: Ensure Hermes Caddy systemd override directory exists
+  tags: [config]
   ansible.builtin.file:
     path: /etc/systemd/system/caddy.service.d
     state: directory
@@ -515,6 +617,7 @@
     owner: root
     group: root
 - name: Install Hermes Caddy systemd override
+  tags: [packages]
   ansible.builtin.template:
     src: caddy-override.conf.j2
     dest: /etc/systemd/system/caddy.service.d/override.conf
@@ -523,6 +626,7 @@
     group: root
   notify: Restart caddy
 - name: Validate Hermes Caddy config
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - bash
@@ -530,6 +634,7 @@
       - set -a && . /etc/caddy/env && set +a && caddy validate --config /etc/caddy/Caddyfile
   changed_when: false
 - name: Enable Hermes Caddy service
+  tags: [service]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -538,8 +643,10 @@
       - caddy
   changed_when: false
 - name: Flush Hermes service restarts before endpoint checks
+  tags: [health]
   ansible.builtin.meta: flush_handlers
 - name: Verify Hermes Caddy service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -551,10 +658,12 @@
   delay: 5
   until: hermes_caddy_active.rc == 0
 - name: Configure optional Hermes Control companion stack
+  tags: [always]
   ansible.builtin.include_role:
     name: hermes_control
   when: hermes_control_enabled | default(false) | bool
 - name: Verify Hermes Control HTTPS health through Caddy
+  tags: [health]
   ansible.builtin.command:
     argv:
       - curl
@@ -575,6 +684,7 @@
   until: hermes_control_https_health.rc == 0
 
 - name: Verify Hermes Control HTTPS diagnostics through Caddy
+  tags: [health]
   ansible.builtin.command:
     argv:
       - curl
@@ -598,6 +708,7 @@
   until: hermes_control_https_diagnostics.rc == 0
 
 - name: Verify Hermes gateway service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -612,6 +723,7 @@
   delay: 5
   until: hermes_gateway_active.rc == 0
 - name: Verify Hermes dashboard service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -624,6 +736,7 @@
   delay: 5
   until: hermes_dashboard_active.rc == 0
 - name: Verify Hermes dashboard login page
+  tags: [validation]
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ hermes_dashboard_port | default(9119) }}/login"
     status_code: 200
@@ -634,6 +747,7 @@
   delay: 5
   until: hermes_dashboard_login_check.status == 200
 - name: Verify Hermes Caddy basic-auth login rewrite
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - curl
@@ -653,6 +767,7 @@
   delay: 5
   until: hermes_https_login_check.rc == 0
 - name: Reject Hermes startup journal errors
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -668,6 +783,7 @@
   changed_when: false
   when: hermes_dashboard_enabled | default(true) | bool
 - name: Verify Hermes static HTTPS route locally
+  tags: [health]
   ansible.builtin.command:
     argv:
       - curl

@@ -33,7 +33,6 @@ locals {
     backup           = false
     read_only        = false
   }
-  forgejo_runtime        = lookup(var.service_runtime, "forgejo", { type = var.forgejo_runtime.type, cloud_init_user = null })
   forgejo_runtime_type   = local.forgejo_runtime.type
   forgejo_storage        = lookup(var.service_storage, "forgejo", {})
   forgejo_data_storage   = lookup(local.forgejo_storage, "data", local.forgejo_default_data_storage)

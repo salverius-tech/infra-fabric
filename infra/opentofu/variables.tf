@@ -372,15 +372,15 @@ variable "forgejo_container_disk_gb" {
 }
 
 variable "service_runtime" {
-  description = "Per-service platform runtime selection. Runtime type defaults to lxc when a service is not listed."
+  description = "Per-service platform runtime selection. Accepted services and default runtime types come from infra/services.json."
   type = map(object({
-    type            = optional(string, "lxc")
+    type            = optional(string)
     cloud_init_user = optional(string)
   }))
   default = {}
 
   validation {
-    condition     = alltrue([for service_name, runtime in var.service_runtime : contains(["lxc", "vm"], runtime.type)])
+    condition     = alltrue([for service_name, runtime in var.service_runtime : runtime.type == null || contains(["lxc", "vm"], runtime.type)])
     error_message = "service_runtime entries must use type lxc or vm."
   }
 
@@ -388,6 +388,23 @@ variable "service_runtime" {
     condition     = alltrue([for service_name, runtime in var.service_runtime : runtime.cloud_init_user == null || can(regex("^[a-z_][a-z0-9_-]{0,31}$", runtime.cloud_init_user))])
     error_message = "service_runtime cloud_init_user values must be valid Linux user names."
   }
+}
+
+variable "forgejo_runtime" {
+  description = "Retired compatibility alias. It must remain null; use service_runtime.forgejo."
+  type = object({
+    type            = optional(string)
+    cloud_init_user = optional(string)
+  })
+  default  = null
+  nullable = true
+}
+
+variable "tailscale_client_enabled" {
+  description = "Retired compatibility alias. It must remain null; use enabled_services."
+  type        = bool
+  default     = null
+  nullable    = true
 }
 
 variable "guest_vm_image_datastore_id" {
@@ -435,49 +452,6 @@ variable "guest_vm_image_checksum" {
   validation {
     condition     = can(regex("^[0-9a-f]{64}$|^[0-9a-f]{128}$", var.guest_vm_image_checksum))
     error_message = "guest_vm_image_checksum must be a lowercase SHA-256 or SHA-512 digest."
-  }
-}
-
-variable "forgejo_runtime" {
-  description = "Deprecated Forgejo-specific runtime compatibility alias. Prefer service_runtime.forgejo."
-  type = object({
-    type = optional(string, "lxc")
-  })
-  default = {
-    type = "lxc"
-  }
-
-  validation {
-    condition     = contains(["lxc", "vm"], var.forgejo_runtime.type)
-    error_message = "forgejo_runtime.type must be lxc or vm."
-  }
-}
-
-variable "forgejo_vm_image_datastore_id" {
-  description = "Proxmox datastore for the Forgejo VM cloud image when forgejo_runtime.type is vm."
-  type        = string
-  default     = "local"
-}
-
-variable "forgejo_vm_image_url" {
-  description = "Pinned Debian cloud image URL used when Forgejo runs as a VM."
-  type        = string
-  default     = "https://cloud.debian.org/images/cloud/trixie/20260623-2518/debian-13-genericcloud-amd64-20260623-2518.qcow2"
-
-  validation {
-    condition     = can(regex("^https://", var.forgejo_vm_image_url))
-    error_message = "forgejo_vm_image_url must be an HTTPS URL."
-  }
-}
-
-variable "forgejo_vm_image_file_name" {
-  description = "Cloud image file name used when Forgejo runs as a VM."
-  type        = string
-  default     = "debian-13-genericcloud-amd64.qcow2"
-
-  validation {
-    condition     = can(regex("^[A-Za-z0-9._-]+\\.qcow2$", var.forgejo_vm_image_file_name))
-    error_message = "forgejo_vm_image_file_name must be a qcow2 file name."
   }
 }
 
@@ -1451,12 +1425,6 @@ variable "onramp_host_startup_down_delay" {
   description = "Seconds to wait after shutting down the onramp-host VM before shutting down the next guest."
   type        = string
   default     = "20"
-}
-
-variable "tailscale_client_enabled" {
-  description = "Deprecated compatibility input. Canonical enabled_services exclusively controls Tailscale resource creation."
-  type        = bool
-  default     = false
 }
 
 variable "tailscale_client_vmid" {

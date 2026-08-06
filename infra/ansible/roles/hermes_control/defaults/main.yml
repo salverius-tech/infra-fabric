@@ -12,3 +12,5 @@ hermes_control_source_ref: ""
 hermes_control_api_token: ""
 hermes_control_bridge_token: ""
 hermes_control_plugin_socket: /run/hermes/control-extension.sock
+hermes_control_workspace_root: /srv
+hermes_control_project_roots: []

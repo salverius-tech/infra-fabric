@@ -1,5 +1,6 @@
 ---
 - name: Require the canonical host identity contract
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - host_identity_provisioning_user | length > 0
@@ -20,6 +21,7 @@
   no_log: true
 
 - name: Converge the automation account
+  tags: [config]
   become: true
   ansible.builtin.user:
     name: "{{ host_identity_provisioning_user }}"
@@ -32,6 +34,7 @@
     state: present
 
 - name: Create provisioning SSH directory
+  tags: [config]
   become: true
   ansible.builtin.file:
     path: "{{ host_identity_provisioning_home }}/.ssh"
@@ -41,6 +44,7 @@
     mode: '0700'
 
 - name: Replace provisioning authorized keys
+  tags: [config]
   become: true
   ansible.builtin.copy:
     dest: "{{ host_identity_provisioning_home }}/.ssh/authorized_keys"
@@ -50,6 +54,7 @@
     mode: '0600'
 
 - name: Converge the operator account
+  tags: [config]
   become: true
   ansible.builtin.user:
     name: "{{ host_identity_operator_user }}"
@@ -61,6 +66,7 @@
     state: present
 
 - name: Set the protected operator sudo password
+  tags: [config]
   become: true
   ansible.builtin.user:
     name: "{{ host_identity_operator_user }}"
@@ -73,6 +79,7 @@
   no_log: true
 
 - name: Create operator SSH directory
+  tags: [config]
   become: true
   ansible.builtin.file:
     path: "{{ host_identity_operator_home }}/.ssh"
@@ -82,6 +89,7 @@
     mode: '0700'
 
 - name: Replace operator authorized keys
+  tags: [config]
   become: true
   ansible.builtin.copy:
     dest: "{{ host_identity_operator_home }}/.ssh/authorized_keys"
@@ -91,6 +99,7 @@
     mode: '0600'
 
 - name: Install host identity prerequisite packages
+  tags: [packages]
   become: true
   ansible.builtin.package:
     name:
@@ -99,6 +108,7 @@
     state: present
 
 - name: Ensure sudoers directory exists
+  tags: [config]
   become: true
   ansible.builtin.file:
     path: /etc/sudoers.d
@@ -108,6 +118,7 @@
     mode: '0755'
 
 - name: Install passwordless sudo policy for automation
+  tags: [packages]
   become: true
   ansible.builtin.copy:
     dest: /etc/sudoers.d/infra
@@ -118,6 +129,7 @@
     validate: /usr/sbin/visudo -cf %s
 
 - name: Install authenticated full sudo policy for operator
+  tags: [packages]
   become: true
   ansible.builtin.copy:
     dest: "/etc/sudoers.d/{{ host_identity_operator_user }}"
@@ -128,6 +140,7 @@
     validate: /usr/sbin/visudo -cf %s
 
 - name: Create temporary chezmoi workspace
+  tags: [config]
   become: true
   ansible.builtin.tempfile:
     state: directory
@@ -136,6 +149,7 @@
   when: host_identity_dotfiles_enabled | bool
 
 - name: Make temporary chezmoi workspace traversable
+  tags: [config]
   become: true
   ansible.builtin.file:
     path: "{{ host_identity_workspace.path }}"
@@ -145,6 +159,7 @@
   when: host_identity_dotfiles_enabled | bool
 
 - name: Download pinned chezmoi archive
+  tags: [packages]
   become: true
   ansible.builtin.get_url:
     url: >-
@@ -156,6 +171,7 @@
   when: host_identity_dotfiles_enabled | bool
 
 - name: Extract pinned chezmoi archive
+  tags: [packages]
   become: true
   ansible.builtin.unarchive:
     src: "{{ host_identity_workspace.path }}/chezmoi.tar.gz"
@@ -164,6 +180,7 @@
   when: host_identity_dotfiles_enabled | bool
 
 - name: Install pinned chezmoi binary
+  tags: [packages]
   become: true
   ansible.builtin.copy:
     src: "{{ host_identity_workspace.path }}/chezmoi"
@@ -175,6 +192,7 @@
   when: host_identity_dotfiles_enabled | bool
 
 - name: Clone pinned operator dotfiles revision
+  tags: [packages]
   become: true
   ansible.builtin.git:
     repo: "{{ host_identity_dotfiles_repository }}"
@@ -189,6 +207,7 @@
   when: host_identity_dotfiles_enabled | bool
   block:
     - name: Hand dotfiles source to {{ host_identity_operator_user }}
+      tags: [config]
       ansible.builtin.file:
         path: "{{ host_identity_workspace.path }}/dotfiles"
         owner: "{{ host_identity_operator_user }}"
@@ -196,6 +215,7 @@
         recurse: true
 
     - name: Temporarily allow passwordless sudo for dotfiles installation
+      tags: [packages]
       ansible.builtin.copy:
         dest: "/etc/sudoers.d/{{ host_identity_operator_user }}-bootstrap"
         content: "{{ host_identity_operator_user }} ALL=(ALL:ALL) NOPASSWD: ALL\n"
@@ -205,6 +225,7 @@
         validate: /usr/sbin/visudo -cf %s
 
     - name: Run chezmoi as {{ host_identity_operator_user }}
+      tags: [config]
       become: true
       become_user: "{{ host_identity_operator_user }}"
       ansible.builtin.command:
@@ -226,6 +247,7 @@
       changed_when: true
   always:
     - name: Restore protected operator sudo policy
+      tags: [restore]
       ansible.builtin.copy:
         dest: "/etc/sudoers.d/{{ host_identity_operator_user }}"
         content: "{{ host_identity_operator_user }} ALL=(ALL:ALL) ALL\n"
@@ -234,10 +256,12 @@
         mode: '0440'
         validate: /usr/sbin/visudo -cf %s
     - name: Remove temporary passwordless sudo policy
+      tags: [config]
       ansible.builtin.file:
         path: "/etc/sudoers.d/{{ host_identity_operator_user }}-bootstrap"
         state: absent
 - name: Remove temporary chezmoi workspace
+  tags: [config]
   become: true
   ansible.builtin.file:
     path: "{{ host_identity_workspace.path }}"
@@ -245,6 +269,7 @@
   when: host_identity_dotfiles_enabled | bool
 
 - name: Set the protected root console recovery password
+  tags: [config]
   become: true
   ansible.builtin.user:
     name: root
@@ -258,6 +283,7 @@
   when: host_identity_root_recovery_enabled | bool
 
 - name: Remove temporary root SSH keys
+  tags: [config]
   become: true
   ansible.builtin.file:
     path: /root/.ssh/authorized_keys
@@ -265,6 +291,7 @@
   when: host_identity_root_recovery_enabled | bool
 
 - name: Disable root SSH while retaining console recovery
+  tags: [config]
   become: true
   ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/99-infra-fabric-root-recovery.conf

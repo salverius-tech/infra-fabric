@@ -1,6 +1,6 @@
 # PRD: Hermes Operator Pilot for Homelab Infrastructure
 
-**Status:** Active design document; onramp-host and temporary SearXNG infrastructure are implemented. The remaining scope is Hermes operator integration and approval workflow.
+**Status:** Working design — source implementation is partial and is not provider, live, audit-durability, search-smoke, or recovery evidence. Onramp-host and temporary SearXNG infrastructure are implemented; the remaining scope is Hermes operator integration and approval workflow. Unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions).
 
 ## Summary
 

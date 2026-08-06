@@ -1,606 +1,620 @@
 {
-  "schema_version": 1,
-  "generated_from": "tracked public sources",
+  "schema_version": 5,
+  "generated_from": "tracked public sources; generated reconciliation outputs excluded",
   "sources": [
     {
       "path": ".hermes/plans/2026-08-03_071330-canonical-cutover-audit-report.md",
       "sha256": "0df5d9f7da7273dc3fb23affb87d571bfd35fd7678cdb2708d934921bc75e46a",
-      "authority": "historical-report",
+      "authority": "historical reference",
       "stated_status": null,
       "extracted_item_count": 13
     },
     {
       "path": ".hermes/plans/2026-08-03_071330-canonical-cutover-audit.md",
       "sha256": "ab78c40b2f039ae9edfa207f08905f0392837fb318a6cd354dc95b921550a09d",
-      "authority": "historical-report",
+      "authority": "historical reference",
       "stated_status": null,
       "extracted_item_count": 4
     },
     {
       "path": ".hermes/plans/2026-08-03_135649-canonical-first-documentation-and-authoring.md",
       "sha256": "14befd4041dcddd0b651ab3b7774e01d6d8a037339fecec475f3f39f3fdb89e5",
-      "authority": "active-implementation-tracker",
+      "authority": "historical reference",
       "stated_status": null,
       "extracted_item_count": 8
     },
     {
       "path": ".hermes/plans/2026-08-03_174531-super-simple-software-factory-vm.md",
       "sha256": "71ebb21b4ed5ef2ceb9189ee5af48eb4dae5fe3bc0c7595ac0bfd1f4d8e70c0c",
-      "authority": "active-implementation-tracker",
+      "authority": "historical reference",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-      "sha256": "6c505a7bd6d2cfddbb4fd9f2c6da61fc320efba45d9cc32f24c43d794f3380f0",
-      "authority": "active-implementation-tracker",
+      "sha256": "64aefec7fdd8765ab857ebfc80c79651cdcdc6c16ba8ae5db39fc38f925476e4",
+      "authority": "implementation tracker",
       "stated_status": "Approved for source-level execution; infrastructure mutation remains prohibited without separate explicit approval",
-      "extracted_item_count": 152
+      "extracted_item_count": 158
     },
     {
       "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
       "sha256": "d95f2616909de0fc044c381a037c39d251789849231ae97d11bbc0823fabab52",
-      "authority": "historical-report",
+      "authority": "historical reference",
       "stated_status": null,
       "extracted_item_count": 41
     },
     {
       "path": ".hermes/plans/2026-08-04-design-to-implementation-backlog-reconciliation.md",
-      "sha256": "95a69404dc9cb2d291b42e871562edcbe8f5d533430445e185c264dcb3d9c47e",
-      "authority": "active-implementation-tracker",
+      "sha256": "465f5a3f355c83e371e775815cef2c03fd47ffccc1e17f7d23db4027e50c4c7b",
+      "authority": "historical reference",
       "stated_status": "Proposed",
       "extracted_item_count": 31
     },
     {
       "path": ".hermes/plans/canonical-values-model-implementation.md",
       "sha256": "84dd88cf4609203e1d651d1883901fd8c35ae283102e8f0c4fe6dfa67d4af553",
-      "authority": "active-implementation-tracker",
+      "authority": "implementation tracker",
       "stated_status": "Canonical schema/catalog, semantic mapping, normalized non-secret importer admission, protected delivery boundary, canonical-first operational gating, and catalog dependency closure are implemented and focused-test verified on `feat/canonical-values-model`. The clean-rebuild host contract is now decided: global `infra` provisioning, global `systemboss` operator access, authenticated operator sudo, pinned full dotfiles, public-key rotation, and new-build-only recovery. Remaining work is selected-source candidate/migration acceptance, private-values setup, host-identity implementation, representative secret execution evidence, projection/consumer parity, semantic plan/apply equivalence, backup/restore rehearsal, operational cutover evidence, and compatibility removal.",
       "extracted_item_count": 273
     },
     {
       "path": ".hermes/plans/canonical-values-model-prd.md",
       "sha256": "d0ddf7b246c406c621b3b1b0b98d816476971c25f9982c6af97fc36cfc206aa8",
-      "authority": "active-implementation-tracker",
+      "authority": "historical reference",
       "stated_status": "Draft \u2014 reviewer revision incorporated; implementation design still pending",
       "extracted_item_count": 5
     },
     {
       "path": ".hermes/plans/hermes-control-integration.md",
       "sha256": "3c46f4d428e12fc9d455b642e847c3d3b1e02b5d49a6fcf13e0e369b7fdd95cd",
-      "authority": "active-implementation-tracker",
+      "authority": "implementation tracker",
       "stated_status": "Implementation in progress \u2014 authority model approved; no live guest deployment, plan, or apply has been performed.",
       "extracted_item_count": 39
     },
     {
       "path": ".hermes/plans/site-aware-values-migration.md",
       "sha256": "11baea5dea69da294d3467b5a62ca27a67f6b34d7826f0a163ac9ffcaae22232",
-      "authority": "active-implementation-tracker",
+      "authority": "implementation tracker",
       "stated_status": "Implemented \u2014 site-aware development validation completed; production",
       "extracted_item_count": 0
     },
     {
       "path": ".hermes/plans/upstream-capability-adoption.md",
-      "sha256": "684208c7e162d04de86d8d7db6507b40bd7dcf932a85da93dcdcfce4e706ffd0",
-      "authority": "active-implementation-tracker",
+      "sha256": "edffb905c5673eabd66cb6c738702f0befd7d2eaa19b2608a36fc2cfbaaa4f9e",
+      "authority": "implementation tracker",
       "stated_status": "Implementation in progress \u2014 approved fork-native work; no live infrastructure mutation, plan, or apply has been performed.",
       "extracted_item_count": 36
     },
     {
       "path": ".hermes/prompts/2026-08-04-luna-adversarial-remediation-review.md",
-      "sha256": "a702d8801f8fc5548667e20ed6d3a19afb175f0f4858a7082abb0d74dbdf04c5",
-      "authority": "unclassified",
+      "sha256": "2c5cd6d0710a8c19de092058ead48cf1abaceab868776e97797c7bd38b9e23da",
+      "authority": "historical reference",
       "stated_status": null,
       "extracted_item_count": 10
     },
     {
       "path": ".specs/archive/direct-service-ansible/evidence/python-inspection.md",
       "sha256": "045a8dd005429e50d15b640131189d45429f197074e5938747488be5cbdfea63",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/direct-service-ansible/plan.md",
       "sha256": "5e89c4ccb3a6de7cc81a2b682fa7e44e5ffe4ac69215099106c7cf46910dd1ee",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 57
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/applied-fixes.md",
       "sha256": "8b918c330f9ef07423b230a19718bd39e0b1bc8506463d35357c3464d5f8a9ad",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 7
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/devops-pro.md",
       "sha256": "5d045a7cbd42f900b2792476988b3f9439182b21f9c89ef7c6dc5f5f48dd6666",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 4
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/product-manager.md",
       "sha256": "fec1536b4a70b67e51684981e82342a89a251ba6292a79c8e0f5ab1df165fe59",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 5
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/python-pro.md",
       "sha256": "6ba07748e30fe27d232ee7a03e0e708de832a26432048294bd2443afdbed2db6",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 4
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/qa-engineer.md",
       "sha256": "ce11a20df29a31a300403db6013747add3a959bdf71befd44b327d24f3f5de12",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/reviewer.md",
       "sha256": "7dcb55de5b5d91982a65e5d0b214d3addc8f02ae7e5be6800570e30a639bc176",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 2
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/security-reviewer.md",
       "sha256": "58fcb4e965cdad1dfd4350141cd12d3136df726b8aa757c40c8b00bdac742df8",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/synthesis.md",
       "sha256": "796894852b4ea1b880a7f488be66152e57a59ba36a7e03316f462f8734921325",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 2
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-1/terraform-pro.md",
       "sha256": "4cf9fe352f914e0d7f383f5b2c3c8216e19bac1b2c6a3abee1e5de5c62aeaf56",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/ansible-implementation-reviewer.md",
       "sha256": "ababdb35137ede60b13035343cfe5d7aabf7b371b54ccc2348924da93a6efe75",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/applied-fixes.md",
       "sha256": "200f8a35ef2e73508402baa3bc5ef2c3f1a82a79a406a34aa02f286d148e677a",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 9
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/devops-pro.md",
       "sha256": "4caf0b8608297dc24d436faa641bcba7968d1d0d7b675fab11365aecaf929088",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/product-manager.md",
       "sha256": "b991e989d530b1f735b069d9940d1d0a880ba773385627ab722115e482f3cba1",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/python-pro.md",
       "sha256": "036ffda7840c63f81bcf3dcacbb837cf36ea86fb21d49c40e24cf7effce7168c",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/qa-engineer.md",
       "sha256": "03167d0721daef602198c1e97a7544783639865cee0c29439979de2e08553845",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/reviewer.md",
       "sha256": "8efbdea3185cff8ba18b8b305174252b89c660e332b365620bb5efa8a082d752",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/security-reviewer.md",
       "sha256": "61283e799d201df026fa0bc7a4a2fea8bb484930268365d6246ada0e88e5a223",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 2
     },
     {
       "path": ".specs/archive/direct-service-ansible/review-2/synthesis.md",
       "sha256": "f81a8e708bde8a4ca5fb53e8706fb5ece433de597239469d8bd0f91925c30c88",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 3
     },
     {
       "path": ".specs/archive/onramp-host-pilot/plan.md",
       "sha256": "8c3519093e8e575d7238c5e7f0fa8bd64162114698c3f7b6d1570287649b531f",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 47
     },
     {
       "path": ".specs/archive/onramp-host-pilot/review-1/applied-fixes.md",
       "sha256": "f741b6fb79b83df26e6d3ffc136f21a1529ce2fc74838bf030f00042a7a77c68",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 5
     },
     {
       "path": ".specs/archive/onramp-host-pilot/review-1/devops-pro.md",
       "sha256": "99b9f6b1af9e34b579b2c6b6ec7db812eacfe7f3a8cda160706908f26a1429dc",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 3
     },
     {
       "path": ".specs/archive/onramp-host-pilot/review-1/product-manager.md",
       "sha256": "998a42cffb10b3152fcf421d9099b60490e7af57662f7b94cbb3e10564ee41cf",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 4
     },
     {
       "path": ".specs/archive/onramp-host-pilot/review-1/qa-engineer.md",
       "sha256": "397b6d0085aa6b6018cfe950a5ae9183d4e2776263cdabfd39e8e8d639b7b3a9",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/onramp-host-pilot/review-1/reviewer.md",
       "sha256": "5b3d0cac3a4b62378b73940f1eadaa4658268667dd457a50a239a1c151bcbd56",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/onramp-host-pilot/review-1/security-reviewer.md",
       "sha256": "039fc88f54b3265c474a41bd690bbe9cf66e98b9c5c1a1639e59cf7c1ca4abe3",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/onramp-host-pilot/review-1/synthesis.md",
       "sha256": "fdb556f4b377fe3e8b44c6f5eea3ea9d3a83eccf6725831d1c13f18cf86f8e6c",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 6
     },
     {
       "path": ".specs/archive/onramp-host-pilot/review-1/terraform-pro.md",
       "sha256": "04e4b58ee8b59d2bbb3cf75526d080db7b3f4e63796a3cded8cc184faa9569f7",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 4
     },
     {
       "path": ".specs/archive/searxng-onramp/plan.md",
       "sha256": "161c85ba998f9b7a8aae48db82807bfcc47d5de9474b36854f4f73b6e6687eb7",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 16
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/plan.md",
       "sha256": "006bb6505088defcea2ac079677dbdea15df2e4c758577c3c571b8a46d8b99cf",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 44
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/applied-fixes.md",
       "sha256": "407b9007cb4bf664b45871c270c0fc962ee1be719ceec45f11e29e392817eec3",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 6
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/devops-pro.md",
       "sha256": "ccd85081fcdd13fb54853b762f1a919adf7e7d3915fa03539f51d9155a15b5d6",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/known-blocker-fixes.md",
       "sha256": "3b377b488f3d9f6ec6ea800ff57875bf501b8b09d15c976b3f6f43c9b902ddef",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/product-manager.md",
       "sha256": "32a0623e7eb5e1df9f9bcde016b7a8c49044d3d6a768b4b170b65d79c34154e6",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 3
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/python-pro.md",
       "sha256": "040f7355df581b181fec257a0c17a88d14af2e73261a3f2d62a77c3148dc5fc1",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/qa-engineer.md",
       "sha256": "b9122ec83e3bff2687dba8fe068387330a25c6d739d33f80532de946122e4b12",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/reviewer.md",
       "sha256": "0287ce21ddcb5209966cfc74627544eeb991d03d0d29361b45d8abdfca6cd742",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 1
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/security-reviewer.md",
       "sha256": "cbf810c2ab80cb33e4e2c518c2975c5b1c823342cc74a4a58457823993471b23",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 4
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/synthesis.md",
       "sha256": "a188b3d9135abdc7c5d7b5a9fee16905d00e44556f60bf44278486510e6c26c8",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": ".specs/archive/searxng-podman-runtime/review-1/terraform-pro.md",
       "sha256": "ea20f3d89c0b92aa2c67ad0b90b54cbdb97012df8dfee5ebe5b6c091f0c572f2",
-      "authority": "unclassified",
+      "authority": "acceptance evidence",
       "stated_status": null,
       "extracted_item_count": 2
     },
     {
       "path": ".specs/direct-hermes-ansible/plan.md",
       "sha256": "69844d03f7a8ef714d1aec5696103bfd5f6f581f800f94e7553213a85df66320",
-      "authority": "unclassified",
+      "authority": "historical reference",
       "stated_status": null,
       "extracted_item_count": 32
     },
     {
       "path": "AGENTS.md",
       "sha256": "478c19103b5def78605cd643d3319d81e7b75740ff0c95b3912246c9c60bae6a",
-      "authority": "contributor-current",
+      "authority": "current authority",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "README.md",
-      "sha256": "40a0f5a597f70aa6a9aae0e3b8718a4754a92813536777d4e701e1c687a19a97",
-      "authority": "operator-current",
+      "sha256": "b606d37bd996e0765f7a81939a8f62851e727e1d4f24250f3e9195e3e6035f48",
+      "authority": "current authority",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/README.md",
-      "sha256": "fb680694591ab0ec9f9a9158246e4f085366ffc23337e0ce8b7322058ec157c1",
-      "authority": "contributor-current",
+      "sha256": "ef1734cfae8c0b0e0a622d2d11940e9b2e20a61c313689b98496708005f82cf0",
+      "authority": "current authority",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-architecture.md",
       "sha256": "833dcd4c180326ce9f6f3bc348c9c7a97e6ffc8f0013da6f252a44e95653ae2b",
-      "authority": "architecture-current",
+      "authority": "current authority",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-quick-start.md",
       "sha256": "a90d2de2c3b67c730bad478bd9551c1b80ae646b97fbb40a531a639c2e4942e5",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-readiness.md",
       "sha256": "a9454fce68c757db734713126f35e83bd495031ac4ea93205faa30fa22f94cf0",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-service-authoring.md",
       "sha256": "8fb1e5b5ad75385a1ef6bd7c4ed6bd78590a8fbe7c4a8eee95cb9e1014d9e3f7",
-      "authority": "contributor-current",
+      "authority": "working design",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-teardown.md",
       "sha256": "757c6213e940bb29b60f18b4cf18fda15d804c15c028e86fffa675c1be029d74",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-troubleshooting.md",
-      "sha256": "a071fdbe575952ba6b24e858984fa9898dc55965989db1edb1333930a1e9d0d9",
-      "authority": "operator-current",
+      "sha256": "47e3d14ff30deef44db44cfbb506354006a32ddcef330319440fc19232fd6610",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-values-mapping-v1.md",
-      "sha256": "43f75b19e77290d6c612e74e3f733f1160afb8970e924ed63f3f91f594f87ab8",
-      "authority": "architecture-current",
-      "stated_status": "Incomplete \u2014 implementation tracker W3 remains partial",
-      "extracted_item_count": 4
+      "sha256": "7c7a60508fd4a02d483b94f5b9b1fb876c8b750b5dfea146f63268ffb87caf73",
+      "authority": "current authority",
+      "stated_status": "Source producer/consumer reconciliation complete \u2014 provider, plan, and live equivalence are not claimed",
+      "extracted_item_count": 3
     },
     {
       "path": "docs/canonical-values-migration.md",
-      "sha256": "3cfc5ad7df0acbd17dd6b7a27042befa7f80546ebdbbf0c5d66ec362a4a738b3",
-      "authority": "architecture-current",
+      "sha256": "7769bb637118a27d688c575a246fcb4f8a0978c286bf3541b8df0aa7bc6cfb95",
+      "authority": "operator guidance",
       "stated_status": null,
-      "extracted_item_count": 0
+      "extracted_item_count": 1
     },
     {
       "path": "docs/canonical-values-model-blockers.md",
       "sha256": "c94a50d1bd1b9b60f38baf8ead87cef314b7f43fb24af8a92dea965c32c49c5d",
-      "authority": "architecture-current",
+      "authority": "working design",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/canonical-values-secret-operations.md",
       "sha256": "3763de55f19ae42fe4a0765861fe05e25fc6e688660b5fa9b92b51ee886e00ff",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": "public operational contract. Recipient and key material remain private and external to this repository.",
       "extracted_item_count": 0
     },
     {
       "path": "docs/debian-baseline.md",
-      "sha256": "daf6009d472ae46aab424a1c6482f61f05edb8dd2508062a0a3610978de724fb",
-      "authority": "architecture-current",
+      "sha256": "bee93782e007e310159082922236a3e21ec1d0344c792f471456623917ec9827",
+      "authority": "working design",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/development-environment.md",
       "sha256": "6177801ff7e11de33d090dc679c009d8f3642fcf368210f023aa63e49d70e2e2",
-      "authority": "contributor-current",
+      "authority": "working design",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/documentation-inventory.json",
-      "sha256": "b578abb656ed422dc846c3407b2be1ef60187408f61399708c46c0e4fdc491e1",
+      "sha256": "1f255ca3c3a6f9f40166fb8e209199c9743d95efa172b170ce81ae91395e2917",
       "authority": "unclassified",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/hermes-control-operations.md",
-      "sha256": "0bc95ec6a3dfaec791f9ef2e79bd65bcd55f0b4bb653d1a9c38b524f1e81b0da",
-      "authority": "operator-current",
+      "sha256": "63c4284b16d1780389c64fe9c8c570704bb661515fa6dfc07e9607b68854c280",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/hermes-operator-pilot-prd.md",
-      "sha256": "b9fd32d005fb5c2d38d0a718f611256b1f40c51f48cdb21fecd79b596f5fb428",
-      "authority": "architecture-current",
-      "stated_status": "Active design document; onramp-host and temporary SearXNG infrastructure are implemented. The remaining scope is Hermes operator integration and approval workflow.",
-      "extracted_item_count": 7
+      "sha256": "5f5a511070272019c99b12dd5a039d0950498a759482a7953b1ed128e471cd35",
+      "authority": "working design",
+      "stated_status": "Working design \u2014 source implementation is partial and is not provider, live, audit-durability, search-smoke, or recovery evidence. Onramp-host and temporary SearXNG infrastructure are implemented; the remaining scope is Hermes operator integration and approval workflow. Unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions).",
+      "extracted_item_count": 13
     },
     {
       "path": "docs/hermes-state-backup.md",
       "sha256": "5400e099e4a8f08a82ac9cdd5a89b9311d3c717226d515edd2e1121914f66cd0",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/hermes-tuning.md",
       "sha256": "1df917be5bcadc73c7ab16313dac55374624706fae43ce53d202fd4649f888e4",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/just-recipes.md",
       "sha256": "94e105456c46dbaade35dbff6f04b8fdc54de0544312028cf345470d4c24a669",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/normalized-plan-equivalence.md",
       "sha256": "36ec1125b6ca8630db5d9ab221b0341f9b4473d189de9537b1cd714df7717131",
-      "authority": "architecture-current",
+      "authority": "working design",
       "stated_status": "provider adapter implemented; optional and explicitly enforceable plan gate wired, provider-backed acceptance remains site-specific",
       "extracted_item_count": 1
     },
     {
       "path": "docs/onramp-app-platform-contract.md",
       "sha256": "ac3ea674420b8d26861026be7e9ac67845b42e633d0637173fd1b40a01acf772",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/onramp-host-runbook.md",
       "sha256": "0c440c7c4fd9983d27afeb5b6f82333e741c7d49d6a0e97e58efc3e852a1b92e",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/onramp-searxng-handoff.md",
       "sha256": "7b548efd4786d503d1cb65411fffc87999de3cf2d883f7876957a9309dadde0a",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/service-catalog.md",
       "sha256": "96489bc2aaa7d76c6dbf06fae4ad88738425ef383756a299d9f18a4fee4dbe2b",
-      "authority": "architecture-current",
+      "authority": "current authority",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
+      "path": "docs/service-operations.md",
+      "sha256": "927ea8d255e0bb444ad12e0fa953b01e8b0adebf24824bf66cb0adc2054ae0c1",
+      "authority": "operator guidance",
+      "stated_status": null,
+      "extracted_item_count": 1
+    },
+    {
       "path": "docs/service-state-backup.md",
       "sha256": "2475fd5cb6913e3ee4b13c3c57f6d36db3f223933ca7c427fb978d70f89ba36a",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/service-update-policy.md",
       "sha256": "5bbf311404dd4be12b2c174c01af636b2a8b9abc245de8f0af4375fb01257820",
-      "authority": "operator-current",
+      "authority": "operator guidance",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "docs/sssf.md",
       "sha256": "0c786675fbbbafc4b6d2fc252f56a87d3a6409951b281ce1ab63b558a65ee6e8",
-      "authority": "operator-current",
+      "authority": "operator guidance",
+      "stated_status": null,
+      "extracted_item_count": 0
+    },
+    {
+      "path": "docs/tooling-reproducibility.md",
+      "sha256": "97ddc2b8264aa9c7a9596f976b80ef76da919e2b85a616aa01ee20dffbbd85dd",
+      "authority": "current authority",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "scaffold/README.md",
       "sha256": "851c9198663b2efb2e7bf35e29c8e9aa35b9450b53629fdbd480b564f54de801",
-      "authority": "contributor-current",
+      "authority": "working design",
       "stated_status": null,
       "extracted_item_count": 0
     },
     {
       "path": "scaffold/sites/_template/README.md",
       "sha256": "6b7337e4dc19a5268c2f37d4d2b717cc2cffed592c66c85f8a92bd2db6f3682d",
-      "authority": "contributor-current",
+      "authority": "working design",
       "stated_status": null,
       "extracted_item_count": 0
     }

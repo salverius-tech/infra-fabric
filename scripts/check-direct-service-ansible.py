@@ -17,12 +17,18 @@ sys.path.insert(0, str(REPO / "scripts"))
 import settings as settings_lib  # noqa: E402
 
 TFVARS = REPO / "infra" / "ansible" / "inventory" / "tfvars.py"
-tfvars_spec = importlib.util.spec_from_file_location("tfvars_inventory", TFVARS)
-assert tfvars_spec and tfvars_spec.loader
-tfvars_inventory = importlib.util.module_from_spec(tfvars_spec)
-tfvars_spec.loader.exec_module(tfvars_inventory)
 
-SERVICE_GROUPS = {name: cfg["group"] for name, cfg in tfvars_inventory.SERVICE_HOSTS.items()}
+
+def service_groups() -> dict[str, str]:
+    """Load the inventory mapping only for commands that need canonical groups."""
+    tfvars_spec = importlib.util.spec_from_file_location("tfvars_inventory", TFVARS)
+    assert tfvars_spec and tfvars_spec.loader
+    tfvars_inventory = importlib.util.module_from_spec(tfvars_spec)
+    try:
+        tfvars_spec.loader.exec_module(tfvars_inventory)
+    except SystemExit as error:
+        raise InputError("unable to load Ansible inventory service mapping") from error
+    return {name: cfg["group"] for name, cfg in tfvars_inventory.SERVICE_HOSTS.items()}
 SPECIAL_PLAYBOOK_GROUPS = {
     "infra/ansible/playbooks/caddy-proxy.yml": "technitium",
     "infra/ansible/playbooks/technitium-dns.yml": "localhost",
@@ -78,7 +84,7 @@ def load_settings(path: Path) -> dict[str, Any]:
 
 
 def expected_group_for_playbook(service: str, playbook: str) -> str:
-    return SPECIAL_PLAYBOOK_GROUPS.get(playbook, SERVICE_GROUPS[service])
+    return SPECIAL_PLAYBOOK_GROUPS.get(playbook, service_groups()[service])
 
 
 def service_rows(settings_path: Path, include_disabled: bool) -> list[dict[str, str]]:
@@ -234,31 +240,108 @@ def run_static_syntax(settings_path: Path, include_disabled: bool) -> list[str]:
     return ["syntax status=pass mode=source-only parser=yaml"]
 
 
+STANDARD_TAGS = {"validation", "packages", "config", "service", "health", "backup", "restore"}
+COMMAND_MODULES = ("ansible.builtin.command", "command", "ansible.builtin.shell", "shell")
+
+
+PLAY_TASK_SECTIONS = ("pre_tasks", "tasks", "post_tasks", "handlers")
+TASK_CHILD_SECTIONS = ("block", "rescue", "always")
+IMPORT_KEYS = {
+    "ansible.builtin.import_playbook", "import_playbook",
+    "ansible.builtin.import_tasks", "import_tasks",
+    "ansible.builtin.include_tasks", "include_tasks",
+    "ansible.builtin.import_role", "import_role",
+    "ansible.builtin.include_role", "include_role",
+}
+DYNAMIC_TRANSPORT_KEYS = {
+    "ansible.builtin.include_tasks", "include_tasks",
+    "ansible.builtin.include_role", "include_role",
+}
+
+
+def is_play(item: dict[str, Any]) -> bool:
+    return "hosts" in item or any(section in item for section in PLAY_TASK_SECTIONS)
+
+
+def is_task_container(item: dict[str, Any]) -> bool:
+    return any(section in item for section in TASK_CHILD_SECTIONS) or any(key in item for key in IMPORT_KEYS)
+
+
+def is_dynamic_transport(item: dict[str, Any]) -> bool:
+    """Return whether a task loads descendants only at runtime."""
+    return any(key in item for key in DYNAMIC_TRANSPORT_KEYS)
+
+
+def is_executable_task(item: dict[str, Any]) -> bool:
+    """A task action, not a play, import/include, or block wrapper."""
+    return not is_play(item) and not is_task_container(item) and isinstance(item.get("name"), str)
+
+
+def nested_tasks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return every YAML task node, including play and block task sections."""
+    flattened: list[dict[str, Any]] = []
+    for item in items:
+        flattened.append(item)
+        sections = PLAY_TASK_SECTIONS if is_play(item) else TASK_CHILD_SECTIONS
+        for section in sections:
+            children = item.get(section)
+            if isinstance(children, list):
+                flattened.extend(nested_tasks([child for child in children if isinstance(child, dict)]))
+    return flattened
+
+
 def command_task_has_idempotence(task: dict[str, Any]) -> bool:
-    if any(key in task for key in ("changed_when", "failed_when", "when")):
+    # A conditional alone says nothing about repeatability.  Commands need either
+    # explicit change semantics or Ansible's creates/removes check-mode guard.
+    if "changed_when" in task:
         return True
     task_args = task.get("args")
     if isinstance(task_args, dict) and any(key in task_args for key in ("creates", "removes")):
         return True
-    for module_name in ("ansible.builtin.command", "command", "ansible.builtin.shell", "shell"):
+    for module_name in COMMAND_MODULES:
         module_args = task.get(module_name)
         if isinstance(module_args, dict) and any(key in module_args for key in ("creates", "removes")):
             return True
     return False
 
 
+def task_tags(task: dict[str, Any]) -> set[str]:
+    value = task.get("tags", [])
+    values = value if isinstance(value, list) else [value]
+    return {str(item) for item in values}
+
+
 def check_mode_static() -> list[str]:
     offenders: list[str] = []
-    for path in sorted((REPO / "infra" / "ansible" / "roles").glob("*/tasks/*.yml")):
-        for task in tasks_in_path(path):
-            if not isinstance(task, dict):
+    observed_tags: set[str] = set()
+    for path in sorted((REPO / "infra" / "ansible").glob("**/*.yml")):
+        for task in nested_tasks(tasks_in_path(path)):
+            name = task.get("name", "<unnamed>")
+            tags = task_tags(task)
+            if not is_executable_task(task):
+                if is_dynamic_transport(task):
+                    if tags != {"always"}:
+                        offenders.append(f"dynamic-transport-tags path={path.relative_to(REPO)} task={name} tags={','.join(sorted(tags))}")
+                elif tags:
+                    offenders.append(f"non-executable-tag path={path.relative_to(REPO)} task={name}")
                 continue
-            if any(key in task for key in ("ansible.builtin.command", "command", "ansible.builtin.shell", "shell")):
-                if not command_task_has_idempotence(task):
-                    offenders.append(f"command-no-idempotence path={path.relative_to(REPO)} task={task.get('name','<unnamed>')}")
+            observed_tags.update(tags)
+            unsupported_tags = tags - STANDARD_TAGS
+            if unsupported_tags:
+                offenders.append(f"unsupported-tag path={path.relative_to(REPO)} task={name} tags={','.join(sorted(unsupported_tags))}")
+            standard_tags = tags & STANDARD_TAGS
+            if not standard_tags:
+                offenders.append(f"untagged-task path={path.relative_to(REPO)} task={name}")
+            elif len(standard_tags) != 1:
+                offenders.append(f"multiple-standard-tags path={path.relative_to(REPO)} task={name} tags={','.join(sorted(standard_tags))}")
+            if any(key in task for key in COMMAND_MODULES) and not command_task_has_idempotence(task):
+                offenders.append(f"command-no-idempotence path={path.relative_to(REPO)} task={name}")
+    missing_tags = STANDARD_TAGS - observed_tags
+    if missing_tags:
+        offenders.append(f"missing-standard-tags tags={','.join(sorted(missing_tags))}")
     if offenders:
         raise CheckError("\n".join(offenders))
-    return ["check-mode status=pass mode=source-only bounded_exceptions=0"]
+    return ["check-mode status=pass mode=source-only command_policy=explicit-change-or-creates-removes tags=validation,packages,config,service,health,backup,restore"]
 
 
 def run_live_probe(kind: str, args: argparse.Namespace) -> list[str]:

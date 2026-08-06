@@ -198,17 +198,13 @@ def enabled_services(settings_path: Path | None) -> list[str]:
 
 
 def service_runtime(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
+    """Read runtime only from the typed service_runtime projection object."""
+    retired_alias = f"{service}_runtime"
+    if retired_alias in tfvars:
+        raise InventoryError(f"retired runtime alias is not accepted: {retired_alias}; use service_runtime.{service}")
     runtimes = tfvars.get("service_runtime", {})
-    canonical = runtimes.get(service) if isinstance(runtimes, dict) and isinstance(runtimes.get(service), dict) else None
-    legacy = tfvars.get(f"{service}_runtime")
-    legacy = legacy if isinstance(legacy, dict) else None
-    if canonical is not None and legacy is not None and canonical != legacy:
-        raise InventoryError(f"conflicting canonical and legacy runtime for service {service}")
-    if canonical is not None:
-        return canonical
-    if legacy is not None:
-        return legacy
-    return {}
+    runtime = runtimes.get(service) if isinstance(runtimes, dict) else None
+    return runtime if isinstance(runtime, dict) else {}
 
 
 def service_play_vars(service: str, tfvars: dict[str, Any]) -> dict[str, Any]:
@@ -279,6 +275,7 @@ def build_inventory(tfvars: dict[str, Any], services: list[str]) -> dict[str, An
         },
         "services": {"children": []},
     }
+    inventory["all"]["vars"]["tailscale_client_enabled"] = "tailscale_client" in services
     hostvars = inventory["_meta"]["hostvars"]
     # Keep registry-known groups resolvable even when their service is disabled.
     # Selection remains governed by settings; no disabled host is added here.

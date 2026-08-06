@@ -15,6 +15,15 @@ argument_specs:
       sssf_data_dir:
         type: str
         required: false
+      sssf_data_device:
+        type: str
+        required: false
+      sssf_pi_path:
+        type: str
+        required: false
+      sssf_uv_path:
+        type: str
+        required: false
       sssf_config_path:
         type: str
         required: false
@@ -71,3 +80,20 @@ argument_specs:
       sssf_visualizer_port:
         type: int
         required: false
+      sssf_max_concurrent_runs:
+        type: int
+        required: false
+      sssf_provider:
+        type: str
+        required: false
+      sssf_visualizer_command:
+        type: str
+        required: false
+      sssf_nodesource_key_sha256:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed NodeSource signing key."
+      sssf_nodesource_key_fingerprint:
+        type: str
+        required: false
+        description: "Expected uppercase 40-hex primary fingerprint for the NodeSource signing key."

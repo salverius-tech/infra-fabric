@@ -14,6 +14,15 @@ from service_catalog import ServiceCatalogError, load_catalog
 
 class ServiceCatalogTests(unittest.TestCase):
     def write_catalog(self, data: dict) -> Path:
+        # Most fixtures exercise a different catalog concern. Declare them as
+        # runtime-free explicitly so the loader contract stays fail-closed.
+        for service in data.get("services", {}).values():
+            service.setdefault("runtime_owner", "none")
+            service.setdefault("runtime", None)
+        return self.write_raw_catalog(data)
+
+    def write_raw_catalog(self, data: dict) -> Path:
+        """Write a deliberately unnormalized fixture for loader-boundary tests."""
         handle = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False)
         with handle:
             json.dump(data, handle)
@@ -38,6 +47,32 @@ class ServiceCatalogTests(unittest.TestCase):
         self.assertEqual(catalog.get("onramp_host").runtime_owner, "shared_host")
         self.assertEqual(catalog.get("searxng_onramp").runtime_owner, "none")
         self.assertEqual(catalog.get("sssf").runtime_owner, "guest")
+
+    def test_runtime_metadata_fails_closed_when_incomplete_or_inconsistent(self) -> None:
+        for runtime in (
+            {"default_type": "lxc"},
+            {"default_type": "lxc", "supported_types": ["vm"]},
+            {"default_type": "baremetal", "supported_types": ["baremetal"]},
+        ):
+            with self.subTest(runtime=runtime), self.assertRaisesRegex(ServiceCatalogError, "runtime"):
+                load_catalog(self.write_catalog({"services": {"app": {"dependencies": [], "runtime": runtime}}}))
+
+    def test_runtime_metadata_is_required_for_runtime_owners_and_null_or_omitted_for_none(self) -> None:
+        cases = (
+            ("guest", {}, "required"),
+            ("shared_host", {}, "required"),
+            ("none", {"runtime": {"default_type": "vm", "supported_types": ["vm"]}}, "null or omitted"),
+        )
+        for owner, extra, message in cases:
+            with self.subTest(owner=owner, extra=extra), self.assertRaisesRegex(ServiceCatalogError, message):
+                load_catalog(
+                    self.write_raw_catalog(
+                        {"services": {"app": {"dependencies": [], "runtime_owner": owner, **extra}}}
+                    )
+                )
+        self.assertIsNone(
+            load_catalog(self.write_raw_catalog({"services": {"app": {"dependencies": [], "runtime_owner": "none"}}})).get("app").runtime
+        )
 
     def test_update_policy_report_is_catalog_derived_and_ordered(self) -> None:
         catalog = load_catalog(
@@ -114,7 +149,13 @@ class ServiceCatalogTests(unittest.TestCase):
         complete = SimpleNamespace(
             shared_hosts={
                 "onramp-host": SimpleNamespace(
-                    security=SimpleNamespace(deploy_user="operator", deploy_dir="/srv")
+                    security=SimpleNamespace(deploy_user="operator", deploy_dir="/srv"),
+                    artifacts=SimpleNamespace(
+                        caddy_cloudflare=SimpleNamespace(
+                            version="2.8.4",
+                            checksums={"amd64": "a" * 64, "arm64": "b" * 64},
+                        )
+                    ),
                 )
             },
             guests={},

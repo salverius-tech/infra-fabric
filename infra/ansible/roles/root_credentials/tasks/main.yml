@@ -1,5 +1,6 @@
 ---
 - name: Require exactly one host for root-password bootstrap
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - ansible_play_hosts | length == 1
@@ -9,6 +10,7 @@
   no_log: true
 
 - name: Validate managed host root password
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | length >= 8
@@ -17,6 +19,7 @@
   no_log: true
 
 - name: Rotate managed host root password
+  tags: [config]
   ansible.builtin.user:
     name: root
     password: >-

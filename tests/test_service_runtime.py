@@ -29,6 +29,12 @@ class ServiceRuntimeTests(unittest.TestCase):
     def test_defaults_to_lxc_for_service_guests(self) -> None:
         self.assertEqual(service_runtime.runtime_type("hermes", {}), "lxc")
 
+    def test_partial_shared_runtime_uses_the_catalog_default_type(self) -> None:
+        self.assertEqual(
+            service_runtime.runtime_type("forgejo", {"service_runtime": {"forgejo": {"cloud_init_user": "forgejo"}}}),
+            "lxc",
+        )
+
     def test_onramp_host_defaults_to_vm(self) -> None:
         self.assertEqual(service_runtime.runtime_type("onramp_host", {}), "vm")
 
@@ -37,6 +43,10 @@ class ServiceRuntimeTests(unittest.TestCase):
             service_runtime.runtime_type("forgejo", {"service_runtime": {"forgejo": {"type": "vm"}}}),
             "vm",
         )
+
+    def test_retired_runtime_alias_is_rejected(self) -> None:
+        with self.assertRaisesRegex(service_runtime.ServiceRuntimeError, "retired runtime alias is not accepted"):
+            service_runtime.runtime_type("forgejo", {"forgejo_runtime": {"type": "vm"}})
 
     def test_rejects_unknown_runtime(self) -> None:
         with self.assertRaises(service_runtime.ServiceRuntimeError):

@@ -1,5 +1,6 @@
 ---
 - name: Verify Technitium service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -11,6 +12,7 @@
   delay: 5
   until: technitium_active.rc == 0
 - name: Verify Technitium UI responds on loopback
+  tags: [validation]
   ansible.builtin.uri:
     url: http://127.0.0.1:5380/
     status_code:
@@ -22,6 +24,7 @@
   delay: 5
   until: technitium_ui_check.status in [200, 302]
 - name: Verify Technitium DNS answers loopback queries
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - dig

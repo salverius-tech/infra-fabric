@@ -1,5 +1,6 @@
 ---
 - name: Validate onramp-host required variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - ansible_distribution == "Debian"
@@ -17,7 +18,60 @@
       directory, SSH policy, private SSH source CIDRs, and Caddy DNS-01
       variables.
 
+- name: Check whether onramp-host Caddy has Cloudflare DNS module
+  tags: [validation]
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
+  register: onramp_host_caddy_cloudflare_module
+  changed_when: false
+  failed_when: false
+
+- name: Require reviewed onramp-host Caddy artifact before guest mutation
+  tags: [always]
+  ansible.builtin.include_tasks: ../../../tasks/reviewed-artifact-cache.yml
+  vars:
+    reviewed_artifact_cache_root: "{{ onramp_host_artifact_cache_root | default('/var/lib/infra-fabric/artifacts') }}"
+    reviewed_artifact_stage_root: /var/tmp/infra-fabric-artifacts
+    reviewed_artifacts:
+      - name: caddy-cloudflare
+        version: "{{ onramp_host_caddy_cloudflare_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "caddy-cloudflare-{{ onramp_host_caddy_cloudflare_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ onramp_host_caddy_cloudflare_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else onramp_host_caddy_cloudflare_sha256_arm64 }}
+
+
+- name: Install Caddy package and service prerequisites
+  tags: [packages]
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+    update_cache: true
+
+- name: Ensure Caddy service account exists
+  tags: [config]
+  ansible.builtin.user:
+    name: caddy
+    system: true
+    state: present
+
+- name: Install reviewed onramp-host Caddy with Cloudflare DNS module
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/caddy-cloudflare/{{ onramp_host_caddy_cloudflare_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/caddy-cloudflare-{{ onramp_host_caddy_cloudflare_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/bin/caddy
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
+  notify: Restart caddy
 - name: Install Podman onramp-host packages
+  tags: [packages]
   ansible.builtin.apt:
     name: "{{ onramp_host_podman_packages }}"
     state: present
@@ -25,6 +79,7 @@
     lock_timeout: 600
 
 - name: Ensure onramp-host deploy user exists
+  tags: [config]
   ansible.builtin.user:
     name: "{{ onramp_host_deploy_user }}"
     shell: /bin/bash
@@ -33,6 +88,7 @@
     append: true
 
 - name: Ensure onramp-host deploy SSH directory exists
+  tags: [config]
   ansible.builtin.file:
     path: "/home/{{ onramp_host_deploy_user }}/.ssh"
     state: directory
@@ -41,11 +97,13 @@
     mode: "0700"
 
 - name: Render onramp-host deploy authorized keys
+  tags: [config]
   ansible.builtin.set_fact:
     onramp_host_authorized_keys: "{{ onramp_host_bootstrap_ssh_public_keys | default([]) | join('\\n') }}"
   no_log: true
 
 - name: Install onramp-host deploy authorized keys
+  tags: [packages]
   ansible.builtin.copy:
     dest: "/home/{{ onramp_host_deploy_user }}/.ssh/authorized_keys"
     owner: "{{ onramp_host_deploy_user }}"
@@ -55,6 +113,7 @@
   no_log: true
 
 - name: Harden onramp-host SSH daemon policy
+  tags: [config]
   ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/90-homelab-onramp-host.conf
     owner: root
@@ -67,6 +126,7 @@
   notify: Restart ssh
 
 - name: Ensure onramp-host deployment directory exists
+  tags: [config]
   ansible.builtin.file:
     path: "{{ onramp_host_deploy_dir }}"
     state: directory
@@ -74,27 +134,9 @@
     group: "{{ onramp_host_deploy_user }}"
     mode: "0750"
 
-- name: Check whether onramp-host Caddy has Cloudflare DNS module
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
-  register: onramp_host_caddy_cloudflare_module
-  changed_when: false
-  failed_when: false
-
-- name: Build onramp-host Caddy with Cloudflare DNS module
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz && PATH=/usr/local/go/bin:${PATH} GOBIN=/usr/local/bin /usr/local/go/bin/go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.6 && PATH=/usr/local/go/bin:${PATH} /usr/local/bin/xcaddy build --with github.com/caddy-dns/cloudflare@v0.2.4 --output /tmp/caddy-cloudflare && install -m 0755 /tmp/caddy-cloudflare /usr/bin/caddy  # yamllint disable-line rule:line-length
-  when: onramp_host_caddy_cloudflare_module.rc != 0
-  changed_when: true
-  notify: Restart caddy
 
 - name: Ensure onramp-host Caddy directories exist
+  tags: [config]
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -107,6 +149,7 @@
     - /etc/systemd/system/caddy.service.d
 
 - name: Install onramp-host Caddy env
+  tags: [packages]
   ansible.builtin.template:
     src: caddy.env.j2
     dest: /etc/caddy/env
@@ -117,6 +160,7 @@
   notify: Restart caddy
 
 - name: Install onramp-host Caddy systemd override
+  tags: [packages]
   ansible.builtin.template:
     src: caddy-override.conf.j2
     dest: /etc/systemd/system/caddy.service.d/override.conf
@@ -126,6 +170,7 @@
   notify: Restart caddy
 
 - name: Install onramp-host base Caddyfile
+  tags: [packages]
   ansible.builtin.template:
     src: Caddyfile.j2
     dest: /etc/caddy/Caddyfile
@@ -135,6 +180,7 @@
   notify: Restart caddy
 
 - name: Install onramp-host placeholder Caddy site snippet
+  tags: [packages]
   ansible.builtin.copy:
     dest: /etc/caddy/sites.d/00-placeholder.caddy
     content: "# Placeholder so the base Caddyfile import glob is valid before app snippets exist.\n"
@@ -143,6 +189,7 @@
     group: root
 
 - name: Validate onramp-host base Caddy config
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - bash
@@ -151,6 +198,7 @@
   changed_when: false
 
 - name: Enable onramp-host Caddy service
+  tags: [service]
   ansible.builtin.systemd_service:
     name: caddy
     enabled: true
@@ -158,10 +206,12 @@
     daemon_reload: true
 
 - name: Document onramp-host sudo policy
+  tags: [config]
   ansible.builtin.debug:
     msg: "No broad sudo policy is installed by default; Rootless Podman and deployment directory ownership are the Onramp runtime contract."
 
 - name: Enable linger for rootless Podman user services
+  tags: [service]
   ansible.builtin.command:
     argv:
       - loginctl
@@ -170,6 +220,7 @@
   changed_when: false
 
 - name: Configure default-deny onramp-host firewall
+  tags: [config]
   ansible.builtin.command:
     argv:
       - ufw
@@ -179,6 +230,7 @@
   changed_when: false
 
 - name: Allow onramp-host outbound traffic
+  tags: [config]
   ansible.builtin.command:
     argv:
       - ufw
@@ -188,6 +240,7 @@
   changed_when: false
 
 - name: Allow onramp-host SSH only from approved source CIDRs
+  tags: [config]
   ansible.builtin.command:
     argv:
       - ufw
@@ -204,6 +257,7 @@
   changed_when: false
 
 - name: Allow approved Onramp reverse-proxy ports only
+  tags: [config]
   ansible.builtin.command:
     argv:
       - ufw
@@ -213,6 +267,7 @@
   changed_when: false
 
 - name: Enable onramp-host firewall
+  tags: [service]
   ansible.builtin.command:
     argv:
       - ufw
@@ -221,10 +276,12 @@
   changed_when: false
 
 - name: Record onramp-host network exposure contract
+  tags: [config]
   ansible.builtin.debug:
     msg: "Default-deny firewall is enabled; Onramp must not use host-published app service ports by default except through approved reverse proxy ports."
 
 - name: Verify onramp-host become path
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - whoami
@@ -233,6 +290,7 @@
   failed_when: onramp_host_become_user.stdout | trim != "root"
 
 - name: Verify rootless Podman info as deploy user
+  tags: [validation]
   become: true
   become_user: "{{ onramp_host_deploy_user }}"
   ansible.builtin.command:
@@ -245,6 +303,7 @@
   changed_when: false
 
 - name: Verify Podman Compose provider as deploy user
+  tags: [validation]
   become: true
   become_user: "{{ onramp_host_deploy_user }}"
   ansible.builtin.command:
@@ -255,6 +314,7 @@
   changed_when: false
 
 - name: Resolve onramp-host deploy user UID
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - id
@@ -264,6 +324,7 @@
   changed_when: false
 
 - name: Ensure rootless Podman socket unit is enabled for deploy user
+  tags: [config]
   become: true
   become_user: "{{ onramp_host_deploy_user }}"
   ansible.builtin.systemd_service:
@@ -276,6 +337,7 @@
   when: onramp_host_enable_docker_compat_socket | bool
 
 - name: Verify onramp-host deployment directory ownership
+  tags: [validation]
   ansible.builtin.stat:
     path: "{{ onramp_host_deploy_dir }}"
   register: onramp_host_deploy_dir_stat
@@ -286,6 +348,7 @@
     onramp_host_deploy_dir_stat.stat.gr_name != onramp_host_deploy_user
 
 - name: Verify rootless Podman user namespace as deploy user
+  tags: [validation]
   become: true
   become_user: "{{ onramp_host_deploy_user }}"
   ansible.builtin.command:

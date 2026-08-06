@@ -76,3 +76,31 @@ argument_specs:
         type: str
         required: false
         description: "Named connection key in runner config (default: forgejo)."
+      forgejo_runner_compose_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed Docker Compose SHA-256 for amd64."
+      forgejo_runner_compose_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed Docker Compose SHA-256 for arm64."
+      forgejo_runner_just_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed just SHA-256 for amd64."
+      forgejo_runner_just_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed just SHA-256 for arm64."
+      forgejo_runner_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed Forgejo runner SHA-256 for amd64."
+      forgejo_runner_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed Forgejo runner SHA-256 for arm64."
+      forgejo_runner_artifact_cache_root:
+        type: str
+        required: false
+        description: "Reviewed artifact pin supplied by the canonical projection."
