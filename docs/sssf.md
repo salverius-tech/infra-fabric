@@ -71,6 +71,20 @@ exact commit and fails if the guest revision differs. Back up state before
 replacing the VM or changing the data layout. Revert the canonical commit and
 rerun the non-mutating plan for rollback review.
 
+## Reviewed runtime artifact cache
+
+The controller must retain reviewed Pi and Bun archives outside both repositories at
+`/var/lib/infra-fabric/artifacts/sssf/`. The role requires the versioned `uv`, `pi`,
+and `bun` archives from that cache and verifies their repository-tracked SHA-256
+before extraction. Do not replace this cache with a guest-side installer, a mutable
+release URL, or an artifact in the canonical/private values repository.
+
+Populate the cache only after separately reviewing the release, archive layout, and
+checksum. Cache paths are `tool/version/filename`, for example
+`pi/0.83.0/pi-linux-x64.tar.gz`. Preserve previous reviewed versions for rollback;
+changing a pin remains a public-source review followed by validation, planning, and
+an explicitly approved apply.
+
 ## State backup and restore
 
 Use the managed service-state workflow:

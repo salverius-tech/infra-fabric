@@ -120,6 +120,40 @@ TARGETS = (
         release_url="https://api.github.com/repos/casey/just/releases/latest",
         canonical_path=("services", "forgejo_runner", "configuration", "just_version"),
     ),
+    Target(
+        name="SSSF uv runtime",
+        path=Path("infra/ansible/roles/sssf/defaults/main.yml"),
+        pattern=r"(?m)^(sssf_uv_version:\s*)([^\s]+)$",
+        replacement=r"\g<1>{version}",
+        release_url="https://api.github.com/repos/astral-sh/uv/releases/latest",
+        checksum_pattern=r"(?m)^(sssf_uv_sha256:\s*)([^\s]+)$",
+        checksum_replacement=r"\g<1>{checksum}",
+        checksum_asset_template="sha256.sum",
+        checksum_file_template="uv-x86_64-unknown-linux-gnu.tar.gz",
+    ),
+    Target(
+        name="SSSF Pi runtime",
+        path=Path("infra/ansible/roles/sssf/defaults/main.yml"),
+        pattern=r"(?m)^(sssf_pi_version:\s*)([^\s]+)$",
+        replacement=r"\g<1>{version}",
+        release_url="https://api.github.com/repos/earendil-works/pi/releases/latest",
+        checksum_pattern=r"(?m)^(sssf_pi_sha256:\s*)([^\s]+)$",
+        checksum_replacement=r"\g<1>{checksum}",
+        checksum_asset_template="SHA256SUMS",
+        checksum_file_template="pi-linux-x64.tar.gz",
+    ),
+    Target(
+        name="SSSF Bun runtime",
+        path=Path("infra/ansible/roles/sssf/defaults/main.yml"),
+        pattern=r"(?m)^(sssf_bun_version:\s*)([^\s]+)$",
+        replacement=r"\g<1>{version}",
+        release_url="https://api.github.com/repos/oven-sh/bun/releases/latest",
+        strip_prefix="bun-v",
+        checksum_pattern=r"(?m)^(sssf_bun_sha256:\s*)([^\s]+)$",
+        checksum_replacement=r"\g<1>{checksum}",
+        checksum_asset_template="SHASUMS256.txt",
+        checksum_file_template="bun-linux-x64.zip",
+    ),
 )
 
 
@@ -386,7 +420,7 @@ def run(
         changed = False
         for target in TARGETS:
             if target.canonical_path is None:
-                results.append(UpdateResult(target.name, target.path, None, None, "skip", "not owned by canonical model"))
+                results.append(process_target(target, root, now, min_age, opener))
                 continue
             result, target_changed = process_canonical_target(target, document, root, now, min_age, opener)
             results.append(result)
@@ -461,8 +495,8 @@ def print_results(results: list[UpdateResult]) -> None:
 
 
 UNMANAGED = (
-    "Technitium: installed by upstream install script only when missing; "
-    "no pinned upgrade target yet.",
+    "Technitium: version/checksum changes are operator-reviewed manual pins; "
+    "just update does not mutate this protected runtime artifact.",
     "Tailscale: installed only when missing; package upgrade policy is not defined yet.",
     "Caddy: apt/custom xcaddy rebuild upgrade policy is not defined yet.",
     "Debian LXC OS packages: required packages are installed during playbooks, "

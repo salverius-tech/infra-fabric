@@ -11,6 +11,11 @@ variable "node_name" {
 variable "vm_id" {
   description = "Proxmox VMID for the LXC."
   type        = number
+
+  validation {
+    condition     = var.vm_id == floor(var.vm_id) && var.vm_id >= 100 && var.vm_id <= 999999999
+    error_message = "vm_id must be an integer in the Proxmox VMID range 100 through 999999999."
+  }
 }
 
 variable "started" {
@@ -33,11 +38,21 @@ variable "tags" {
 variable "cores" {
   description = "CPU cores allocated to the LXC."
   type        = number
+
+  validation {
+    condition     = var.cores == floor(var.cores) && var.cores > 0
+    error_message = "cores must be a positive integer."
+  }
 }
 
 variable "memory_mb" {
   description = "Dedicated memory in MiB."
   type        = number
+
+  validation {
+    condition     = var.memory_mb == floor(var.memory_mb) && var.memory_mb > 0
+    error_message = "memory_mb must be a positive integer."
+  }
 }
 
 variable "swap_mb" {
@@ -72,6 +87,11 @@ variable "disk" {
     datastore_id = string
     size_gb      = number
   })
+
+  validation {
+    condition     = trimspace(var.disk.datastore_id) != "" && var.disk.size_gb > 0
+    error_message = "disk requires a non-empty datastore_id and a positive size_gb."
+  }
 }
 
 variable "mount_points" {
@@ -87,6 +107,11 @@ variable "mount_points" {
     replicate = optional(bool, false)
   }))
   default = []
+
+  validation {
+    condition     = alltrue([for mount in var.mount_points : trimspace(mount.volume) != "" && can(regex("^/", mount.path))]) && length(distinct([for mount in var.mount_points : mount.path])) == length(var.mount_points)
+    error_message = "mount_points require non-empty volumes and absolute unique guest paths."
+  }
 }
 
 variable "hostname" {
@@ -107,6 +132,11 @@ variable "dns_servers" {
 variable "ipv4_address" {
   description = "IPv4 address in CIDR notation, or dhcp."
   type        = string
+
+  validation {
+    condition     = var.ipv4_address == "dhcp" || can(cidrhost(var.ipv4_address, 0))
+    error_message = "ipv4_address must be dhcp or an IPv4 CIDR address."
+  }
 }
 
 variable "ipv4_gateway" {
@@ -132,6 +162,11 @@ variable "network" {
     mac_address = optional(string)
     vlan_id     = optional(number)
   })
+
+  validation {
+    condition     = trimspace(var.network.bridge) != "" && (try(var.network.mac_address, null) == null || can(regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$", var.network.mac_address))) && (try(var.network.vlan_id, null) == null || (var.network.vlan_id >= 1 && var.network.vlan_id <= 4094))
+    error_message = "network requires a bridge; optional mac_address must be colon-delimited and vlan_id must be 1 through 4094."
+  }
 }
 
 variable "template_file_id" {

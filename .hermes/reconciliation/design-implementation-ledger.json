@@ -628,31 +628,6 @@
       "notes": "Extracted claim; implementation and acceptance evidence are intentionally not inferred during extraction."
     },
     {
-      "id": "recon-acceptance-c55a0f677e6f71a6",
-      "source": {
-        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-        "section": "Combined Backlog Reconciliation and Audit Remediation Plan",
-        "line": 10,
-        "kind": "acceptance"
-      },
-      "summary": "**Implementation progress (2026-08-05):** Package S2 is source-complete with focused regression evidence. Package S3 is in progress: site-scoped locking, immutable reviewed-input execution, immediate pre-mutation re-verification, and local-state snapshot/restore primitives are implemented; guarded teardown remains outstanding. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses",
-      "domain": "state",
-      "scope": "repository",
-      "disposition": "unreconciled",
-      "evidence_level": "design",
-      "evidence": [],
-      "missing_evidence": [
-        "Source-level reconciliation has not yet assigned a disposition."
-      ],
-      "superseded_by": [],
-      "duplicates": [],
-      "dependencies": [],
-      "priority": "none",
-      "recommended_action": "none",
-      "target_artifact": "",
-      "notes": "Extracted claim; implementation and acceptance evidence are intentionally not inferred during extraction."
-    },
-    {
       "id": "recon-decision-eb3aee6b05b5972f",
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",

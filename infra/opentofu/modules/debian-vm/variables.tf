@@ -11,6 +11,11 @@ variable "node_name" {
 variable "vm_id" {
   description = "Proxmox VMID."
   type        = number
+
+  validation {
+    condition     = var.vm_id == floor(var.vm_id) && var.vm_id >= 100 && var.vm_id <= 999999999
+    error_message = "vm_id must be an integer in the Proxmox VMID range 100 through 999999999."
+  }
 }
 
 variable "name" {
@@ -63,6 +68,11 @@ variable "disk" {
     datastore_id = string
     size_gb      = number
   })
+
+  validation {
+    condition     = trimspace(var.disk.datastore_id) != "" && var.disk.size_gb > 0
+    error_message = "disk requires a non-empty datastore_id and a positive size_gb."
+  }
 }
 
 variable "extra_disks" {
@@ -73,16 +83,36 @@ variable "extra_disks" {
     interface    = string
   }))
   default = []
+
+  validation {
+    condition     = alltrue([for disk in var.extra_disks : trimspace(disk.datastore_id) != "" && disk.size_gb > 0 && can(regex("^[a-z]+[0-9]+$", disk.interface))])
+    error_message = "Each extra disk requires a non-empty datastore_id, positive size_gb, and interface such as scsi1."
+  }
+
+  validation {
+    condition     = length(distinct([for disk in var.extra_disks : disk.interface])) == length(var.extra_disks)
+    error_message = "extra_disks interfaces must be unique."
+  }
 }
 
 variable "cores" {
   description = "CPU cores."
   type        = number
+
+  validation {
+    condition     = var.cores == floor(var.cores) && var.cores > 0
+    error_message = "cores must be a positive integer."
+  }
 }
 
 variable "memory_mb" {
   description = "Dedicated memory in MiB."
   type        = number
+
+  validation {
+    condition     = var.memory_mb == floor(var.memory_mb) && var.memory_mb > 0
+    error_message = "memory_mb must be a positive integer."
+  }
 }
 
 variable "search_domain" {
@@ -98,12 +128,22 @@ variable "dns_servers" {
 variable "ipv4_address" {
   description = "IPv4 address/CIDR, or dhcp."
   type        = string
+
+  validation {
+    condition     = var.ipv4_address == "dhcp" || can(cidrhost(var.ipv4_address, 0))
+    error_message = "ipv4_address must be dhcp or an IPv4 CIDR address."
+  }
 }
 
 variable "ipv4_gateway" {
   description = "IPv4 gateway."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.ipv4_gateway == null || can(cidrhost("${var.ipv4_gateway}/32", 0))
+    error_message = "ipv4_gateway must be null or an IPv4 address."
+  }
 }
 
 variable "cloud_init_user" {
@@ -129,6 +169,11 @@ variable "network" {
     mac_address = optional(string)
     vlan_id     = optional(number)
   })
+
+  validation {
+    condition     = trimspace(var.network.bridge) != "" && (try(var.network.mac_address, null) == null || can(regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$", var.network.mac_address))) && (try(var.network.vlan_id, null) == null || (var.network.vlan_id >= 1 && var.network.vlan_id <= 4094))
+    error_message = "network requires a bridge; optional mac_address must be colon-delimited and vlan_id must be 1 through 4094."
+  }
 }
 
 variable "startup" {

@@ -33,6 +33,7 @@ class HermesControlRoleTests(unittest.TestCase):
         )
         header = diagnostic["ansible.builtin.command"]["argv"][10]
         self.assertEqual(header, "Authorization: Bearer {{ hermes_control_api_token }}")
+        self.assertIn("{{ hermes_control_api_token }}", header)
         self.assertNotIn("***", header)
         self.assertNotIn("Bearer  ", header)
         self.assertTrue(diagnostic["no_log"])

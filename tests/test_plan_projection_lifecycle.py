@@ -63,6 +63,25 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertEqual(content.count('trap cleanup_generated_tmp EXIT'), 1)
         self.assertNotIn('rm -rf "${generated_dir}"\n', content)
 
+    def test_teardown_uses_a_distinct_metadata_bound_destroy_contract(self) -> None:
+        source = (ROOT / "scripts" / "teardown-infra.sh").read_text(encoding="utf-8")
+        self.assertIn('scripts/run-infra.sh bash -euo pipefail -c', source)
+        self.assertIn('python scripts/settings.py policy --action destroy --canonical', source)
+        self.assertIn('-destroy', source)
+        self.assertIn('--operation destroy --print-summary', source)
+        self.assertIn('--operation destroy --allow-destroy --allow-stateful-batch', source)
+        self.assertIn('execution-snapshot.py create', source)
+        self.assertIn('state-snapshot.py create', source)
+        self.assertIn('execution-snapshot.py verify --snapshot "${execution_snapshot}"', source)
+        self.assertIn('Teardown apply requires an explicit --approve argument', source)
+        result = subprocess.run(
+            ["bash", "-n", str(ROOT / "scripts" / "teardown-infra.sh")],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

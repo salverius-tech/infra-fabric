@@ -7,6 +7,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_MAIN = ROOT / "infra/opentofu/modules/debian-vm/main.tf"
 MODULE_VARIABLES = ROOT / "infra/opentofu/modules/debian-vm/variables.tf"
+LXC_MODULE_VARIABLES = ROOT / "infra/opentofu/modules/debian-lxc/variables.tf"
 FORGEJO = ROOT / "infra/opentofu/forgejo.tf"
 ROOT_TOFU = ROOT / "infra/opentofu/main.tf"
 
@@ -32,6 +33,33 @@ class DebianVmImageContractTests(unittest.TestCase):
         self.assertIn("proxmox_download_file.debian_13_service_vm_image[0].id", forgejo)
         self.assertIn("create       = false", forgejo)
         self.assertNotIn("forgejo_vm_image_url", forgejo)
+
+    def test_vm_module_rejects_invalid_resource_and_network_shapes(self) -> None:
+        variables = MODULE_VARIABLES.read_text(encoding="utf-8")
+        for contract in (
+            "vm_id must be an integer in the Proxmox VMID range",
+            "disk requires a non-empty datastore_id and a positive size_gb.",
+            "extra_disks interfaces must be unique.",
+            "cores must be a positive integer.",
+            "memory_mb must be a positive integer.",
+            "ipv4_address must be dhcp or an IPv4 CIDR address.",
+            "ipv4_gateway must be null or an IPv4 address.",
+            "vlan_id must be 1 through 4094.",
+        ):
+            self.assertIn(contract, variables)
+
+    def test_lxc_module_matches_vm_identity_and_compute_validation(self) -> None:
+        variables = LXC_MODULE_VARIABLES.read_text(encoding="utf-8")
+        for contract in (
+            "vm_id must be an integer in the Proxmox VMID range",
+            "cores must be a positive integer.",
+            "memory_mb must be a positive integer.",
+            "disk requires a non-empty datastore_id and a positive size_gb.",
+            "mount_points require non-empty volumes and absolute unique guest paths.",
+            "ipv4_address must be dhcp or an IPv4 CIDR address.",
+            "vlan_id must be 1 through 4094.",
+        ):
+            self.assertIn(contract, variables)
 
 
 if __name__ == "__main__":

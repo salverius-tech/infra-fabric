@@ -32,7 +32,7 @@ Technitium is not currently a target of `just update`. To change it, update the 
 
 ## Other update boundaries
 
-`just update` currently manages OpenTofu, TFLint, Forgejo, Forgejo runner, Docker Compose, and just pins. Caddy build inputs are version-pinned but do not yet have an automated update target. Tailscale package updates and general guest OS upgrades are also outside the `just update` workflow.
+`just update` manages repository-owned SSSF uv, Pi, and Bun version/checksum pins in addition to OpenTofu, TFLint, Forgejo, Forgejo runner, Docker Compose, and just pins. Updating an SSSF pin does not download a guest artifact: before apply, an operator must review and place the matching archive in `/var/lib/infra-fabric/artifacts/sssf/`. Caddy build inputs are version-pinned but do not yet have an automated update target. Tailscale package updates and general guest OS upgrades are also outside the `just update` workflow.
 
 For components not managed by `just update`, document the reviewed pin or package policy explicitly and avoid ad hoc production upgrades.
 

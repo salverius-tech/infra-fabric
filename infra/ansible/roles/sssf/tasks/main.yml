@@ -16,13 +16,22 @@
       - sssf_max_concurrent_runs | int >= 1
       - sssf_max_concurrent_runs | int <= 4
       - sssf_allowed_repositories is iterable
+      - ansible_architecture == 'x86_64'
+      - sssf_artifact_path is match('^/[^ ]+$')
+      - sssf_uv_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
+      - sssf_pi_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
+      - sssf_bun_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
+      - sssf_uv_sha256 is match('^[0-9a-f]{64}$')
+      - sssf_pi_sha256 is match('^[0-9a-f]{64}$')
+      - sssf_bun_sha256 is match('^[0-9a-f]{64}$')
       - >-
         (sssf_provider == 'openrouter' and sssf_openrouter_api_key | length > 0) or
         (sssf_provider == 'openai' and sssf_openai_api_key | length > 0) or
         (sssf_provider == 'fireworks' and sssf_fireworks_api_key | length > 0)
     fail_msg: >-
       SSSF requires a pinned upstream commit, non-root runtime user, normalized paths,
-      loopback-only visualizer binding, bounded concurrency, and at least one provider key.
+      loopback-only visualizer binding, x86_64 reviewed runtime pins, bounded concurrency,
+      and at least one provider key.
 
 - name: Install SSSF operating-system dependencies
   ansible.builtin.apt:
@@ -131,43 +140,86 @@
     sssf_node_version.rc != 0 or
     (sssf_node_version.stdout | trim | regex_replace('^v', '')) is version('22.19.0', '<')
 
-- name: Install uv when absent
-  ansible.builtin.shell: |
-    set -euo pipefail
-    if ! command -v uv >/dev/null 2>&1; then
-      curl -LsSf https://astral.sh/uv/install.sh | sh
-    fi
-  args:
-    executable: /bin/bash
-  become: true
-  become_user: "{{ sssf_runtime_user }}"
-  environment:
-    HOME: "/home/{{ sssf_runtime_user }}"
-  changed_when: false
+- name: Check reviewed SSSF runtime artifacts on the controller
+  ansible.builtin.stat:
+    path: "{{ sssf_artifact_path }}/{{ item.tool }}/{{ item.version }}/{{ item.filename }}"
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  become: false
+  register: sssf_cached_artifacts
+  loop:
+    - { tool: uv, version: "{{ sssf_uv_version }}", filename: uv-x86_64-unknown-linux-gnu.tar.gz, checksum: "{{ sssf_uv_sha256 }}" }
+    - { tool: pi, version: "{{ sssf_pi_version }}", filename: pi-linux-x64.tar.gz, checksum: "{{ sssf_pi_sha256 }}" }
+    - { tool: bun, version: "{{ sssf_bun_version }}", filename: bun-linux-x64.zip, checksum: "{{ sssf_bun_sha256 }}" }
+  when: item.tool != 'bun' or sssf_visualizer_enabled | bool
 
-- name: Install pi coding agent when absent
-  ansible.builtin.shell: |
-    set -euo pipefail
-    if ! command -v pi >/dev/null 2>&1; then
-      curl -fsSL https://pi.dev/install.sh | bash
-    fi
-  args:
-    executable: /bin/bash
-  become: true
-  become_user: "{{ sssf_runtime_user }}"
-  environment:
-    HOME: "/home/{{ sssf_runtime_user }}"
-  changed_when: false
+- name: Require reviewed SSSF runtime artifacts
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.checksum == item.item.checksum
+    fail_msg: "Missing or checksum-mismatched reviewed SSSF {{ item.item.tool }} artifact in {{ sssf_artifact_path }}."
+  loop: "{{ sssf_cached_artifacts.results }}"
+  when: not item.skipped | default(false)
 
-- name: Expose non-root SSSF tool installations
+- name: Stage reviewed SSSF runtime artifacts
+  ansible.builtin.copy:
+    src: "{{ sssf_artifact_path }}/{{ item.tool }}/{{ item.version }}/{{ item.filename }}"
+    dest: "/var/tmp/sssf-{{ item.tool }}-{{ item.version }}.{{ item.filename.split('.')[-1] }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop:
+    - { tool: uv, version: "{{ sssf_uv_version }}", filename: uv-x86_64-unknown-linux-gnu.tar.gz }
+    - { tool: pi, version: "{{ sssf_pi_version }}", filename: pi-linux-x64.tar.gz }
+    - { tool: bun, version: "{{ sssf_bun_version }}", filename: bun-linux-x64.zip }
+  when: item.tool != 'bun' or sssf_visualizer_enabled | bool
+
+- name: Install checksum-verified uv runtime
   ansible.builtin.file:
-    src: "/home/{{ sssf_runtime_user }}/.local/bin/{{ item.name }}"
-    dest: "{{ item.path }}"
+    path: "/opt/sssf/runtimes/uv/{{ sssf_uv_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Extract checksum-verified uv runtime
+  ansible.builtin.unarchive:
+    src: "/var/tmp/sssf-uv-{{ sssf_uv_version }}.gz"
+    dest: "/opt/sssf/runtimes/uv/{{ sssf_uv_version }}"
+    remote_src: true
+    extra_opts: [--strip-components=1]
+    creates: "/opt/sssf/runtimes/uv/{{ sssf_uv_version }}/uv"
+
+- name: Expose checksum-verified uv runtime
+  ansible.builtin.file:
+    src: "/opt/sssf/runtimes/uv/{{ sssf_uv_version }}/uv"
+    dest: "{{ sssf_uv_path }}"
     state: link
     force: true
-  loop:
-    - { name: uv, path: "{{ sssf_uv_path }}" }
-    - { name: pi, path: "{{ sssf_pi_path }}" }
+
+- name: Create Pi runtime release directory
+  ansible.builtin.file:
+    path: "/opt/sssf/runtimes/pi/{{ sssf_pi_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Extract checksum-verified Pi runtime
+  ansible.builtin.unarchive:
+    src: "/var/tmp/sssf-pi-{{ sssf_pi_version }}.gz"
+    dest: "/opt/sssf/runtimes/pi/{{ sssf_pi_version }}"
+    remote_src: true
+    creates: "/opt/sssf/runtimes/pi/{{ sssf_pi_version }}/pi/pi"
+
+- name: Expose checksum-verified Pi runtime
+  ansible.builtin.file:
+    src: "/opt/sssf/runtimes/pi/{{ sssf_pi_version }}/pi/pi"
+    dest: "{{ sssf_pi_path }}"
+    state: link
+    force: true
+
 
 - name: Initialize SSSF upstream checkout
   ansible.builtin.shell: |
@@ -230,19 +282,42 @@
   notify: Restart sssf visualizer
 
 - name: Install Bun for the optional SSSF visualizer
-  ansible.builtin.shell: |
-    set -euo pipefail
-    if ! command -v bun >/dev/null 2>&1; then
-      curl -fsSL https://bun.sh/install | bash
-      install -m 0755 /root/.bun/bin/bun /usr/local/bin/bun
-    fi
-    bun install --cwd {{ (sssf_data_dir ~ '/upstream/.claude/skills/sssf/apps/visualizer') | quote }} --frozen-lockfile
-  args:
-    executable: /bin/bash
+  ansible.builtin.file:
+    path: "/opt/sssf/runtimes/bun/{{ sssf_bun_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: sssf_visualizer_enabled | bool
+
+- name: Extract checksum-verified Bun runtime
+  ansible.builtin.unarchive:
+    src: "/var/tmp/sssf-bun-{{ sssf_bun_version }}.zip"
+    dest: "/opt/sssf/runtimes/bun/{{ sssf_bun_version }}"
+    remote_src: true
+    creates: "/opt/sssf/runtimes/bun/{{ sssf_bun_version }}/bun-linux-x64/bun"
+  when: sssf_visualizer_enabled | bool
+
+- name: Expose checksum-verified Bun runtime
+  ansible.builtin.file:
+    src: "/opt/sssf/runtimes/bun/{{ sssf_bun_version }}/bun-linux-x64/bun"
+    dest: /usr/local/bin/bun
+    state: link
+    force: true
+  when: sssf_visualizer_enabled | bool
+
+- name: Install SSSF visualizer dependencies from its lockfile
+  ansible.builtin.command:
+    argv:
+      - bun
+      - install
+      - --frozen-lockfile
+      - --cwd
+      - "{{ sssf_data_dir }}/upstream/.claude/skills/sssf/apps/visualizer"
   become: true
   become_user: "{{ sssf_runtime_user }}"
   when: sssf_visualizer_enabled | bool
-  changed_when: false
+  changed_when: true
 
 - name: Remove SSSF visualizer unit when disabled
   ansible.builtin.file:

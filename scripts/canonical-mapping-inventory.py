@@ -89,7 +89,7 @@ class InventoryError(ValueError):
 
 FAMILY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("selection", ("enabled_services", "service_runtime", "forgejo_runtime")),
-    ("service_compatibility", ("service_storage",)),
+    ("service_compatibility", ("service_storage", "stateful_service_disable_policies", "stateful_destroy_acknowledged")),
     ("canonical_bootstrap_access", ("bootstrap_ssh_user", "bootstrap_ssh_public_keys")),
     ("canonical_operator_access", ("operator_user", "operator_ssh_public_keys", "operator_dotfiles_", "operator_chezmoi_")),
     ("provider", ("proxmox_",)),

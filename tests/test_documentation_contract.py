@@ -138,7 +138,18 @@ class DocumentationContractTests(unittest.TestCase):
 
     def test_every_public_just_recipe_is_documented(self) -> None:
         docs = (ROOT / "docs" / "just-recipes.md").read_text(encoding="utf-8")
-        recipes = ("apply", "default", "edit-secrets", "plan", "setup", "ssh-initialize", "update", "validate")
+        recipes = (
+            "apply",
+            "default",
+            "edit-secrets",
+            "plan",
+            "setup",
+            "ssh-initialize",
+            "teardown-apply",
+            "teardown-plan",
+            "update",
+            "validate",
+        )
         headings = {
             line.removeprefix("## ").strip().strip("`").split()[0]
             for line in docs.splitlines()

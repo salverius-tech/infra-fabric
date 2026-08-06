@@ -45,6 +45,7 @@ class ServiceRegistryParityTests(unittest.TestCase):
                     runtime: tuple(addresses)
                     for runtime, addresses in config.get("terraform_replace_addresses", {}).items()
                 },
+                "execution_resource": str(config.get("inventory", {}).get("host", "")).strip(),
             }
             for name, config in service_registry["services"].items()
         }

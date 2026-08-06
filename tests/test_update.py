@@ -19,6 +19,11 @@ spec.loader.exec_module(update_script)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_technitium_update_status_matches_manual_checksum_pin_policy(self) -> None:
+        status = "\n".join(update_script.UNMANAGED)
+        self.assertIn("version/checksum changes are operator-reviewed manual pins", status)
+        self.assertNotIn("installed by upstream install script", status)
+
     def fake_release(self, version: str, published_at: datetime) -> bytes:
         return json.dumps(
             {
@@ -90,6 +95,38 @@ class UpdateTests(unittest.TestCase):
 
             self.assertEqual(result.status, "hold")
             self.assertEqual(inventory.read_text(encoding="utf-8"), 'forgejo_version: "12.0.4"\n')
+
+    def test_updates_repository_owned_sssf_pin_and_checksum(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            defaults = root / "infra/ansible/roles/sssf/defaults/main.yml"
+            defaults.parent.mkdir(parents=True)
+            defaults.write_text(
+                "sssf_uv_version: 0.12.0\nsssf_uv_sha256: old\n",
+                encoding="utf-8",
+            )
+            target = next(target for target in update_script.TARGETS if target.name == "SSSF uv runtime")
+            now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+
+            def opener(url: str) -> bytes:
+                if url.endswith("/checksum"):
+                    return b"abc123  uv-x86_64-unknown-linux-gnu.tar.gz\n"
+                return json.dumps(
+                    {
+                        "tag_name": "0.12.1",
+                        "published_at": (now - timedelta(hours=72)).isoformat().replace("+00:00", "Z"),
+                        "html_url": "https://example.invalid/uv",
+                        "assets": [{"name": "sha256.sum", "browser_download_url": "https://example.invalid/checksum"}],
+                    }
+                ).encode("utf-8")
+
+            result = update_script.process_target(target, root, now, timedelta(hours=48), opener)
+
+            self.assertEqual(result.status, "updated")
+            self.assertEqual(
+                defaults.read_text(encoding="utf-8"),
+                "sssf_uv_version: 0.12.1\nsssf_uv_sha256: abc123\n",
+            )
 
     def test_updates_canonical_release_owner(self) -> None:
         document = {

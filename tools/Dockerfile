@@ -19,6 +19,7 @@ RUN apt-get update \
         bash \
         ca-certificates \
         curl \
+        git \
         age \
         gosu \
         jq \

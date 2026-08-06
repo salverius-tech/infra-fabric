@@ -38,9 +38,11 @@ VALUES_SITE=<site> just update
 VALUES_SITE=<site> just validate
 VALUES_SITE=<site> just plan
 VALUES_SITE=<site> just apply
+VALUES_SITE=<site> just teardown-plan
+VALUES_SITE=<site> just teardown-apply --approve
 ```
 
-`edit-secrets` and `ssh-initialize` are explicit protected-input operations. `apply` is the only normal infrastructure mutation operation and requires explicit approval of a fresh verified plan. Private implementation recipes are not operator commands.
+`edit-secrets` and `ssh-initialize` are explicit protected-input operations. `apply` is the only normal infrastructure mutation operation and requires explicit approval of a fresh verified plan. `teardown-plan` and `teardown-apply --approve` are the separate guarded full-site retirement path. Private implementation recipes are not operator commands.
 
 ## Workflow
 

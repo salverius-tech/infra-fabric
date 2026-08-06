@@ -248,7 +248,11 @@
   become: true
   ansible.builtin.user:
     name: root
-    password: "{{ lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | password_hash('sha512', host_identity_root_password_hash_salt) }}"
+    password: >-
+      {{ lookup('env', 'INFRA_BOOTSTRAP_ROOT_PASSWORD') | password_hash(
+        'sha512',
+        ((host_identity_root_password_hash_salt ~ ':' ~ canonical_site ~ ':' ~ canonical_resource) | hash('sha256'))[:16]
+      ) }}
     update_password: always
   no_log: true
   when: host_identity_root_recovery_enabled | bool

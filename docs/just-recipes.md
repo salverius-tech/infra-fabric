@@ -94,6 +94,22 @@ INFRA_ALLOW_STATEFUL_BATCH=1 VALUES_SITE=<site> just apply
 
 These flags do not approve the operation by themselves. They do not authorize router/firewall changes, state surgery, credential rotation, or other work outside the saved plan.
 
+## `teardown-plan`
+
+```bash
+VALUES_SITE=<site> just teardown-plan
+```
+
+Creates and displays a full-site guarded destroy plan. It requires canonical destroy policy and protected-input preflight, then writes private `destroy.tfplan` metadata bound to the selected site, canonical/projection identity, source commit, input hashes, scope, age, and destructive summary. Review it before any teardown apply.
+
+## `teardown-apply`
+
+```bash
+VALUES_SITE=<site> just teardown-apply --approve
+```
+
+Consumes only a fresh verified guarded destroy plan. The literal `--approve` is an explicit acknowledgement, not a substitute for user authorization. Immediately before provider mutation, the wrapper re-verifies metadata, seals an immutable execution snapshot, and snapshots local state. It does not run Ansible after a successful destroy.
+
 ## Canonical artifact locations
 
 For the selected site, derived files are beneath:

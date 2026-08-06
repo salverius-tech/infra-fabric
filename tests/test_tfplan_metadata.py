@@ -330,6 +330,50 @@ class TfplanMetadataTests(unittest.TestCase):
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo, target_service="hermes")
 
+    def test_destroy_metadata_cannot_execute_as_normal_apply(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            data = tfplan_metadata.create_metadata(
+                plan,
+                metadata,
+                repo,
+                24,
+                {"resource_changes": [{"address": "resource.delete", "change": {"actions": ["delete"]}}]},
+                operation="destroy",
+            )
+            self.assertEqual(data["operation"], "destroy")
+            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "operation differs"):
+                tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
+            tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True, operation="destroy")
+
+    def test_destroy_metadata_rejects_targeted_scope(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir, self.assertRaisesRegex(tfplan_metadata.MetadataError, "destroy plan cannot target"):
+            tfplan_metadata.create_metadata(
+                plan,
+                metadata,
+                repo,
+                24,
+                {"resource_changes": []},
+                target_service="forgejo",
+                operation="destroy",
+            )
+
+    def test_destroy_summary_has_no_normal_apply_acknowledgement(self) -> None:
+        text = tfplan_metadata.format_plan_summary(
+            {
+                "resource_changes": {"create": 0, "update": 0, "replace": 0, "delete": 1},
+                "destructive": True,
+                "destructive_changes": [{"address": "resource.delete", "actions": "delete"}],
+                "stateful_changes": [],
+                "stateful_targets": [],
+                "stateful_services": [],
+            },
+            operation="destroy",
+        )
+        self.assertIn("Guarded teardown apply", text)
+        self.assertNotIn("INFRA_ALLOW_DESTROY", text)
+
     def test_replacement_scope_requires_matching_target_service(self) -> None:
         with self.assertRaises(tfplan_metadata.MetadataError):
             tfplan_metadata.plan_scope("forgejo", "hermes")

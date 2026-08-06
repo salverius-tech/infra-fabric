@@ -1,85 +1,40 @@
 # Canonical teardown and site retirement
 
-There is no normal `just destroy` recipe. Destruction is an explicit OpenTofu workflow because it removes resources and may remove durable service data.
+Teardown is a separate guarded full-site workflow because it removes resources and may remove durable service data. There is no unguarded `just destroy` recipe and direct OpenTofu lifecycle commands are not supported operator paths.
 
 ## Before teardown
 
 1. Confirm the selected site and lifecycle policy.
 2. Confirm the site is not production or protected.
 3. Decide whether service-state backups are required. Do not create backups automatically if the site is intentionally disposable.
-4. Ensure no other apply, plan, restore, or state operation is running.
+4. Ensure every controller uses the repository wrappers on the same selected-site filesystem. The wrapper holds the site lock while the plan or teardown executes; it is not a distributed lock.
 5. Do not remove host-key material until the destroy has completed.
 
-The destroy plan is the review boundary. Never run a blind `tofu destroy` against a shared or production state.
+The saved destroy plan is the review boundary. The wrapper binds it to its hash, expiration, site, canonical model/projection identity, Git commit, input hashes, full-site scope, and destructive summary. Never bypass that boundary against a shared or production state.
 
 ## Plan the teardown
 
 From the repository root, replace `<site>` with the selected site:
 
 ```bash
-SOPS_AGE_KEY_FILE="$HOME/.config/infra-fabric/keys/<site>/site.age" \
-VALUES_SITE=<site> \
-INFRA_VALUES_DIR=values/sites/<site> \
-INFRA_COPY_SSH_KEYS=true \
-INFRA_SSH_IDENTITY_SOURCE=sops \
-scripts/run-infra.sh bash -euo pipefail -c '
-  python scripts/workspace-preflight.py --require-values --require-secrets
-  python scripts/settings.py policy --action destroy --canonical
-  tofu -chdir=infra/opentofu init
-
-  destroy_plan="${INFRA_VALUES_DIR}/.destroy.tfplan"
-  rm -f "${destroy_plan}"
-  destroy_command=(
-    tofu -chdir=infra/opentofu plan
-    -destroy
-    -var-file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"
-    -state="../../${INFRA_VALUES_DIR}/terraform.tfstate"
-    -out="../../${destroy_plan}"
-  )
-  python scripts/canonical-provider-env.py -- "${destroy_command[@]}"
-  tofu -chdir=infra/opentofu show "../../${destroy_plan}"
-'
+VALUES_SITE=<site> just teardown-plan
 ```
 
 Review the complete output. Confirm that the resources, storage, image/template artifacts, and outputs belong only to the selected site. If the plan is unexpected, stop and correct the canonical inputs or state reconciliation before applying.
 
 ## Apply the teardown
 
-After explicit approval of the reviewed destroy plan:
+After explicit approval of the reviewed destroy plan, use the literal approval argument:
 
 ```bash
-SOPS_AGE_KEY_FILE="$HOME/.config/infra-fabric/keys/<site>/site.age" \
-VALUES_SITE=<site> \
-INFRA_VALUES_DIR=values/sites/<site> \
-INFRA_COPY_SSH_KEYS=true \
-INFRA_SSH_IDENTITY_SOURCE=sops \
-scripts/run-infra.sh bash -euo pipefail -c '
-  python scripts/workspace-preflight.py --require-values --require-secrets
-  python scripts/settings.py policy --action destroy --canonical
-
-  destroy_plan="${INFRA_VALUES_DIR}/.destroy.tfplan"
-  test -f "${destroy_plan}"
-  apply_command=(
-    tofu -chdir=infra/opentofu apply
-    -state="../../${INFRA_VALUES_DIR}/terraform.tfstate"
-    "../../${destroy_plan}"
-  )
-  python scripts/canonical-provider-env.py -- "${apply_command[@]}"
-  rm -f "${destroy_plan}"
-'
+VALUES_SITE=<site> just teardown-apply --approve
 ```
 
-If the apply fails, retain the plan and state for diagnosis. Do not delete state or host-key files until the actual resource result is understood.
+Immediately before mutation, the wrapper re-verifies the reviewed metadata, seals an immutable execution snapshot, and creates a local state snapshot. The destroy plan artifacts are consumed after the attempt; retain the state snapshot, execution snapshot, and host-key material for diagnosis. Do not delete state or host-key files until the actual resource result is understood.
 
 ## After successful teardown
 
-Verify that the selected state has no resources:
-
-```bash
-VALUES_SITE=<site> INFRA_VALUES_DIR=values/sites/<site> \
-scripts/run-infra.sh bash -euo pipefail -c \
-  'tofu -chdir=infra/opentofu state list -state="../../${INFRA_VALUES_DIR}/terraform.tfstate"'
-```
+Run a fresh `VALUES_SITE=<site> just plan` only after separately approving the read-only provider contact. Do not use raw state commands to decide whether teardown completed.
 
 For a permanently retired disposable site, remove only artifacts that are no longer needed:
 

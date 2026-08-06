@@ -7,7 +7,7 @@
 **Starting commit:** `f5b4b48192f3ff36771f3c8e14528e6bcd904407`
 **Recommended execution model:** `gpt-5.6-terra`
 
-**Implementation progress (2026-08-05):** Package S2 is source-complete with focused regression evidence. Package S3 is in progress: site-scoped locking, immutable reviewed-input execution, immediate pre-mutation re-verification, and local-state snapshot/restore primitives are implemented; guarded teardown remains outstanding. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses.
+**Implementation progress (2026-08-05):** Packages S2, S3, and O2 are source-complete with focused regression evidence. Package O1 has completed the repository-local HTTPS diagnostics header, structural contract, and role argument-spec work; Hermes Control upstream/repository and live guest acceptance remain separately unverified. O3 now removes the SSSF uv/Pi/Bun remote installers in favor of SHA-256-verified controller-side artifacts, includes managed repository-pin updates, and makes Bun cache acquisition conditional on the visualizer; wider convergence reporting and a unified artifact contract remain open. Q1 now derives host-identity root-recovery password salts from canonical site/resource identity; the broader idempotence, tags, and check-mode package remains open. Q2 now validates VM/LXC identity, compute, disk, network, and module-specific extra-disk or mount-path contracts at reusable module boundaries, and constrains the Proxmox provider consistently to the reviewed `~> 0.88` series; projection completeness, aliases, moved-state contracts, and external mapping evidence remain open. S3 includes separate metadata-bound guarded teardown planning/application, immutable execution snapshots, immediate pre-mutation re-verification, local-state snapshot/restore primitives, and single-controller enforcement. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses.
 
 ## Model recommendation
 
@@ -305,13 +305,13 @@ fix: unify canonical secret preflight and delivery
 
 Audit coverage: **H8, H12, M3**, parts of **M15**.
 
-- [ ] Implement a metadata-bound destroy planner/apply helper using plan hash, age, site, model/projection digest, Git commit, scope, input hashes, destructive summary, and explicit approval.
-- [ ] Remove raw destroy/apply commands from operator documentation.
+- [x] Implement a metadata-bound destroy planner/apply helper using plan hash, age, site, model/projection digest, Git commit, scope, input hashes, destructive summary, and explicit approval.
+- [x] Remove raw destroy/apply commands from operator documentation.
 - [x] Hold a site-scoped lock from pre-apply verification through storage preparation, OpenTofu apply, and Ansible orchestration.
 - [x] Consume an immutable private execution snapshot of plan, metadata, projections, and protected-input identity.
 - [x] Make post-apply verification diagnostic rather than the first drift detection.
 - [x] Implement source-level local-state backup primitives: restrictive permissions, checksum, atomic snapshot, retention, and tested restore validation against disposable fixtures.
-- [ ] Do not choose a remote backend without an approved decision.
+- [x] Do not choose a remote backend without an approved decision.
 - [x] Document/enforce single-controller operation until distributed locking is approved.
 - [x] Add race/change tests around verification and use boundaries.
 
@@ -343,9 +343,9 @@ Milestone verification:
 
 Audit coverage: **H9, M18**, Hermes Control tracker.
 
-- [ ] Correct the HTTPS diagnostics authorization header.
-- [ ] Add a non-secret structural/render test proving variable use without exposing token contents.
-- [ ] Add `argument_specs` for Hermes Control and reconcile parent-role inputs.
+- [x] Correct the HTTPS diagnostics authorization header.
+- [x] Add a non-secret structural/render test proving variable use without exposing token contents.
+- [x] Add `argument_specs` for Hermes Control and reconcile parent-role inputs.
 - [ ] Reconcile all Hermes Control tracker items against current source; implement outstanding source-level tasks that do not require live deployment.
 - [ ] Keep live guest and service acceptance explicitly unverified.
 
@@ -359,10 +359,10 @@ fix: complete hermes control source contract
 
 Audit coverage: **H3, M1**.
 
-- [ ] Add a canonical execution-resource key using resource ID/inventory host.
-- [ ] Serialize services sharing the same execution resource while retaining parallelism across distinct hosts.
-- [ ] Test onramp applications, independent guests, failures, and dependency ordering.
-- [ ] Remove, guard, or clearly quarantine `site.yml` so it cannot act as a competing orchestration authority.
+- [x] Add a canonical execution-resource key using resource ID/inventory host.
+- [x] Serialize services sharing the same execution resource while retaining parallelism across distinct hosts.
+- [x] Test onramp applications, independent guests, failures, and dependency ordering.
+- [x] Remove, guard, or clearly quarantine `site.yml` so it cannot act as a competing orchestration authority.
 
 Commit boundary:
 
@@ -374,14 +374,14 @@ fix: serialize ansible services by managed host
 
 Audit coverage: **H2, H11, M8**, parts of **L3**.
 
-- [ ] Require checksum fields whenever the generic VM module downloads an image.
-- [ ] Prefer verified top-level image acquisition and pass immutable file IDs to modules.
-- [ ] Ensure Forgejo VM creation always verifies image content.
-- [ ] Pin Infisical PostgreSQL and Redis images by digest in both deployment modes.
-- [ ] Replace Tailscale/uv/Pi/Bun network installers with signed repositories or immutable checksum-pinned artifacts.
+- [x] Require checksum fields whenever the generic VM module downloads an image.
+- [x] Prefer verified top-level image acquisition and pass immutable file IDs to modules.
+- [x] Ensure Forgejo VM creation always verifies image content.
+- [x] Pin Infisical PostgreSQL and Redis images by digest in both deployment modes.
+- [x] Replace Tailscale/uv/Pi/Bun network installers with signed repositories or immutable checksum-pinned artifacts.
 - [ ] Report changes accurately.
 - [ ] Add an integrity contract test covering every production image and network installer.
-- [ ] Add managed update paths for newly pinned artifacts.
+- [x] Add managed update paths for newly pinned artifacts.
 
 Commit boundary:
 

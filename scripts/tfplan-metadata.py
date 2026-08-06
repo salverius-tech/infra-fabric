@@ -26,8 +26,9 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     from canonical_values import load_site, model_digest
     from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 DEFAULT_MAX_AGE_HOURS = 24
+PLAN_OPERATIONS = frozenset({"apply", "destroy"})
 INPUT_GLOBS = (
     "infra/opentofu/**/*.tf",
     "infra/opentofu/.terraform.lock.hcl",
@@ -231,7 +232,7 @@ def summarize_plan(plan_json: dict[str, Any], repo: Path | None = None) -> dict[
     }
 
 
-def format_plan_summary(summary: dict[str, Any]) -> str:
+def format_plan_summary(summary: dict[str, Any], *, operation: str = "apply") -> str:
     counts = summary.get("resource_changes", {})
     lines = [
         "OpenTofu plan summary:",
@@ -251,7 +252,10 @@ def format_plan_summary(summary: dict[str, Any]) -> str:
         remaining = len(destructive_changes) - 20
         if remaining > 0:
             lines.append(f"  ... and {remaining} more")
-        lines.append("Apply is gated. Set INFRA_ALLOW_DESTROY=1 only after review.")
+        if plan_operation(operation) == "destroy":
+            lines.append("Guarded teardown apply requires a reviewed destroy plan and explicit --approve.")
+        else:
+            lines.append("Apply is gated. Set INFRA_ALLOW_DESTROY=1 only after review.")
     else:
         lines.append("Destructive changes: none")
     stateful_targets = summary.get("stateful_targets", [])
@@ -269,6 +273,12 @@ def plan_scope(target_service: str = "", replace_service: str = "") -> dict[str,
     if replace_service and target_service != replace_service:
         raise MetadataError("A replacement plan must target the same service.")
     return {"target_service": target_service, "replace_service": replace_service}
+
+
+def plan_operation(operation: str) -> str:
+    if operation not in PLAN_OPERATIONS:
+        raise MetadataError("Saved tfplan operation is invalid. Run `just plan` again.")
+    return operation
 
 
 def selected_site(repo: Path) -> str | None:
@@ -327,11 +337,15 @@ def create_metadata(
     plan_json: dict[str, Any] | None = None,
     target_service: str = "",
     replace_service: str = "",
+    operation: str = "apply",
 ) -> dict[str, Any]:
     if not plan.is_file():
         raise MetadataError(f"Missing plan file: {plan}")
     now = datetime.now(timezone.utc)
     summary = summarize_plan(plan_json if plan_json is not None else load_plan_json(plan, repo), repo)
+    operation = plan_operation(operation)
+    if operation == "destroy" and (target_service or replace_service):
+        raise MetadataError("A destroy plan cannot target or replace one service.")
     data: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "created_at": now.isoformat(),
@@ -344,6 +358,7 @@ def create_metadata(
             "sha256": sha256_file(plan),
         },
         "summary": summary,
+        "operation": operation,
         "scope": plan_scope(target_service, replace_service),
         "inputs": matching_inputs(repo),
     }
@@ -401,6 +416,7 @@ def load_metadata(metadata: Path) -> dict[str, Any]:
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     if data.get("site") is not None and not isinstance(data.get("site"), str):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
+    data["operation"] = plan_operation(data.get("operation"))
     data["canonical"] = validate_canonical_identity(data.get("canonical"))
     scope = data.get("scope")
     if not isinstance(scope, dict) or not all(isinstance(scope.get(key), str) for key in ("target_service", "replace_service")):
@@ -418,10 +434,13 @@ def verify_metadata(
     allow_stateful_batch: bool = False,
     target_service: str = "",
     replace_service: str = "",
+    operation: str = "apply",
 ) -> None:
     if not plan.is_file():
         raise MetadataError("Saved tfplan is missing. Run `just plan` again.")
     data = load_metadata(metadata)
+    if data["operation"] != plan_operation(operation):
+        raise MetadataError("Saved tfplan operation differs from this execution. Run `just plan` again.")
 
     try:
         expires_at = datetime.fromisoformat(data["expires_at"])
@@ -481,6 +500,7 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--print-summary", action="store_true")
     create.add_argument("--target-service", default="")
     create.add_argument("--replace-service", default="")
+    create.add_argument("--operation", choices=tuple(sorted(PLAN_OPERATIONS)), default="apply")
 
     verify = subparsers.add_parser("verify")
     verify.add_argument("--plan", type=Path, required=True)
@@ -489,6 +509,7 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--allow-stateful-batch", action="store_true")
     verify.add_argument("--target-service", default="")
     verify.add_argument("--replace-service", default="")
+    verify.add_argument("--operation", choices=tuple(sorted(PLAN_OPERATIONS)), default="apply")
 
     summary = subparsers.add_parser("summary")
     summary.add_argument("--metadata", type=Path, required=True)
@@ -504,9 +525,10 @@ def main(argv: list[str] | None = None) -> int:
                 args.max_age_hours,
                 target_service=args.target_service,
                 replace_service=args.replace_service,
+                operation=args.operation,
             )
             if args.print_summary:
-                print(format_plan_summary(data["summary"]))
+                print(format_plan_summary(data["summary"], operation=data["operation"]))
         elif args.command == "verify":
             verify_metadata(
                 args.plan,
@@ -516,9 +538,11 @@ def main(argv: list[str] | None = None) -> int:
                 args.allow_stateful_batch,
                 args.target_service,
                 args.replace_service,
+                args.operation,
             )
         elif args.command == "summary":
-            print(format_plan_summary(load_metadata(args.metadata)["summary"]))
+            data = load_metadata(args.metadata)
+            print(format_plan_summary(data["summary"], operation=data["operation"]))
     except MetadataError as error:
         print(error, file=sys.stderr)
         return 1

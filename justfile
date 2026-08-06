@@ -121,3 +121,15 @@ apply:
     scripts/require-site-context.sh
     just check-values
     scripts/apply-infra.sh
+
+# Create a guarded full-site destroy plan; review before the separately approved teardown apply
+teardown-plan:
+    scripts/require-site-context.sh
+    just check-values
+    scripts/teardown-infra.sh plan
+
+# Apply the reviewed guarded destroy plan; requires literal --approve
+teardown-apply approval="":
+    scripts/require-site-context.sh
+    just check-values
+    scripts/teardown-infra.sh apply "{{approval}}"
