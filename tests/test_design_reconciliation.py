@@ -176,70 +176,42 @@ class DesignReconciliationTests(unittest.TestCase):
                     "open-question",
                 )
 
-    def test_current_genuine_questions_are_lossless_and_consolidated_with_provenance(
-        self,
-    ):
-        decisions = [
+    def test_approved_decisions_are_retained_without_unresolved_questions(self):
+        unresolved = [
             record
             for record in self.ledger["records"]
             if record["source"]["kind"] == "open-question"
+            or record["package"] == "DECISIONS"
         ]
-        self.assertEqual(len(decisions), 12)
+        self.assertEqual(unresolved, [])
+        approved = [
+            record
+            for record in self.ledger["records"]
+            if record["source"]["path"]
+            == ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md"
+            and record["source"]["heading"] == "Approved decision record — 2026-08-06"
+            and record["summary"].startswith("**Decision D")
+        ]
+        self.assertEqual(len(approved), 10)
         self.assertEqual(
-            len(
-                [record for record in decisions if record["disposition"] != "duplicate"]
-            ),
-            10,
+            {record["summary"].split(" — ", 1)[0] for record in approved},
+            {f"**Decision D{number}" for number in range(1, 11)},
         )
-        self.assertEqual(
-            sum(record["disposition"] == "duplicate" for record in decisions), 2
-        )
-        self.assertEqual(
-            len(
-                [
-                    record
-                    for record in self.ledger["records"]
-                    if record["package"] == "DECISIONS"
-                ]
-            ),
-            12,
-        )
-        self.assertFalse(
-            [
-                record
-                for record in self.ledger["records"]
-                if record["source"]["kind"] == "decision"
-            ]
-        )
-        self.assertEqual(
-            {record["source"]["path"] for record in decisions},
-            {
-                "docs/hermes-operator-pilot-prd.md",
-                ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-            },
-        )
-        for record in decisions:
-            self.assertTrue(record["source_identity"])
-            self.assertEqual(record["decision_contract"]["owner"], "unassigned")
-            self.assertEqual(record["decision_contract"]["trigger"], "")
-            self.assertEqual(record["decision_contract"]["deadline"], "")
-            self.assertEqual(record["decision_contract"]["dependency_ids"], [])
-            self.assertEqual(record["decision_contract"]["options"], [])
-            if record["disposition"] == "duplicate":
-                self.assertIn(
-                    record["duplicate_of"], {item["id"] for item in decisions}
-                )
+        self.assertTrue(all(record["decision_contract"] is None for record in approved))
 
-    def test_decision_register_separates_canonical_question_from_duplicate_provenance(
-        self,
-    ):
+    def test_decision_register_records_that_no_questions_remain(self):
         register = self.module.artifacts(
             self.register, self.ledger, self.backlog, self.coverage
         )[self.module.RECON / "decision-register.md"]
         self.assertIn("## Canonical unresolved questions", register)
         self.assertIn("## Duplicate source provenance", register)
-        self.assertEqual(
-            register.count("Which Hermes actions are in scope for the first pilot"), 1
+        self.assertIn(
+            "No explicit unresolved operator/product questions were extracted.",
+            register,
+        )
+        self.assertIn("No duplicate source questions.", register)
+        self.assertNotIn(
+            "Which Hermes actions are in scope for the first pilot", register
         )
 
     def test_historical_decision_with_named_successor_is_superseded_not_open(self):
@@ -257,9 +229,8 @@ class DesignReconciliationTests(unittest.TestCase):
         self.assertIsNone(record["decision_contract"])
 
     def test_current_extraction_count_and_source_identities_are_preserved(self):
-        # The original 904 claims remain; twelve previously missed authoritative
-        # list-item claims and one tracked operations claim extend the ledger without
-        # replacing source provenance.
+        # Approved decision records replace the former open-question records while
+        # preserving the declared extraction universe and stable source identities.
         self.assertEqual(len(self.ledger["records"]), 917)
         source_paths = {source["path"] for source in self.register["sources"]}
         self.assertIn("docs/service-operations.md", source_paths)

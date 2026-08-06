@@ -1,6 +1,6 @@
 # Wave 14: DECISIONS — Explicit operator/product decisions
 Source status: **evidence-required**. Source disposition: **blocked-external**. External status: **blocked-external**.
 Dependencies: none.
-Ledger records: recon-open-question-ddd39b03e3334cf5, recon-open-question-6ee9d06283feea00, recon-open-question-95333eb886ffe2b4, recon-open-question-be64460ced4c9bd3, recon-open-question-eb86f57df8987ea9, recon-open-question-0a0b20a2c71d09ed, recon-open-question-af01bfba1bd4d97b, recon-open-question-3019c450883c7477, recon-open-question-d70459d1a290222d, recon-open-question-f41d01cf73b19daf, recon-open-question-f5c52449e956928e, recon-open-question-17f05123e73d1bb4.
+Ledger records: none.
 Package evidence: evidence required.
-Evidence citations: .hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:161, .hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:162, .hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:163, .hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:164, .hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:165, .hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:166, docs/hermes-operator-pilot-prd.md:156, docs/hermes-operator-pilot-prd.md:157, docs/hermes-operator-pilot-prd.md:158, docs/hermes-operator-pilot-prd.md:159, docs/hermes-operator-pilot-prd.md:160, docs/hermes-operator-pilot-prd.md:161.
+Evidence citations: none.

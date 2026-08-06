@@ -156,16 +156,79 @@ Tasks:
 - [ ] Mark provider/live/recovery acceptance items `implemented-unverified` or `evidence-required` as appropriate.
 - [ ] Generate the initial canonical backlog and dependency graph.
 
-Decisions that must not be guessed:
+## Approved decision record — 2026-08-06
 
-- durable local-state single-controller policy versus remote locking backend;
-- final ownership/retirement trigger for temporary `searxng_onramp`;
-- Hermes operator local apply versus Forgejo workflow semantics;
-- required durable audit trail for operator actions;
-- compatibility-window end and legacy-removal authorization;
-- provider/live/recovery environments used for final acceptance.
+These decisions were reviewed interactively in order. They are design authority for
+future work; recording them does not authorize implementation, private-values
+mutation, provider contact, live changes, or Phase 9 execution.
 
-If these decisions block source work, stop with options and affected ledger IDs. Otherwise defer only the dependent acceptance package.
+- **Decision D1 — State and locking policy.** Keep local state under a designated
+   single-controller/single-writer policy. All mutation uses the supported wrappers
+   and shared site lock. Read-only work may run elsewhere, but a reviewed
+   remote-locking backend is required before enabling a second independent mutation
+   controller.
+- **Decision D2 — Temporary SearXNG ownership.** `infra-fabric` remains the temporary
+   owner of
+   `searxng_onramp` until `onramp-vNext` proves deployment, secret delivery, proxy,
+   health, rollback, backup/restore, Hermes consumption, development cutover, and
+   rollback readiness. Retirement is evidence-triggered rather than date-triggered.
+- **Decision D3 — Hermes/Forgejo execution semantics.** Hermes may eventually request
+   apply only
+   through the designated controller's local `scripts/hermes-operator.py` →
+   `just apply` path. Forgejo provides validation and monitoring, not infrastructure
+   mutation, while state is local. There must not be two apply authorities.
+- **Decision D4 — Durable audit contract.** Mutations require a private
+   controller-owned,
+   append-only, tamper-evident and externally backed-up audit journal. A mutation
+   fails closed unless its sanitized pre-execution record is durable; completion or
+   failure uses the same correlation ID. Hermes may not edit or delete audit history.
+- **Decision D5 — Compatibility retirement.** Normal setup, validate, plan, apply,
+   teardown,
+   Ansible, and runtime workflows are canonical-only now. Legacy inputs fail
+   explicitly. Bounded forensic discovery/recovery tooling remains quarantined until
+   canonical rebuild and recovery acceptance passes and the operator separately
+   authorizes permanent removal.
+- **Decision D6 — Acceptance environments.** Use separate disposable development,
+   isolated
+   recovery-rehearsal, and production environment roles. Production derives only
+   from its own canonical source and never from development. Destructive recovery
+   rehearsal does not run against active production.
+- **Decision D7 — First Hermes pilot scope.** The initial pilot is read-only: status,
+   validate,
+   plan, sanitized summaries, and read-only Forgejo monitoring. `/infra-apply` is a
+   separately activated extension only after durable audit, trustworthy approval
+   identity, development acceptance, and recovery verification. Private-value writes,
+   Git publication, teardown, state surgery, restore, and credential mutation are
+   excluded.
+- **Decision D8 — Onramp substrate handoff.** Expose a versioned, identity-bound,
+   non-secret
+   contract for one Debian 13 VM shared-host substrate. `infra-fabric` owns Proxmox
+   lifecycle, network, storage, host security, rootless Podman prerequisites, and base
+   proxy capability; `onramp-vNext` owns application definitions and lifecycle. It
+   receives neither Proxmox authority nor generated-file edit authority.
+- **Decision D9 — Future private-values edits.** Hermes and the language model do not
+   edit raw
+   private files. A post-pilot feature may orchestrate expiring typed proposals whose
+   actual values enter through a protected controller-local interface outside
+   transcripts. Applying, committing, and pushing the private repository remain
+   separate approvals; secret edits remain SOPS-aware protected operations.
+- **Decision D10 — Hermes-independent recovery.** Hermes is optional and is recovered
+   last. A trusted controller restores reviewed public/private repository identities,
+   external identities, state, host trust, audit continuity, and services in
+   dependency order, using the same canonical `just` workflows. Primary-audit outage
+   requires a protected append-only emergency journal, not unaudited mutation.
+
+Decision-driven follow-up work remains separately authorized:
+
+- document and enforce the single-controller and canonical-only policy boundaries;
+- implement durable audit persistence before enabling Hermes apply;
+- add read-only Forgejo monitoring and keep the first pilot mutation-disabled;
+- define and test the versioned Onramp handoff projection before retiring the
+  temporary SearXNG contract;
+- design the protected private-values proposal mechanism only after pilot acceptance;
+- document and rehearse the Hermes-independent controller recovery procedure; and
+- execute the environment-specific evidence sequence only through the separately
+  approved Phase 9 gates.
 
 Required verification:
 
@@ -547,7 +610,7 @@ Tasks:
 - [x] Run `scripts/validate-public.sh` in a fresh detached worktree.
 - [x] Run public-safety checks and secret-pattern scans.
 - [x] Run `git diff --check` and inspect commit history for coherent packages.
-- [ ] Push the completed source-level branch.
+- [x] Push the completed source-level branch; local and upstream revisions were verified to match after publication.
 
 Required final report:
 

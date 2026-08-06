@@ -151,11 +151,24 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 - Private values could leak through summaries, logs, dashboard output, or copied command output.
 - Disabled services that still exist in state could confuse operators unless the UI distinguishes configured, enabled, deployed, reachable, and maintained states.
 
-## Open questions
+## Resolved pilot decisions
 
-- Which Hermes actions are in scope for the first pilot: status only, validate, plan, apply, private values commits, or Forgejo workflow monitoring?
-- Should Hermes trigger `just apply` locally, trigger Forgejo Actions, or support both with different approval paths?
-- What is the minimum audit trail required for an operator-approved apply?
-- Which onramp-host provisioning shape should a future infrastructure plan expose to `onramp-vNext`?
-- How should Hermes safely support edits to `values/` without exposing private values in transcripts or summaries?
-- What recovery path should be documented when Hermes is unavailable but infrastructure needs maintenance?
+The ten approved decisions and their implementation boundaries are recorded in the
+[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record--2026-08-06).
+For this pilot specifically:
+
+- The initial Hermes surface is read-only: status, validate, plan, sanitized
+  summaries, and read-only Forgejo monitoring.
+- A future `/infra-apply` extension may use only the designated controller's local
+  guarded apply path. Forgejo does not become a second apply authority while state is
+  local.
+- Mutation activation requires durable private append-only audit persistence,
+  trustworthy approval identity, development acceptance, and recovery verification.
+- The Onramp handoff is a versioned non-secret Debian 13 VM shared-host substrate;
+  Onramp owns applications but receives no Proxmox lifecycle authority.
+- Private-values editing is excluded from the pilot. Any future feature uses typed,
+  expiring proposals and a protected input channel outside transcripts, with separate
+  apply, commit, and push approvals.
+- Hermes is not a recovery dependency. Trusted operators retain the same canonical
+  controller workflow, audit continuity, and dependency-ordered recovery path when
+  Hermes is unavailable.
