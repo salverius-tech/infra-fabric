@@ -74,11 +74,11 @@ validate:
 edit-secrets SITE="dev":
     @site_arg="{{SITE}}"; site="${site_arg#SITE=}"; VALUES_SITE="${site}" bash -c 'set -euo pipefail; source scripts/site-context.sh; require_site_context; require_canonical_authority; values_dir="$(site_values_dir)"; SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${HOME}/.config/infra-fabric/keys/${VALUES_SITE}/site.age}"; export SOPS_AGE_KEY_FILE; [[ -f "${SOPS_AGE_KEY_FILE}" && -r "${SOPS_AGE_KEY_FILE}" ]] || { printf "External site age identity is missing or unreadable: %s\\n" "${SOPS_AGE_KEY_FILE}" >&2; exit 2; }; [[ -f "${values_dir}/.sops.yaml" && -f "${values_dir}/secrets.sops.yaml" ]] || { printf "Selected site SOPS policy or bundle is missing: %s\\n" "${values_dir}" >&2; exit 2; }; sops_bin="$(command -v sops || true)"; [[ -n "${sops_bin}" ]] || [[ -x "${HOME}/.local/bin/sops" ]] && sops_bin="${sops_bin:-${HOME}/.local/bin/sops}"; if [[ -n "${sops_bin}" ]]; then SOPS_EDITOR="${SOPS_EDITOR:-${EDITOR:-vi}}" "${sops_bin}" --config "${values_dir}/.sops.yaml" edit "${values_dir}/secrets.sops.yaml"; else source scripts/container-secret-transport.sh; transport_prepare; docker compose run --rm "${transport_compose_mount_args[@]}" "${transport_compose_env_args[@]}" infra sops --config "/workspace/${values_dir}/.sops.yaml" edit "/workspace/${values_dir}/secrets.sops.yaml"; fi'
 
-# Check upstream releases and update eligible pinned versions after the safety hold period
-update:
+# Check upstream releases and update eligible pinned versions after the safety hold period; pass --dry-run to report without writes
+update *args:
     scripts/require-site-context.sh
     source scripts/site-context.sh; require_canonical_authority
-    scripts/python.sh scripts/update.py
+    scripts/python.sh scripts/update.py {{args}}
 
 # Show recent Forgejo Actions runs for the private values repo
 [private]

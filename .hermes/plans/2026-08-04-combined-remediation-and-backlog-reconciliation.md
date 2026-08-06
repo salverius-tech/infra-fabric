@@ -7,7 +7,7 @@
 **Starting commit:** `f5b4b48192f3ff36771f3c8e14528e6bcd904407`
 **Recommended execution model:** `gpt-5.6-terra`
 
-**Implementation progress (2026-08-05):** Packages S2, S3, and O2 are source-complete with focused regression evidence. Package O1 has completed the repository-local HTTPS diagnostics header, structural contract, and role argument-spec work; Hermes Control upstream/repository and live guest acceptance remain separately unverified. O3 now removes the SSSF uv/Pi/Bun remote installers in favor of SHA-256-verified controller-side artifacts, includes managed repository-pin updates, and makes Bun cache acquisition conditional on the visualizer; wider convergence reporting and a unified artifact contract remain open. Q1 now derives host-identity root-recovery password salts from canonical site/resource identity; the broader idempotence, tags, and check-mode package remains open. Q2 now validates VM/LXC identity, compute, disk, network, and module-specific extra-disk or mount-path contracts at reusable module boundaries, and constrains the Proxmox provider consistently to the reviewed `~> 0.88` series; projection completeness, aliases, moved-state contracts, and external mapping evidence remain open. S3 includes separate metadata-bound guarded teardown planning/application, immutable execution snapshots, immediate pre-mutation re-verification, local-state snapshot/restore primitives, and single-controller enforcement. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses.
+**Implementation progress (2026-08-05):** Packages S2, S3, and O2 are source-complete with focused regression evidence. Package O1 has completed the repository-local HTTPS diagnostics header, structural contract, and role argument-spec work; Hermes Control upstream/repository and live guest acceptance remain separately unverified. O3 now removes the SSSF uv/Pi/Bun remote installers in favor of SHA-256-verified controller-side artifacts, includes managed repository-pin updates, and makes Bun cache acquisition conditional on the visualizer; wider convergence reporting and a unified artifact contract remain open. Q3 now has non-mutating `just update --dry-run` behavior through both repository-owned and canonical update paths; catalog-derived policy/status reporting and end-to-end catalog output coverage remain open. Q1 now derives host-identity root-recovery password salts from canonical site/resource identity; the broader idempotence, tags, and check-mode package remains open. Q2 now validates VM/LXC identity, compute, disk, network, and module-specific extra-disk or mount-path contracts at reusable module boundaries, and constrains the Proxmox provider consistently to the reviewed `~> 0.88` series; projection completeness, aliases, moved-state contracts, and external mapping evidence remain open. S3 includes separate metadata-bound guarded teardown planning/application, immutable execution snapshots, immediate pre-mutation re-verification, local-state snapshot/restore primitives, and single-controller enforcement. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses.
 
 ## Model recommendation
 
@@ -428,7 +428,7 @@ Audit coverage: **M6, M7, L7**, outstanding W1/W3/W5 items.
 
 - [ ] Add reusable module validation for VMID, CPU, memory, disk, address/gateway, MAC, VLAN, mount paths, and unique disk interfaces.
 - [ ] Add projection completeness checks for conditionally required root variables.
-- [ ] Align the provider compatibility constraint to the reviewed pre-1.0 series.
+- [x] Align the provider compatibility constraint to the reviewed pre-1.0 series.
 - [ ] Update stale HCL descriptions that direct edits to generated/legacy files.
 - [ ] Reduce compatibility aliases through typed resource/service objects without changing resource addresses.
 - [ ] Preserve moved blocks and add state-address contract tests.
@@ -444,11 +444,11 @@ refactor: tighten canonical opentofu contracts
 
 Audit coverage: **M9**.
 
-- [ ] Process repository-owned tool pins regardless of canonical site mode.
+- [x] Process repository-owned tool pins regardless of canonical site mode.
 - [ ] Derive service release/update status from the catalog.
-- [ ] Remove stale Technitium output.
+- [x] Remove stale Technitium output.
 - [ ] Add end-to-end update dry-run/output tests.
-- [ ] Ensure newly immutable runtime dependencies participate in managed update policy.
+- [x] Ensure newly immutable runtime dependencies participate in managed update policy.
 
 Commit boundary:
 

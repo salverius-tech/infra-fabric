@@ -298,6 +298,7 @@ def process_target(
     now: datetime,
     min_age: timedelta,
     opener: Callable[[str], bytes] | None = None,
+    dry_run: bool = False,
 ) -> UpdateResult:
     current, text = read_current(target, root)
     if text is None:
@@ -339,7 +340,8 @@ def process_target(
 
     checksum = checksum_for_release(target, release, opener)
     updated = replace_version(target, text, release, checksum)
-    (root / target.path).write_text(updated, encoding="utf-8", newline="\n")
+    if not dry_run:
+        (root / target.path).write_text(updated, encoding="utf-8", newline="\n")
     return UpdateResult(
         target.name,
         target.path,
@@ -377,6 +379,7 @@ def process_canonical_target(
     now: datetime,
     min_age: timedelta,
     opener: Callable[[str], bytes] | None = None,
+    dry_run: bool = False,
 ) -> tuple[UpdateResult, bool]:
     if target.canonical_path is None:
         return UpdateResult(target.name, Path("values/sites/<site>/site.yaml"), None, None, "skip", "no canonical owner"), False
@@ -396,14 +399,16 @@ def process_canonical_target(
         hours = int(remaining.total_seconds() // 3600)
         minutes = int((remaining.total_seconds() % 3600) // 60)
         return UpdateResult(target.name, display_path, current_value, release.version, "hold", f"published {release.published_at.isoformat()}; wait {hours}h {minutes}m more ({release.url})"), False
-    set_canonical_value(document, target.canonical_path, release.version)
-    return UpdateResult(target.name, display_path, current_value, release.version, "updated", f"release age {age}; {release.url}"), True
+    if not dry_run:
+        set_canonical_value(document, target.canonical_path, release.version)
+    return UpdateResult(target.name, display_path, current_value, release.version, "updated", f"release age {age}; {release.url}"), not dry_run
 
 
 def run(
     root: Path,
     min_age_hours: int,
     opener: Callable[[str], bytes] | None = None,
+    dry_run: bool = False,
 ) -> list[UpdateResult]:
     now = datetime.now(timezone.utc)
     min_age = timedelta(hours=min_age_hours)
@@ -420,9 +425,9 @@ def run(
         changed = False
         for target in TARGETS:
             if target.canonical_path is None:
-                results.append(process_target(target, root, now, min_age, opener))
+                results.append(process_target(target, root, now, min_age, opener, dry_run))
                 continue
-            result, target_changed = process_canonical_target(target, document, root, now, min_age, opener)
+            result, target_changed = process_canonical_target(target, document, root, now, min_age, opener, dry_run)
             results.append(result)
             changed = changed or target_changed
         if changed:
@@ -478,7 +483,7 @@ def run(
                 )
             )
             continue
-        results.append(process_target(target, root, now, min_age, opener))
+        results.append(process_target(target, root, now, min_age, opener, dry_run))
     return results
 
 
@@ -508,15 +513,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--min-age-hours", type=int, default=DEFAULT_MIN_AGE_HOURS)
+    parser.add_argument("--dry-run", action="store_true", help="report eligible updates without writing pins or canonical values")
     args = parser.parse_args(argv)
 
     try:
-        results = run(args.root, args.min_age_hours)
+        results = run(args.root, args.min_age_hours, dry_run=args.dry_run)
     except UpdateError as error:
         print(error, file=sys.stderr)
         return 1
 
     print_results(results)
+    if args.dry_run:
+        print("\nDry run: no pins or canonical values were written.")
     print("\nUnmanaged by just update:")
     for item in UNMANAGED:
         print(f"- {item}")

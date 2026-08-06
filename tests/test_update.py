@@ -75,6 +75,18 @@ class UpdateTests(unittest.TestCase):
                 "ARG OPENTOFU_LINUX_AMD64_SHA256=abc123\n",
             )
 
+    def test_dry_run_reports_eligible_repository_pin_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "tools").mkdir()
+            dockerfile = root / "tools" / "Dockerfile"
+            original = "ARG OPENTOFU_VERSION=1.0.0\nARG OPENTOFU_LINUX_AMD64_SHA256=old\n"
+            dockerfile.write_text(original, encoding="utf-8")
+            now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+            result = update_script.process_target(update_script.TARGETS[0], root, now, timedelta(hours=48), self.fake_opener("1.1.0", now - timedelta(hours=72)), dry_run=True)
+            self.assertEqual(result.status, "updated")
+            self.assertEqual(dockerfile.read_text(encoding="utf-8"), original)
+
     def test_holds_recent_release(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

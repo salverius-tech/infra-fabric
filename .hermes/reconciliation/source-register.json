@@ -32,7 +32,7 @@
     },
     {
       "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-      "sha256": "a29a622c95203d0c28266b57a8b927865981cb57122d57790c76c608343e91b5",
+      "sha256": "b3c0f3e357429d7c611440cf656d88959183a793ec513828ace6ab8bf4212a57",
       "authority": "active-implementation-tracker",
       "stated_status": "Approved for source-level execution; infrastructure mutation remains prohibited without separate explicit approval",
       "extracted_item_count": 152
