@@ -65,6 +65,7 @@ class ServiceStateTests(unittest.TestCase):
         self.assertIn("generated/ansible-vars.json", cli)
         self.assertIn("flatten-ansible-vars.py", cli)
         self.assertIn(".service-state-ansible-vars-", cli)
+        self.assertIn("rc=\\$?; rm -f", cli)
         self.assertIn('"/workspace/${site_values_dir}/site.yaml"', cli)
         self.assertNotIn('"${repo_root}/${site_values_dir}/site.yaml"', cli)
         self.assertIn('grep -Fx "${requested}" >/dev/null', cli)
@@ -82,6 +83,8 @@ class ServiceStateTests(unittest.TestCase):
         self.assertIn("Fail after attempting all managed service restarts", restore)
         self.assertIn("service_state_system_restart", restore)
         self.assertIn("service_state_user_restart", restore)
+        backup = BACKUP.read_text(encoding="utf-8")
+        self.assertIn("--exclude=*/lost+found", backup)
 
     def test_onramp_recovery_dependencies_and_container_paths_are_wired(self) -> None:
         defaults = yaml.safe_load(ONRAMP_DEFAULTS.read_text(encoding="utf-8"))

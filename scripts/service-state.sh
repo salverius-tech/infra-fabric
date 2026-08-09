@@ -166,14 +166,14 @@ run_playbook() {
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; python /workspace/scripts/flatten-ansible-vars.py --input ${vars_file@Q} --output ${flat_vars_file@Q}; ansible-playbook -i ${inventory@Q} -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml; rm -f ${flat_vars_file@Q}"
+      "export PATH=/opt/ansible/bin:\$PATH; python /workspace/scripts/flatten-ansible-vars.py --input ${vars_file@Q} --output ${flat_vars_file@Q}; ansible-playbook -i ${inventory@Q} -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml; rc=\$?; rm -f ${flat_vars_file@Q}; exit \$rc"
   else
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       SERVICE_STATE_RESTORE_FILE="${restore_file}" \
       scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; python /workspace/scripts/flatten-ansible-vars.py --input ${vars_file@Q} --output ${flat_vars_file@Q}; ansible-playbook -i ${inventory@Q} -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml; rm -f ${flat_vars_file@Q}"
+      "export PATH=/opt/ansible/bin:\$PATH; python /workspace/scripts/flatten-ansible-vars.py --input ${vars_file@Q} --output ${flat_vars_file@Q}; ansible-playbook -i ${inventory@Q} -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml; rc=\$?; rm -f ${flat_vars_file@Q}; exit \$rc"
   fi
 }
 

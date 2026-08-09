@@ -124,11 +124,38 @@
           tags: [config]
           ansible.builtin.command:
             argv:
-              - cp
-              - -a
-              - "{{ item }}"
-              - "{{ service_state_snapshot_dir.path }}{{ item }}"
+              - tar
+              - --numeric-owner
+              - --exclude=*/lost+found
+              - -C
+              - /
+              - -cf
+              - "{{ service_state_snapshot_dir.path }}/.snapshot-{{ service_state_path_index }}.tar"
+              - "{{ item | regex_replace('^/', '') }}"
           loop: "{{ service_state_existing_paths }}"
+          loop_control:
+            index_var: service_state_path_index
+          changed_when: true
+
+        - name: Extract service-state path snapshots
+          tags: [config]
+          ansible.builtin.unarchive:
+            src: "{{ service_state_snapshot_dir.path }}/.snapshot-{{ service_state_path_index }}.tar"
+            dest: "{{ service_state_snapshot_dir.path }}"
+            remote_src: true
+          loop: "{{ service_state_existing_paths }}"
+          loop_control:
+            index_var: service_state_path_index
+          changed_when: true
+
+        - name: Remove temporary service-state path archives
+          tags: [packages]
+          ansible.builtin.file:
+            path: "{{ service_state_snapshot_dir.path }}/.snapshot-{{ service_state_path_index }}.tar"
+            state: absent
+          loop: "{{ service_state_existing_paths }}"
+          loop_control:
+            index_var: service_state_path_index
           changed_when: true
 
         - name: Write service-state backup manifest
