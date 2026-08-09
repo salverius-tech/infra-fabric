@@ -113,11 +113,7 @@
       block:
         - name: Stop managed system services before restore
           tags: [restore]
-          ansible.builtin.command:
-            argv:
-              - systemctl
-              - stop
-              - "{{ item }}"
+          ansible.builtin.raw: "systemctl stop {{ item | quote }}"
           loop: "{{ service_state_definition.services | default([]) }}"
           changed_when: true
 
@@ -316,11 +312,7 @@
 
         - name: Restart managed system services after restore
           tags: [restore]
-          ansible.builtin.command:
-            argv:
-              - systemctl
-              - start
-              - "{{ item }}"
+          ansible.builtin.raw: "systemctl start {{ item | quote }}"
           loop: "{{ service_state_definition.services | default([]) }}"
           register: service_state_system_restart
           failed_when: false

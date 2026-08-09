@@ -75,8 +75,8 @@ class CapacityPreflightTests(unittest.TestCase):
         self.assertIn("- --extract", restore)
         self.assertIn("- --numeric-owner", restore)
         self.assertIn("- --no-overwrite-dir", restore)
-        self.assertIn("- systemctl\n              - stop", restore)
-        self.assertIn("- systemctl\n              - start", restore)
+        self.assertIn('ansible.builtin.raw: "systemctl stop {{ item | quote }}"', restore)
+        self.assertIn('ansible.builtin.raw: "systemctl start {{ item | quote }}"', restore)
 
 
 if __name__ == "__main__":
