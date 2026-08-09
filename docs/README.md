@@ -20,6 +20,7 @@ Public-safe documentation for canonical site infrastructure.
 - [Service operations matrix](service-operations.md) — catalog-derived health, logs, credentials, update/rollback, state, and recovery routing for every registered service.
 - [Hermes tuning](hermes-tuning.md) — managed Hermes runtime tuning.
 - [Hermes Control operations](hermes-control-operations.md) — companion-stack operation and verification.
+- [Hermes-independent controller recovery](hermes-independent-recovery.md) — recover the canonical workflow without depending on Hermes.
 - [Managed service-state backup and restore](service-state-backup.md) — state backup and restore contracts.
 - [Super Simple Software Factory](sssf.md) — dedicated VM installation, workspace, visualizer, health, and state operations.
 - [Hermes state backup and restore](hermes-state-backup.md) — Hermes-specific state handling.

@@ -95,6 +95,7 @@
     "docs/development-environment.md": "working design",
     "docs/design-implementation-backlog.md": "current authority",
     "docs/hermes-control-operations.md": "operator guidance",
+    "docs/hermes-independent-recovery.md": "operator guidance",
     "docs/hermes-operator-pilot-prd.md": "working design",
     "docs/hermes-state-backup.md": "operator guidance",
     "docs/hermes-tuning.md": "operator guidance",

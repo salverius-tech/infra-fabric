@@ -61,7 +61,7 @@ Hashes and source totals are generated from the tracked public source universe.
 | `.specs/direct-hermes-ansible/plan.md` | historical reference | `69844d03f7a8ef714d1aec5696103bfd5f6f581f800f94e7553213a85df66320` | 32 |
 | `AGENTS.md` | current authority | `478c19103b5def78605cd643d3319d81e7b75740ff0c95b3912246c9c60bae6a` | 0 |
 | `README.md` | current authority | `b606d37bd996e0765f7a81939a8f62851e727e1d4f24250f3e9195e3e6035f48` | 0 |
-| `docs/README.md` | current authority | `ef1734cfae8c0b0e0a622d2d11940e9b2e20a61c313689b98496708005f82cf0` | 0 |
+| `docs/README.md` | current authority | `1c59359837be42427781bc125803c5883cf79d1197b6ff695286d008cd9b1c72` | 0 |
 | `docs/canonical-architecture.md` | current authority | `833dcd4c180326ce9f6f3bc348c9c7a97e6ffc8f0013da6f252a44e95653ae2b` | 0 |
 | `docs/canonical-quick-start.md` | operator guidance | `a90d2de2c3b67c730bad478bd9551c1b80ae646b97fbb40a531a639c2e4942e5` | 0 |
 | `docs/canonical-readiness.md` | operator guidance | `a9454fce68c757db734713126f35e83bd495031ac4ea93205faa30fa22f94cf0` | 0 |
@@ -74,7 +74,7 @@ Hashes and source totals are generated from the tracked public source universe.
 | `docs/canonical-values-secret-operations.md` | operator guidance | `3763de55f19ae42fe4a0765861fe05e25fc6e688660b5fa9b92b51ee886e00ff` | 0 |
 | `docs/debian-baseline.md` | working design | `bee93782e007e310159082922236a3e21ec1d0344c792f471456623917ec9827` | 0 |
 | `docs/development-environment.md` | working design | `6177801ff7e11de33d090dc679c009d8f3642fcf368210f023aa63e49d70e2e2` | 0 |
-| `docs/documentation-inventory.json` | unclassified | `1f255ca3c3a6f9f40166fb8e209199c9743d95efa172b170ce81ae91395e2917` | 0 |
+| `docs/documentation-inventory.json` | unclassified | `20a9183f80c1493b0a4078518121ba752ce97360ec03794bfb4beab502f5fda7` | 0 |
 | `docs/hermes-control-operations.md` | operator guidance | `63c4284b16d1780389c64fe9c8c570704bb661515fa6dfc07e9607b68854c280` | 0 |
 | `docs/hermes-operator-pilot-prd.md` | working design | `9dbcaf054e1779db732ba613655c3060c03da14d7f6715a3d315dcfb6b3bf757` | 7 |
 | `docs/hermes-state-backup.md` | operator guidance | `5400e099e4a8f08a82ac9cdd5a89b9311d3c717226d515edd2e1121914f66cd0` | 0 |

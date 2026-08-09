@@ -403,7 +403,7 @@
     },
     {
       "path": "docs/README.md",
-      "sha256": "ef1734cfae8c0b0e0a622d2d11940e9b2e20a61c313689b98496708005f82cf0",
+      "sha256": "1c59359837be42427781bc125803c5883cf79d1197b6ff695286d008cd9b1c72",
       "authority": "current authority",
       "stated_status": null,
       "extracted_item_count": 0
@@ -494,7 +494,7 @@
     },
     {
       "path": "docs/documentation-inventory.json",
-      "sha256": "1f255ca3c3a6f9f40166fb8e209199c9743d95efa172b170ce81ae91395e2917",
+      "sha256": "20a9183f80c1493b0a4078518121ba752ce97360ec03794bfb4beab502f5fda7",
       "authority": "unclassified",
       "stated_status": null,
       "extracted_item_count": 0
