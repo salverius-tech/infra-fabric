@@ -37942,19 +37942,19 @@
       "evidence_level": "source"
     },
     {
-      "id": "recon-acceptance-5a1a5547a01ab7d5",
-      "source_identity": "source-bf60f671c7763526",
+      "id": "recon-acceptance-1659976126560565",
+      "source_identity": "source-b5c55096e0f2c5da",
       "source": {
         "path": "docs/hermes-operator-pilot-prd.md",
         "heading": "Problem",
         "line": 19,
         "kind": "acceptance"
       },
-      "summary": "The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. External backup/central durability and operator identity binding remain outstanding acceptance gates. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding",
+      "summary": "The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `audit-verify`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. External backup/central durability and operator identity binding remain outstanding acceptance gates. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding",
       "semantic_identity": {
         "path": "docs/hermes-operator-pilot-prd.md",
         "kind": "acceptance",
-        "normalized_summary": "the first repository-side operator interface is `scripts/hermes-operator.py`. it provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. the dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained jsonl journal; set `hermes_operator_audit_path` to place that journal in private controller storage instead of the default local `.tmp/` path. external backup/central durability and operator identity binding remain outstanding acceptance gates. the hermes package's bundled searxng provider is selected when `hermes_web_searxng_url` is configured; live search smoke testing remains outstanding",
+        "normalized_summary": "the first repository-side operator interface is `scripts/hermes-operator.py`. it provides sanitized machine-readable `status`, `audit-verify`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. the dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained jsonl journal; set `hermes_operator_audit_path` to place that journal in private controller storage instead of the default local `.tmp/` path. external backup/central durability and operator identity binding remain outstanding acceptance gates. the hermes package's bundled searxng provider is selected when `hermes_web_searxng_url` is configured; live search smoke testing remains outstanding",
         "occurrence": 1
       },
       "domain": "state",
@@ -37968,7 +37968,7 @@
           "path": "docs/hermes-operator-pilot-prd.md",
           "lines": "19",
           "role": "source-claim",
-          "claim": "The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. External backup/central durability and operator identity binding remain outstanding acceptance gates. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding"
+          "claim": "The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `audit-verify`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. External backup/central durability and operator identity binding remain outstanding acceptance gates. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding"
         }
       ],
       "missing_evidence": [

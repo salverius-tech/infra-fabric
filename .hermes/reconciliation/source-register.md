@@ -76,7 +76,7 @@ Hashes and source totals are generated from the tracked public source universe.
 | `docs/development-environment.md` | working design | `6177801ff7e11de33d090dc679c009d8f3642fcf368210f023aa63e49d70e2e2` | 0 |
 | `docs/documentation-inventory.json` | unclassified | `1f255ca3c3a6f9f40166fb8e209199c9743d95efa172b170ce81ae91395e2917` | 0 |
 | `docs/hermes-control-operations.md` | operator guidance | `63c4284b16d1780389c64fe9c8c570704bb661515fa6dfc07e9607b68854c280` | 0 |
-| `docs/hermes-operator-pilot-prd.md` | working design | `c1db9bcd8367f869373a174f0311590a729d93d8b68348a92eb61b0af89c98bd` | 7 |
+| `docs/hermes-operator-pilot-prd.md` | working design | `9dbcaf054e1779db732ba613655c3060c03da14d7f6715a3d315dcfb6b3bf757` | 7 |
 | `docs/hermes-state-backup.md` | operator guidance | `5400e099e4a8f08a82ac9cdd5a89b9311d3c717226d515edd2e1121914f66cd0` | 0 |
 | `docs/hermes-tuning.md` | operator guidance | `1df917be5bcadc73c7ab16313dac55374624706fae43ce53d202fd4649f888e4` | 0 |
 | `docs/just-recipes.md` | operator guidance | `94e105456c46dbaade35dbff6f04b8fdc54de0544312028cf345470d4c24a669` | 0 |

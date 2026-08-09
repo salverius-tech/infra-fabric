@@ -103,6 +103,16 @@ class HermesOperatorTests(unittest.TestCase):
             with self.assertRaises(hermes_operator.OperatorError):
                 hermes_operator.run_action(root, "validate", runner=lambda *_: (0, "ok\n"))
 
+    def test_audit_verify_returns_only_safe_chain_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            hermes_operator.run_action(root, "validate", runner=lambda *_: (0, "ok\n"))
+            result = hermes_operator.verify_audit(root)
+            self.assertEqual(result["action"], "audit-verify")
+            self.assertEqual(result["record_count"], 1)
+            self.assertEqual(len(result["head_hash"]), 64)
+            self.assertNotIn(str(root), json.dumps(result))
+
     def test_status_is_machine_readable_and_does_not_include_private_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

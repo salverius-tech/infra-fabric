@@ -139,6 +139,17 @@ def status(repo: Path) -> dict[str, Any]:
     }
 
 
+def verify_audit(repo: Path) -> dict[str, Any]:
+    """Verify the private operator journal and return only safe metadata."""
+    head_hash, record_count = read_audit_chain(audit_path(repo))
+    return {
+        "action": "audit-verify",
+        "ok": True,
+        "record_count": record_count,
+        "head_hash": head_hash,
+    }
+
+
 def audit_path(repo: Path) -> Path:
     configured = os.environ.get("HERMES_OPERATOR_AUDIT_PATH", "")
     return Path(configured).expanduser() if configured else repo / ".tmp" / "hermes-operator-audit.jsonl"
@@ -280,7 +291,7 @@ def run_action(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("status", "validate", "plan", "apply"))
+    parser.add_argument("action", choices=("status", "audit-verify", "validate", "plan", "apply"))
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     parser.add_argument("--approve", action="store_true", help="explicitly approve apply")
@@ -291,6 +302,8 @@ def main(argv: list[str] | None = None) -> int:
         repo = args.repo.resolve()
         if args.action == "status":
             result = status(repo)
+        elif args.action == "audit-verify":
+            result = verify_audit(repo)
         else:
             result = run_action(
                 repo,
