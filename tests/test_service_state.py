@@ -63,6 +63,8 @@ class ServiceStateTests(unittest.TestCase):
         self.assertNotIn("supported_services=(", cli)
         self.assertIn('print(name)', cli)
         self.assertIn("generated/ansible-vars.json", cli)
+        self.assertIn('"/workspace/${site_values_dir}/site.yaml"', cli)
+        self.assertNotIn('"${repo_root}/${site_values_dir}/site.yaml"', cli)
 
     def test_forgejo_database_state_contract_fails_closed_without_projection(self) -> None:
         for path in (BACKUP, RESTORE):

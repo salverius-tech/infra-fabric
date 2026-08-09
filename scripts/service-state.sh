@@ -131,8 +131,8 @@ verify_canonical_service_state_inputs() {
     return 0
   fi
   scripts/python.sh scripts/verify-projections.py \
-    --site-file "${repo_root}/${site_values_dir}/site.yaml" \
-    --generated-dir "${repo_root}/${site_values_dir}/generated"
+    --site-file "/workspace/${site_values_dir}/site.yaml" \
+    --generated-dir "/workspace/${site_values_dir}/generated"
 }
 
 require_canonical_service_enabled() {
