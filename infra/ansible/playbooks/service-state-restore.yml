@@ -115,6 +115,8 @@
           tags: [restore]
           ansible.builtin.raw: "systemctl stop {{ item | quote }}"
           loop: "{{ service_state_definition.services | default([]) }}"
+          register: service_state_system_stop
+          failed_when: service_state_system_stop.rc not in [0, 5]
           changed_when: true
 
         - name: Resolve service-state user service owner UID
@@ -352,7 +354,7 @@
           ansible.builtin.raw: "systemctl start {{ item | quote }}"
           loop: "{{ service_state_definition.services | default([]) }}"
           register: service_state_system_restart
-          failed_when: false
+          failed_when: service_state_system_restart.rc not in [0, 5]
           changed_when: true
 
     - name: Fail after attempting all managed service restarts
