@@ -229,9 +229,9 @@ class DesignReconciliationTests(unittest.TestCase):
         self.assertIsNone(record["decision_contract"])
 
     def test_current_extraction_count_and_source_identities_are_preserved(self):
-        # Approved decision records replace the former open-question records while
-        # preserving the declared extraction universe and stable source identities.
-        self.assertEqual(len(self.ledger["records"]), 918)
+        # The Phase 9 status reconciliation adds one preserved source claim while
+        # retaining all prior identities.
+        self.assertEqual(len(self.ledger["records"]), 919)
         source_paths = {source["path"] for source in self.register["sources"]}
         self.assertIn("docs/service-operations.md", source_paths)
         self.assertIn("docs/tooling-reproducibility.md", source_paths)

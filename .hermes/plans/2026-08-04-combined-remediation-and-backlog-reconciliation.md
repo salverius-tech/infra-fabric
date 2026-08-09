@@ -7,7 +7,7 @@
 **Starting commit:** `f5b4b48192f3ff36771f3c8e14528e6bcd904407`
 **Recommended execution model:** `gpt-5.6-terra`
 
-**Status reconciliation (2026-08-07):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Provider-backed planning, real-host second-run idempotence, service and infrastructure recovery rehearsals, upstream Hermes Control compatibility, live guest/service health, and all production actions remain separately blocked external acceptance gates. Phase 9 remains unauthorized unless the operator separately approves its next individual risk boundary.
+**Status reconciliation (2026-08-09):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, and second-run idempotence all passed, including Forgejo Runner registration. Service-state and infrastructure recovery rehearsals, upstream Hermes Control compatibility, external audit durability, Onramp handoff/temporary SearXNG retirement, and all production actions remain separately blocked external acceptance gates. Phase 9 still requires separate approval for each remaining risk boundary.
 
 ## Model recommendation
 
@@ -632,17 +632,18 @@ Exit gate:
 
 # Phase 9 — Separately approved external acceptance
 
-**Status:** Not authorized by this plan.
+**Status:** Development gates 1–3 completed under separate approval; remaining gates are not authorized by this plan.
 
 When the operator explicitly approves it in a later session, execute in increasing risk order:
 
-1. provider-backed non-mutating plan/equivalence on a disposable or approved development site;
-2. reviewed development apply;
-3. direct health and second-run idempotence checks;
+1. ~~provider-backed non-mutating plan/equivalence on a disposable or approved development site~~ — completed for disposable `dev`; semantic equivalence remains unclaimed because no prior normalized baseline was supplied;
+2. ~~reviewed development apply~~ — completed with provider and Ansible convergence;
+3. ~~direct health and second-run idempotence checks~~ — completed, including Forgejo Runner registration and service activity;
 4. service-state backup and restore rehearsal;
 5. infrastructure-state recovery rehearsal;
-6. Hermes operator/live integration validation;
-7. production plan and separately approved production apply.
+6. Hermes operator/live integration validation, including external audit durability and approval identity;
+7. Onramp handoff/cutover evidence and retirement of the temporary SearXNG ownership exception;
+8. production plan and separately approved production apply.
 
 Each step requires its own approval, evidence, rollback plan, and public-safe summary. Do not collapse these into one authorization.
 

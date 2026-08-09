@@ -32,10 +32,10 @@
     },
     {
       "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-      "sha256": "d8b04a6bbb65878b6062c8255129a470bd1063f838f7bf4c7dcb5f030b584054",
+      "sha256": "6bc75a6c913c0cb9c1537394a3ccd54103833bbb3c0508d3bb9baeefc97361f4",
       "authority": "implementation tracker",
       "stated_status": "Approved for source-level execution; infrastructure mutation remains prohibited without separate explicit approval",
-      "extracted_item_count": 165
+      "extracted_item_count": 166
     },
     {
       "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
@@ -515,9 +515,9 @@
     },
     {
       "path": "docs/hermes-operator-pilot-prd.md",
-      "sha256": "9dbcaf054e1779db732ba613655c3060c03da14d7f6715a3d315dcfb6b3bf757",
+      "sha256": "8f390c351e7c4306d5090acf1d242d47610ea05b8293d62f1936ed820525f62c",
       "authority": "working design",
-      "stated_status": "Working design \u2014 source implementation is partial and is not provider, live, audit-durability, search-smoke, or recovery evidence. Onramp-host and temporary SearXNG infrastructure are implemented; the remaining scope is Hermes operator integration and approval workflow. Unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions).",
+      "stated_status": "Working design \u2014 source implementation and disposable development infrastructure acceptance are evidenced, but this is not yet provider-equivalence, Hermes live-integration, external audit-durability, search-smoke, or recovery evidence. Onramp-host and temporary SearXNG infrastructure are implemented; the remaining scope is Hermes operator integration, approval workflow, recovery rehearsal, and production acceptance. Unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions).",
       "extracted_item_count": 7
     },
     {

@@ -8,7 +8,7 @@ Hashes and source totals are generated from the tracked public source universe.
 | `.hermes/plans/2026-08-03_071330-canonical-cutover-audit.md` | historical reference | `ab78c40b2f039ae9edfa207f08905f0392837fb318a6cd354dc95b921550a09d` | 4 |
 | `.hermes/plans/2026-08-03_135649-canonical-first-documentation-and-authoring.md` | historical reference | `14befd4041dcddd0b651ab3b7774e01d6d8a037339fecec475f3f39f3fdb89e5` | 8 |
 | `.hermes/plans/2026-08-03_174531-super-simple-software-factory-vm.md` | historical reference | `71ebb21b4ed5ef2ceb9189ee5af48eb4dae5fe3bc0c7595ac0bfd1f4d8e70c0c` | 0 |
-| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | implementation tracker | `d8b04a6bbb65878b6062c8255129a470bd1063f838f7bf4c7dcb5f030b584054` | 165 |
+| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | implementation tracker | `6bc75a6c913c0cb9c1537394a3ccd54103833bbb3c0508d3bb9baeefc97361f4` | 166 |
 | `.hermes/plans/2026-08-04-comprehensive-project-audit.md` | historical reference | `d95f2616909de0fc044c381a037c39d251789849231ae97d11bbc0823fabab52` | 41 |
 | `.hermes/plans/2026-08-04-design-to-implementation-backlog-reconciliation.md` | historical reference | `465f5a3f355c83e371e775815cef2c03fd47ffccc1e17f7d23db4027e50c4c7b` | 31 |
 | `.hermes/plans/canonical-values-model-implementation.md` | implementation tracker | `84dd88cf4609203e1d651d1883901fd8c35ae283102e8f0c4fe6dfa67d4af553` | 273 |
@@ -77,7 +77,7 @@ Hashes and source totals are generated from the tracked public source universe.
 | `docs/documentation-inventory.json` | unclassified | `20a9183f80c1493b0a4078518121ba752ce97360ec03794bfb4beab502f5fda7` | 0 |
 | `docs/hermes-control-operations.md` | operator guidance | `63c4284b16d1780389c64fe9c8c570704bb661515fa6dfc07e9607b68854c280` | 0 |
 | `docs/hermes-independent-recovery.md` | operator guidance | `07ccf843d02e5cd3ea696e377204e111a1714f885259b17c68ce654b7dc03202` | 0 |
-| `docs/hermes-operator-pilot-prd.md` | working design | `9dbcaf054e1779db732ba613655c3060c03da14d7f6715a3d315dcfb6b3bf757` | 7 |
+| `docs/hermes-operator-pilot-prd.md` | working design | `8f390c351e7c4306d5090acf1d242d47610ea05b8293d62f1936ed820525f62c` | 7 |
 | `docs/hermes-state-backup.md` | operator guidance | `5400e099e4a8f08a82ac9cdd5a89b9311d3c717226d515edd2e1121914f66cd0` | 0 |
 | `docs/hermes-tuning.md` | operator guidance | `1df917be5bcadc73c7ab16313dac55374624706fae43ce53d202fd4649f888e4` | 0 |
 | `docs/just-recipes.md` | operator guidance | `94e105456c46dbaade35dbff6f04b8fdc54de0544312028cf345470d4c24a669` | 0 |

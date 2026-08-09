@@ -1031,22 +1031,22 @@
       "evidence_level": "source"
     },
     {
-      "id": "recon-blocker-a1f2ee500b2f2f57",
-      "source_identity": "source-b6b173272fd6cfdb",
+      "id": "recon-blocker-a978f966301d6629",
+      "source_identity": "source-c5f089eba8f378be",
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Combined Backlog Reconciliation and Audit Remediation Plan",
         "line": 10,
         "kind": "blocker"
       },
-      "summary": "**Status reconciliation (2026-08-07):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Provider-backed planning, real-host second-run idempotence, service and infrastructure recovery rehearsals, upstream Hermes Control compatibility, live guest/service health, and all production actions remain separately blocked external acceptance gates. Phase 9 remains unauthorized unless the operator separately approves its next individual risk boundary",
+      "summary": "**Status reconciliation (2026-08-09):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, and second-run idempotence all passed, including Forgejo Runner registration. Service-state and infrastructure recovery rehearsals, upstream Hermes Control compatibility, external audit durability, Onramp handoff/temporary SearXNG retirement, and all production actions remain separately blocked external acceptance gates. Phase 9 still requires separate approval for each remaining risk boundary",
       "semantic_identity": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "kind": "blocker",
-        "normalized_summary": "**status reconciliation (2026-08-07):** r1, r2, s1, s2, s3, o1, o2, o3, q1, q2, q3, documentation, and ci are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. this plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. provider-backed planning, real-host second-run idempotence, service and infrastructure recovery rehearsals, upstream hermes control compatibility, live guest/service health, and all production actions remain separately blocked external acceptance gates. phase 9 remains unauthorized unless the operator separately approves its next individual risk boundary",
+        "normalized_summary": "**status reconciliation (2026-08-09):** r1, r2, s1, s2, s3, o1, o2, o3, q1, q2, q3, documentation, and ci are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. this plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, and second-run idempotence all passed, including forgejo runner registration. service-state and infrastructure recovery rehearsals, upstream hermes control compatibility, external audit durability, onramp handoff/temporary searxng retirement, and all production actions remain separately blocked external acceptance gates. phase 9 still requires separate approval for each remaining risk boundary",
         "occurrence": 1
       },
-      "domain": "service",
+      "domain": "state",
       "scope": "repository",
       "priority": "none",
       "recommended_action": "cite production and focused verification evidence; do not treat tracker status or checkbox as proof",
@@ -1057,7 +1057,7 @@
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "10",
           "role": "source-claim",
-          "claim": "**Status reconciliation (2026-08-07):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Provider-backed planning, real-host second-run idempotence, service and infrastructure recovery rehearsals, upstream Hermes Control compatibility, live guest/service health, and all production actions remain separately blocked external acceptance gates. Phase 9 remains unauthorized unless the operator separately approves its next individual risk boundary"
+          "claim": "**Status reconciliation (2026-08-09):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, and second-run idempotence all passed, including Forgejo Runner registration. Service-state and infrastructure recovery rehearsals, upstream Hermes Control compatibility, external audit durability, Onramp handoff/temporary SearXNG retirement, and all production actions remain separately blocked external acceptance gates. Phase 9 still requires separate approval for each remaining risk boundary"
         }
       ],
       "missing_evidence": [
@@ -1810,7 +1810,7 @@
       "dependencies": [],
       "duplicates": [],
       "superseded_by": [
-        "recon-blocker-a1f2ee500b2f2f57"
+        "recon-blocker-a978f966301d6629"
       ],
       "decision_contract": null,
       "package": "DOCS",
@@ -5914,7 +5914,7 @@
       "dependencies": [],
       "duplicates": [],
       "superseded_by": [
-        "recon-blocker-a1f2ee500b2f2f57"
+        "recon-blocker-a978f966301d6629"
       ],
       "decision_contract": null,
       "package": "DOCS",
@@ -7277,12 +7277,53 @@
       "duplicate_of": "recon-acceptance-53490289f7ee4f4e"
     },
     {
+      "id": "recon-requirement-f0628383d826a901",
+      "source_identity": "source-d9f524252af2ea79",
+      "source": {
+        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+        "heading": "Phase 9 \u2014 Separately approved external acceptance",
+        "line": 635,
+        "kind": "requirement"
+      },
+      "summary": "**Status:** Development gates 1\u20133 completed under separate approval; remaining gates are not authorized by this plan",
+      "semantic_identity": {
+        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+        "kind": "requirement",
+        "normalized_summary": "**status:** development gates 1\u20133 completed under separate approval; remaining gates are not authorized by this plan",
+        "occurrence": 1
+      },
+      "domain": "ci",
+      "scope": "repository",
+      "priority": "none",
+      "recommended_action": "cite production and focused verification evidence; do not treat tracker status or checkbox as proof",
+      "target_artifact": "",
+      "notes": "Losslessly extracted source claim under the declared extraction contract. Adjudicated conservatively without private, provider, live, or recovery access.",
+      "evidence": [
+        {
+          "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+          "lines": "635",
+          "role": "source-claim",
+          "claim": "**Status:** Development gates 1\u20133 completed under separate approval; remaining gates are not authorized by this plan"
+        }
+      ],
+      "missing_evidence": [
+        "Production-path and focused verification citations are required before a static implementation claim; provider/live/recovery are separate gates."
+      ],
+      "dependencies": [],
+      "duplicates": [],
+      "superseded_by": [],
+      "decision_contract": null,
+      "package": "DOCS",
+      "disposition": "evidence-required",
+      "evidence_level": "source"
+    },
+    {
       "id": "recon-acceptance-af34347fa20958ca",
       "source_identity": "source-5988c99192c7e353",
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 685,
+        "line": 686,
         "kind": "acceptance"
       },
       "summary": "## Final definition of done",
@@ -7301,7 +7342,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "685",
+          "lines": "686",
           "role": "source-claim",
           "claim": "## Final definition of done"
         }
@@ -7323,7 +7364,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 689,
+        "line": 690,
         "kind": "task"
       },
       "summary": "All backlog-bearing sources are registered and hashed",
@@ -7342,7 +7383,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "689",
+          "lines": "690",
           "role": "source-claim",
           "claim": "All backlog-bearing sources are registered and hashed"
         }
@@ -7364,7 +7405,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 690,
+        "line": 691,
         "kind": "task"
       },
       "summary": "Every extracted item has a stable ledger record",
@@ -7383,7 +7424,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "690",
+          "lines": "691",
           "role": "source-claim",
           "claim": "Every extracted item has a stable ledger record"
         }
@@ -7405,7 +7446,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 691,
+        "line": 692,
         "kind": "task"
       },
       "summary": "Every audit finding has a package and disposition",
@@ -7424,7 +7465,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "691",
+          "lines": "692",
           "role": "source-claim",
           "claim": "Every audit finding has a package and disposition"
         }
@@ -7446,7 +7487,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 692,
+        "line": 693,
         "kind": "task"
       },
       "summary": "No unresolved duplicate, supersession, contradiction, or dependency remains",
@@ -7465,7 +7506,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "692",
+          "lines": "693",
           "role": "source-claim",
           "claim": "No unresolved duplicate, supersession, contradiction, or dependency remains"
         }
@@ -7487,7 +7528,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 693,
+        "line": 694,
         "kind": "task"
       },
       "summary": "All authorized source-level packages are implemented and verified",
@@ -7506,7 +7547,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "693",
+          "lines": "694",
           "role": "source-claim",
           "claim": "All authorized source-level packages are implemented and verified"
         }
@@ -7528,7 +7569,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 694,
+        "line": 695,
         "kind": "task"
       },
       "summary": "All tracked documentation has an accurate authority classification",
@@ -7547,7 +7588,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "694",
+          "lines": "695",
           "role": "source-claim",
           "claim": "All tracked documentation has an accurate authority classification"
         }
@@ -7569,7 +7610,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 695,
+        "line": 696,
         "kind": "task"
       },
       "summary": "The canonical backlog is generated and validated",
@@ -7588,7 +7629,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "695",
+          "lines": "696",
           "role": "source-claim",
           "claim": "The canonical backlog is generated and validated"
         }
@@ -7610,7 +7651,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 696,
+        "line": 697,
         "kind": "task"
       },
       "summary": "Public safety passes",
@@ -7629,7 +7670,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "696",
+          "lines": "697",
           "role": "source-claim",
           "claim": "Public safety passes"
         }
@@ -7651,7 +7692,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 697,
+        "line": 698,
         "kind": "task"
       },
       "summary": "A fresh detached worktree passes the full public suite",
@@ -7670,7 +7711,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "697",
+          "lines": "698",
           "role": "source-claim",
           "claim": "A fresh detached worktree passes the full public suite"
         }
@@ -7692,7 +7733,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 698,
+        "line": 699,
         "kind": "task"
       },
       "summary": "No private-value contents, plans, state, credentials, identities, or live endpoints were accessed or emitted; one read-only review traversed private path names without reading contents",
@@ -7711,7 +7752,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "698",
+          "lines": "699",
           "role": "source-claim",
           "claim": "No private-value contents, plans, state, credentials, identities, or live endpoints were accessed or emitted; one read-only review traversed private path names without reading contents"
         }
@@ -7733,7 +7774,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 699,
+        "line": 700,
         "kind": "task"
       },
       "summary": "Provider/live/recovery evidence is clearly separated and remains open unless separately approved",
@@ -7752,7 +7793,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "699",
+          "lines": "700",
           "role": "source-claim",
           "claim": "Provider/live/recovery evidence is clearly separated and remains open unless separately approved"
         }
@@ -7774,7 +7815,7 @@
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Final definition of done",
-        "line": 700,
+        "line": 701,
         "kind": "task"
       },
       "summary": "All completed work is committed and pushed, with a clean worktree and matching upstream revision",
@@ -7793,7 +7834,7 @@
       "evidence": [
         {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-          "lines": "700",
+          "lines": "701",
           "role": "source-claim",
           "claim": "All completed work is committed and pushed, with a clean worktree and matching upstream revision"
         }
@@ -37901,19 +37942,19 @@
       "evidence_level": "source"
     },
     {
-      "id": "recon-requirement-12e91c78b88806e9",
-      "source_identity": "source-585a6c7bd912bafa",
+      "id": "recon-acceptance-31d97f4066a16ed6",
+      "source_identity": "source-ddb129ffe99678e7",
       "source": {
         "path": "docs/hermes-operator-pilot-prd.md",
         "heading": "PRD: Hermes Operator Pilot for Homelab Infrastructure",
         "line": 3,
-        "kind": "requirement"
+        "kind": "acceptance"
       },
-      "summary": "**Status:** Working design \u2014 source implementation is partial and is not provider, live, audit-durability, search-smoke, or recovery evidence. Onramp-host and temporary SearXNG infrastructure are implemented; the remaining scope is Hermes operator integration and approval workflow. Unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions)",
+      "summary": "**Status:** Working design \u2014 source implementation and disposable development infrastructure acceptance are evidenced, but this is not yet provider-equivalence, Hermes live-integration, external audit-durability, search-smoke, or recovery evidence. Onramp-host and temporary SearXNG infrastructure are implemented; the remaining scope is Hermes operator integration, approval workflow, recovery rehearsal, and production acceptance. Unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions)",
       "semantic_identity": {
         "path": "docs/hermes-operator-pilot-prd.md",
-        "kind": "requirement",
-        "normalized_summary": "**status:** working design \u2014 source implementation is partial and is not provider, live, audit-durability, search-smoke, or recovery evidence. onramp-host and temporary searxng infrastructure are implemented; the remaining scope is hermes operator integration and approval workflow. unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions)",
+        "kind": "acceptance",
+        "normalized_summary": "**status:** working design \u2014 source implementation and disposable development infrastructure acceptance are evidenced, but this is not yet provider-equivalence, hermes live-integration, external audit-durability, search-smoke, or recovery evidence. onramp-host and temporary searxng infrastructure are implemented; the remaining scope is hermes operator integration, approval workflow, recovery rehearsal, and production acceptance. unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions)",
         "occurrence": 1
       },
       "domain": "operator",
@@ -37927,7 +37968,7 @@
           "path": "docs/hermes-operator-pilot-prd.md",
           "lines": "3",
           "role": "source-claim",
-          "claim": "**Status:** Working design \u2014 source implementation is partial and is not provider, live, audit-durability, search-smoke, or recovery evidence. Onramp-host and temporary SearXNG infrastructure are implemented; the remaining scope is Hermes operator integration and approval workflow. Unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions)"
+          "claim": "**Status:** Working design \u2014 source implementation and disposable development infrastructure acceptance are evidenced, but this is not yet provider-equivalence, Hermes live-integration, external audit-durability, search-smoke, or recovery evidence. Onramp-host and temporary SearXNG infrastructure are implemented; the remaining scope is Hermes operator integration, approval workflow, recovery rehearsal, and production acceptance. Unresolved questions remain in the [decision register](../.hermes/reconciliation/decision-register.md#explicit-source-questions-and-decisions)"
         }
       ],
       "missing_evidence": [
