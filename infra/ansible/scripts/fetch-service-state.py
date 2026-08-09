@@ -22,6 +22,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--host", required=True)
     parser.add_argument("--user", required=True)
     parser.add_argument("--port", type=int, default=22)
+    parser.add_argument("--identity-file", type=Path, required=True)
     parser.add_argument("--ssh-common-args", default="")
     parser.add_argument("--remote-archive", required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -43,6 +44,7 @@ def validate_paths(remote_archive: str, output: Path, backup_root: Path) -> tupl
 
 def ssh_command(args: argparse.Namespace) -> list[str]:
     command = ["ssh", "-p", str(args.port)]
+    command.extend(("-i", str(args.identity_file)))
     if args.ssh_common_args:
         command.extend(shlex.split(args.ssh_common_args))
     command.append(f"{args.user}@{args.host}")

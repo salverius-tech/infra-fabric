@@ -37,6 +37,7 @@ class FetchServiceStateTests(unittest.TestCase):
     def args(self, root: Path, output: str = "state.tar.gz") -> object:
         return fetch_service_state.parse_args([
             "--host", "192.0.2.71", "--user", "operator", "--remote-archive", "/tmp/hermes-state.tar.gz",
+            "--identity-file", "/home/anvil/.ssh/canonical-bootstrap",
             "--output", str(root / output), "--backup-root", str(root),
         ])
 
@@ -76,6 +77,8 @@ class FetchServiceStateTests(unittest.TestCase):
                 "ssh",
                 "-p",
                 "22",
+                "-i",
+                "/home/anvil/.ssh/canonical-bootstrap",
                 "-o",
                 "BatchMode=yes",
                 "-o",
