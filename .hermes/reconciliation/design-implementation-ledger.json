@@ -1031,19 +1031,19 @@
       "evidence_level": "source"
     },
     {
-      "id": "recon-blocker-a978f966301d6629",
-      "source_identity": "source-c5f089eba8f378be",
+      "id": "recon-acceptance-3d59330014b80313",
+      "source_identity": "source-f2bf1516926ff5c7",
       "source": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "heading": "Combined Backlog Reconciliation and Audit Remediation Plan",
         "line": 10,
-        "kind": "blocker"
+        "kind": "acceptance"
       },
-      "summary": "**Status reconciliation (2026-08-09):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, and second-run idempotence all passed, including Forgejo Runner registration. Service-state and infrastructure recovery rehearsals, upstream Hermes Control compatibility, external audit durability, Onramp handoff/temporary SearXNG retirement, and all production actions remain separately blocked external acceptance gates. Phase 9 still requires separate approval for each remaining risk boundary",
+      "summary": "**Status reconciliation (2026-08-09):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, second-run idempotence, and service-state backup/restore rehearsals all passed, including Forgejo Runner registration and all enabled disposable stateful services. The remaining gates are infrastructure/controller recovery, upstream Hermes Control compatibility and live operator acceptance, durable external audit storage, Forgejo monitoring pilot acceptance, Onramp handoff and temporary SearXNG retirement, and all production actions. Phase 9 still requires separate approval for each remaining risk boundary",
       "semantic_identity": {
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-        "kind": "blocker",
-        "normalized_summary": "**status reconciliation (2026-08-09):** r1, r2, s1, s2, s3, o1, o2, o3, q1, q2, q3, documentation, and ci are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. this plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, and second-run idempotence all passed, including forgejo runner registration. service-state and infrastructure recovery rehearsals, upstream hermes control compatibility, external audit durability, onramp handoff/temporary searxng retirement, and all production actions remain separately blocked external acceptance gates. phase 9 still requires separate approval for each remaining risk boundary",
+        "kind": "acceptance",
+        "normalized_summary": "**status reconciliation (2026-08-09):** r1, r2, s1, s2, s3, o1, o2, o3, q1, q2, q3, documentation, and ci are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. this plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, second-run idempotence, and service-state backup/restore rehearsals all passed, including forgejo runner registration and all enabled disposable stateful services. the remaining gates are infrastructure/controller recovery, upstream hermes control compatibility and live operator acceptance, durable external audit storage, forgejo monitoring pilot acceptance, onramp handoff and temporary searxng retirement, and all production actions. phase 9 still requires separate approval for each remaining risk boundary",
         "occurrence": 1
       },
       "domain": "state",
@@ -1057,7 +1057,7 @@
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "10",
           "role": "source-claim",
-          "claim": "**Status reconciliation (2026-08-09):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, and second-run idempotence all passed, including Forgejo Runner registration. Service-state and infrastructure recovery rehearsals, upstream Hermes Control compatibility, external audit durability, Onramp handoff/temporary SearXNG retirement, and all production actions remain separately blocked external acceptance gates. Phase 9 still requires separate approval for each remaining risk boundary"
+          "claim": "**Status reconciliation (2026-08-09):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Separately approved development acceptance is now evidenced: provider-backed zero-change plan, reviewed disposable development apply, direct service health, second-run idempotence, and service-state backup/restore rehearsals all passed, including Forgejo Runner registration and all enabled disposable stateful services. The remaining gates are infrastructure/controller recovery, upstream Hermes Control compatibility and live operator acceptance, durable external audit storage, Forgejo monitoring pilot acceptance, Onramp handoff and temporary SearXNG retirement, and all production actions. Phase 9 still requires separate approval for each remaining risk boundary"
         }
       ],
       "missing_evidence": [
@@ -1810,7 +1810,7 @@
       "dependencies": [],
       "duplicates": [],
       "superseded_by": [
-        "recon-blocker-a978f966301d6629"
+        "recon-acceptance-3d59330014b80313"
       ],
       "decision_contract": null,
       "package": "DOCS",
@@ -5914,7 +5914,7 @@
       "dependencies": [],
       "duplicates": [],
       "superseded_by": [
-        "recon-blocker-a978f966301d6629"
+        "recon-acceptance-3d59330014b80313"
       ],
       "decision_contract": null,
       "package": "DOCS",
