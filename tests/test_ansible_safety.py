@@ -143,6 +143,12 @@ class AnsibleSafetyTests(unittest.TestCase):
         self.assertNotIn("forgejo_runner_registration.stdout", str(config))
         self.assertIn("forgejo_runner_uuid", str(task_by_name(RUNNER_TASKS, "Set Forgejo runner UUID")))
 
+    def test_forgejo_runner_registration_secret_matches_cli_contract(self) -> None:
+        validation = task_by_name(RUNNER_TASKS, "Validate Forgejo Actions runner variables")
+        assertion = validation.get("ansible.builtin.assert", {})
+        self.assertIn("forgejo_runner_registration_secret is match", str(assertion.get("that")))
+        self.assertIn("{40}", str(assertion.get("that")))
+
     def test_forgejo_runner_registration_task_order(self) -> None:
         names = task_names(RUNNER_TASKS)
         ordered = [

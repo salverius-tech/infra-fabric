@@ -8,9 +8,9 @@
       - forgejo_runner_url is defined
       - forgejo_runner_scope is defined
       - forgejo_runner_registration_secret is defined
-      - forgejo_runner_registration_secret | length >= 40
+      - forgejo_runner_registration_secret is match('^[0-9A-Fa-f]{40}$')
       - forgejo_runner_label is defined
-    fail_msg: forgejo_runner_vmid, forgejo_vmid, forgejo_runner_url, forgejo_runner_scope, forgejo_runner_registration_secret, and forgejo_runner_label are required.  # yamllint disable-line rule:line-length
+    fail_msg: forgejo_runner_vmid, forgejo_vmid, forgejo_runner_url, forgejo_runner_scope, forgejo_runner_registration_secret (exactly 40 hexadecimal characters), and forgejo_runner_label are required.  # yamllint disable-line rule:line-length
   no_log: true
 - name: Require reviewed Forgejo runner artifacts before guest mutation
   tags: [always]
