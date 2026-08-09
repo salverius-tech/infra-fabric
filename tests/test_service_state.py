@@ -67,6 +67,8 @@ class ServiceStateTests(unittest.TestCase):
         self.assertNotIn('"${repo_root}/${site_values_dir}/site.yaml"', cli)
         self.assertIn('grep -Fx "${requested}" >/dev/null', cli)
         self.assertNotIn('grep -Fxq "${requested}"', cli)
+        self.assertIn("/home/anvil/.ssh/canonical-bootstrap", cli)
+        self.assertIn("StrictHostKeyChecking=yes", cli)
 
     def test_forgejo_database_state_contract_fails_closed_without_projection(self) -> None:
         for path in (BACKUP, RESTORE):
