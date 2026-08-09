@@ -252,12 +252,22 @@
             dest: "{{ service_state_remote_restore }}"
             mode: "0600"
 
-        - name: Remove existing managed service-state paths before restore
+        - name: Find existing managed service-state children before restore
+          tags: [restore]
+          ansible.builtin.find:
+            paths: "{{ item }}"
+            recurse: false
+            hidden: true
+            excludes: [lost+found]
+          loop: "{{ service_state_definition.paths }}"
+          register: service_state_restore_children
+
+        - name: Remove existing managed service-state children before restore
           tags: [restore]
           ansible.builtin.file:
-            path: "{{ item }}"
+            path: "{{ item.path }}"
             state: absent
-          loop: "{{ service_state_definition.paths }}"
+          loop: "{{ service_state_restore_children.results | map(attribute='files') | flatten }}"
 
         - name: Restore managed service-state archive
           tags: [restore]
