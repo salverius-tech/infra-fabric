@@ -137,6 +137,29 @@ class DocumentationContractTests(unittest.TestCase):
             for marker in required:
                 self.assertIn(marker, text, f"{marker!r} missing from {relative}")
 
+    def test_hermes_independent_recovery_doc_preserves_fail_closed_order(self) -> None:
+        recovery = (ROOT / "docs" / "hermes-independent-recovery.md").read_text(encoding="utf-8")
+        required = (
+            "Hermes is an operator surface, not a recovery dependency",
+            "This is a public-safe procedure",
+            "Restore public source",
+            "Restore private site inputs",
+            "Restore audit continuity",
+            "Restore state and trust metadata",
+            "Run non-mutating checks",
+            "Re-establish infrastructure control",
+            "Converge services and recover Hermes last",
+            "hash chain is a stop condition",
+            "Never accept a changed guest host key from scanning alone",
+            "canonical wrapper after separate approval",
+        )
+        for marker in required:
+            self.assertIn(marker, recovery, marker)
+        self.assertLess(recovery.index("Restore public source"), recovery.index("Restore private site inputs"))
+        self.assertLess(recovery.index("Restore audit continuity"), recovery.index("Re-establish infrastructure control"))
+        self.assertLess(recovery.index("Run non-mutating checks"), recovery.index("Re-establish infrastructure control"))
+        self.assertLess(recovery.index("Re-establish infrastructure control"), recovery.index("Converge services and recover Hermes last"))
+
     def test_current_docs_do_not_teach_retired_authoring_surfaces(self) -> None:
         files = (
             ROOT / "README.md",
