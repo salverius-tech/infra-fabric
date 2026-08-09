@@ -113,10 +113,13 @@
       block:
         - name: Stop managed system services before restore
           tags: [restore]
-          ansible.builtin.systemd_service:
-            name: "{{ item }}"
-            state: stopped
+          ansible.builtin.command:
+            argv:
+              - systemctl
+              - stop
+              - "{{ item }}"
           loop: "{{ service_state_definition.services | default([]) }}"
+          changed_when: true
 
         - name: Resolve service-state user service owner UID
           tags: [validation]
@@ -313,11 +316,11 @@
 
         - name: Restart managed system services after restore
           tags: [restore]
-          ansible.builtin.systemd_service:
-            name: "{{ item }}"
-            state: started
-            enabled: true
-            daemon_reload: true
+          ansible.builtin.command:
+            argv:
+              - systemctl
+              - start
+              - "{{ item }}"
           loop: "{{ service_state_definition.services | default([]) }}"
           register: service_state_system_restart
           failed_when: false

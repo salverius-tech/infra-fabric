@@ -75,6 +75,8 @@ class CapacityPreflightTests(unittest.TestCase):
         self.assertIn("- --extract", restore)
         self.assertIn("- --numeric-owner", restore)
         self.assertIn("- --no-overwrite-dir", restore)
+        self.assertIn("- systemctl\n              - stop", restore)
+        self.assertIn("- systemctl\n              - start", restore)
 
 
 if __name__ == "__main__":
