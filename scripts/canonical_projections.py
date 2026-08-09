@@ -299,6 +299,15 @@ def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | No
         tf_domain = catalog.get(name).inventory.get("tf_domain")
         if endpoint_names and isinstance(tf_domain, str) and tf_domain not in values:
             values[tf_domain] = endpoint_names[0]
+        extra_play_vars = catalog.get(name).inventory.get("extra_play_vars")
+        if isinstance(extra_play_vars, Mapping):
+            for tf_key in extra_play_vars.values():
+                if not isinstance(tf_key, str) or tf_key in values:
+                    continue
+                if tf_key.endswith("_server_name") and endpoint_names:
+                    values[tf_key] = endpoint_names[0]
+                elif tf_key.endswith("_public_url") and service.endpoints.public_url:
+                    values[tf_key] = service.endpoints.public_url
     _assert_non_secret(values, "opentofu")
     return values
 
@@ -370,6 +379,7 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
     canonical model or operator-edited YAML.
     """
     _validate_non_secret_inputs(model)
+    opentofu_values = render_opentofu_variables(model, catalog)
     services: dict[str, Any] = {}
     for name, service in sorted(model.services.items()):
         if not service.enabled:
@@ -401,6 +411,11 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                 value = _compatibility_value(model, service, resource, canonical_path)
                 if value is not None:
                     legacy_vars[legacy_name] = value
+        extra_play_vars = capability.inventory.get("extra_play_vars")
+        if isinstance(extra_play_vars, Mapping):
+            for legacy_name, tf_key in extra_play_vars.items():
+                if isinstance(legacy_name, str) and isinstance(tf_key, str) and tf_key in opentofu_values:
+                    legacy_vars[legacy_name] = opentofu_values[tf_key]
         vmid_var = capability.inventory.get("vmid_var")
         if isinstance(vmid_var, str) and vmid_var:
             legacy_vars[vmid_var] = resource.identity.vmid

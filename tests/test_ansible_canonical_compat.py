@@ -238,6 +238,28 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         self.assertEqual(ansible["services"]["forgejo"]["legacy_vars"]["forgejo_domain"], "git.example.internal")
         self.assertEqual(tofu["forgejo_server_name"], "git.example.internal")
 
+    def test_shared_host_extra_endpoint_vars_reach_canonical_ansible_projection(self) -> None:
+        model = self.model.model_copy(deep=True)
+        service = model.services["searxng_onramp"].model_copy(
+            update={
+                "enabled": True,
+                "resource": "forgejo",
+                "endpoints": model.services["searxng_onramp"].endpoints.model_copy(
+                    update={
+                        "public_names": ["search.example.internal"],
+                        "public_url": "https://search.example.internal/",
+                    }
+                ),
+            }
+        )
+        model.services["searxng_onramp"] = service
+        ansible = render_ansible_vars(model, self.catalog)["services"]["searxng_onramp"]["legacy_vars"]
+        tofu = render_opentofu_variables(model, self.catalog)
+        self.assertEqual(tofu["searxng_server_name"], "search.example.internal")
+        self.assertEqual(tofu["searxng_public_url"], "https://search.example.internal/")
+        self.assertEqual(ansible["searxng_server_name"], "search.example.internal")
+        self.assertEqual(ansible["searxng_public_url"], "https://search.example.internal/")
+
     def test_projection_does_not_emit_sensitive_sentinel(self) -> None:
         inventory = render_ansible_inventory(self.model, self.catalog)
         variables = render_ansible_vars(self.model, self.catalog)
