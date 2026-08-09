@@ -243,6 +243,7 @@
               - --file={{ service_state_remote_restore }}
               - --directory=/
               - --numeric-owner
+              - --no-overwrite-dir
           changed_when: true
 
         - name: Check restored Forgejo PostgreSQL database dump
