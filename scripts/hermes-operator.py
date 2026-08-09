@@ -161,8 +161,10 @@ def audit_record_hash(record: dict[str, Any]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def read_audit_chain(path: Path) -> tuple[str, int]:
+def read_audit_chain(path: Path, *, allow_missing: bool = False) -> tuple[str, int]:
     if not path.exists():
+        if not allow_missing:
+            raise OperatorError("Hermes operator audit journal is unavailable")
         return "0" * 64, 0
     previous_hash = "0" * 64
     count = 0
@@ -205,7 +207,7 @@ def write_audit_record(repo: Path, action: str, returncode: int, result: dict[st
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(path.parent, 0o700)
     with audit_writer_lock(path):
-        previous_hash, _ = read_audit_chain(path)
+        previous_hash, _ = read_audit_chain(path, allow_missing=True)
         summary = result.get("plan") if isinstance(result.get("plan"), dict) else None
         record = {
             "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),

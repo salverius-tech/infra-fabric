@@ -113,6 +113,11 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertEqual(len(result["head_hash"]), 64)
             self.assertNotIn(str(root), json.dumps(result))
 
+    def test_audit_verify_fails_closed_when_journal_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(hermes_operator.OperatorError, "audit journal is unavailable"):
+                hermes_operator.verify_audit(Path(temp))
+
     def test_status_is_machine_readable_and_does_not_include_private_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
