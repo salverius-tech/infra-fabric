@@ -149,6 +149,14 @@ class AnsibleSafetyTests(unittest.TestCase):
         self.assertIn("forgejo_runner_registration_secret is match", str(assertion.get("that")))
         self.assertIn("{40}", str(assertion.get("that")))
 
+    def test_forgejo_runner_registration_uses_transient_secret_file(self) -> None:
+        registration = task_by_name(RUNNER_TASKS, "Register Forgejo Actions runner with Forgejo")
+        text = command_text(registration)
+        self.assertIn("mktemp", text)
+        self.assertIn("trap", text)
+        self.assertIn("--secret-file", text)
+        self.assertNotIn("--secret \"${FORGEJO_RUNNER_SECRET}\"", text)
+
     def test_forgejo_runner_registration_task_order(self) -> None:
         names = task_names(RUNNER_TASKS)
         ordered = [
