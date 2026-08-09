@@ -140,7 +140,7 @@ require_canonical_service_enabled() {
   if [[ -z "${VALUES_SITE:-}" ]]; then
     return 0
   fi
-  if ! enabled_supported_services | grep -Fxq "${requested}"; then
+  if ! enabled_supported_services | grep -Fx "${requested}" >/dev/null; then
     printf 'Service-state target is not enabled in the canonical site: %s\n' "${requested}" >&2
     exit 2
   fi
