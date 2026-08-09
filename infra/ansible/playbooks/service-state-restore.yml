@@ -203,6 +203,8 @@
               - "{{ ansible_user | default(ansible_user_id) }}"
               - --port
               - "{{ ansible_port | default(22) | string }}"
+              - --identity-file
+              - /home/anvil/.ssh/canonical-bootstrap
               - --ssh-common-args
               - "{{ ansible_ssh_common_args | default('') }}"
               - --remote-archive
