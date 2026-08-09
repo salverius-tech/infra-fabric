@@ -72,6 +72,8 @@ class CapacityPreflightTests(unittest.TestCase):
             restore.index("Preflight service-state restore capacity"),
             restore.index("Stop managed system services before restore"),
         )
+        self.assertIn("- --extract", restore)
+        self.assertIn("- --numeric-owner", restore)
 
 
 if __name__ == "__main__":
