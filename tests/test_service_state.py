@@ -83,6 +83,8 @@ class ServiceStateTests(unittest.TestCase):
         self.assertIn("Fail after attempting all managed service restarts", restore)
         self.assertIn("service_state_system_restart", restore)
         self.assertIn("service_state_user_restart", restore)
+        self.assertNotIn("rsync", restore)
+        self.assertIn("--exclude=*/lost+found", restore)
         backup = BACKUP.read_text(encoding="utf-8")
         self.assertIn("--exclude=*/lost+found", backup)
 
