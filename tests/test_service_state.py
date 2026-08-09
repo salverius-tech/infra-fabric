@@ -63,6 +63,8 @@ class ServiceStateTests(unittest.TestCase):
         self.assertNotIn("supported_services=(", cli)
         self.assertIn('print(name)', cli)
         self.assertIn("generated/ansible-vars.json", cli)
+        self.assertIn("flatten-ansible-vars.py", cli)
+        self.assertIn(".service-state-ansible-vars-", cli)
         self.assertIn('"/workspace/${site_values_dir}/site.yaml"', cli)
         self.assertNotIn('"${repo_root}/${site_values_dir}/site.yaml"', cli)
         self.assertIn('grep -Fx "${requested}" >/dev/null', cli)
