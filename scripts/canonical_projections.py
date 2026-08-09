@@ -286,6 +286,8 @@ def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | No
     for name, service in model.services.items():
         if not service.enabled:
             continue
+        resource = _resource(model, service.resource or "")
+        inventory = catalog.get(name).inventory
         if name == "forgejo" and isinstance(service.configuration.get("database"), dict):
             values["forgejo_database"] = dict(service.configuration["database"])
         if service.resource:
@@ -301,13 +303,21 @@ def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | No
             values[tf_domain] = endpoint_names[0]
         extra_play_vars = catalog.get(name).inventory.get("extra_play_vars")
         if isinstance(extra_play_vars, Mapping):
+            canonical_play_vars = inventory.get("canonical_play_vars")
             for tf_key in extra_play_vars.values():
                 if not isinstance(tf_key, str) or tf_key in values:
                     continue
                 if tf_key.endswith("_server_name") and endpoint_names:
                     values[tf_key] = endpoint_names[0]
-                elif tf_key.endswith("_public_url") and service.endpoints.public_url:
+                elif tf_key.endswith("_public_url") and not tf_key.endswith("_enable_public_url") and service.endpoints.public_url:
                     values[tf_key] = service.endpoints.public_url
+                elif isinstance(canonical_play_vars, Mapping) and isinstance(canonical_play_vars.get(tf_key), str):
+                    try:
+                        value = _compatibility_value(model, service, resource, canonical_play_vars[tf_key])
+                    except ProjectionError:
+                        continue
+                    if value is not None:
+                        values[tf_key] = value
     _assert_non_secret(values, "opentofu")
     return values
 

@@ -244,6 +244,13 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             update={
                 "enabled": True,
                 "resource": "forgejo",
+                "configuration": {
+                    **model.services["searxng_onramp"].configuration,
+                    "enable_public_url": True,
+                    "container_port": 8080,
+                    "bind_address": "127.0.0.1",
+                    "instance_name": "search",
+                },
                 "endpoints": model.services["searxng_onramp"].endpoints.model_copy(
                     update={
                         "public_names": ["search.example.internal"],
@@ -257,6 +264,7 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         tofu = render_opentofu_variables(model, self.catalog)
         self.assertEqual(tofu["searxng_server_name"], "search.example.internal")
         self.assertEqual(tofu["searxng_public_url"], "https://search.example.internal/")
+        self.assertIsInstance(tofu["searxng_enable_public_url"], bool)
         self.assertEqual(ansible["searxng_server_name"], "search.example.internal")
         self.assertEqual(ansible["searxng_public_url"], "https://search.example.internal/")
 
