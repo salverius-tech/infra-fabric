@@ -54,7 +54,6 @@ managed_service_state_catalog:
     group: onramp_host
     description: Infisical onramp compose/env files and container data under the onramp deploy directory.
     services:
-      - infisical-onramp.service
       - caddy
     user_services:
       - infisical-onramp.service
@@ -66,7 +65,6 @@ managed_service_state_catalog:
     group: onramp_host
     description: SearXNG onramp compose/env/settings files and container data under the onramp deploy directory.
     services:
-      - searxng-onramp.service
       - caddy
     user_services:
       - searxng-onramp.service

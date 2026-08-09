@@ -39,6 +39,14 @@ class ServiceStateTests(unittest.TestCase):
             ["hermes-gateway", "hermes-dashboard"],
         )
 
+    def test_onramp_user_units_are_not_declared_as_system_services(self) -> None:
+        for service, unit in (
+            ("infisical_onramp", "infisical-onramp.service"),
+            ("searxng_onramp", "searxng-onramp.service"),
+        ):
+            self.assertNotIn(unit, self.catalog[service]["services"])
+            self.assertIn(unit, self.catalog[service]["user_services"])
+
     def test_forgejo_postgres_backup_and_restore_are_managed(self) -> None:
         backup = BACKUP.read_text(encoding="utf-8")
         restore = RESTORE.read_text(encoding="utf-8")
