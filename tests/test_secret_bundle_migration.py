@@ -139,8 +139,21 @@ class SecretBundleMigrationTests(unittest.TestCase):
             )
             self.assertIn("backup", result)
             encrypt = commands[-1]
-            self.assertEqual(encrypt[encrypt.index("--filename-override") + 1], "values/sites/dev/secrets.sops.yaml")
+            self.assertEqual(encrypt[encrypt.index("--filename-override") + 1], "secrets.sops.yaml")
             self.assertEqual(encrypt[encrypt.index("--config") + 1], str(policy))
+
+    def test_encrypted_apply_reuses_matching_backup_after_interrupted_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            bundle = Path(temporary) / "values" / "sites" / "dev" / "secrets.sops.yaml"
+            bundle.parent.mkdir(parents=True)
+            bundle.write_text("old-ciphertext", encoding="utf-8")
+            (bundle.parent / ".sops.yaml").write_text("policy-metadata", encoding="utf-8")
+            bundle.with_name("secrets.sops.yaml.pre-migration").write_text("old-ciphertext", encoding="utf-8")
+
+            with patch("secret_bundle_migration._run_sops", side_effect=["operator:\n  systemboss_password: old\n", "new-ciphertext"]):
+                migrate_encrypted_bundle(bundle, apply=True)
+
+            self.assertEqual(bundle.read_text(encoding="utf-8"), "new-ciphertext")
 
 
 if __name__ == "__main__":

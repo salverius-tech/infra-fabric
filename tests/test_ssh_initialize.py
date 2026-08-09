@@ -104,7 +104,7 @@ class SshInitializeTests(unittest.TestCase):
             ) as run:
                 module._sops_yaml("sops", bundle, {"secret": "synthetic"}, Path(temporary) / "key")
         command = run.call_args.args[0]
-        self.assertEqual(command[command.index("--filename-override") + 1], "values/sites/dev/secrets.sops.yaml")
+        self.assertEqual(command[command.index("--filename-override") + 1], "secrets.sops.yaml")
         self.assertEqual(command[command.index("--config") + 1], str(policy))
 
 

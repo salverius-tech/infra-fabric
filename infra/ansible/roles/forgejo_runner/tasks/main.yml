@@ -221,7 +221,7 @@
     argv:
       - bash
       - -lc
-      - 'set -euo pipefail; runuser -u git -- env "$(printf ''%s=%s'' FORGEJO_RUNNER_SECRET "${FORGEJO_RUNNER_SECRET}")" /usr/local/bin/forgejo forgejo-cli actions register --config /etc/forgejo/app.ini --work-path /var/lib/forgejo --name "$1" --scope "$2" --secret "${FORGEJO_RUNNER_SECRET}" | tail -n1 # public-safety: allow-secret'  # yamllint disable-line rule:line-length
+      - 'set -euo pipefail; runuser -u git -- env FORGEJO_RUNNER_SECRET="${FORGEJO_RUNNER_SECRET}" /usr/local/bin/forgejo forgejo-cli actions register --config /etc/forgejo/app.ini --work-path /var/lib/forgejo --name "$1" --scope "$2" --secret "${FORGEJO_RUNNER_SECRET}" | tail -n1 # public-safety: allow-secret'  # yamllint disable-line rule:line-length
       - --
       - '{{ forgejo_runner_name | default(''homelab-deploy'') }}'
       - '{{ forgejo_runner_scope }}'

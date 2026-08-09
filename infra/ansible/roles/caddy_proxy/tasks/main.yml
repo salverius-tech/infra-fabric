@@ -20,6 +20,13 @@
   changed_when: false
   failed_when: false
 
+- name: Gather DNS LXC architecture for reviewed artifact selection
+  tags: [validation]
+  ansible.builtin.setup:
+    filter:
+      - ansible_architecture
+  when: ansible_architecture is not defined
+
 - name: Require reviewed DNS LXC Caddy artifact before guest mutation
   tags: [always]
   ansible.builtin.include_tasks: ../../../tasks/reviewed-artifact-cache.yml

@@ -230,7 +230,7 @@ class SecretProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(SecretProviderError, "scope"):
             inspect_sops_policy(policy, site="dev")
         policy.write_text(
-            "creation_rules:\n  - path_regex: '^values/sites/dev/secrets\\.sops\\.yaml$'\n    age: age1example\n",
+            "creation_rules:\n  - path_regex: '^secrets\\.sops\\.yaml$'\n    age: age1example\n",
             encoding="utf-8",
         )
         with self.assertRaisesRegex(SecretProviderError, "does not match"):
@@ -239,7 +239,7 @@ class SecretProviderTests(unittest.TestCase):
     def test_sops_policy_supports_site_and_recovery_recipients(self) -> None:
         policy = self.root / ".sops.yaml"
         policy.write_text(
-            "creation_rules:\n  - path_regex: '^values/sites/dev/secrets\\.sops\\.yaml$'\n"
+            "creation_rules:\n  - path_regex: '^secrets\\.sops\\.yaml$'\n"
             "    age:\n      - age1site\n      - age1recovery\n",
             encoding="utf-8",
         )
@@ -256,7 +256,7 @@ class SecretProviderTests(unittest.TestCase):
         policy = self.root / ".sops.yaml"
         for scope in (
             r"^values/sites/[^/]+/secrets\.sops\.yaml$",
-            r"^values/sites/prod/secrets\.sops\.yaml$",
+            r"^other\.sops\.yaml$",
         ):
             policy.write_text(
                 f"creation_rules:\n  - path_regex: '{scope}'\n    age: age1site\n",
@@ -267,9 +267,9 @@ class SecretProviderTests(unittest.TestCase):
             with self.assertRaisesRegex(SecretProviderError, "scope"):
                 sops_policy_recipients(policy, site="dev")
 
-    def test_canonical_sops_filename_is_exact_and_site_relative(self) -> None:
+    def test_canonical_sops_filename_is_exact_and_policy_relative(self) -> None:
         bundle = self.root / "values" / "sites" / "dev" / "secrets.sops.yaml"
-        self.assertEqual(canonical_sops_filename(bundle), "values/sites/dev/secrets.sops.yaml")
+        self.assertEqual(canonical_sops_filename(bundle), "secrets.sops.yaml")
         with self.assertRaisesRegex(SecretProviderError, "bundle path"):
             canonical_sops_filename(self.root / "secrets.sops.yaml")
 

@@ -8,7 +8,7 @@ Hashes and source totals are generated from the tracked public source universe.
 | `.hermes/plans/2026-08-03_071330-canonical-cutover-audit.md` | historical reference | `ab78c40b2f039ae9edfa207f08905f0392837fb318a6cd354dc95b921550a09d` | 4 |
 | `.hermes/plans/2026-08-03_135649-canonical-first-documentation-and-authoring.md` | historical reference | `14befd4041dcddd0b651ab3b7774e01d6d8a037339fecec475f3f39f3fdb89e5` | 8 |
 | `.hermes/plans/2026-08-03_174531-super-simple-software-factory-vm.md` | historical reference | `71ebb21b4ed5ef2ceb9189ee5af48eb4dae5fe3bc0c7595ac0bfd1f4d8e70c0c` | 0 |
-| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | implementation tracker | `524d7f10e3b619cdf166e7e74d0a29c8c102c39303b72add77a084bb5f2ddd85` | 164 |
+| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | implementation tracker | `d8b04a6bbb65878b6062c8255129a470bd1063f838f7bf4c7dcb5f030b584054` | 165 |
 | `.hermes/plans/2026-08-04-comprehensive-project-audit.md` | historical reference | `d95f2616909de0fc044c381a037c39d251789849231ae97d11bbc0823fabab52` | 41 |
 | `.hermes/plans/2026-08-04-design-to-implementation-backlog-reconciliation.md` | historical reference | `465f5a3f355c83e371e775815cef2c03fd47ffccc1e17f7d23db4027e50c4c7b` | 31 |
 | `.hermes/plans/canonical-values-model-implementation.md` | implementation tracker | `84dd88cf4609203e1d651d1883901fd8c35ae283102e8f0c4fe6dfa67d4af553` | 273 |
@@ -68,7 +68,7 @@ Hashes and source totals are generated from the tracked public source universe.
 | `docs/canonical-service-authoring.md` | working design | `8fb1e5b5ad75385a1ef6bd7c4ed6bd78590a8fbe7c4a8eee95cb9e1014d9e3f7` | 0 |
 | `docs/canonical-teardown.md` | operator guidance | `757c6213e940bb29b60f18b4cf18fda15d804c15c028e86fffa675c1be029d74` | 0 |
 | `docs/canonical-troubleshooting.md` | operator guidance | `47e3d14ff30deef44db44cfbb506354006a32ddcef330319440fc19232fd6610` | 0 |
-| `docs/canonical-values-mapping-v1.md` | current authority | `7c7a60508fd4a02d483b94f5b9b1fb876c8b750b5dfea146f63268ffb87caf73` | 3 |
+| `docs/canonical-values-mapping-v1.md` | current authority | `c3bbb61ef921441fa979379b94e85edd9fcf7302d5fa8b9b5d22d260df4d6ab0` | 3 |
 | `docs/canonical-values-migration.md` | operator guidance | `7769bb637118a27d688c575a246fcb4f8a0978c286bf3541b8df0aa7bc6cfb95` | 1 |
 | `docs/canonical-values-model-blockers.md` | working design | `c94a50d1bd1b9b60f38baf8ead87cef314b7f43fb24af8a92dea965c32c49c5d` | 0 |
 | `docs/canonical-values-secret-operations.md` | operator guidance | `3763de55f19ae42fe4a0765861fe05e25fc6e688660b5fa9b92b51ee886e00ff` | 0 |
@@ -76,7 +76,7 @@ Hashes and source totals are generated from the tracked public source universe.
 | `docs/development-environment.md` | working design | `6177801ff7e11de33d090dc679c009d8f3642fcf368210f023aa63e49d70e2e2` | 0 |
 | `docs/documentation-inventory.json` | unclassified | `1f255ca3c3a6f9f40166fb8e209199c9743d95efa172b170ce81ae91395e2917` | 0 |
 | `docs/hermes-control-operations.md` | operator guidance | `63c4284b16d1780389c64fe9c8c570704bb661515fa6dfc07e9607b68854c280` | 0 |
-| `docs/hermes-operator-pilot-prd.md` | working design | `480d0bbfe2b40c183f3b565885be6ca88345e9363310b74ebf02f59ef9849de2` | 7 |
+| `docs/hermes-operator-pilot-prd.md` | working design | `c1db9bcd8367f869373a174f0311590a729d93d8b68348a92eb61b0af89c98bd` | 7 |
 | `docs/hermes-state-backup.md` | operator guidance | `5400e099e4a8f08a82ac9cdd5a89b9311d3c717226d515edd2e1121914f66cd0` | 0 |
 | `docs/hermes-tuning.md` | operator guidance | `1df917be5bcadc73c7ab16313dac55374624706fae43ce53d202fd4649f888e4` | 0 |
 | `docs/just-recipes.md` | operator guidance | `94e105456c46dbaade35dbff6f04b8fdc54de0544312028cf345470d4c24a669` | 0 |

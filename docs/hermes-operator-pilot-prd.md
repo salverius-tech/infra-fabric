@@ -16,7 +16,7 @@ The homelab infrastructure workflow is repo-driven and intentionally cautious: s
 
 Hermes is now available as a managed LXC with a browser-facing dashboard. The next product question is how to use Hermes as an operator cockpit for this repository without bypassing the audited runbook workflow, leaking private values, or turning the infra repo into a general application catalog.
 
-The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized local action metadata under `.tmp/hermes-operator-audit.jsonl`; durable centralized audit persistence remains outstanding. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding.
+The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. External backup/central durability and operator identity binding remain outstanding acceptance gates. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding.
 
 ## Goals
 
@@ -121,6 +121,7 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 ## Observability and audit requirements
 
 - Hermes should capture command, repo, status, and sanitized summaries for operator actions.
+- The operator journal must be private, append-only, fsynced, hash-chained, and fail closed on malformed or tampered prior records; journal backup and independent controller durability are separate acceptance requirements.
 - Live mutation summaries must include what changed, validation run, known gaps, and next steps.
 - Failed workflows must report root cause and next safe command without dumping sensitive logs.
 - Future workflow telemetry should make plan, review, and execution quality auditable without reconstructing full transcripts.
@@ -154,7 +155,7 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 ## Resolved pilot decisions
 
 The ten approved decisions and their implementation boundaries are recorded in the
-[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record--2026-08-06).
+[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record-2026-08-06).
 For this pilot specifically:
 
 - The initial Hermes surface is read-only: status, validate, plan, sanitized

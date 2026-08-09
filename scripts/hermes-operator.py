@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -136,9 +137,45 @@ def status(repo: Path) -> dict[str, Any]:
     }
 
 
+def audit_path(repo: Path) -> Path:
+    configured = os.environ.get("HERMES_OPERATOR_AUDIT_PATH", "")
+    return Path(configured).expanduser() if configured else repo / ".tmp" / "hermes-operator-audit.jsonl"
+
+
+def audit_record_hash(record: dict[str, Any]) -> str:
+    unsigned = {key: value for key, value in record.items() if key != "record_hash"}
+    payload = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def read_audit_chain(path: Path) -> tuple[str, int]:
+    if not path.exists():
+        return "0" * 64, 0
+    previous_hash = "0" * 64
+    count = 0
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise OperatorError("cannot read Hermes operator audit journal") from error
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise OperatorError("Hermes operator audit journal is malformed") from error
+        if not isinstance(record, dict) or record.get("previous_hash") != previous_hash:
+            raise OperatorError("Hermes operator audit journal failed chain verification")
+        if record.get("record_hash") != audit_record_hash(record):
+            raise OperatorError("Hermes operator audit journal failed integrity verification")
+        previous_hash = record["record_hash"]
+        count += 1
+    return previous_hash, count
+
+
 def write_audit_record(repo: Path, action: str, returncode: int, result: dict[str, Any]) -> None:
-    path = repo / ".tmp" / "hermes-operator-audit.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = audit_path(repo)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
+    previous_hash, _ = read_audit_chain(path)
     summary = result.get("plan") if isinstance(result.get("plan"), dict) else None
     record = {
         "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -149,9 +186,18 @@ def write_audit_record(repo: Path, action: str, returncode: int, result: dict[st
             "destructive": bool(summary and summary.get("destructive")),
             "resource_changes": summary.get("resource_changes", {}) if summary else {},
         },
+        "previous_hash": previous_hash,
     }
-    with path.open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps(record, sort_keys=True) + "\n")
+    record["record_hash"] = audit_record_hash(record)
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(path, 0o600)
+    except OSError as error:
+        raise OperatorError("cannot durably append Hermes operator audit record") from error
 
 
 def default_runner(command: list[str], env: dict[str, str], repo: Path) -> tuple[int, str]:

@@ -74,6 +74,7 @@ def encrypt(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) -> by
         capture_output=True,
         text=True,
         env=environment,
+        cwd=bundle.parent,
         check=False,
         timeout=30,
     )
@@ -83,6 +84,8 @@ def encrypt(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) -> by
 
 
 def set_secret(bundle: Path, path: str, value: str, key_file: Path, *, replace: bool, sops: str) -> str:
+    bundle = bundle.resolve()
+    key_file = key_file.resolve()
     if not value or "\n" in value or "\r" in value:
         raise SecretSetError("secret value is empty or multiline")
     try:

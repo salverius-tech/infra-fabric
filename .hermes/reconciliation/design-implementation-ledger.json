@@ -1031,6 +1031,47 @@
       "evidence_level": "source"
     },
     {
+      "id": "recon-blocker-a1f2ee500b2f2f57",
+      "source_identity": "source-b6b173272fd6cfdb",
+      "source": {
+        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+        "heading": "Combined Backlog Reconciliation and Audit Remediation Plan",
+        "line": 10,
+        "kind": "blocker"
+      },
+      "summary": "**Status reconciliation (2026-08-07):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Provider-backed planning, real-host second-run idempotence, service and infrastructure recovery rehearsals, upstream Hermes Control compatibility, live guest/service health, and all production actions remain separately blocked external acceptance gates. Phase 9 remains unauthorized unless the operator separately approves its next individual risk boundary",
+      "semantic_identity": {
+        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+        "kind": "blocker",
+        "normalized_summary": "**status reconciliation (2026-08-07):** r1, r2, s1, s2, s3, o1, o2, o3, q1, q2, q3, documentation, and ci are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. this plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. provider-backed planning, real-host second-run idempotence, service and infrastructure recovery rehearsals, upstream hermes control compatibility, live guest/service health, and all production actions remain separately blocked external acceptance gates. phase 9 remains unauthorized unless the operator separately approves its next individual risk boundary",
+        "occurrence": 1
+      },
+      "domain": "service",
+      "scope": "repository",
+      "priority": "none",
+      "recommended_action": "cite production and focused verification evidence; do not treat tracker status or checkbox as proof",
+      "target_artifact": "",
+      "notes": "Losslessly extracted source claim under the declared extraction contract. Adjudicated conservatively without private, provider, live, or recovery access.",
+      "evidence": [
+        {
+          "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+          "lines": "10",
+          "role": "source-claim",
+          "claim": "**Status reconciliation (2026-08-07):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Provider-backed planning, real-host second-run idempotence, service and infrastructure recovery rehearsals, upstream Hermes Control compatibility, live guest/service health, and all production actions remain separately blocked external acceptance gates. Phase 9 remains unauthorized unless the operator separately approves its next individual risk boundary"
+        }
+      ],
+      "missing_evidence": [
+        "Production-path and focused verification citations are required before a static implementation claim; provider/live/recovery are separate gates."
+      ],
+      "dependencies": [],
+      "duplicates": [],
+      "superseded_by": [],
+      "decision_contract": null,
+      "package": "DOCS",
+      "disposition": "evidence-required",
+      "evidence_level": "source"
+    },
+    {
       "id": "recon-acceptance-972545a7ab4fab24",
       "source_identity": "source-f9bdedb73ca38597",
       "source": {
@@ -1769,7 +1810,7 @@
       "dependencies": [],
       "duplicates": [],
       "superseded_by": [
-        "recon-acceptance-972545a7ab4fab24"
+        "recon-blocker-a1f2ee500b2f2f57"
       ],
       "decision_contract": null,
       "package": "DOCS",
@@ -5873,7 +5914,7 @@
       "dependencies": [],
       "duplicates": [],
       "superseded_by": [
-        "recon-acceptance-972545a7ab4fab24"
+        "recon-blocker-a1f2ee500b2f2f57"
       ],
       "decision_contract": null,
       "package": "DOCS",
@@ -37901,22 +37942,22 @@
       "evidence_level": "source"
     },
     {
-      "id": "recon-requirement-7478f03c7411e422",
-      "source_identity": "source-4caa51df32e379aa",
+      "id": "recon-acceptance-5a1a5547a01ab7d5",
+      "source_identity": "source-bf60f671c7763526",
       "source": {
         "path": "docs/hermes-operator-pilot-prd.md",
         "heading": "Problem",
         "line": 19,
-        "kind": "requirement"
+        "kind": "acceptance"
       },
-      "summary": "The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized local action metadata under `.tmp/hermes-operator-audit.jsonl`; durable centralized audit persistence remains outstanding. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding",
+      "summary": "The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. External backup/central durability and operator identity binding remain outstanding acceptance gates. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding",
       "semantic_identity": {
         "path": "docs/hermes-operator-pilot-prd.md",
-        "kind": "requirement",
-        "normalized_summary": "the first repository-side operator interface is `scripts/hermes-operator.py`. it provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. the dashboard/gateway loads this plugin and records sanitized local action metadata under `.tmp/hermes-operator-audit.jsonl`; durable centralized audit persistence remains outstanding. the hermes package's bundled searxng provider is selected when `hermes_web_searxng_url` is configured; live search smoke testing remains outstanding",
+        "kind": "acceptance",
+        "normalized_summary": "the first repository-side operator interface is `scripts/hermes-operator.py`. it provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. the dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained jsonl journal; set `hermes_operator_audit_path` to place that journal in private controller storage instead of the default local `.tmp/` path. external backup/central durability and operator identity binding remain outstanding acceptance gates. the hermes package's bundled searxng provider is selected when `hermes_web_searxng_url` is configured; live search smoke testing remains outstanding",
         "occurrence": 1
       },
-      "domain": "operator",
+      "domain": "state",
       "scope": "repository",
       "priority": "none",
       "recommended_action": "cite production and focused verification evidence; do not treat tracker status or checkbox as proof",
@@ -37927,7 +37968,7 @@
           "path": "docs/hermes-operator-pilot-prd.md",
           "lines": "19",
           "role": "source-claim",
-          "claim": "The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized local action metadata under `.tmp/hermes-operator-audit.jsonl`; durable centralized audit persistence remains outstanding. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding"
+          "claim": "The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. External backup/central durability and operator identity binding remain outstanding acceptance gates. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding"
         }
       ],
       "missing_evidence": [
@@ -38029,7 +38070,7 @@
       "source": {
         "path": "docs/hermes-operator-pilot-prd.md",
         "heading": "Acceptance criteria",
-        "line": 128,
+        "line": 129,
         "kind": "acceptance"
       },
       "summary": "## Acceptance criteria",
@@ -38048,7 +38089,7 @@
       "evidence": [
         {
           "path": "docs/hermes-operator-pilot-prd.md",
-          "lines": "128",
+          "lines": "129",
           "role": "source-claim",
           "claim": "## Acceptance criteria"
         }
@@ -38070,7 +38111,7 @@
       "source": {
         "path": "docs/hermes-operator-pilot-prd.md",
         "heading": "Acceptance criteria",
-        "line": 135,
+        "line": 136,
         "kind": "requirement"
       },
       "summary": "Adding a plugin backend includes an explicit classification decision: Hermes-local, durable platform service, or app-platform service",
@@ -38089,7 +38130,7 @@
       "evidence": [
         {
           "path": "docs/hermes-operator-pilot-prd.md",
-          "lines": "135",
+          "lines": "136",
           "role": "source-claim",
           "claim": "Adding a plugin backend includes an explicit classification decision: Hermes-local, durable platform service, or app-platform service"
         }
@@ -38106,19 +38147,19 @@
       "evidence_level": "source"
     },
     {
-      "id": "recon-requirement-1297220b017221eb",
-      "source_identity": "source-944a69c7084d5f26",
+      "id": "recon-requirement-6038970b130f91e5",
+      "source_identity": "source-353c0c7c52f43446",
       "source": {
         "path": "docs/hermes-operator-pilot-prd.md",
         "heading": "Resolved pilot decisions",
-        "line": 157,
+        "line": 158,
         "kind": "requirement"
       },
-      "summary": "[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record--2026-08-06)",
+      "summary": "[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record-2026-08-06)",
       "semantic_identity": {
         "path": "docs/hermes-operator-pilot-prd.md",
         "kind": "requirement",
-        "normalized_summary": "[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record--2026-08-06)",
+        "normalized_summary": "[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record-2026-08-06)",
         "occurrence": 1
       },
       "domain": "operator",
@@ -38130,9 +38171,9 @@
       "evidence": [
         {
           "path": "docs/hermes-operator-pilot-prd.md",
-          "lines": "157",
+          "lines": "158",
           "role": "source-claim",
-          "claim": "[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record--2026-08-06)"
+          "claim": "[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record-2026-08-06)"
         }
       ],
       "missing_evidence": [

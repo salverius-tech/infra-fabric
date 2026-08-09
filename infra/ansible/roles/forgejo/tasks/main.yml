@@ -116,10 +116,19 @@
   ansible.builtin.template:
     src: app.ini.j2
     dest: /etc/forgejo/app.ini
-    mode: '0640'
+    # Forgejo persists its generated OAuth2 JWT secret during first service start.
+    # The service runs as the git group member, so it must retain group write access.
+    mode: '0660'
     owner: root
     group: git
   when: forgejo_write_initial_config | default(false) | bool or forgejo_app_ini_check.rc != 0 or forgejo_database.type | default('sqlite') == 'postgres'
+
+- name: Permit Forgejo to persist generated app.ini secrets
+  ansible.builtin.file:
+    path: /etc/forgejo/app.ini
+    owner: root
+    group: git
+    mode: '0660'
   no_log: true
   notify: Restart forgejo
 - name: Mark Forgejo app.ini as installed for non-interactive service startup

@@ -16,11 +16,11 @@
   hosts: "{{ direct_access_ready_hosts | default('services') }}"
   gather_facts: false
   tasks:
-    - name: Verify or enroll controller known_hosts for direct service endpoints  # noqa: run-once[task]
+    - name: Verify or enroll controller known_hosts for each direct service endpoint
       tags: [health]
       ansible.builtin.shell: |
         set -euo pipefail
-        host={{ hostvars[service_inventory_host].ansible_host | quote }}
+        host={{ ansible_host | quote }}
         known_hosts={{ direct_access_ready_known_hosts_file | default(
           '/workspace/' ~ (lookup('env', 'INFRA_VALUES_DIR') | default('values', true)) ~
           '/ansible/known_hosts', true
@@ -58,13 +58,9 @@
         executable: /bin/bash
       delegate_to: localhost
       changed_when: false
-      run_once: true
-      loop: "{{ ansible_play_hosts }}"
-      loop_control:
-        loop_var: service_inventory_host
       when:
-        - hostvars[service_inventory_host].ansible_host is defined
-        - hostvars[service_inventory_host].ansible_host | length > 0
+        - ansible_host is defined
+        - ansible_host | length > 0
 
 - name: Verify direct service SSH and Python readiness
   hosts: "{{ direct_access_ready_hosts | default('services') }}"

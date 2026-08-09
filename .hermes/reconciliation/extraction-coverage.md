@@ -8,7 +8,7 @@ Generated losslessly from tracked source records; generated artifacts are exclud
 | `.hermes/plans/2026-08-03_071330-canonical-cutover-audit.md` | 4 |
 | `.hermes/plans/2026-08-03_135649-canonical-first-documentation-and-authoring.md` | 8 |
 | `.hermes/plans/2026-08-03_174531-super-simple-software-factory-vm.md` | 0 |
-| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | 164 |
+| `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md` | 165 |
 | `.hermes/plans/2026-08-04-comprehensive-project-audit.md` | 41 |
 | `.hermes/plans/2026-08-04-design-to-implementation-backlog-reconciliation.md` | 31 |
 | `.hermes/plans/canonical-values-model-implementation.md` | 273 |
@@ -93,5 +93,5 @@ Generated losslessly from tracked source records; generated artifacts are exclud
 | `scaffold/README.md` | 0 |
 | `scaffold/sites/_template/README.md` | 0 |
 
-Total extracted records: **917**.
+Total extracted records: **918**.
 Audit finding IDs present: **38 / 38**.

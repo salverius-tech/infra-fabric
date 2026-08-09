@@ -147,11 +147,13 @@ _PLACEHOLDER_RECIPIENT = "age1REPLACE_WITH_SITE_RECIPIENT"
 
 
 def _sops_site_scope(site: str) -> str:
-    return f"^values/sites/{site}/secrets\\.sops\\.yaml$"
+    """Return the SOPS path scope relative to a site-local policy file."""
+    del site
+    return r"^secrets\.sops\.yaml$"
 
 
 def canonical_sops_filename(bundle: Path) -> str:
-    """Return the exact site-relative filename used by private SOPS policy."""
+    """Return the filename SOPS matches relative to a site-local policy file."""
     resolved = bundle.expanduser().resolve()
     parts = resolved.parts
     for index in range(len(parts) - 3):
@@ -162,7 +164,7 @@ def canonical_sops_filename(bundle: Path) -> str:
                 and index + 3 == len(parts) - 1
                 and parts[index + 3] == "secrets.sops.yaml"
             ):
-                return f"values/sites/{site}/secrets.sops.yaml"
+                return "secrets.sops.yaml"
     raise SecretProviderError("canonical SOPS bundle path is invalid")
 
 

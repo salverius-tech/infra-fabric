@@ -76,7 +76,7 @@ class RecoverCanonicalSecretsTests(unittest.TestCase):
             self.assertEqual(report, ["imported missing canonical target: services.forgejo.secrets.internal_token"])
             self.assertNotIn("synthetic-value", repr(report))
             encrypt = commands[-1]
-            self.assertEqual(encrypt[encrypt.index("--filename-override") + 1], "values/sites/dev/secrets.sops.yaml")
+            self.assertEqual(encrypt[encrypt.index("--filename-override") + 1], "secrets.sops.yaml")
             self.assertEqual(encrypt[encrypt.index("--config") + 1], str(policy))
             self.assertEqual(bundle.read_text(encoding="utf-8"), "new-ciphertext")
 

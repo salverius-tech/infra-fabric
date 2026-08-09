@@ -10,6 +10,7 @@ services:
     volumes:
       - .:/workspace
       - ${HOST_SSH_DIR:-${HOME}/.ssh}:/ssh-ro:ro
+      - ${INFRA_ARTIFACT_CACHE_ROOT:-/var/lib/infra-fabric/artifacts}:/var/lib/infra-fabric/artifacts:ro
       - tofu-plugin-cache:/home/anvil/.terraform.d/plugin-cache
       - ansible-cache:/home/anvil/.ansible
     environment:
@@ -20,6 +21,9 @@ services:
       INFRA_COPY_SSH_KEYS: ${INFRA_COPY_SSH_KEYS:-false}
       INFRA_SSH_IDENTITY_FILE: ${INFRA_SSH_IDENTITY_FILE:-}
       INFRA_SSH_IDENTITY_SOURCE: ${INFRA_SSH_IDENTITY_SOURCE:-external}
+      INFRA_PVE_SSH_IDENTITY_FILE: ${INFRA_PVE_SSH_IDENTITY_FILE:-}
+      INFRA_APPLY_ANSIBLE_MODE: ${INFRA_APPLY_ANSIBLE_MODE:-parallel}
+      INFRA_APPLY_ANSIBLE_MAX_WORKERS: ${INFRA_APPLY_ANSIBLE_MAX_WORKERS:-4}
       INFRA_HOST_UID: ${INFRA_HOST_UID:-1000}
       INFRA_HOST_GID: ${INFRA_HOST_GID:-1000}
       SERVICE_STATE_BACKUP_ROOT: ${SERVICE_STATE_BACKUP_ROOT:-}

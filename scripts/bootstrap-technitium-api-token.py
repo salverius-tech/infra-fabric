@@ -35,13 +35,14 @@ class TechnitiumBootstrapClient:
         params: Mapping[str, str] | None = None,
         token: str | None = None,
         timeout: int = 30,
+        method: str = "POST",
     ) -> dict[str, Any]:
         data = urllib.parse.urlencode(params or {}).encode()
         headers = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
         request = urllib.request.Request(
-            f"{self.api_url}{path}", data=data, headers=headers, method="POST"
+            f"{self.api_url}{path}", data=data if method == "POST" else None, headers=headers, method=method
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read().decode()
@@ -54,7 +55,9 @@ class TechnitiumBootstrapClient:
         last_error: Exception | None = None
         for _attempt in range(retries):
             try:
-                return self.call("/status", timeout=10)
+                # Technitium exposes status as a GET endpoint; POST is not routed
+                # and returns 404 even after the API itself is ready.
+                return self.call("/status", timeout=10, method="GET")
             except BootstrapError as error:
                 if "invalid-token" in str(error).lower():
                     return {"status": "ok", "hasDefaultCredentials": False}
@@ -110,7 +113,12 @@ def ensure_admin_password(
     entries: dict[str, EnvEntry],
     user: str,
 ) -> str:
-    configured = env_value(entries, "TECHNITIUM_ADMIN_PASSWORD") or env_value(entries, "TECHNITIUM_ADMIN_PASS")
+    configured = (
+        env_value(entries, "TECHNITIUM_ADMIN_PASSWORD")
+        or env_value(entries, "TECHNITIUM_ADMIN_PASS")
+        or os.environ.get("TECHNITIUM_ADMIN_PASSWORD", "")
+        or os.environ.get("TECHNITIUM_ADMIN_PASS", "")
+    )
     if not is_placeholder(configured):
         return configured
 
@@ -129,7 +137,10 @@ def ensure_admin_password(
 
 
 def bootstrap(env_file: Path, retries: int, delay: int, token_name: str) -> bool:
-    env_lines = read_lines(env_file)
+    # Canonical execution snapshots intentionally contain only site.yaml,
+    # secrets.sops.yaml, policy, and derived projections.  Their legacy .env
+    # file is absent; protected values arrive through transient environment.
+    env_lines = read_lines(env_file) if env_file.is_file() else []
     entries = parse_env_lines(env_lines, env_file)
     api_url = env_value(entries, "TECHNITIUM_API_URL") or os.environ.get("TECHNITIUM_API_URL", "")
     if is_placeholder(api_url):
@@ -138,7 +149,7 @@ def bootstrap(env_file: Path, retries: int, delay: int, token_name: str) -> bool
     client = TechnitiumBootstrapClient(api_url)
     status = client.wait_for_status(retries, delay)
 
-    existing_token = env_value(entries, "TECHNITIUM_API_TOKEN")
+    existing_token = env_value(entries, "TECHNITIUM_API_TOKEN") or os.environ.get("TECHNITIUM_API_TOKEN", "")
     if validate_existing_token(client, existing_token):
         print("Technitium API token already works.")
         return False
@@ -147,16 +158,18 @@ def bootstrap(env_file: Path, retries: int, delay: int, token_name: str) -> bool
     admin_password = ensure_admin_password(client, status, env_file, env_lines, entries, user)
     try:
         session_token = login(client, user, admin_password)
-    except BootstrapError:
-        if not bool(status.get("hasDefaultCredentials")):
-            raise
-        new_password = secrets.token_urlsafe(32)
-        default_session_token = login(client, user, "admin")
-        client.call("/user/changePassword", {"pass": "admin", "newPass": new_password}, token=default_session_token)
-        set_env(env_lines, entries, "TECHNITIUM_ADMIN_PASSWORD", new_password)
-        write_lines(env_file, env_lines)
-        print("Replaced stale Technitium admin password from default credentials.")
-        session_token = login(client, user, new_password)
+    except BootstrapError as configured_login_error:
+        # Some supported releases report hasDefaultCredentials=false after an
+        # auth-config reset even though the default administrator login works.
+        # Probe that login before rotating; if it also fails, preserve the
+        # configured-password failure rather than changing server state.
+        try:
+            default_session_token = login(client, user, "admin")
+        except BootstrapError:
+            raise configured_login_error
+        client.call("/user/changePassword", {"pass": "admin", "newPass": admin_password}, token=default_session_token)
+        print("Replaced default Technitium admin password from protected canonical input.")
+        session_token = login(client, user, admin_password)
     api_token = create_api_token(client, session_token, token_name)
     set_env(env_lines, entries, "TECHNITIUM_API_TOKEN", api_token)
     write_lines(env_file, env_lines)

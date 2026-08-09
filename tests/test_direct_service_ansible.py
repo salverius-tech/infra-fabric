@@ -73,6 +73,9 @@ class DirectServiceAnsibleHelperTests(unittest.TestCase):
         self.assertIn("direct_access_ready_accept_host_key_change", playbook)
         self.assertIn("SSH host key changed", playbook)
         self.assertNotIn("ssh-keygen -R {{ hostvars", playbook)
+        self.assertIn("host={{ ansible_host | quote }}", playbook)
+        self.assertNotIn("run_once: true", playbook)
+        self.assertNotIn("ansible_play_hosts", playbook)
 
     def test_nested_command_args_are_recognized_as_idempotence_guards(self) -> None:
         checker = self.load_helper().command_task_has_idempotence

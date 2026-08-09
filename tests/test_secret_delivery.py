@@ -188,12 +188,18 @@ class SecretDeliveryTests(unittest.TestCase):
         with self.assertRaises(secret_delivery.SecretDeliveryError):
             secret_delivery.deliver_services_environment(provider, catalog, services)
 
-    def test_service_without_runtime_secrets_receives_only_declared_provider_secret(self) -> None:
+    def test_technitium_delivery_includes_protected_admin_password(self) -> None:
         catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
         services = {"technitium": SimpleNamespace(enabled=True, configuration={})}
-        provider = FakeProvider({"secrets.providers.cloudflare.api_token": "CF"})
+        provider = FakeProvider(
+            {
+                "secrets.providers.cloudflare.api_token": "CF",
+                "services.technitium.secrets.api_token": "TOKEN",
+                "services.technitium.secrets.admin_password": "ADMIN",
+            }
+        )
         environment = secret_delivery.deliver_services_environment(provider, catalog, services)
-        self.assertEqual(environment, {"CF_DNS_API_TOKEN": "CF"})
+        self.assertEqual(environment, {"CF_DNS_API_TOKEN": "CF", "TECHNITIUM_API_TOKEN": "TOKEN", "TECHNITIUM_ADMIN_PASSWORD": "ADMIN"})
         self.assertNotIn("INFRA_BOOTSTRAP_ROOT_PASSWORD", environment)
         self.assertNotIn("INFRA_OPERATOR_PASSWORD", environment)
         self.assertNotIn("PROXMOX_VE_API_TOKEN", environment)

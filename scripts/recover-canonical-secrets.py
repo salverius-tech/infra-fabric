@@ -129,6 +129,7 @@ def recover(values_root: Path, bundle: Path, mappings: list[tuple[str, str]], *,
                 "-",
             ],
             input_text=_yaml_dump(document),
+            cwd=bundle.parent,
         )
         staged = bundle.with_name(f".{bundle.name}.recovery-next")
         staged.write_text(encrypted, encoding="utf-8")

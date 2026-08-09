@@ -130,6 +130,7 @@ def _run_sops(
     *,
     input_text: str | None = None,
     environment: dict[str, str] | None = None,
+    cwd: Path | None = None,
 ) -> str:
     env = os.environ.copy()
     if environment:
@@ -143,6 +144,7 @@ def _run_sops(
             text=True,
             check=False,
             env=env,
+            cwd=cwd,
         )
     except OSError as error:
         raise SecretBundleMigrationError("SOPS executable is unavailable") from error
@@ -199,7 +201,7 @@ def migrate_encrypted_bundle(
         relative_name = canonical_sops_filename(destination)
     except SecretProviderError as error:
         raise SecretBundleMigrationError("secret bundle destination is not canonical") from error
-    with tempfile.TemporaryDirectory(prefix="canonical-secret-migration-") as temporary:
+    with tempfile.TemporaryDirectory(prefix=".canonical-secret-migration-", dir=destination.parent) as temporary:
         temporary_dir = Path(temporary)
         plaintext = temporary_dir / "bundle.yaml"
         plaintext.write_text(_yaml_dump(migrated), encoding="utf-8")
@@ -219,15 +221,18 @@ def migrate_encrypted_bundle(
                 str(plaintext),
             ],
             environment=environment,
+            cwd=destination.parent,
         )
         staged = temporary_dir / "bundle.sops.yaml"
         staged.write_text(encrypted, encoding="utf-8")
         staged.chmod(0o600)
         backup = destination.with_name(destination.name + ".pre-migration")
         if backup.exists():
-            raise SecretBundleMigrationError("secret-bundle migration backup already exists")
-        shutil.copy2(destination, backup)
-        backup.chmod(0o600)
+            if hashlib.sha256(backup.read_bytes()).digest() != hashlib.sha256(destination.read_bytes()).digest():
+                raise SecretBundleMigrationError("secret-bundle migration backup already exists")
+        else:
+            shutil.copy2(destination, backup)
+            backup.chmod(0o600)
         os.replace(staged, destination)
     result["backup"] = str(backup)
     result["destination_ciphertext_sha256"] = hashlib.sha256(destination.read_bytes()).hexdigest()

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import stat
 import json
 import sys
 import tempfile
@@ -71,6 +73,34 @@ class HermesOperatorTests(unittest.TestCase):
             audit = json.loads((root / ".tmp" / "hermes-operator-audit.jsonl").read_text())
             self.assertEqual(audit["action"], "validate")
             self.assertNotIn("secret-value", (root / ".tmp" / "hermes-operator-audit.jsonl").read_text())
+
+    def test_audit_records_form_a_mode_restricted_hash_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            audit_path = root / "private" / "audit.jsonl"
+            previous = os.environ.get("HERMES_OPERATOR_AUDIT_PATH")
+            os.environ["HERMES_OPERATOR_AUDIT_PATH"] = str(audit_path)
+            try:
+                hermes_operator.run_action(root, "validate", runner=lambda *_: (0, "ok\n"))
+                hermes_operator.run_action(root, "validate", runner=lambda *_: (0, "ok\n"))
+            finally:
+                if previous is None:
+                    os.environ.pop("HERMES_OPERATOR_AUDIT_PATH", None)
+                else:
+                    os.environ["HERMES_OPERATOR_AUDIT_PATH"] = previous
+            records = [json.loads(line) for line in audit_path.read_text().splitlines()]
+            self.assertEqual(records[0]["previous_hash"], "0" * 64)
+            self.assertEqual(records[1]["previous_hash"], records[0]["record_hash"])
+            self.assertEqual(stat.S_IMODE(audit_path.stat().st_mode), 0o600)
+
+    def test_tampered_audit_journal_fails_closed_before_append(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            audit_path = root / ".tmp" / "hermes-operator-audit.jsonl"
+            hermes_operator.run_action(root, "validate", runner=lambda *_: (0, "ok\n"))
+            audit_path.write_text(audit_path.read_text().replace('"ok":true', '"ok":false'), encoding="utf-8")
+            with self.assertRaises(hermes_operator.OperatorError):
+                hermes_operator.run_action(root, "validate", runner=lambda *_: (0, "ok\n"))
 
     def test_status_is_machine_readable_and_does_not_include_private_values(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

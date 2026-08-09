@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
 import tempfile
@@ -18,6 +19,12 @@ spec.loader.exec_module(apply_ansible_services)
 
 
 class ApplyAnsibleServicesTests(unittest.TestCase):
+    def test_canonical_identity_args_keep_proxmox_lifecycle_root_skip_enabled(self) -> None:
+        with mock.patch.dict(os.environ, {"INFRA_HOST_IDENTITY_SKIP_ROOT": "false"}, clear=False):
+            result = apply_ansible_services.canonical_identity_extra_args()
+
+        self.assertIn("infra_host_identity_skip_root=true", result)
+
     def test_dependency_waves_parallelize_independent_services(self) -> None:
         waves = apply_ansible_services.dependency_waves(
             ["technitium", "forgejo", "forgejo_runner", "onramp_host", "searxng_onramp", "hermes"]
@@ -149,6 +156,53 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 "infra/ansible/playbooks/direct-access-ready.yml",
             ],
         )
+
+    def test_canonical_transport_binds_ssh_known_hosts_to_execution_context(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            generated = root / "generated"
+            generated.mkdir()
+            (generated / "ansible-vars.json").write_text('{"services": {}}\n', encoding="utf-8")
+
+            class Context:
+                canonical_site_path = root / "site.yaml"
+
+                @staticmethod
+                def generated_path(name: str) -> Path:
+                    return generated / name
+
+                @staticmethod
+                def path(name: str) -> Path:
+                    return root / name
+
+            with (
+                mock.patch.object(apply_ansible_services, "canonical_dns_environment", return_value={}),
+                mock.patch.dict(os.environ, {"INFRA_PVE_SSH_IDENTITY_FILE": "pve-management"}, clear=False),
+            ):
+                transport = apply_ansible_services.canonical_ansible_transport(Context(), root, [])
+
+        assert transport is not None
+        self.assertIn(
+            json.dumps(
+                {
+                    "ansible_ssh_common_args": (
+                        f"-o UserKnownHostsFile={root / 'ansible/known_hosts'} -o StrictHostKeyChecking=yes"
+                    )
+                }
+            ),
+            transport.extra_args,
+        )
+
+    def test_runtime_known_hosts_path_uses_live_values_dir_during_snapshot_execution(self) -> None:
+        class Context:
+            @staticmethod
+            def path(name: str) -> Path:
+                return Path("/sealed-snapshot") / name
+
+        with mock.patch.dict(os.environ, {"INFRA_VALUES_DIR": "/live-values/sites/dev"}, clear=False):
+            result = apply_ansible_services.runtime_known_hosts_path(Context())
+
+        self.assertEqual(result, Path("/live-values/sites/dev/ansible/known_hosts"))
 
     def test_run_service_keeps_service_playbooks_sequential(self) -> None:
         commands: list[list[str]] = []

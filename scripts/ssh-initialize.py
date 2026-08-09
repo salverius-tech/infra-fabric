@@ -82,6 +82,7 @@ def _sops_yaml(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) ->
         capture_output=True,
         text=True,
         env=env,
+        cwd=bundle.parent,
         check=False,
         timeout=30,
     )

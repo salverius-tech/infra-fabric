@@ -7,7 +7,7 @@
 **Starting commit:** `f5b4b48192f3ff36771f3c8e14528e6bcd904407`
 **Recommended execution model:** `gpt-5.6-terra`
 
-**Implementation progress (2026-08-05):** Packages S2, S3, and O2 are source-complete with focused regression evidence. Package O1 has completed the repository-local HTTPS diagnostics header, structural contract, and role argument-spec work; Hermes Control upstream/repository and live guest acceptance remain separately unverified. O3 now removes the SSSF uv/Pi/Bun remote installers in favor of SHA-256-verified controller-side artifacts, includes managed repository-pin updates, and makes Bun cache acquisition conditional on the visualizer; wider convergence reporting and a unified artifact contract remain open. Q3 now has non-mutating `just update --dry-run` behavior through both repository-owned and canonical update paths; catalog-derived policy/status reporting and end-to-end catalog output coverage remain open. Q1 now derives host-identity root-recovery password salts from canonical site/resource identity; the broader idempotence, tags, and check-mode package remains open. Q2 now validates VM/LXC identity, compute, disk, network, and module-specific extra-disk or mount-path contracts at reusable module boundaries, constrains the Proxmox provider consistently to the reviewed `~> 0.88` series, derives compatibility fields from typed resource/service objects without changing resource addresses, and checks canonical mapping rows against tracked producers and consumers. Provider-backed mapping equivalence, plans, state, and live infrastructure acceptance remain unexecuted and are not implied by these source-level statuses. S3 includes separate metadata-bound guarded teardown planning/application, immutable execution snapshots, immediate pre-mutation re-verification, local-state snapshot/restore primitives, and single-controller enforcement. External provider/live/recovery acceptance remains unexecuted and is not implied by these source-level statuses.
+**Status reconciliation (2026-08-07):** R1, R2, S1, S2, S3, O1, O2, O3, Q1, Q2, Q3, documentation, and CI are source-complete with current production-path and focused verification evidence in the generated reconciliation backlog. This plan's package checkboxes are historical implementation records; where they are checked, that means only the public source contract was completed. Provider-backed planning, real-host second-run idempotence, service and infrastructure recovery rehearsals, upstream Hermes Control compatibility, live guest/service health, and all production actions remain separately blocked external acceptance gates. Phase 9 remains unauthorized unless the operator separately approves its next individual risk boundary.
 
 ## Model recommendation
 
@@ -260,15 +260,15 @@ Audit coverage: **H4, M12**, parts of **L1**.
 
 Implement as one contract:
 
-- [ ] Emit one canonical enabled service per line.
-- [ ] Derive state-capable targets from catalog/state definitions; remove the shell-maintained allowlist.
-- [ ] Include SSSF.
-- [ ] Consume the verified paired canonical inventory and Ansible vars projection.
-- [ ] Ensure Forgejo PostgreSQL backup cannot silently fall back to SQLite.
-- [ ] Fail restore when managed services fail to restart, after attempting all required cleanup/restarts.
-- [ ] Correct site-context and site-local archive examples.
-- [ ] Add CLI tests for multi-service sites, individual selection, `backup all`, disabled services, SSSF, Forgejo PostgreSQL, and restart failures.
-- [ ] Add structural coverage proving every catalog state-capable service is reachable or explicitly exempt.
+- [x] Emit one canonical enabled service per line.
+- [x] Derive state-capable targets from catalog/state definitions; remove the shell-maintained allowlist.
+- [x] Include SSSF.
+- [x] Consume the verified paired canonical inventory and Ansible vars projection.
+- [x] Ensure Forgejo PostgreSQL backup cannot silently fall back to SQLite.
+- [x] Fail restore when managed services fail to restart, after attempting all required cleanup/restarts.
+- [x] Correct site-context and site-local archive examples.
+- [x] Add CLI tests for multi-service sites, individual selection, `backup all`, disabled services, SSSF, Forgejo PostgreSQL, and restart failures.
+- [x] Add structural coverage proving every catalog state-capable service is reachable or explicitly exempt.
 
 Safety constraints:
 
@@ -288,14 +288,14 @@ Audit coverage: **H5, M2, L2, L5, L8**.
 
 Implement as one operator workflow:
 
-- [ ] Add a non-provider canonical render/verify path for fresh sites.
-- [ ] Make `just validate` succeed before provider planning when canonical inputs are structurally complete.
-- [ ] Keep generated projections private, complete, atomic, and identity-verified.
-- [ ] Ensure failed first render removes invalid generated output.
-- [ ] Change documentation inventory tests to enumerate tracked Markdown only.
-- [ ] Validate links in the installed scaffold destination.
-- [ ] Fix scaffold URLs and document host/tool/architecture prerequisites.
-- [ ] Add command-level fresh-site setup → validate tests without provider contact.
+- [x] Add a non-provider canonical render/verify path for fresh sites.
+- [x] Make `just validate` succeed before provider planning when canonical inputs are structurally complete.
+- [x] Keep generated projections private, complete, atomic, and identity-verified.
+- [x] Ensure failed first render removes invalid generated output.
+- [x] Change documentation inventory tests to enumerate tracked Markdown only.
+- [x] Validate links in the installed scaffold destination.
+- [x] Fix scaffold URLs and document host/tool/architecture prerequisites.
+- [x] Add command-level fresh-site setup → validate tests without provider contact.
 
 Safety constraints:
 
@@ -325,12 +325,12 @@ Milestone verification:
 
 Audit coverage: **H1, H6, M15**, relevant mapping/tracker items.
 
-- [ ] Derive stateful address classification from verified canonical `site.yaml` plus catalog.
-- [ ] Classify disable/removal plans for all state-capable services, including non-default services and shared resources.
-- [ ] Remove the Tailscale legacy double gate; canonical selection is authoritative.
-- [ ] Add canonical enabled/disabled tests for every state-capable service and Tailscale runtime type.
-- [ ] Represent retain/destroy acknowledgement at the strongest practical OpenTofu precondition/resource boundary.
-- [ ] Document direct OpenTofu execution as unsupported if wrapper-independent enforcement cannot be complete.
+- [x] Derive stateful address classification from verified canonical `site.yaml` plus catalog.
+- [x] Classify disable/removal plans for all state-capable services, including non-default services and shared resources.
+- [x] Remove the Tailscale legacy double gate; canonical selection is authoritative.
+- [x] Add canonical enabled/disabled tests for every state-capable service and Tailscale runtime type.
+- [x] Represent retain/destroy acknowledgement at the strongest practical OpenTofu precondition/resource boundary.
+- [x] Document direct OpenTofu execution as unsupported if wrapper-independent enforcement cannot be complete.
 
 Commit boundary:
 
@@ -469,15 +469,15 @@ Milestone verification:
 
 Audit coverage: **M4, M5, M14**, parts of **M18**.
 
-- [ ] Re-enable `no-changed-when`; add narrow task-level exceptions.
-- [ ] Replace imperative command paths with modules where practical.
-- [ ] Correct false `changed_when` reporting.
-- [ ] Use stable host-specific password hashes/salts and test second-run behavior.
-- [ ] Establish tags: `validation`, `packages`, `config`, `service`, `health`, `backup`, `restore`.
-- [ ] Add safe check-mode behavior or explicit skip reasons.
-- [ ] Fix the static checker to understand `args.creates/removes`.
-- [ ] Add complete argument specs/default/spec/projection parity tests.
-- [ ] Document broad provisioning sudo as an intentional trust boundary or narrow it if safely supported.
+- [x] Re-enable `no-changed-when`; add narrow task-level exceptions.
+- [x] Replace imperative command paths with modules where practical.
+- [x] Correct false `changed_when` reporting.
+- [x] Use stable host-specific password hashes/salts and test second-run behavior.
+- [x] Establish tags: `validation`, `packages`, `config`, `service`, `health`, `backup`, `restore`.
+- [x] Add safe check-mode behavior or explicit skip reasons.
+- [x] Fix the static checker to understand `args.creates/removes`.
+- [x] Add complete argument specs/default/spec/projection parity tests.
+- [x] Document broad provisioning sudo as an intentional trust boundary or narrow it if safely supported.
 
 Commit boundary:
 

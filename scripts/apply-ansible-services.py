@@ -53,10 +53,22 @@ class ServiceResult:
 
 @dataclass(frozen=True)
 class CanonicalAnsibleTransport:
-    inventory: str
+    inventories: tuple[str, ...]
     extra_args: tuple[str, ...]
     vars_path: Path
+    runtime_inventory_path: Path
     environment: dict[str, str]
+
+
+def runtime_known_hosts_path(context: object) -> Path:
+    """Keep mutable SSH trust material outside an immutable execution snapshot."""
+    configured = os.environ.get("INFRA_VALUES_DIR", "").strip()
+    if configured:
+        values_dir = Path(configured).expanduser()
+        if not values_dir.is_absolute():
+            values_dir = (REPO / values_dir).resolve()
+        return values_dir / "ansible" / "known_hosts"
+    return getattr(context, "path")("ansible/known_hosts")
 
 
 def enabled_services(settings_path: Path | None = None, service: str = "") -> list[str]:
@@ -151,8 +163,9 @@ def canonical_identity_extra_args() -> tuple[str, ...]:
     args: list[str] = []
     if identity and re.fullmatch(r"[A-Za-z0-9._-]+", identity):
         args.extend(("-e", f"ansible_ssh_private_key_file={Path.home() / '.ssh' / identity}"))
-    if os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "").strip().lower() != "false":
-        args.extend(("-e", "infra_host_identity_skip_root=true"))
+    # LXC first-boot root access is handled explicitly by run_canonical_host_identity.
+    # Service lifecycle playbooks must never reuse the guest bootstrap identity on PVE.
+    args.extend(("-e", "infra_host_identity_skip_root=true"))
     return tuple(args)
 
 
@@ -220,7 +233,7 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     technitium_address = technitium.network.address.split("/", 1)[0]
     return {
         "DNS_RECORDS_FILE": str(dns_path),
-        "TECHNITIUM_API_URL": f"http://{technitium_address}:5380",
+        "TECHNITIUM_API_URL": f"http://{technitium_address}:5380/api",
     }
 
 
@@ -379,7 +392,7 @@ def run_canonical_direct_access_ready(
 ) -> int:
     """Enroll and verify guest SSH trust before the first canonical connection."""
     runner = runner or default_runner
-    known_hosts = getattr(context, "path")("ansible/known_hosts")
+    known_hosts = runtime_known_hosts_path(context)
     ready_hosts = "all:!proxmox"
     selected_resource = os.environ.get("INFRA_HOST_IDENTITY_ONLY", "").strip()
     if selected_resource:
@@ -446,10 +459,38 @@ def canonical_ansible_transport(context: object, log_dir: Path, services: list[s
         os.close(file_descriptor)
         vars_path.unlink(missing_ok=True)
         raise
+    pve_identity = os.environ.get("INFRA_PVE_SSH_IDENTITY_FILE", "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", pve_identity):
+        vars_path.unlink(missing_ok=True)
+        raise RuntimeError("canonical Ansible execution requires an explicit Proxmox SSH identity")
+    runtime_inventory_path = log_dir / ".canonical-proxmox-identity.json"
+    runtime_inventory_path.write_text(
+        json.dumps(
+            {
+                "all": {"vars": {"ansible_ssh_private_key_file": str(Path.home() / ".ssh" / "canonical-bootstrap")}},
+                "proxmox": {"vars": {"ansible_ssh_private_key_file": str(Path.home() / ".ssh" / pve_identity)}},
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    os.chmod(runtime_inventory_path, 0o600)
+    known_hosts = runtime_known_hosts_path(context)
+    ssh_common_args = f"-o UserKnownHostsFile={known_hosts} -o StrictHostKeyChecking=yes"
+    ssh_transport_vars = json.dumps({"ansible_ssh_common_args": ssh_common_args})
     return CanonicalAnsibleTransport(
-        inventory=str(inventory_path),
-        extra_args=("-e", f"@{vars_path}", *canonical_identity_extra_args()),
+        inventories=(str(inventory_path), str(runtime_inventory_path)),
+        extra_args=(
+            "-e",
+            f"@{vars_path}",
+            "-e",
+            ssh_transport_vars,
+            "-e",
+            "infra_host_identity_skip_root=true",
+        ),
         vars_path=vars_path,
+        runtime_inventory_path=runtime_inventory_path,
         environment=environment,
     )
 
@@ -460,7 +501,7 @@ def bootstrap_technitium_token(env_file: Path, log_path: Path, env: dict[str, st
         log_path,
         env,
     )
-    if rc == 0:
+    if rc == 0 and env_file.is_file():
         refresh_env_from_file(env_file, env)
     return rc
 
@@ -667,7 +708,7 @@ def main(argv: list[str] | None = None) -> int:
             if transport is None:
                 raise RuntimeError("--canonical-ansible requires a selected canonical site")
             base_env.update(transport.environment)
-            inventories = (transport.inventory,)
+            inventories = transport.inventories
             extra_args = transport.extra_args
         else:
             base_env.update(canonical_dns_environment(context))
@@ -758,6 +799,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if transport is not None:
             transport.vars_path.unlink(missing_ok=True)
+            transport.runtime_inventory_path.unlink(missing_ok=True)
     summarize_results(services, results)
     return summarize_failures(results)
 

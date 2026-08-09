@@ -49,17 +49,21 @@ if [[ -d /ssh-ro ]]; then
       ;;
   esac
 
-  if [[ "${INFRA_SSH_IDENTITY_SOURCE:-external}" == "sops" ]]; then
-    if [[ "${INFRA_COPY_SSH_KEYS:-false}" != "true" ]]; then
-      printf 'SOPS-backed SSH identity requires the protected SSH transport boundary.\n' >&2
-      exit 2
-    fi
+  if [[ "${INFRA_SSH_IDENTITY_SOURCE:-external}" == "sops" && "${INFRA_COPY_SSH_KEYS:-false}" == "true" && -n "${INFRA_VALUES_DIR:-}" ]]; then
     if [[ -z "${INFRA_VALUES_DIR:-}" || -z "${SOPS_AGE_KEY_FILE:-}" ]]; then
       printf 'SOPS-backed SSH identity inputs are unavailable.\n' >&2
       exit 2
     fi
     python3 /workspace/scripts/canonical_ssh_identity.py --destination "${ssh_dir}/canonical-bootstrap"
     export INFRA_SSH_IDENTITY_FILE=canonical-bootstrap
+    pve_identity_file="${INFRA_PVE_SSH_IDENTITY_FILE:-}"
+    if [[ -n "${pve_identity_file}" ]]; then
+      if [[ ! "${pve_identity_file}" =~ ^[A-Za-z0-9._-]+$ ]] || [[ ! -f "/ssh-ro/${pve_identity_file}" ]]; then
+        printf 'Configured Proxmox SSH identity is unavailable.\n' >&2
+        exit 2
+      fi
+      cp "/ssh-ro/${pve_identity_file}" "${ssh_dir}/${pve_identity_file}"
+    fi
   fi
 
   for path in /ssh-ro/known_hosts /ssh-ro/config /ssh-ro/*.pub; do

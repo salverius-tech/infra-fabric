@@ -51,13 +51,19 @@
       ],
       "dependencies": [],
       "required_secrets": [
-        "secrets.providers.cloudflare.api_token"
+        "secrets.providers.cloudflare.api_token",
+        "services.technitium.secrets.api_token",
+        "services.technitium.secrets.admin_password"
       ],
       "secret_classifications": {
-        "secrets.providers.cloudflare.api_token": "provider"
+        "secrets.providers.cloudflare.api_token": "provider",
+        "services.technitium.secrets.api_token": "runtime",
+        "services.technitium.secrets.admin_password": "runtime"
       },
       "secret_environment": {
-        "secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN"
+        "secrets.providers.cloudflare.api_token": "CF_DNS_API_TOKEN",
+        "services.technitium.secrets.api_token": "TECHNITIUM_API_TOKEN",
+        "services.technitium.secrets.admin_password": "TECHNITIUM_ADMIN_PASSWORD"
       },
       "inventory": {
         "host": "technitium_dns",
