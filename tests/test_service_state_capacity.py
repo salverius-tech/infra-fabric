@@ -62,7 +62,7 @@ class CapacityPreflightTests(unittest.TestCase):
         self.assertIn("validate-service-state-archive.py", restore)
         self.assertIn("fetch-service-state.py", restore)
         self.assertNotIn("ansible.builtin.fetch:", restore)
-        self.assertNotIn("failed_when: false", restore[:restore.index("Create temporary pre-restore")])
+        self.assertIn("Validate managed system service stop results", restore)
         self.assertNotIn("tar -tzf", restore)
         self.assertIn("- name: Restore service state with failure-safe service recovery\n      block:", restore)
         self.assertNotIn("- name: Restore service state with failure-safe service recovery\n      tags:", restore)
