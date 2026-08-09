@@ -155,6 +155,7 @@ class AnsibleSafetyTests(unittest.TestCase):
         self.assertIn("mktemp", text)
         self.assertIn("trap", text)
         self.assertIn("--secret-file", text)
+        self.assertIn("--labels \"$3\"", text)
         self.assertNotIn("--secret \"${FORGEJO_RUNNER_SECRET}\"", text)
 
     def test_forgejo_runner_registration_task_order(self) -> None:

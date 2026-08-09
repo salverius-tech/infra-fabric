@@ -233,10 +233,12 @@
           --work-path /var/lib/forgejo \
           --name "$1" \
           --scope "$2" \
+          --labels "$3" \
           --secret-file "${secret_file}" | tail -n1 # public-safety: allow-secret
       - --
       - '{{ forgejo_runner_name | default(''homelab-deploy'') }}'
       - '{{ forgejo_runner_scope }}'
+      - "{{ (forgejo_runner_labels | default([forgejo_runner_label ~ ':host'])) | join(',') }}"
   environment:
     FORGEJO_RUNNER_SECRET: '{{ forgejo_runner_registration_secret }}'
   register: forgejo_runner_registration
