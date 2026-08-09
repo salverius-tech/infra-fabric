@@ -13,4 +13,5 @@ require_site_context
 
 INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh python scripts/apply-ansible-services.py \
   --mode sequential \
+  --canonical-ansible \
   --service "${service}"

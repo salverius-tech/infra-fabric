@@ -51,6 +51,8 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         apply_content = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
         validate_content = (ROOT / "scripts" / "validate-values.sh").read_text(encoding="utf-8")
         self.assertIn('apply-ansible-services.py', apply_content)
+        service_apply_content = (ROOT / "scripts" / "apply-service.sh").read_text(encoding="utf-8")
+        self.assertIn("--canonical-ansible", service_apply_content)
         for consumer_content in (apply_content, validate_content):
             self.assertIn('ansible_inventory="${INFRA_VALUES_DIR}/ansible/inventory/local.yml"', consumer_content)
             self.assertIn('ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"', consumer_content)
