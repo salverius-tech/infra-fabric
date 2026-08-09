@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
+import fcntl
 import hashlib
 import json
 import os
@@ -171,33 +173,50 @@ def read_audit_chain(path: Path) -> tuple[str, int]:
     return previous_hash, count
 
 
+@contextlib.contextmanager
+def audit_writer_lock(path: Path):
+    lock_path = path.with_suffix(".lock")
+    try:
+        fd = os.open(lock_path, os.O_WRONLY | os.O_CREAT, 0o600)
+        os.chmod(lock_path, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as stream:
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+    except OSError as error:
+        raise OperatorError("cannot lock Hermes operator audit journal") from error
+
+
 def write_audit_record(repo: Path, action: str, returncode: int, result: dict[str, Any]) -> None:
     path = audit_path(repo)
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(path.parent, 0o700)
-    previous_hash, _ = read_audit_chain(path)
-    summary = result.get("plan") if isinstance(result.get("plan"), dict) else None
-    record = {
-        "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "action": action,
-        "returncode": returncode,
-        "ok": returncode == 0,
-        "plan": {
-            "destructive": bool(summary and summary.get("destructive")),
-            "resource_changes": summary.get("resource_changes", {}) if summary else {},
-        },
-        "previous_hash": previous_hash,
-    }
-    record["record_hash"] = audit_record_hash(record)
-    try:
-        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
-        with os.fdopen(fd, "a", encoding="utf-8") as stream:
-            stream.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.chmod(path, 0o600)
-    except OSError as error:
-        raise OperatorError("cannot durably append Hermes operator audit record") from error
+    with audit_writer_lock(path):
+        previous_hash, _ = read_audit_chain(path)
+        summary = result.get("plan") if isinstance(result.get("plan"), dict) else None
+        record = {
+            "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "action": action,
+            "returncode": returncode,
+            "ok": returncode == 0,
+            "plan": {
+                "destructive": bool(summary and summary.get("destructive")),
+                "resource_changes": summary.get("resource_changes", {}) if summary else {},
+            },
+            "previous_hash": previous_hash,
+        }
+        record["record_hash"] = audit_record_hash(record)
+        try:
+            fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+            with os.fdopen(fd, "a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chmod(path, 0o600)
+        except OSError as error:
+            raise OperatorError("cannot durably append Hermes operator audit record") from error
 
 
 def default_runner(command: list[str], env: dict[str, str], repo: Path) -> tuple[int, str]:

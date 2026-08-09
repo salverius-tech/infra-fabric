@@ -92,6 +92,7 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertEqual(records[0]["previous_hash"], "0" * 64)
             self.assertEqual(records[1]["previous_hash"], records[0]["record_hash"])
             self.assertEqual(stat.S_IMODE(audit_path.stat().st_mode), 0o600)
+            self.assertEqual(stat.S_IMODE(audit_path.with_suffix(".lock").stat().st_mode), 0o600)
 
     def test_tampered_audit_journal_fails_closed_before_append(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
