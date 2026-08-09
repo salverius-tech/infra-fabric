@@ -76,6 +76,7 @@ Generated losslessly from tracked source records; generated artifacts are exclud
 | `docs/development-environment.md` | 0 |
 | `docs/documentation-inventory.json` | 0 |
 | `docs/hermes-control-operations.md` | 0 |
+| `docs/hermes-independent-recovery.md` | 0 |
 | `docs/hermes-operator-pilot-prd.md` | 7 |
 | `docs/hermes-state-backup.md` | 0 |
 | `docs/hermes-tuning.md` | 0 |

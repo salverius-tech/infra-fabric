@@ -507,6 +507,13 @@
       "extracted_item_count": 0
     },
     {
+      "path": "docs/hermes-independent-recovery.md",
+      "sha256": "07ccf843d02e5cd3ea696e377204e111a1714f885259b17c68ce654b7dc03202",
+      "authority": "operator guidance",
+      "stated_status": null,
+      "extracted_item_count": 0
+    },
+    {
       "path": "docs/hermes-operator-pilot-prd.md",
       "sha256": "9dbcaf054e1779db732ba613655c3060c03da14d7f6715a3d315dcfb6b3bf757",
       "authority": "working design",
