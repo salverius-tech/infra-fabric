@@ -220,6 +220,20 @@ class TfplanMetadataTests(unittest.TestCase):
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
+    def test_docs_only_commit_change_keeps_identical_plan_valid(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir, patch.object(tfplan_metadata, "git_commit", side_effect=["plan-commit", "docs-commit"]):
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_operational_source_input_change_rejects_identical_plan(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            (repo / "infra" / "opentofu" / "main.tf").write_text("terraform { required_version = \">= 1.0\" }\n")
+            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "inputs changed"):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
     def test_changed_canonical_site_file_fails(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:

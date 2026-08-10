@@ -10,11 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CompatibilityBoundaryTests(unittest.TestCase):
-    def run_gate(self, values_dir: Path, *, allow_legacy: bool = False) -> subprocess.CompletedProcess[str]:
+    def run_gate(self, values_dir: Path) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         env.update({"VALUES_DIR": str(values_dir), "VALUES_SITE": "dev"})
-        if allow_legacy:
-            env["INFRA_ALLOW_LEGACY_COMPATIBILITY"] = "true"
         return subprocess.run(
             ["bash", "-c", "source scripts/site-context.sh; require_canonical_authority"],
             cwd=ROOT,
@@ -35,13 +33,28 @@ class CompatibilityBoundaryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             result = self.run_gate(Path(directory))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("INFRA_ALLOW_LEGACY_COMPATIBILITY=true", result.stderr)
+        self.assertIn("just setup", result.stderr)
+        self.assertIn("migration or recovery", result.stderr)
 
-    def test_legacy_compatibility_requires_explicit_opt_in(self) -> None:
+    def test_legacy_compatibility_environment_cannot_bypass_canonical_authority(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            result = self.run_gate(Path(directory), allow_legacy=True)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("legacy compatibility explicitly enabled", result.stderr)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "VALUES_DIR": directory,
+                    "VALUES_SITE": "dev",
+                    "INFRA_ALLOW_LEGACY_COMPATIBILITY": "true",
+                }
+            )
+            result = subprocess.run(
+                ["bash", "-c", "source scripts/site-context.sh; require_canonical_authority"],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("site.yaml", result.stderr)
 
 
 if __name__ == "__main__":

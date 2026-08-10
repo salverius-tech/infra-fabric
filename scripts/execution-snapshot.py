@@ -1,17 +1,42 @@
 #!/usr/bin/env python3
 """Create a private read-only snapshot for one verified apply execution."""
+
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-import hashlib
+import contextlib
 import json
 import os
-from pathlib import Path
-import shutil
 import stat
 import sys
-import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+try:
+    from private_files import (
+        PrivateFileError,
+        atomic_copy,
+        open_private_directory,
+        open_regular_child,
+        open_regular_file,
+        staging_directory,
+        stream_sha256,
+        stream_sha256_handle,
+        write_private_manifest,
+    )
+except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from private_files import (
+        PrivateFileError,
+        atomic_copy,
+        open_private_directory,
+        open_regular_child,
+        open_regular_file,
+        staging_directory,
+        stream_sha256,
+        stream_sha256_handle,
+        write_private_manifest,
+    )
 
 
 SCHEMA_VERSION = 1
@@ -31,46 +56,17 @@ class ExecutionSnapshotError(RuntimeError):
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _safe_source(path: Path) -> None:
     try:
-        metadata = path.lstat()
-    except OSError as error:
-        raise ExecutionSnapshotError("execution snapshot source is unavailable") from error
-    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
-        raise ExecutionSnapshotError("execution snapshot source must be a regular non-symlink file")
+        return stream_sha256(path, "execution snapshot file")
+    except PrivateFileError as error:
+        raise ExecutionSnapshotError(str(error)) from error
 
 
-def _copy(source: Path, destination: Path) -> None:
-    _safe_source(source)
-    destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    destination.parent.chmod(0o700)
-    flags = os.O_RDONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
+def _copy(source, destination: Path) -> None:
     try:
-        descriptor = os.open(source, flags)
-    except OSError as error:
-        raise ExecutionSnapshotError("execution snapshot source changed during copy") from error
-    try:
-        before = os.fstat(descriptor)
-        with os.fdopen(descriptor, "rb", closefd=False) as input_file, destination.open("xb") as output_file:
-            shutil.copyfileobj(input_file, output_file, length=1024 * 1024)
-            output_file.flush()
-            os.fsync(output_file.fileno())
-        after = os.fstat(descriptor)
-    finally:
-        os.close(descriptor)
-    identity = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
-    if identity != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns):
-        raise ExecutionSnapshotError("execution snapshot source changed during copy")
-    destination.chmod(0o600)
+        atomic_copy(source, destination, label="execution snapshot source")
+    except PrivateFileError as error:
+        raise ExecutionSnapshotError(str(error)) from error
 
 
 def _expected_sources(values_dir: Path, plan: Path, metadata: Path) -> dict[str, Path]:
@@ -85,67 +81,147 @@ def _expected_sources(values_dir: Path, plan: Path, metadata: Path) -> dict[str,
     return sources
 
 
+def _relative_components(relative: str) -> tuple[str, ...]:
+    """Reject manifest paths that could escape a held snapshot descriptor."""
+    if not relative or relative.startswith("/"):
+        raise ExecutionSnapshotError("execution snapshot manifest path is unsafe")
+    components = tuple(relative.split("/"))
+    if any(component in {"", ".", ".."} for component in components):
+        raise ExecutionSnapshotError("execution snapshot manifest path is unsafe")
+    return components
+
+
+@contextlib.contextmanager
+def _open_snapshot_file(root_fd: int, relative: str):
+    """Open a lexically-safe nested regular child from one held root FD."""
+    components = _relative_components(relative)
+    descriptors: list[int] = []
+    parent_fd = root_fd
+    directory_flags = (
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        for component in components[:-1]:
+            descriptor = os.open(component, directory_flags, dir_fd=parent_fd)
+            descriptors.append(descriptor)
+            if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+                raise ExecutionSnapshotError(
+                    "execution snapshot manifest path is unsafe"
+                )
+            parent_fd = descriptor
+        with open_regular_child(
+            parent_fd, components[-1], "execution snapshot file"
+        ) as handle:
+            yield handle
+    except ExecutionSnapshotError:
+        raise
+    except (OSError, PrivateFileError) as error:
+        raise ExecutionSnapshotError(
+            "execution snapshot manifest path is unsafe"
+        ) from error
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
 def verify_snapshot(snapshot: Path, *, sealed: bool = True) -> dict[str, object]:
     """Verify snapshot structure, permissions, and every copied file hash."""
-    if snapshot.is_symlink() or not snapshot.is_dir():
-        raise ExecutionSnapshotError("execution snapshot directory is unsafe")
-    root = snapshot.resolve()
-    directory_mode = root.stat().st_mode & 0o777
-    expected_directory_mode = 0o500 if sealed else 0o700
-    if directory_mode != expected_directory_mode:
-        raise ExecutionSnapshotError("execution snapshot directory permissions are invalid")
-    manifest_path = root / "execution-manifest.json"
-    _safe_source(manifest_path)
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ExecutionSnapshotError("execution snapshot manifest is invalid") from error
-    files = manifest.get("files") if isinstance(manifest, dict) else None
-    if manifest.get("schema_version") != SCHEMA_VERSION or not isinstance(files, dict) or not files:
-        raise ExecutionSnapshotError("execution snapshot manifest schema is invalid")
-    file_mode = 0o400 if sealed else 0o600
-    if manifest_path.stat().st_mode & 0o777 != file_mode:
-        raise ExecutionSnapshotError("execution snapshot manifest permissions are invalid")
-    for relative, expected_hash in files.items():
-        if not isinstance(relative, str) or not isinstance(expected_hash, str):
-            raise ExecutionSnapshotError("execution snapshot manifest entries are invalid")
-        path = root / relative
-        if root not in path.resolve().parents:
-            raise ExecutionSnapshotError("execution snapshot manifest path is unsafe")
-        _safe_source(path)
-        if path.stat().st_mode & 0o777 != file_mode or _sha256(path) != expected_hash:
-            raise ExecutionSnapshotError("execution snapshot integrity check failed")
-    return manifest
+        with open_private_directory(snapshot, "execution snapshot") as root_fd:
+            directory_mode = os.fstat(root_fd).st_mode & 0o777
+            expected_directory_mode = 0o500 if sealed else 0o700
+            if directory_mode != expected_directory_mode:
+                raise ExecutionSnapshotError(
+                    "execution snapshot directory permissions are invalid"
+                )
+            try:
+                with open_regular_child(
+                    root_fd, "execution-manifest.json", "execution snapshot manifest"
+                ) as handle:
+                    manifest = json.loads(handle.read().decode("utf-8"))
+                    manifest_mode = os.fstat(handle.fileno()).st_mode & 0o777
+            except (
+                PrivateFileError,
+                OSError,
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+            ) as error:
+                raise ExecutionSnapshotError(
+                    "execution snapshot manifest is invalid"
+                ) from error
+            files = manifest.get("files") if isinstance(manifest, dict) else None
+            if (
+                manifest.get("schema_version") != SCHEMA_VERSION
+                or not isinstance(files, dict)
+                or not files
+            ):
+                raise ExecutionSnapshotError(
+                    "execution snapshot manifest schema is invalid"
+                )
+            file_mode = 0o400 if sealed else 0o600
+            if manifest_mode != file_mode:
+                raise ExecutionSnapshotError(
+                    "execution snapshot manifest permissions are invalid"
+                )
+            for relative, expected_hash in files.items():
+                if not isinstance(relative, str) or not isinstance(expected_hash, str):
+                    raise ExecutionSnapshotError(
+                        "execution snapshot manifest entries are invalid"
+                    )
+                with _open_snapshot_file(root_fd, relative) as handle:
+                    mode = os.fstat(handle.fileno()).st_mode & 0o777
+                    actual_hash = stream_sha256_handle(handle)
+                if mode != file_mode or actual_hash != expected_hash:
+                    raise ExecutionSnapshotError(
+                        "execution snapshot integrity check failed"
+                    )
+            return manifest
+    except PrivateFileError as error:
+        raise ExecutionSnapshotError(
+            "execution snapshot directory is unsafe"
+        ) from error
+
+
+def _seal_tree(directory_fd: int) -> None:
+    """Seal an already-held snapshot tree without reopening path spellings."""
+    for name in os.listdir(directory_fd):
+        metadata = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if stat.S_ISDIR(metadata.st_mode):
+            descriptor = os.open(
+                name,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=directory_fd,
+            )
+            try:
+                _seal_tree(descriptor)
+                os.fchmod(descriptor, 0o500)
+            finally:
+                os.close(descriptor)
+        elif stat.S_ISREG(metadata.st_mode):
+            descriptor = os.open(
+                name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=directory_fd
+            )
+            try:
+                if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                    raise ExecutionSnapshotError(
+                        "execution snapshot contains a symlink"
+                    )
+                os.fchmod(descriptor, 0o400)
+            finally:
+                os.close(descriptor)
+        else:
+            raise ExecutionSnapshotError("execution snapshot contains a symlink")
 
 
 def _seal(snapshot: Path) -> None:
-    for path in snapshot.rglob("*"):
-        if path.is_symlink():
-            raise ExecutionSnapshotError("execution snapshot contains a symlink")
-        path.chmod(0o500 if path.is_dir() else 0o400)
-    snapshot.chmod(0o500)
-
-
-def _remove_snapshot(snapshot: Path) -> None:
-    verify_snapshot(snapshot)
-    for path in sorted(snapshot.rglob("*"), key=lambda item: len(item.parts), reverse=True):
-        path.chmod(0o700 if path.is_dir() else 0o600)
-    snapshot.chmod(0o700)
-    shutil.rmtree(snapshot)
-
-
-def _prune(destination_root: Path, retain: int) -> None:
-    snapshots = sorted(
-        (
-            entry
-            for entry in destination_root.iterdir()
-            if entry.is_dir() and not entry.is_symlink() and entry.name.startswith("execution-")
-        ),
-        key=lambda entry: entry.name,
-        reverse=True,
-    )
-    for expired in snapshots[retain:]:
-        _remove_snapshot(expired)
+    try:
+        with open_private_directory(snapshot, "execution snapshot") as root_fd:
+            _seal_tree(root_fd)
+            os.fchmod(root_fd, 0o500)
+    except PrivateFileError as error:
+        raise ExecutionSnapshotError("execution snapshot contains a symlink") from error
 
 
 def create_snapshot(
@@ -158,47 +234,55 @@ def create_snapshot(
     retain: int = DEFAULT_RETENTION,
 ) -> Path:
     """Copy verified execution inputs into one atomically installed read-only directory."""
-    if not site or any(character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for character in site):
+    if not site or any(
+        character
+        not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+        for character in site
+    ):
         raise ExecutionSnapshotError("execution snapshot site is invalid")
     if retain < 1:
         raise ExecutionSnapshotError("execution snapshot retention must be positive")
-    if destination_root.is_symlink():
-        raise ExecutionSnapshotError("execution snapshot root is unsafe")
-    destination_root.mkdir(parents=True, exist_ok=True, mode=0o700)
-    destination_root.chmod(0o700)
-    temporary = Path(tempfile.mkdtemp(prefix=".execution-next-", dir=destination_root))
-    temporary.chmod(0o700)
     try:
-        sources = _expected_sources(values_dir, plan, metadata)
-        files: dict[str, str] = {}
-        for relative, source in sources.items():
-            if relative.startswith("values/"):
-                destination = temporary / "values" / "sites" / site / relative.removeprefix("values/")
-                manifest_relative = destination.relative_to(temporary).as_posix()
-            else:
-                destination = temporary / relative
-                manifest_relative = relative
-            _copy(source, destination)
-            files[manifest_relative] = _sha256(destination)
-        manifest = {
-            "schema_version": SCHEMA_VERSION,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "site": site,
-            "files": dict(sorted(files.items())),
-        }
-        manifest_path = temporary / "execution-manifest.json"
-        manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        manifest_path.chmod(0o600)
-        verify_snapshot(temporary, sealed=False)
-        final = destination_root / f"execution-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}-{files['tfplan'][:12]}"
-        os.replace(temporary, final)
-        _seal(final)
-        verify_snapshot(final)
-        _prune(destination_root, retain)
-        return final
-    finally:
-        if temporary.exists():
-            shutil.rmtree(temporary)
+        with staging_directory(destination_root, prefix=".execution-next-") as staging:
+            temporary = staging.path
+            sources = _expected_sources(values_dir, plan, metadata)
+            files: dict[str, str] = {}
+            for relative, source in sources.items():
+                if relative.startswith("values/"):
+                    destination = (
+                        temporary
+                        / "values"
+                        / "sites"
+                        / site
+                        / relative.removeprefix("values/")
+                    )
+                    manifest_relative = destination.relative_to(temporary).as_posix()
+                else:
+                    destination = temporary / relative
+                    manifest_relative = relative
+                with open_regular_file(
+                    source, "execution snapshot source"
+                ) as held_source:
+                    _copy(held_source, destination)
+                files[manifest_relative] = _sha256(destination)
+            manifest = {
+                "schema_version": SCHEMA_VERSION,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "site": site,
+                "files": dict(sorted(files.items())),
+            }
+            write_private_manifest(temporary / "execution-manifest.json", manifest)
+            verify_snapshot(temporary, sealed=False)
+            _seal(temporary)
+            verify_snapshot(temporary)
+            final = staging.publish(
+                f"execution-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}-{files['tfplan'][:12]}"
+            )
+            verify_snapshot(final)
+            staging.prune(prefix="execution-", retain=retain)
+            return final
+    except PrivateFileError as error:
+        raise ExecutionSnapshotError(str(error)) from error
 
 
 def main(argv: list[str] | None = None) -> int:

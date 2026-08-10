@@ -54,12 +54,17 @@ class DocumentationContractTests(unittest.TestCase):
         )
         documents = inventory["documents"]
         if shutil.which("git"):
-            tracked = set(
-                subprocess.check_output(
+            tracked = {
+                relative
+                for relative in subprocess.check_output(
                     ["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.md"],
                     text=True,
                 ).splitlines()
-            )
+                # A P10-A artifact can be deleted before its successor is staged.
+                # Inventory validation must describe the actual working tree, not a
+                # stale index entry that no longer has a document to classify.
+                if (ROOT / relative).is_file()
+            }
         else:
             ignored_roots = {".git", "values", ".venv", ".tmp", ".terraform"}
             tracked = {

@@ -6,6 +6,7 @@ complete. It enumerates current OpenTofu variables and service-catalog entries,
 assigns each variable to a bounded ownership family, and fails when a new
 variable does not fit a reviewed family. The resulting JSON is public-safe.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -19,9 +20,8 @@ from typing import Annotated, Any, Union, get_args, get_origin
 
 from pydantic import BaseModel
 
-
 VARIABLE_RE = re.compile(r'^variable\s+"([^"]+)"', re.MULTILINE)
-HCL_ASSIGNMENT_RE = re.compile(r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=')
+HCL_ASSIGNMENT_RE = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=")
 VALID_DISPOSITIONS = {
     "canonical",
     "derived",
@@ -34,7 +34,11 @@ VALID_DISPOSITIONS = {
     "retired-input",
     "unsupported-review",
 }
-NON_CANONICAL_MAPPING_DISPOSITIONS = {"generated-projection", "operational-artifact", "retired-input"}
+NON_CANONICAL_MAPPING_DISPOSITIONS = {
+    "generated-projection",
+    "operational-artifact",
+    "retired-input",
+}
 PROTECTED_CONTRACTS = [
     {
         "canonical_path": "secrets.bootstrap.root_password",
@@ -80,7 +84,9 @@ VALID_SECRET_CLASSES = {
     "secret/bootstrap",
     "protected metadata",
 }
-ENV_NAME_RE = re.compile(r'\b(?:TF_VAR_|INFRA_|VALUES_|PROXMOX_|ANSIBLE_|DNS_)[A-Z][A-Z0-9_]*\b')
+ENV_NAME_RE = re.compile(
+    r"\b(?:TF_VAR_|INFRA_|VALUES_|PROXMOX_|ANSIBLE_|DNS_)[A-Z][A-Z0-9_]*\b"
+)
 
 
 class InventoryError(ValueError):
@@ -89,13 +95,48 @@ class InventoryError(ValueError):
 
 FAMILY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("selection", ("enabled_services", "service_runtime", "forgejo_runtime")),
-    ("service_compatibility", ("service_storage", "stateful_service_disable_policies", "stateful_destroy_acknowledged")),
+    (
+        "service_compatibility",
+        (
+            "service_storage",
+            "stateful_service_disable_policies",
+            "stateful_destroy_acknowledged",
+        ),
+    ),
     ("canonical_bootstrap_access", ("bootstrap_ssh_user", "bootstrap_ssh_public_keys")),
-    ("canonical_operator_access", ("operator_user", "operator_ssh_public_keys", "operator_dotfiles_", "operator_chezmoi_")),
+    (
+        "canonical_operator_access",
+        (
+            "operator_user",
+            "operator_ssh_public_keys",
+            "operator_dotfiles_",
+            "operator_chezmoi_",
+        ),
+    ),
     ("provider", ("proxmox_",)),
-    ("platform_storage_image", ("rootfs_datastore_id", "template_datastore_id", "debian_template_", "guest_vm_", "forgejo_vm_", "lxc_template_download_timeout_seconds")),
+    (
+        "platform_storage_image",
+        (
+            "rootfs_datastore_id",
+            "template_datastore_id",
+            "debian_template_",
+            "guest_vm_",
+            "forgejo_vm_",
+            "lxc_template_download_timeout_seconds",
+        ),
+    ),
     ("technitium_resource", ("technitium_container_",)),
-    ("forgejo_resource_or_service", ("forgejo_container_", "forgejo_lan_ip", "forgejo_server_name", "forgejo_database", "forgejo_storage", "forgejo_startup_")),
+    (
+        "forgejo_resource_or_service",
+        (
+            "forgejo_container_",
+            "forgejo_lan_ip",
+            "forgejo_server_name",
+            "forgejo_database",
+            "forgejo_storage",
+            "forgejo_startup_",
+        ),
+    ),
     ("forgejo_runner_resource", ("forgejo_runner_",)),
     ("infisical_resource_or_service", ("infisical_",)),
     ("hermes_resource_or_service", ("hermes_",)),
@@ -107,9 +148,15 @@ FAMILY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 
 def classify_variable(name: str) -> str:
-    matches = [family for family, prefixes in FAMILY_PATTERNS if any(name == prefix or name.startswith(prefix) for prefix in prefixes)]
+    matches = [
+        family
+        for family, prefixes in FAMILY_PATTERNS
+        if any(name == prefix or name.startswith(prefix) for prefix in prefixes)
+    ]
     if len(matches) != 1:
-        raise InventoryError(f"unclassified or ambiguously classified OpenTofu variable: {name}")
+        raise InventoryError(
+            f"unclassified or ambiguously classified OpenTofu variable: {name}"
+        )
     return matches[0]
 
 
@@ -142,7 +189,6 @@ def load_catalog(path: Path) -> dict[str, Any]:
     }
 
 
-
 def _matrix_token_matches(text: str, token: str) -> bool:
     """Match a complete source token, not a substring of a dotted/keyed value."""
     if not token:
@@ -151,7 +197,9 @@ def _matrix_token_matches(text: str, token: str) -> bool:
     return re.search(pattern, text) is not None
 
 
-def reconcile_matrix_inputs(source_inputs: dict[str, Any], matrix: dict[str, Any]) -> dict[str, Any]:
+def reconcile_matrix_inputs(
+    source_inputs: dict[str, Any], matrix: dict[str, Any]
+) -> dict[str, Any]:
     rows = matrix["rows"]
     matched: list[dict[str, str]] = []
     unmatched: list[dict[str, str]] = []
@@ -160,32 +208,55 @@ def reconcile_matrix_inputs(source_inputs: dict[str, Any], matrix: dict[str, Any
     eligible_inputs = []
     for item in source_inputs["inputs"]:
         if item.get("disposition") in NON_CANONICAL_MAPPING_DISPOSITIONS:
-            excluded.append({"source": item["source"], "key": item["key"], "disposition": item["disposition"]})
+            excluded.append(
+                {
+                    "source": item["source"],
+                    "key": item["key"],
+                    "disposition": item["disposition"],
+                }
+            )
         else:
             eligible_inputs.append(item)
     for item in eligible_inputs:
         source_name = Path(item["source"]).name
         key = item["key"]
-        key_candidates = [candidate for candidate in rows if _matrix_token_matches(candidate["Legacy source(s)"], key)]
+        key_candidates = [
+            candidate
+            for candidate in rows
+            if _matrix_token_matches(candidate["Legacy source(s)"], key)
+        ]
         source_key_candidates = [
             candidate
             for candidate in key_candidates
             if _matrix_token_matches(candidate["Legacy source(s)"], item["source"])
         ]
-        candidates = source_key_candidates or key_candidates or [
-            candidate
-            for candidate in rows
-            if _matrix_token_matches(candidate["Legacy source(s)"], item["source"])
-            or _matrix_token_matches(candidate["Legacy source(s)"], source_name)
-        ]
+        candidates = (
+            source_key_candidates
+            or key_candidates
+            or [
+                candidate
+                for candidate in rows
+                if _matrix_token_matches(candidate["Legacy source(s)"], item["source"])
+                or _matrix_token_matches(candidate["Legacy source(s)"], source_name)
+            ]
+        )
         record = {"source": item["source"], "key": key}
         if not candidates:
             unmatched.append(record)
         elif len(candidates) > 1:
-            ambiguous.append({**record, "canonical_paths": sorted(candidate["Canonical path"] for candidate in candidates)})
+            ambiguous.append(
+                {
+                    **record,
+                    "canonical_paths": sorted(
+                        candidate["Canonical path"] for candidate in candidates
+                    ),
+                }
+            )
             unmatched.append(record)
         else:
-            matched.append({**record, "canonical_path": candidates[0]["Canonical path"]})
+            matched.append(
+                {**record, "canonical_path": candidates[0]["Canonical path"]}
+            )
     return {
         "input_count": len(eligible_inputs),
         "source_input_count": len(source_inputs["inputs"]),
@@ -201,45 +272,105 @@ def reconcile_matrix_inputs(source_inputs: dict[str, Any], matrix: dict[str, Any
     }
 
 
-def classify_ambiguous_legacy_aliases(source_inputs: dict[str, Any], matrix_coverage: dict[str, Any] | None = None) -> dict[str, Any]:
-    matched_keys = {(item["source"], item["key"]) for item in (matrix_coverage or {}).get("matched", [])}
+def classify_ambiguous_legacy_aliases(
+    source_inputs: dict[str, Any], matrix_coverage: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    matched_keys = {
+        (item["source"], item["key"])
+        for item in (matrix_coverage or {}).get("matched", [])
+    }
     secret_keys = {"container_root_password", "container_ssh_public_keys"}
     aliases = [
-        {"source": item["source"], "key": item["key"], "classification": "ambiguous", "scope": "resource-scoped", "canonical_owner": "review-required", "reason": "generic migration alias lacks explicit resource scope"}
+        {
+            "source": item["source"],
+            "key": item["key"],
+            "classification": "ambiguous",
+            "scope": "resource-scoped",
+            "canonical_owner": "review-required",
+            "reason": "generic migration alias lacks explicit resource scope",
+        }
         for item in source_inputs["inputs"]
-        if item["source"].endswith("scripts/migrate-values.py") and item["key"].startswith("container_") and item["key"] not in secret_keys and (item["source"], item["key"]) not in matched_keys
+        if item["source"].endswith("scripts/migrate-values.py")
+        and item["key"].startswith("container_")
+        and item["key"] not in secret_keys
+        and (item["source"], item["key"]) not in matched_keys
     ]
     provider_secrets = [
-        {"source": item["source"], "key": item["key"], "classification": "secret-provider-input", "scope": "provider-scoped", "canonical_owner": "review-required", "reason": "provider secret alias requires explicit delivery contract"}
+        {
+            "source": item["source"],
+            "key": item["key"],
+            "classification": "secret-provider-input",
+            "scope": "provider-scoped",
+            "canonical_owner": "review-required",
+            "reason": "provider secret alias requires explicit delivery contract",
+        }
         for item in source_inputs["inputs"]
-        if item["source"].endswith("scripts/migrate-values.py") and item["key"] in secret_keys
+        if item["source"].endswith("scripts/migrate-values.py")
+        and item["key"] in secret_keys
     ]
-    return {"ambiguous_resource_aliases": aliases, "provider_secret_aliases": provider_secrets, "status": "review-required" if aliases or provider_secrets else "complete"}
+    return {
+        "ambiguous_resource_aliases": aliases,
+        "provider_secret_aliases": provider_secrets,
+        "status": "review-required" if aliases or provider_secrets else "complete",
+    }
 
 
 def load_consumer_contract(repo: Path) -> dict[str, Any]:
-    paths = [repo / "scripts/plan-infra.sh", repo / "scripts/apply-infra.sh", repo / "scripts/validate-values.sh"]
+    paths = [
+        repo / "scripts/plan-infra.sh",
+        repo / "scripts/apply-infra.sh",
+        repo / "scripts/validate-values.sh",
+    ]
     evidence_paths = [*paths, repo / "scripts/site-context.sh"]
     text = "\n".join(path.read_text(encoding="utf-8") for path in evidence_paths)
+    apply_text = (repo / "scripts/apply-infra.sh").read_text(encoding="utf-8")
+    legacy_terraform = "terraform.tfvars" in text
+    legacy_static_inventory = "ansible/inventory/local.yml" in text
     canonical_gate = all(
         marker in text
         for marker in (
             "generated/terraform.auto.tfvars.json",
             "generated/ansible-inventory.json",
             "verify-projections.py",
-            "Canonical site exists but generated projection is missing",
+            "require_canonical_projection_set",
             "require_canonical_authority",
-            "INFRA_ALLOW_LEGACY_COMPATIBILITY",
         )
     )
-    canonical_ansible = "--canonical-ansible" in text
+    canonical_ansible = (
+        "python scripts/apply-ansible-services.py" in apply_text
+        and "--inventory" not in apply_text
+        and "--env-file" not in apply_text
+    )
+    canonical_only = (
+        canonical_gate
+        and canonical_ansible
+        and not legacy_terraform
+        and not legacy_static_inventory
+    )
+    compatibility = canonical_gate and canonical_ansible and not canonical_only
     return {
         "paths": [str(path.relative_to(repo)) for path in paths],
-        "legacy_terraform_input_present": "terraform.tfvars" in text,
-        "legacy_static_inventory_present": "ansible/inventory/local.yml" in text,
+        "legacy_terraform_input_present": legacy_terraform,
+        "legacy_static_inventory_present": legacy_static_inventory,
         "canonical_projection_authoritative": canonical_gate and canonical_ansible,
-        "cutover_status": "canonical-site-authoritative-with-legacy-compatibility" if canonical_gate and canonical_ansible else "deferred",
-        "legacy_compatibility_scope": "selected workspaces without site.yaml" if canonical_gate else "unbounded",
+        "cutover_status": (
+            "canonical-site-authoritative"
+            if canonical_only
+            else (
+                "canonical-site-authoritative-with-legacy-compatibility"
+                if compatibility
+                else "deferred"
+            )
+        ),
+        "legacy_compatibility_scope": (
+            "forensic-importers-only"
+            if canonical_only
+            else (
+                "selected workspaces without site.yaml"
+                if compatibility
+                else "unbounded"
+            )
+        ),
     }
 
 
@@ -250,31 +381,52 @@ def retired_alias_contract(repo: Path) -> dict[str, Any]:
     services = (repo / "infra/opentofu/services.tf").read_text(encoding="utf-8")
     scaffold_inputs = set(_assignment_keys(repo / "scaffold/terraform.tfvars"))
     declared_nullable = all(
-        re.search(rf'(?s)variable "{re.escape(alias)}" {{.*?default\s*=\s*null', variables)
+        re.search(
+            rf'(?s)variable "{re.escape(alias)}" {{.*?default\s*=\s*null', variables
+        )
         for alias in aliases
     )
-    rejected_by_precondition = all(f"var.{alias} == null" in services for alias in aliases)
+    rejected_by_precondition = all(
+        f"var.{alias} == null" in services for alias in aliases
+    )
     scaffold_absent = not (set(aliases) & scaffold_inputs)
     return {
         "aliases": list(aliases),
-        "opentofu_boundary": "explicit-null-preconditions" if declared_nullable and rejected_by_precondition else "incomplete",
+        "opentofu_boundary": (
+            "explicit-null-preconditions"
+            if declared_nullable and rejected_by_precondition
+            else "incomplete"
+        ),
         "scaffold_inputs": "absent" if scaffold_absent else "present",
-        "status": "complete" if declared_nullable and rejected_by_precondition and scaffold_absent else "review-required",
+        "status": (
+            "complete"
+            if declared_nullable and rejected_by_precondition and scaffold_absent
+            else "review-required"
+        ),
     }
 
 
 def load_mapping_matrix(path: Path) -> dict[str, Any]:
     lines = path.read_text(encoding="utf-8").splitlines()
-    header_index = next((index for index, line in enumerate(lines) if line.startswith("| Canonical path |")), None)
+    header_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if line.startswith("| Canonical path |")
+        ),
+        None,
+    )
     if header_index is None:
         raise InventoryError(f"mapping matrix header missing: {path}")
-    header = [cell.strip() for cell in lines[header_index].strip().strip("|").split("|")]
+    header = [
+        cell.strip() for cell in lines[header_index].strip().strip("|").split("|")
+    ]
     if tuple(header) != MATRIX_HEADERS:
         raise InventoryError(f"mapping matrix headers changed: {path}")
     rows: list[dict[str, str]] = []
     invalid_rows: list[int] = []
     started = False
-    for line_number, line in enumerate(lines[header_index + 2:], header_index + 3):
+    for line_number, line in enumerate(lines[header_index + 2 :], header_index + 3):
         if not line.startswith("|"):
             if started:
                 break
@@ -286,13 +438,17 @@ def load_mapping_matrix(path: Path) -> dict[str, Any]:
         if len(cells) != len(MATRIX_HEADERS):
             invalid_rows.append(line_number)
             continue
-        row: dict[str, str] = {str(key): value for key, value in zip(MATRIX_HEADERS, cells)}
+        row: dict[str, str] = {
+            str(key): value for key, value in zip(MATRIX_HEADERS, cells)
+        }
         row["Canonical path"] = row["Canonical path"].strip("`")
         if any(not value for value in row.values()):
             invalid_rows.append(line_number)
         rows.append(row)
     if invalid_rows:
-        raise InventoryError(f"mapping matrix has incomplete rows at lines: {invalid_rows}")
+        raise InventoryError(
+            f"mapping matrix has incomplete rows at lines: {invalid_rows}"
+        )
     return {
         "path": str(path.relative_to(path.parents[2])),
         "headers": list(MATRIX_HEADERS),
@@ -361,15 +517,29 @@ def resolve_model_path(path: str) -> bool:
     return True
 
 
-def catalog_path_coverage(catalog_path: Path, catalog: dict[str, Any]) -> dict[str, Any]:
+def catalog_path_coverage(
+    catalog_path: Path, catalog: dict[str, Any]
+) -> dict[str, Any]:
     """Validate every catalog Ansible canonical owner against the canonical model."""
     valid: list[dict[str, str]] = []
     invalid: list[dict[str, str]] = []
     for service in catalog["services"]:
-        raw = json.loads(catalog_path.read_text(encoding="utf-8"))["services"][service["name"]]
-        for legacy_key, relative_path in raw.get("inventory", {}).get("canonical_play_vars", {}).items():
-            path = relative_path if relative_path.startswith(("services.", "resources.")) else f"services.{service['name']}.{relative_path}"
-            item = {"service": service["name"], "legacy_key": legacy_key, "canonical_path": path}
+        raw = json.loads(catalog_path.read_text(encoding="utf-8"))["services"][
+            service["name"]
+        ]
+        for legacy_key, relative_path in (
+            raw.get("inventory", {}).get("canonical_play_vars", {}).items()
+        ):
+            path = (
+                relative_path
+                if relative_path.startswith(("services.", "resources."))
+                else f"services.{service['name']}.{relative_path}"
+            )
+            item = {
+                "service": service["name"],
+                "legacy_key": legacy_key,
+                "canonical_path": path,
+            }
             (valid if resolve_model_path(path) else invalid).append(item)
     return {
         "checked_count": len(valid) + len(invalid),
@@ -389,8 +559,14 @@ def matrix_path_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
         path = row["Canonical path"]
         if "<" in path or "*" in path:
             excluded.append({"canonical_path": path, "reason": "schema-template"})
-        elif path.startswith("derived.") or ".secrets." in path or path.startswith("secrets."):
-            excluded.append({"canonical_path": path, "reason": "derived-or-protected-contract"})
+        elif (
+            path.startswith("derived.")
+            or ".secrets." in path
+            or path.startswith("secrets.")
+        ):
+            excluded.append(
+                {"canonical_path": path, "reason": "derived-or-protected-contract"}
+            )
         else:
             item = {"canonical_path": path, "source": row["Legacy source(s)"]}
             (checked if resolve_model_path(path) else invalid).append(item)
@@ -424,10 +600,16 @@ def matrix_classification_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
         secret_path = row["Canonical path"].startswith("secrets.")
         if protected_row and secret_class == "public":
             reasons.append("secret/protected row is marked public")
-        if secret_path and row_class not in {"secret", "protected", "canonical/deprecated"}:
+        if secret_path and row_class not in {
+            "secret",
+            "protected",
+            "canonical/deprecated",
+        }:
             reasons.append("secret path lacks secret/protected row class")
         if reasons:
-            invalid.append({"canonical_path": row["Canonical path"], "reasons": reasons})
+            invalid.append(
+                {"canonical_path": row["Canonical path"], "reasons": reasons}
+            )
     return {
         "checked_count": len(matrix["rows"]),
         "valid_count": len(matrix["rows"]) - len(invalid),
@@ -439,11 +621,19 @@ def matrix_classification_coverage(matrix: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def source_reconciliation_gate(source_inputs: dict[str, Any], matrix_coverage: dict[str, Any]) -> dict[str, Any]:
+def source_reconciliation_gate(
+    source_inputs: dict[str, Any], matrix_coverage: dict[str, Any]
+) -> dict[str, Any]:
     """Require every current source identity to have one reviewed matrix disposition."""
-    source_identities = {(item["source"], item["key"]) for item in source_inputs["inputs"]}
-    matched_identities = {(item["source"], item["key"]) for item in matrix_coverage["matched"]}
-    excluded_identities = {(item["source"], item["key"]) for item in matrix_coverage["excluded"]}
+    source_identities = {
+        (item["source"], item["key"]) for item in source_inputs["inputs"]
+    }
+    matched_identities = {
+        (item["source"], item["key"]) for item in matrix_coverage["matched"]
+    }
+    excluded_identities = {
+        (item["source"], item["key"]) for item in matrix_coverage["excluded"]
+    }
     accounted = matched_identities | excluded_identities
     duplicate_matched = len(matched_identities) != len(matrix_coverage["matched"])
     duplicate_excluded = len(excluded_identities) != len(matrix_coverage["excluded"])
@@ -464,7 +654,11 @@ def source_reconciliation_gate(source_inputs: dict[str, Any], matrix_coverage: d
         "missing": [{"source": source, "key": key} for source, key in missing],
         "unexpected": [{"source": source, "key": key} for source, key in unexpected],
         "reasons": reasons,
-        "status": "complete" if not reasons and len(source_identities) == len(accounted) else "review-required",
+        "status": (
+            "complete"
+            if not reasons and len(source_identities) == len(accounted)
+            else "review-required"
+        ),
     }
 
 
@@ -472,19 +666,44 @@ def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
     """Report row-level consumer references, not token presence alone."""
     files: list[Path] = []
     for root in (repo / "infra", repo / "scripts"):
-        files.extend(path for path in root.rglob("*") if path.is_file() and path.suffix in {".py", ".tf", ".sh", ".yml", ".yaml", ".json"})
+        files.extend(
+            path
+            for path in root.rglob("*")
+            if path.is_file()
+            and path.suffix in {".py", ".tf", ".sh", ".yml", ".yaml", ".json"}
+        )
     contents = {
         path: path.read_text(encoding="utf-8", errors="ignore").splitlines()
         for path in files
     }
     corpus = "\n".join("\n".join(lines) for lines in contents.values())
     dynamic_rules = (
-        (re.compile(r"^service_runtime\."), "canonical_projections.render_opentofu_variables"),
-        (re.compile(r"^(?:technitium|forgejo|forgejo_runner|infisical|hermes|tailscale_client|onramp_host)_container_"), "canonical_projections._resource_variables"),
-        (re.compile(r"^service_storage\."), "canonical_projections._resource_variables"),
-        (re.compile(r"^dns-records\.json\."), "canonical_projections.render_dns_records"),
-        (re.compile(r"^platform\.images\."), "canonical_projections.render_opentofu_variables"),
-        (re.compile(r"^(?:[a-z0-9_]+)_server_name$|^(?:[a-z0-9_]+)_public_url$"), "canonical_projections.render_opentofu_variables"),
+        (
+            re.compile(r"^service_runtime\."),
+            "canonical_projections.render_opentofu_variables",
+        ),
+        (
+            re.compile(
+                r"^(?:technitium|forgejo|forgejo_runner|infisical|hermes|tailscale_client|onramp_host)_container_"
+            ),
+            "canonical_projections._resource_variables",
+        ),
+        (
+            re.compile(r"^service_storage\."),
+            "canonical_projections._resource_variables",
+        ),
+        (
+            re.compile(r"^dns-records\.json\."),
+            "canonical_projections.render_dns_records",
+        ),
+        (
+            re.compile(r"^platform\.images\."),
+            "canonical_projections.render_opentofu_variables",
+        ),
+        (
+            re.compile(r"^(?:[a-z0-9_]+)_server_name$|^(?:[a-z0-9_]+)_public_url$"),
+            "canonical_projections.render_opentofu_variables",
+        ),
     )
     exact: list[dict[str, Any]] = []
     dynamic: list[dict[str, Any]] = []
@@ -498,7 +717,12 @@ def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
         for token in re.findall(r"`([^`]+)`", row["Generated consumer field(s)"]):
             item = {"canonical_path": row["Canonical path"], "consumer_token": token}
             references = [
-                {"file": str(path.relative_to(repo)), "lines": [index + 1 for index, line in enumerate(lines) if token in line]}
+                {
+                    "file": str(path.relative_to(repo)),
+                    "lines": [
+                        index + 1 for index, line in enumerate(lines) if token in line
+                    ],
+                }
                 for path, lines in contents.items()
                 if any(token in line for line in lines)
             ]
@@ -507,7 +731,10 @@ def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
                 exact.append(evidence)
                 row_exact.append(evidence)
                 continue
-            owner = next((owner for pattern, owner in dynamic_rules if pattern.search(token)), None)
+            owner = next(
+                (owner for pattern, owner in dynamic_rules if pattern.search(token)),
+                None,
+            )
             if owner and owner.split(".")[-1] in corpus:
                 evidence = {**item, "evidence": owner}
                 dynamic.append(evidence)
@@ -517,13 +744,15 @@ def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
                 row_missing.append(item)
         if row_exact or row_dynamic or row_missing:
             rows_with_tokens += 1
-            row_evidence.append({
-                "canonical_path": row["Canonical path"],
-                "exact": row_exact,
-                "dynamic": row_dynamic,
-                "missing": row_missing,
-                "status": "complete" if not row_missing else "review-required",
-            })
+            row_evidence.append(
+                {
+                    "canonical_path": row["Canonical path"],
+                    "exact": row_exact,
+                    "dynamic": row_dynamic,
+                    "missing": row_missing,
+                    "status": "complete" if not row_missing else "review-required",
+                }
+            )
     return {
         "token_count": len(exact) + len(dynamic) + len(missing),
         "exact_evidence_count": len(exact),
@@ -531,8 +760,14 @@ def consumer_evidence(repo: Path, matrix: dict[str, Any]) -> dict[str, Any]:
         "missing_exact_evidence_count": len(missing),
         "missing_exact_evidence": missing,
         "row_count": rows_with_tokens,
-        "evidenced_row_count": sum(item["status"] == "complete" for item in row_evidence),
-        "rows_without_evidence": [item["canonical_path"] for item in row_evidence if item["status"] != "complete"],
+        "evidenced_row_count": sum(
+            item["status"] == "complete" for item in row_evidence
+        ),
+        "rows_without_evidence": [
+            item["canonical_path"]
+            for item in row_evidence
+            if item["status"] != "complete"
+        ],
         "row_evidence": row_evidence,
         "semantic_status": "complete" if not missing else "review-required",
         "status": "complete" if not missing else "review-required",
@@ -577,7 +812,7 @@ def _assignment_keys(path: Path) -> list[str]:
         match = HCL_ASSIGNMENT_RE.match(line)
         if match:
             key = match.group(1)
-            value = line[match.end():].strip()
+            value = line[match.end() :].strip()
             if value.startswith("{"):
                 stack.append(key)
             else:
@@ -602,7 +837,9 @@ def _json_shape(path: Path) -> dict[str, Any]:
     return {
         "top_level_keys": sorted(str(key) for key in data),
         "nested_keys": {
-            str(key): sorted(str(item) for item in value) if isinstance(value, dict) else []
+            str(key): (
+                sorted(str(item) for item in value) if isinstance(value, dict) else []
+            )
             for key, value in data.items()
         },
     }
@@ -641,7 +878,9 @@ def _yaml_var_keys(path: Path) -> list[str]:
     return keys
 
 
-def _input_records(source: str, keys: list[str], disposition: str, review_reason: str) -> list[dict[str, str]]:
+def _input_records(
+    source: str, keys: list[str], disposition: str, review_reason: str
+) -> list[dict[str, str]]:
     if disposition not in VALID_DISPOSITIONS:
         raise InventoryError(f"invalid source-input disposition: {disposition}")
     return [
@@ -665,13 +904,38 @@ def load_source_input_inventory(repo: Path) -> dict[str, Any]:
     ansible_keys = _yaml_var_keys(repo / "scaffold/ansible/inventory/local.yml")
     migration_keys = _python_string_constants(
         migration,
-        {"SECRET_KEYS", "GENERATED_SECRET_KEYS", "ENV_TO_INVENTORY", "HISTORICAL_ENV_KEYS", "TF_VAR_RENAMES", "TECHNITIUM_TFVARS_RENAMES", "MIGRATION_ENV_KEYS"},
+        {
+            "SECRET_KEYS",
+            "GENERATED_SECRET_KEYS",
+            "ENV_TO_INVENTORY",
+            "HISTORICAL_ENV_KEYS",
+            "TF_VAR_RENAMES",
+            "TECHNITIUM_TFVARS_RENAMES",
+            "MIGRATION_ENV_KEYS",
+        },
     )
     dotenv_keys = _python_string_constants(
         parser,
-        {"PROXMOX_KEYS", "CADDY_KEYS", "TERRAFORM_KEYS", "TECHNITIUM_DNS_KEYS", "TECHNITIUM_BOOTSTRAP_KEYS", "FORGEJO_KEYS", "TAILSCALE_KEYS", "INFISICAL_KEYS", "HERMES_KEYS", "SEARXNG_KEYS", "EDGEROUTER_KEYS", "ALLOWED_KEYS"},
+        {
+            "PROXMOX_KEYS",
+            "CADDY_KEYS",
+            "TERRAFORM_KEYS",
+            "TECHNITIUM_DNS_KEYS",
+            "TECHNITIUM_BOOTSTRAP_KEYS",
+            "FORGEJO_KEYS",
+            "TAILSCALE_KEYS",
+            "INFISICAL_KEYS",
+            "HERMES_KEYS",
+            "SEARXNG_KEYS",
+            "EDGEROUTER_KEYS",
+            "ALLOWED_KEYS",
+        },
     )
-    layout_keys = _python_string_constants(migration_site, {"MIGRATED_FILES"}) + ["terraform.tfstate*", "service-backups", "settings.local.json"]
+    layout_keys = _python_string_constants(migration_site, {"MIGRATED_FILES"}) + [
+        "terraform.tfstate*",
+        "service-backups",
+        "settings.local.json",
+    ]
     layout_dispositions = {
         ".env": "generated-projection",
         "terraform.tfvars": "generated-projection",
@@ -686,24 +950,65 @@ def load_source_input_inventory(repo: Path) -> dict[str, Any]:
         "settings.local.json": "operational-artifact",
     }
     records = [
-        *_input_records("scaffold/terraform.tfvars", tfvars_keys, "unsupported", "scaffold legacy input awaits canonical row"),
-        *_input_records("scaffold/dns-records.local.json", dns_keys, "unsupported", "DNS ownership and record semantics await matrix row"),
-        *_input_records("scaffold/ansible/inventory/local.yml", ansible_keys, "ansible-only", "static inventory remains a compatibility consumer"),
-        *_input_records("scripts/migrate-values.py", migration_keys, "deprecated", "legacy migration alias or key awaits matrix reconciliation"),
-        *_input_records("scripts/parse-env.py", dotenv_keys, "deprecated", "dotenv compatibility key awaits matrix reconciliation"),
+        *_input_records(
+            "scaffold/terraform.tfvars",
+            tfvars_keys,
+            "unsupported",
+            "scaffold legacy input awaits canonical row",
+        ),
+        *_input_records(
+            "scaffold/dns-records.local.json",
+            dns_keys,
+            "unsupported",
+            "DNS ownership and record semantics await matrix row",
+        ),
+        *_input_records(
+            "scaffold/ansible/inventory/local.yml",
+            ansible_keys,
+            "ansible-only",
+            "static inventory remains a compatibility consumer",
+        ),
+        *_input_records(
+            "scripts/migrate-values.py",
+            migration_keys,
+            "deprecated",
+            "legacy migration alias or key awaits matrix reconciliation",
+        ),
+        *_input_records(
+            "scripts/parse-env.py",
+            dotenv_keys,
+            "deprecated",
+            "dotenv compatibility key awaits matrix reconciliation",
+        ),
         *[
             {
                 **record,
                 "disposition": layout_dispositions[record["key"]],
-                "review_reason": "generated compatibility projection" if layout_dispositions[record["key"]] == "generated-projection" else "private operational artifact",
+                "review_reason": (
+                    "generated compatibility projection"
+                    if layout_dispositions[record["key"]] == "generated-projection"
+                    else "private operational artifact"
+                ),
             }
-            for record in _input_records("scripts/migrate-site-values.py", layout_keys, "unsupported-review", "site-layout artifact requires explicit migration/state policy")
+            for record in _input_records(
+                "scripts/migrate-site-values.py",
+                layout_keys,
+                "unsupported-review",
+                "site-layout artifact requires explicit migration/state policy",
+            )
         ],
     ]
     for record in records:
-        if record["source"] == "scripts/migrate-values.py" and record["key"] in {"FORGEJO_UPSTREAM", "ascii"}:
+        if record["source"] == "scripts/migrate-values.py" and record["key"] in {
+            "FORGEJO_UPSTREAM",
+            "ascii",
+        }:
             record["disposition"] = "retired-input"
-            record["review_reason"] = "retired compatibility input retained only for cleanup" if record["key"] == "FORGEJO_UPSTREAM" else "migration implementation metadata is not a site value"
+            record["review_reason"] = (
+                "retired compatibility input retained only for cleanup"
+                if record["key"] == "FORGEJO_UPSTREAM"
+                else "migration implementation metadata is not a site value"
+            )
     return {
         "input_count": len(records),
         "inputs": records,
@@ -716,7 +1021,9 @@ def load_source_input_inventory(repo: Path) -> dict[str, Any]:
     }
 
 
-def load_source_inventory(repo: Path, variables: list[dict[str, str]], catalog: dict[str, Any]) -> dict[str, Any]:
+def load_source_inventory(
+    repo: Path, variables: list[dict[str, str]], catalog: dict[str, Any]
+) -> dict[str, Any]:
     """Inventory every Phase 0 source surface without claiming semantic coverage."""
     named_sources = [
         "infra/opentofu/variables.tf",
@@ -739,7 +1046,13 @@ def load_source_inventory(repo: Path, variables: list[dict[str, str]], catalog: 
     paths = [_source_path(repo, relative) for relative in named_sources]
     scaffold_tfvars = _assignment_keys(repo / "scaffold/terraform.tfvars")
     dns_shape = _json_shape(repo / "scaffold/dns-records.local.json")
-    env_refs = _env_references([repo / relative for relative in named_sources if relative.endswith((".py", ".sh"))])
+    env_refs = _env_references(
+        [
+            repo / relative
+            for relative in named_sources
+            if relative.endswith((".py", ".sh"))
+        ]
+    )
     return {
         "source_count": len(paths),
         "sources": [
@@ -765,7 +1078,13 @@ def load_source_inventory(repo: Path, variables: list[dict[str, str]], catalog: 
         },
         "ansible": {
             "catalog_service_count": len(catalog["services"]),
-            "inventory_fields": sorted({field for service in catalog["services"] for field in service["inventory_fields"]}),
+            "inventory_fields": sorted(
+                {
+                    field
+                    for service in catalog["services"]
+                    for field in service["inventory_fields"]
+                }
+            ),
             "environment_references": env_refs,
         },
         "coverage": {
@@ -781,22 +1100,55 @@ def classify_deferred_input(item: dict[str, str]) -> tuple[str, str]:
     source = item["source"]
     key = item["key"]
     if source.endswith("scripts/migrate-site-values.py"):
-        return "migration-only-or-unsupported", "site-layout artifact requires an explicit migration/state policy"
+        return (
+            "migration-only-or-unsupported",
+            "site-layout artifact requires an explicit migration/state policy",
+        )
     if source.endswith("scaffold/dns-records.local.json") and key == "settings":
-        return "ambiguous-or-destructive", "DNS resolver settings require an explicit platform policy"
+        return (
+            "ambiguous-or-destructive",
+            "DNS resolver settings require an explicit platform policy",
+        )
     if source.endswith("scripts/migrate-values.py") and key.startswith("container_"):
-        return "ambiguous-or-destructive", "generic migration alias does not identify one resource"
-    if key in {"debian_template_url", "debian_template_file_name", "debian_template_checksum_algorithm", "debian_template_checksum"}:
-        return "ambiguous-or-destructive", "public scaffold transport conflicts with the canonical HTTPS image contract"
+        return (
+            "ambiguous-or-destructive",
+            "generic migration alias does not identify one resource",
+        )
+    if key in {
+        "debian_template_url",
+        "debian_template_file_name",
+        "debian_template_checksum_algorithm",
+        "debian_template_checksum",
+    }:
+        return (
+            "ambiguous-or-destructive",
+            "public scaffold transport conflicts with the canonical HTTPS image contract",
+        )
     if re.search(
         r"(?:^|_)(?:password|pass|secret|token|private[_-]?key|api[_-]?key|ssh_public_keys|auth_key|encryption_key)(?:_|$)",
         key,
         re.IGNORECASE,
     ):
-        return "secret-or-protected", "protected material or delivery metadata requires an approved secret consumer contract"
-    if key in {"PROXMOX_VE_ENDPOINT", "PROXMOX_VE_USERNAME", "PVE_HOST", "EDGEROUTER_ADDR", "EDGEROUTER_USER", "CF_API_EMAIL"}:
-        return "secret-or-protected", "provider or external-system input has no canonical delivery boundary"
-    return "behavior-without-typed-owner", "legacy behavior/configuration lacks an exact typed canonical owner and projection"
+        return (
+            "secret-or-protected",
+            "protected material or delivery metadata requires an approved secret consumer contract",
+        )
+    if key in {
+        "PROXMOX_VE_ENDPOINT",
+        "PROXMOX_VE_USERNAME",
+        "PVE_HOST",
+        "EDGEROUTER_ADDR",
+        "EDGEROUTER_USER",
+        "CF_API_EMAIL",
+    }:
+        return (
+            "secret-or-protected",
+            "provider or external-system input has no canonical delivery boundary",
+        )
+    return (
+        "behavior-without-typed-owner",
+        "legacy behavior/configuration lacks an exact typed canonical owner and projection",
+    )
 
 
 def deferred_classification(matrix_coverage: dict[str, Any]) -> dict[str, Any]:
@@ -816,11 +1168,17 @@ def deferred_classification(matrix_coverage: dict[str, Any]) -> dict[str, Any]:
         "unclassified_count": unclassified_count,
         "counts": counts,
         "items": items,
-        "status": "complete" if not sum("classification" not in item for item in items) else "review-required",
+        "status": (
+            "complete"
+            if not sum("classification" not in item for item in items)
+            else "review-required"
+        ),
     }
 
 
-def candidate_generation_readiness(matrix_coverage: dict[str, Any], alias_classification: dict[str, Any] | None = None) -> dict[str, Any]:
+def candidate_generation_readiness(
+    matrix_coverage: dict[str, Any], alias_classification: dict[str, Any] | None = None
+) -> dict[str, Any]:
     reasons: list[str] = []
     if matrix_coverage["unmatched_count"]:
         reasons.append("matrix coverage is incomplete")
@@ -837,15 +1195,37 @@ def candidate_generation_readiness(matrix_coverage: dict[str, Any], alias_classi
     }
 
 
-def build_candidate_projection(matrix_coverage: dict[str, Any], *, allowed: bool) -> dict[str, Any]:
+def build_candidate_projection(
+    matrix_coverage: dict[str, Any], *, allowed: bool
+) -> dict[str, Any]:
     """Build a value-free projection manifest only after importer admission."""
     if not allowed:
-        return {"status": "blocked", "row_count": 0, "source_reference_count": 0, "rows": []}
+        return {
+            "status": "blocked",
+            "row_count": 0,
+            "source_reference_count": 0,
+            "rows": [],
+        }
     grouped: dict[str, list[dict[str, str]]] = {}
     for item in matrix_coverage["matched"]:
-        grouped.setdefault(item["canonical_path"], []).append({"source": item["source"], "key": item["key"]})
-    rows = [{"canonical_path": path, "sources": sorted(sources, key=lambda item: (item["source"], item["key"]))} for path, sources in sorted(grouped.items())]
-    return {"status": "complete" if rows and not matrix_coverage["unmatched"] else "blocked", "row_count": len(rows), "source_reference_count": sum(len(row["sources"]) for row in rows), "rows": rows}
+        grouped.setdefault(item["canonical_path"], []).append(
+            {"source": item["source"], "key": item["key"]}
+        )
+    rows = [
+        {
+            "canonical_path": path,
+            "sources": sorted(sources, key=lambda item: (item["source"], item["key"])),
+        }
+        for path, sources in sorted(grouped.items())
+    ]
+    return {
+        "status": (
+            "complete" if rows and not matrix_coverage["unmatched"] else "blocked"
+        ),
+        "row_count": len(rows),
+        "source_reference_count": sum(len(row["sources"]) for row in rows),
+        "rows": rows,
+    }
 
 
 def build_report(repo: Path) -> dict[str, Any]:
@@ -859,27 +1239,48 @@ def build_report(repo: Path) -> dict[str, Any]:
     matrix_path_status = matrix_path_coverage(matrix)
     matrix_classification_status = matrix_classification_coverage(matrix)
     consumer_evidence_status = consumer_evidence(repo, matrix)
-    if all(
-        status["status"] == "complete"
-        for status in (source_reconciliation, matrix_path_status, matrix_classification_status, consumer_evidence_status)
-    ) and matrix_coverage["status"] == "complete":
+    if (
+        all(
+            status["status"] == "complete"
+            for status in (
+                source_reconciliation,
+                matrix_path_status,
+                matrix_classification_status,
+                consumer_evidence_status,
+            )
+        )
+        and matrix_coverage["status"] == "complete"
+    ):
         matrix["status"] = "semantic-coverage-complete"
     deferred = deferred_classification(matrix_coverage)
-    alias_classification = classify_ambiguous_legacy_aliases(source_inputs, matrix_coverage)
-    candidate_readiness = candidate_generation_readiness(matrix_coverage, alias_classification)
+    alias_classification = classify_ambiguous_legacy_aliases(
+        source_inputs, matrix_coverage
+    )
+    candidate_readiness = candidate_generation_readiness(
+        matrix_coverage, alias_classification
+    )
     runtime_importer_contract = {
         "status": "implemented",
         "scope": "all normalized non-secret mapped observations",
-        "required_identity_scope": ["forgejo_domain", "forgejo_root_url", "forgejo_runtime", "technitium_vmid"],
+        "required_identity_scope": [
+            "forgejo_domain",
+            "forgejo_root_url",
+            "forgejo_runtime",
+            "technitium_vmid",
+        ],
         "evidence_bound_candidates": True,
         "secret_provider_inputs": "excluded-until-protected-delivery-contract",
     }
     candidate_readiness["status"] = "blocked"
     candidate_readiness["candidate_generation_allowed"] = False
-    candidate_readiness["reasons"].append("selected-source runtime admission must pass without conflicts")
+    candidate_readiness["reasons"].append(
+        "selected-source runtime admission must pass without conflicts"
+    )
     candidate_projection = build_candidate_projection(matrix_coverage, allowed=False)
     catalog_contract = _catalog_contract(repo / "infra/services.json")
-    canonical_path_coverage = catalog_path_coverage(repo / "infra/services.json", catalog)
+    canonical_path_coverage = catalog_path_coverage(
+        repo / "infra/services.json", catalog
+    )
     consumer_contract = load_consumer_contract(repo)
     retired_aliases = retired_alias_contract(repo)
     return {
@@ -897,7 +1298,11 @@ def build_report(repo: Path) -> dict[str, Any]:
         "mapping_matrix": matrix,
         "mapping_contract_evidence": {
             "scope": "tracked-public-repository-producers-and-consumers",
-            "source_producer_consumer_status": "complete" if matrix["status"] == "semantic-coverage-complete" else "review-required",
+            "source_producer_consumer_status": (
+                "complete"
+                if matrix["status"] == "semantic-coverage-complete"
+                else "review-required"
+            ),
             "provider_plan_equivalence": "not-claimed",
             "live_infrastructure_equivalence": "not-claimed",
         },
@@ -918,7 +1323,11 @@ def build_report(repo: Path) -> dict[str, Any]:
         "source_inputs": source_inputs,
         "classification": {
             "unclassified_variables": [],
-            "inventory_status": "complete" if source_inputs["unique_identities"] == source_inputs["input_count"] else "incomplete",
+            "inventory_status": (
+                "complete"
+                if source_inputs["unique_identities"] == source_inputs["input_count"]
+                else "incomplete"
+            ),
             "classification_status": source_inputs["status"],
             "semantic_mapping_status": matrix["status"],
             "consumer_cutover_status": consumer_contract["cutover_status"],
@@ -928,7 +1337,9 @@ def build_report(repo: Path) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument(
+        "--repo", type=Path, default=Path(__file__).resolve().parents[1]
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     try:

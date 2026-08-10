@@ -7,28 +7,22 @@ export INFRA_HOST_GID := `scripts/host-id.sh gid`
 default:
     @just --list
 
-# Fresh-checkout setup: build tools, create or clone values/, then show next files to edit
+# Fresh-checkout canonical setup: build tools, create or clone values/, then show selected site inputs
 setup remote="" site="":
+    @site_arg="{{site}}"; [[ -n "${site_arg}" ]] || { printf 'A canonical site is required. Run `just setup "" <site>`; use explicit migration or recovery tools for legacy forensics.\n' >&2; exit 2; }
     docker compose build infra
-    @env -u VALUES_SITE -u INFRA_VALUES_DIR scripts/python.sh scripts/settings.py validate >/dev/null
-    @selected_remote="$(env -u VALUES_SITE -u INFRA_VALUES_DIR scripts/discover-values-remote.sh "{{remote}}")"; \
+    @selected_remote="{{remote}}"; \
     if [[ -d values ]]; then \
-        if [[ -n "{{site}}" ]]; then \
-            if [[ -d "values/sites/{{site}}" ]]; then VALUES_SITE="{{site}}" scripts/values.sh check; else VALUES_SITE="{{site}}" scripts/values.sh init; fi; \
-        else \
-            scripts/values.sh check; \
-        fi; \
+        if [[ -d "values/sites/{{site}}" ]]; then VALUES_SITE="{{site}}" scripts/values.sh check; else VALUES_SITE="{{site}}" scripts/values.sh init; fi; \
     elif [[ -n "${selected_remote}" ]]; then \
-        scripts/values.sh clone "${selected_remote}"; \
+        scripts/values.sh clone "${selected_remote}"; VALUES_SITE="{{site}}" scripts/values.sh check; \
     else \
-        scripts/values.sh init; \
+        VALUES_SITE="{{site}}" scripts/values.sh init; \
     fi
-    @if [[ -z "{{site}}" ]]; then scripts/python.sh scripts/migrate-values.py; fi
-    docker compose run --rm infra python scripts/workspace-preflight.py --require-values
-    @if [[ -t 0 && -t 1 ]]; then if [[ -n "{{site}}" ]]; then printf 'Skipping bootstrap credential initialization for canonical site; add the SOPS policy and bundle, then run the explicit ssh-initialize workflow.\n'; else INFRA_COPY_SSH_KEYS=true docker compose run --rm infra bash scripts/bootstrap-pve-token.sh --if-needed; fi; else printf 'Skipping Proxmox token bootstrap wizard because just setup is not interactive.\n'; fi
-    @if [[ -t 0 && -t 1 ]]; then if [[ -n "{{site}}" ]]; then printf 'Skipping legacy domain wizard for canonical site; domain values come from site.yaml.\n'; else scripts/python.sh scripts/bootstrap-domain.py --if-needed; fi; else printf 'Skipping domain wizard because just setup is not interactive.\n'; fi
+    @VALUES_SITE="{{site}}" docker compose run --rm infra python scripts/workspace-preflight.py --require-values
+    @printf 'Setup does not create credentials or invoke legacy wizards. Add the SOPS policy and bundle, then run the explicit ssh-initialize workflow if required.\n'
     @printf '\nEdit these private values before running `just validate` and `just plan`:\n'
-    @if [[ -n "{{site}}" ]]; then printf '  values/sites/{{site}}/site.yaml\n  values/sites/{{site}}/.sops.yaml\n  values/sites/{{site}}/secrets.sops.yaml\n'; else printf '  values/.env\n  values/terraform.tfvars\n  values/dns-records.local.json\n  values/ansible/inventory/local.yml\n'; fi
+    @printf '  values/sites/{{site}}/site.yaml\n  values/sites/{{site}}/.sops.yaml\n  values/sites/{{site}}/secrets.sops.yaml\n'
 
 # Initialize the selected canonical site's bootstrap SSH identity through SOPS
 ssh-initialize SITE="dev":
@@ -44,9 +38,9 @@ status-values:
 check-values:
     scripts/values.sh check
 
-# Migrate older private values layouts to the current schema
+# Bounded legacy importer for explicit recovery/forensics only; never a normal lifecycle fallback
 [private]
-migrate-values: check-values
+recover-legacy-values-forensics:
     scripts/python.sh scripts/migrate-values.py
 
 # Validate public-safety rules for tracked source and scaffold templates

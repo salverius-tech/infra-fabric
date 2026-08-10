@@ -2,8 +2,8 @@ import copy
 import importlib.util
 import json
 import subprocess
+import tempfile
 import unittest
-from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,9 +22,9 @@ class DesignReconciliationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.module = load_module()
-        cls.register, cls.ledger, cls.backlog, cls.coverage = cls.module.build()
+        cls.completion, cls.audit, cls.backlog, cls.coverage = cls.module.build()
 
-    def test_generated_lossless_ledger_is_current(self):
+    def test_generated_compact_authorities_are_current(self):
         result = subprocess.run(
             ["python3", "-B", str(SCRIPT), "--check"],
             cwd=ROOT,
@@ -33,347 +33,145 @@ class DesignReconciliationTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("38 audit findings", result.stdout)
+        self.assertIn("external acceptance only", result.stdout)
 
-    def test_total_lossless_coverage_and_no_source_record_loss(self):
-        expected = []
-        for path in self.module.source_paths():
-            if path.endswith(".md") or path == "AGENTS.md":
-                expected.extend(
-                    self.module.extract_items(
-                        path,
-                        (ROOT / path).read_text(),
-                        self.module.authority_for(
-                            path,
-                            json.loads(
-                                (
-                                    ROOT / "docs" / "documentation-inventory.json"
-                                ).read_text()
-                            ),
-                        ),
-                    )
-                )
-        actual = self.ledger["records"]
-        self.assertGreater(len(actual), 0)
-        self.assertEqual(
-            Counter(r["id"] for r in expected), Counter(r["id"] for r in actual)
+    def test_active_artifacts_are_only_compact_authorities(self):
+        artifacts = self.module.artifacts(
+            self.completion, self.audit, self.backlog, self.coverage
         )
         self.assertEqual(
-            sum(s["extracted_item_count"] for s in self.register["sources"]),
-            len(actual),
-        )
-
-    def test_no_unreconciled_and_required_provenance(self):
-        required = {"path", "heading", "line", "kind"}
-        for record in self.ledger["records"]:
-            self.assertNotEqual(record["disposition"], "unreconciled")
-            self.assertIn(record["disposition"], self.module.DISPOSITIONS)
-            self.assertTrue(required.issubset(record["source"]))
-            self.assertTrue(record["semantic_identity"])
-            self.assertTrue(record["evidence"])
-
-    def test_ids_are_stable_under_line_shifts(self):
-        original = self.module.make_record(
-            "docs/example.md", 12, "Heading", "requirement", "A requirement", None, 1
-        )
-        shifted = self.module.make_record(
-            "docs/example.md", 99, "Heading", "requirement", "A requirement", None, 1
-        )
-        self.assertEqual(original["id"], shifted["id"])
-        self.assertNotEqual(original["source"]["line"], shifted["source"]["line"])
-
-    def test_source_identity_is_stable_when_adjudicated_classification_changes(self):
-        requirement = self.module.make_record(
-            "docs/example.md", 12, "Heading", "requirement", "A source claim", None, 1
-        )
-        question = self.module.make_record(
-            "docs/example.md", 12, "Heading", "open-question", "A source claim", None, 1
-        )
-        self.assertEqual(requirement["source_identity"], question["source_identity"])
-        self.assertNotEqual(requirement["id"], question["id"])
-
-    def test_checkbox_is_only_source_evidence(self):
-        checked = self.module.make_record(
-            "docs/example.md", 1, "Heading", "task", "checked task", None, 1
-        )
-        self.assertEqual(checked["disposition"], "evidence-required")
-        self.assertEqual(checked["evidence_level"], "source")
-        self.assertEqual(checked["evidence"][0]["role"], "source-claim")
-
-    def test_decision_word_false_positives_remain_non_decision_source_claims(self):
-        cases = (
-            ("## Approved architectural decision ledger", "requirement"),
-            ("## Decision log", "requirement"),
-            ("Prepare a decision register before implementation.", "requirement"),
-            ("The acceptance decision must be recorded.", "acceptance"),
-            ("A blocked task requires an operator decision.", "blocker"),
-        )
-        for line, expected in cases:
-            with self.subTest(line=line):
-                self.assertEqual(self.module.kind_for_line(line), expected)
-                record = self.module.make_record(
-                    "docs/example.md", 1, "Example", expected, line, None, 1
-                )
-                self.assertNotEqual(record["package"], "DECISIONS")
-                self.assertNotEqual(record["disposition"], "blocked-external")
-
-    def test_authoritative_open_question_heading_accepts_list_items_without_literal_prefix(
-        self,
-    ):
-        cases = (
-            (
-                "docs/hermes-operator-pilot-prd.md",
-                "working design",
-                "Open questions",
-                "Which Hermes actions are in scope for the first pilot: status only, validate, plan, apply, private values commits, or Forgejo workflow monitoring?",
-            ),
-            (
-                ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-                "implementation tracker",
-                "Decisions that must not be guessed",
-                "durable local-state single-controller policy versus remote locking backend;",
-            ),
-        )
-        for path, authority, heading, summary in cases:
-            with self.subTest(path=path, summary=summary):
-                self.assertEqual(
-                    self.module.kind_for_line(
-                        f"- {summary}", heading=heading, authority=authority
-                    ),
-                    "open-question",
-                )
-                record = self.module.make_record(
-                    path, 1, heading, "open-question", summary, None, 1
-                )
-                self.assertEqual(record["package"], "DECISIONS")
-                self.assertEqual(record["disposition"], "blocked-external")
-                self.assertEqual(
-                    record["decision_contract"],
-                    {
-                        "owner": "unassigned",
-                        "options": [],
-                        "trigger": "",
-                        "deadline": "",
-                        "dependency_ids": [],
-                    },
-                )
-
-    def test_open_question_heading_rejects_false_positive_authority_and_non_list_text(
-        self,
-    ):
-        for authority, line in (
-            ("historical-report", "- What did the historical decision choose?"),
-            ("working design", "Open questions"),
-            (
-                "working design",
-                "The Open questions heading is an instruction, not a source choice.",
-            ),
-        ):
-            with self.subTest(authority=authority, line=line):
-                self.assertNotEqual(
-                    self.module.kind_for_line(
-                        line, heading="Open questions", authority=authority
-                    ),
-                    "open-question",
-                )
-
-    def test_approved_decisions_are_retained_without_unresolved_questions(self):
-        unresolved = [
-            record
-            for record in self.ledger["records"]
-            if record["source"]["kind"] == "open-question"
-            or record["package"] == "DECISIONS"
-        ]
-        self.assertEqual(unresolved, [])
-        approved = [
-            record
-            for record in self.ledger["records"]
-            if record["source"]["path"]
-            == ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md"
-            and record["source"]["heading"] == "Approved decision record — 2026-08-06"
-            and record["summary"].startswith("**Decision D")
-        ]
-        self.assertEqual(len(approved), 10)
-        self.assertEqual(
-            {record["summary"].split(" — ", 1)[0] for record in approved},
-            {f"**Decision D{number}" for number in range(1, 11)},
-        )
-        self.assertTrue(all(record["decision_contract"] is None for record in approved))
-
-    def test_decision_register_records_that_no_questions_remain(self):
-        register = self.module.artifacts(
-            self.register, self.ledger, self.backlog, self.coverage
-        )[self.module.RECON / "decision-register.md"]
-        self.assertIn("## Canonical unresolved questions", register)
-        self.assertIn("## Duplicate source provenance", register)
-        self.assertIn(
-            "No explicit unresolved operator/product questions were extracted.",
-            register,
-        )
-        self.assertIn("No duplicate source questions.", register)
-        self.assertNotIn(
-            "Which Hermes actions are in scope for the first pilot", register
-        )
-
-    def test_historical_decision_with_named_successor_is_superseded_not_open(self):
-        record = self.module.make_record(
-            "docs/example.md",
-            1,
-            "History",
-            "requirement",
-            "Historical source decision record: the retired review is succeeded by canonical readiness.",
-            None,
-            1,
-        )
-        self.assertEqual(record["package"], "DOCS")
-        self.assertEqual(record["disposition"], "superseded")
-        self.assertIsNone(record["decision_contract"])
-
-    def test_current_extraction_count_and_source_identities_are_preserved(self):
-        # The Phase 9 status reconciliation adds one preserved source claim while
-        # retaining all prior identities.
-        self.assertEqual(len(self.ledger["records"]), 919)
-        source_paths = {source["path"] for source in self.register["sources"]}
-        self.assertIn("docs/service-operations.md", source_paths)
-        self.assertIn("docs/tooling-reproducibility.md", source_paths)
-        self.assertNotIn("docs/design-implementation-backlog.md", source_paths)
-        self.assertEqual(
-            len({record["source_identity"] for record in self.ledger["records"]}),
-            len(self.ledger["records"]),
-        )
-        self.assertFalse(
-            [
-                record
-                for record in self.ledger["records"]
-                if record["package"] == "DECISIONS"
-                and record["source"]["kind"] != "open-question"
-            ]
-        )
-
-    def test_hashes_and_all_audit_findings_are_covered(self):
-        findings = {
-            r["id"].upper()
-            for r in self.ledger["records"]
-            if r["source"]["kind"] == "finding"
-        }
-        self.assertEqual(findings, set(self.module.AUDIT_IDS))
-        audit_records = [
-            r for r in self.ledger["records"] if r["source"]["kind"] == "finding"
-        ]
-        self.assertEqual(
+            set(artifacts),
             {
-                r["package"]
-                for r in audit_records
-                if r["id"].upper() in self.module.AUDIT_IDS
+                self.module.RECON / "package-completion.json",
+                self.module.RECON / "package-completion.md",
+                self.module.RECON / "audit-dispositions.json",
+                self.module.RECON / "audit-dispositions.md",
+                self.module.RECON / "explicit-decisions.md",
+                self.module.RECON / "acceptance-matrix.json",
+                self.module.RECON / "acceptance-matrix.md",
+                ROOT / "docs/design-implementation-backlog.md",
             },
-            set(self.module.AUDIT_PACKAGE.values()),
-        )
-        self.assertFalse(self.module.validate(self.register, self.ledger, self.backlog))
-        mutated = copy.deepcopy(self.register)
-        mutated["sources"][0]["sha256"] = "0" * 64
-        self.assertTrue(
-            any(
-                "stale source hash" in error
-                for error in self.module.validate(mutated, self.ledger, self.backlog)
-            )
         )
 
-    def test_no_dangling_references_or_cycles(self):
-        self.assertFalse(self.module.validate(self.register, self.ledger, self.backlog))
-        cyclic = copy.deepcopy(self.backlog)
-        cyclic["packages"][0]["depends_on"].append(cyclic["packages"][0]["id"])
-        self.assertTrue(
-            any(
-                "cycle" in error
-                for error in self.module.validate(self.register, self.ledger, cyclic)
-            )
-        )
-        dangling = copy.deepcopy(self.ledger)
-        dangling["records"][0]["dependencies"] = ["not-a-record"]
-        self.assertTrue(
-            any(
-                "dangling record reference" in error
-                for error in self.module.validate(self.register, dangling, self.backlog)
-            )
-        )
-
-    def test_every_record_is_in_exactly_one_backlog_package(self):
-        membership = [
-            rid
-            for package in self.backlog["packages"]
-            for rid in package["included_record_ids"]
-        ]
+    def test_all_original_audit_findings_retain_disposition_and_evidence(self):
+        findings = self.audit["findings"]
         self.assertEqual(
-            Counter(membership),
-            Counter(record["id"] for record in self.ledger["records"]),
-        )
-        self.assertEqual(self.backlog["external_acceptance"], ["ACCEPTANCE"])
-        for package in self.backlog["packages"]:
-            self.assertEqual(package["external_status"], "blocked-external")
-            if package["source_status"] == "source-complete":
-                self.assertEqual(
-                    set(package["evidence_registry"]), {"production", "verification"}
-                )
-
-    def test_source_complete_package_requires_both_current_citations(self):
-        incomplete = copy.deepcopy(self.backlog)
-        package = next(
-            item
-            for item in incomplete["packages"]
-            if item["source_status"] == "source-complete"
-        )
-        del package["evidence_registry"]["verification"]
-        self.assertTrue(
-            any(
-                "lacks production/verification evidence" in error
-                for error in self.module.validate(
-                    self.register, self.ledger, incomplete
-                )
-            )
-        )
-
-    def test_implemented_audit_findings_have_package_evidence_without_promoting_all_claims(
-        self,
-    ):
-        findings = [
-            record
-            for record in self.ledger["records"]
-            if record["source"]["kind"] == "finding"
-        ]
-        self.assertTrue(
-            all(record["disposition"] == "implemented-static" for record in findings)
+            {finding["id"] for finding in findings}, set(self.module.AUDIT_IDS)
         )
         self.assertTrue(
             all(
-                {"production", "verification"}
-                <= {item.get("role") for item in record["evidence"]}
-                for record in findings
-            )
-        )
-        non_findings = [
-            record
-            for record in self.ledger["records"]
-            if record["source"]["kind"] != "finding"
-        ]
-        self.assertFalse(
-            any(
-                record["disposition"] == "implemented-static" for record in non_findings
+                finding["package"]
+                in {package["id"] for package in self.completion["packages"]}
+                and finding["disposition"] == "implemented-static"
+                and set(finding["evidence"]) == {"production", "verification"}
+                for finding in findings
             )
         )
 
-    def test_invalid_package_citation_range_fails_closed(self):
-        invalid = copy.deepcopy(self.backlog)
-        package = next(
-            item
-            for item in invalid["packages"]
-            if item["source_status"] == "source-complete"
-        )
-        package["evidence_registry"]["production"]["lines"] = "999999"
+    def test_frontier_contains_only_incomplete_source_packages(self):
+        package_by_id = {
+            package["id"]: package for package in self.completion["packages"]
+        }
+        self.assertEqual(self.completion["frontier"], [])
         self.assertTrue(
-            any(
-                "invalid citation range" in error
-                for error in self.module.validate(self.register, self.ledger, invalid)
+            all(
+                package_by_id[package_id]["source_status"] == "incomplete"
+                for package_id in self.completion["frontier"]
             )
         )
+        self.assertNotIn("DECISIONS", package_by_id)
+
+    def test_closed_decisions_are_explicit_without_a_decisions_package(self):
+        self.assertEqual(len(self.completion["explicit_decisions"]), 10)
+        self.assertEqual(
+            {decision["id"] for decision in self.completion["explicit_decisions"]},
+            {f"D{number}" for number in range(1, 11)},
+        )
+        self.assertFalse(self.completion["unresolved_decisions"])
+
+    def test_acceptance_matrix_separates_environments(self):
+        matrix = self.completion["acceptance_matrix"]
+        self.assertEqual(
+            set(matrix["environments"]),
+            {"development", "isolated-recovery", "production"},
+        )
+        self.assertEqual(set(matrix["columns"]), set(self.module.MATRIX_COLUMNS))
+        self.assertEqual(matrix["rows"]["development"]["service-restore"], "evidenced")
+        self.assertEqual(
+            matrix["rows"]["isolated-recovery"]["service-restore"],
+            "not-evidenced",
+        )
+        self.assertEqual(
+            matrix["rows"]["production"]["service-restore"], "not-evidenced"
+        )
+
+    def test_frozen_lossless_history_is_a_resolvable_git_reference(self):
+        reference = self.completion["historical_ledger"]
+        self.assertRegex(reference["git_ref"], r"^[0-9a-f]{40}$")
+        result = subprocess.run(
+            ["git", "cat-file", "-e", f"{reference['git_ref']}:" + reference["path"]],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_validation_fails_closed_for_stale_audit_citation(self):
+        invalid = copy.deepcopy(self.audit)
+        invalid["findings"][0]["evidence"]["production"]["lines"] = "999999"
+        self.assertTrue(self.module.validate(self.completion, invalid, self.backlog))
+
+    def test_validation_fails_closed_for_promoted_recovery_evidence(self):
+        invalid = copy.deepcopy(self.completion)
+        invalid["acceptance_matrix"]["rows"]["isolated-recovery"][
+            "service-restore"
+        ] = "evidenced"
+        self.assertTrue(self.module.validate(invalid, self.audit, self.backlog))
+
+    def test_validation_fails_closed_for_frontier_or_decision_regression(self):
+        invalid = copy.deepcopy(self.completion)
+        invalid["frontier"] = ["R1"]
+        invalid["unresolved_decisions"] = ["new-question"]
+        self.assertTrue(self.module.validate(invalid, self.audit, self.backlog))
+
+    def test_retire_declared_artifacts_deletes_only_declared_paths(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            reconciliation = Path(temporary_directory)
+            declared_artifact = reconciliation / self.module.RETIRED_ARTIFACTS[0]
+            declared_wave = (
+                reconciliation / "waves" / self.module.RETIRED_WAVE_OUTPUTS[0]
+            )
+            undeclared_artifact = reconciliation / "operator-notes.md"
+            undeclared_wave = reconciliation / "waves" / "operator-notes.md"
+            for path in (
+                declared_artifact,
+                declared_wave,
+                undeclared_artifact,
+                undeclared_wave,
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("preserve or retire\n", encoding="utf-8")
+
+            self.module.retire_declared_artifacts(reconciliation)
+
+            self.assertFalse(declared_artifact.exists())
+            self.assertFalse(declared_wave.exists())
+            self.assertTrue(undeclared_artifact.is_file())
+            self.assertTrue(undeclared_wave.is_file())
+
+    def test_validation_rejects_retired_generated_artifacts(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            reconciliation = Path(temporary_directory)
+            retired = reconciliation / "backlog.json"
+            retired.write_text("{}\n", encoding="utf-8")
+            original_reconciliation = self.module.RECON
+            setattr(self.module, "RECON", reconciliation)
+            try:
+                self.assertTrue(
+                    self.module.validate(self.completion, self.audit, self.backlog)
+                )
+            finally:
+                setattr(self.module, "RECON", original_reconciliation)
 
 
 if __name__ == "__main__":

@@ -2,13 +2,15 @@
 
 `just --list` is the public command surface. Run commands from the repository root. The selected canonical site is represented by `values/sites/<site>/site.yaml` and protected values by `values/sites/<site>/secrets.sops.yaml`.
 
-Select a site before lifecycle work:
+Select a site before every normal operator workflow (including values checks and validation):
 
 ```bash
 export VALUES_SITE=<site>
 ```
 
 Private implementation recipes are not operator commands.
+
+The only retained legacy-layout entry point is the private `recover-legacy-values-forensics` recipe. It is a bounded recovery/forensics importer, never a substitute for setup, validate, plan, apply, teardown, or Ansible execution; see [canonical model operations](canonical-values-migration.md#executable-compatibility-boundary).
 
 ## `default`
 
@@ -24,9 +26,9 @@ Lists the supported public recipes. No files or infrastructure are changed.
 just setup "" <site>
 ```
 
-Creates or preserves the selected site scaffold and initializes the private values repository when required by the local workflow. The selected site scaffold is public-safe and does not create SOPS identities, credentials, or encrypted secret content. Existing files are not overwritten. Complete private SOPS prerequisites before validation or planning.
+Requires `<site>` and creates or preserves that selected canonical-site scaffold before initializing the private values repository when required by the local workflow. `VALUES_SITE` plus `values/sites/<site>/site.yaml` are mandatory for every normal operator command. The selected site scaffold is public-safe and does not create SOPS identities, credentials, encrypted secret content, or legacy `.env`/tfvars/inventory inputs. Existing files are not overwritten. Complete private SOPS prerequisites before validation or planning.
 
-The optional first argument is the private values remote and the optional second argument is the site identifier. Prefer an existing private repository when one is already authoritative.
+The optional first argument is the private values remote; the second argument is the required site identifier. Prefer an existing private repository when one is already authoritative.
 
 ## `edit-secrets`
 
@@ -125,4 +127,4 @@ Keep these private. Plan artifacts are disposable and must be regenerated when i
 
 ## Safe recovery rule
 
-When a recipe reports stale inputs, missing projections, failed policy verification, missing secrets, provider failure, or host-readiness failure, correct the canonical source or prerequisite and rerun the public recipe. Do not edit generated files, plans, state, or identity material to bypass a failed gate.
+When a recipe reports a missing site, stale inputs, missing projections, failed policy verification, missing secrets, provider failure, or host-readiness failure, restore or create `values/sites/<site>/site.yaml` through `just setup "" <site>`, then correct the canonical source or prerequisite and rerun the public recipe. Use only the explicit migration/importer or recovery tools for legacy forensic work; they are not normal recipe fallbacks. Do not edit generated files, plans, state, or identity material to bypass a failed gate.

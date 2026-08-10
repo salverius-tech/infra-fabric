@@ -39,7 +39,7 @@ class SshKeyHandlingTests(unittest.TestCase):
         self.assertIn("INFRA_COPY_SSH_KEYS=true", text)
         setup = text[text.index("setup remote"):text.index("\n# Show private values")]
         self.assertNotIn("INFRA_SSH_IDENTITY_SOURCE", setup)
-        self.assertIn("Skipping bootstrap credential initialization for canonical site", setup)
+        self.assertIn("Setup does not create credentials or invoke legacy wizards", setup)
         self.assertIn("ssh-initialize SITE=", text)
 
     def test_proxmox_token_uses_infra_fabric_comments(self) -> None:

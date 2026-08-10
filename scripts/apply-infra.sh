@@ -25,12 +25,9 @@ fi
 
 # shellcheck disable=SC2016
 INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh bash -euo pipefail -c '
+source scripts/site-context.sh
 python scripts/workspace-preflight.py --require-values --require-secrets
-if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
-  python scripts/settings.py policy --action apply --canonical
-else
-  python scripts/settings.py policy --action apply
-fi
+python scripts/settings.py policy --action apply --canonical
 
 if [[ ! -f "${INFRA_VALUES_DIR}/tfplan" && ! -f "${INFRA_VALUES_DIR}/tfplan.meta.json" ]]; then
   printf "No saved infrastructure plan found. Run just plan, review the output, then run just apply.\n" >&2
@@ -68,52 +65,32 @@ verify_saved_plan() {
 }
 verify_saved_plan
 python scripts/tfplan-metadata.py summary --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json"
-if [[ ! -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
-  python scripts/settings.py summary
-fi
-ansible_inventory="${INFRA_VALUES_DIR}/ansible/inventory/local.yml"
-canonical_ansible_args=()
-canonical_site=false
-if [[ -f "${INFRA_VALUES_DIR}/site.yaml" ]]; then
-  for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
-    if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
-      printf "%s\n" "Canonical site exists but generated projection is missing: ${required_projection}. Run just plan again." >&2
-      exit 1
-    fi
-  done
-  python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
-  ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
-  tofu_vars_file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"
-  canonical_ansible_args=(--canonical-ansible)
-  canonical_site=true
-  execution_snapshot="$(python scripts/execution-snapshot.py create \
-    --values-dir "${INFRA_VALUES_DIR}" \
-    --plan "${execution_plan}" \
-    --metadata "${execution_metadata}" \
-    --destination-root "${INFRA_VALUES_DIR}/execution-snapshots" \
-    --site "${VALUES_SITE}")"
-  python scripts/execution-snapshot.py verify --snapshot "${execution_snapshot}"
-  execution_plan="${execution_snapshot}/tfplan"
-  execution_metadata="${execution_snapshot}/tfplan.meta.json"
-  execution_values_dir="${execution_snapshot}/values/sites/${VALUES_SITE}"
-  ansible_inventory="${execution_values_dir}/generated/ansible-inventory.json"
-  tofu_vars_file="../../${execution_values_dir}/generated/terraform.auto.tfvars.json"
-  export VALUES_DIR="${execution_snapshot}/values"
-fi
+require_canonical_projection_set "${INFRA_VALUES_DIR}/generated"
+# Apply consumes existing plan-bound projections and verifies them exactly once.
+python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
+ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
+
+execution_snapshot="$(python scripts/execution-snapshot.py create \
+  --values-dir "${INFRA_VALUES_DIR}" \
+  --plan "${execution_plan}" \
+  --metadata "${execution_metadata}" \
+  --destination-root "${INFRA_VALUES_DIR}/execution-snapshots" \
+  --site "${VALUES_SITE}")"
+python scripts/execution-snapshot.py verify --snapshot "${execution_snapshot}"
+execution_plan="${execution_snapshot}/tfplan"
+execution_metadata="${execution_snapshot}/tfplan.meta.json"
+execution_values_dir="${execution_snapshot}/values/sites/${VALUES_SITE}"
+ansible_inventory="${execution_values_dir}/generated/ansible-inventory.json"
+tofu_vars_file="../../${execution_values_dir}/generated/terraform.auto.tfvars.json"
+export VALUES_DIR="${execution_snapshot}/values"
 
 ansible_inventory_args=("-i" "${ansible_inventory}")
-if [[ "${#canonical_ansible_args[@]}" -eq 0 ]]; then
-  ansible_inventory_args+=("-i" "infra/ansible/inventory/tfvars.py")
-fi
 
 storage_vars_args=()
 if [[ -n "${target_service}" ]]; then
   storage_vars_args+=(--service "${target_service}")
 fi
-projection_args=()
-if [[ "${canonical_site}" == true ]]; then
-  projection_args+=(--projection "${execution_values_dir}/generated/terraform.auto.tfvars.json")
-fi
+projection_args=(--projection "${execution_values_dir}/generated/terraform.auto.tfvars.json")
 python scripts/storage-vars.py --summary "${storage_vars_args[@]}" "${projection_args[@]}"
 python scripts/guest-mount-feature-vars.py --summary "${projection_args[@]}"
 
@@ -156,11 +133,7 @@ python scripts/state-snapshot.py create \
     esac
   done < <(env)
   apply_command=(tofu -chdir=infra/opentofu apply -state=../../${INFRA_VALUES_DIR}/terraform.tfstate ../../${execution_plan})
-  if [[ "${canonical_site}" == true ]]; then
-    python scripts/canonical-provider-env.py -- "${apply_command[@]}"
-  else
-    "${apply_command[@]}"
-  fi
+  python scripts/canonical-provider-env.py -- "${apply_command[@]}"
 )
 
 # Diagnostic only: mutation was authorized by the immediately preceding verification.
@@ -174,15 +147,6 @@ ansible_service_args=()
 if [[ -n "${target_service}" ]]; then
   ansible_service_args+=(--service "${target_service}")
 fi
-if [[ "${#canonical_ansible_args[@]}" -gt 0 ]]; then
-  python scripts/apply-ansible-services.py \
-    "${canonical_ansible_args[@]}" \
-    "${ansible_service_args[@]}"
-else
-  python scripts/apply-ansible-services.py \
-    --inventory "${ansible_inventory}" \
-    --inventory infra/ansible/inventory/tfvars.py \
-    --env-file "${INFRA_VALUES_DIR}/.env" \
-    "${ansible_service_args[@]}"
-fi
+python scripts/apply-ansible-services.py \
+  "${ansible_service_args[@]}"
 ' bash "${target_service}" "${replace_service}" "${destroy_verify_flag}" "${stateful_batch_verify_flag}"

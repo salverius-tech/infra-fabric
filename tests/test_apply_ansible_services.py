@@ -65,7 +65,6 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 ["onramp_host", "infisical_onramp", "searxng_onramp"],
                 ("inventory.yml",),
                 Path(temp),
-                Path(temp) / ".env",
                 {},
                 max_workers=3,
                 runner=runner,
@@ -90,11 +89,12 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertNotIn("refresh_root_password_from_tfvars", source)
         self.assertNotIn("TF_VAR_lxc_root_password", source)
 
-    def test_canonical_dns_environment_keeps_legacy_context_unchanged(self) -> None:
-        class LegacyContext:
+    def test_canonical_dns_environment_rejects_a_context_without_a_selected_site(self) -> None:
+        class MissingCanonicalContext:
             canonical_site_path = None
 
-        self.assertEqual(apply_ansible_services.canonical_dns_environment(LegacyContext()), {})
+        with self.assertRaisesRegex(RuntimeError, "selected canonical site"):
+            apply_ansible_services.canonical_dns_environment(MissingCanonicalContext())
 
     def test_canonical_dns_environment_fails_closed_when_generated_projection_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -112,13 +112,10 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "generated projection"):
                 apply_ansible_services.canonical_dns_environment(CanonicalContext())
 
-    def test_canonical_mode_rejects_explicit_legacy_inventory(self) -> None:
-        self.assertEqual(
-            apply_ansible_services.main(
-                ["--canonical-ansible", "--inventory", "legacy-inventory.yml", "--service", "forgejo"]
-            ),
-            1,
-        )
+    def test_normal_entrypoint_rejects_legacy_inventory_arguments(self) -> None:
+        with self.assertRaises(SystemExit) as raised:
+            apply_ansible_services.main(["--inventory", "legacy-inventory.yml", "--service", "forgejo"])
+        self.assertEqual(raised.exception.code, 2)
 
     def test_canonical_direct_access_ready_enrolls_site_known_hosts(self) -> None:
         commands: list[list[str]] = []
@@ -179,7 +176,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 mock.patch.object(apply_ansible_services, "canonical_dns_environment", return_value={}),
                 mock.patch.dict(os.environ, {"INFRA_PVE_SSH_IDENTITY_FILE": "pve-management"}, clear=False),
             ):
-                transport = apply_ansible_services.canonical_ansible_transport(Context(), root, [])
+                transport = apply_ansible_services.canonical_ansible_transport(Context(), root)
 
         assert transport is not None
         self.assertIn(
@@ -216,7 +213,6 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 "forgejo_runner",
                 ("inventory.yml", "tfvars.py"),
                 Path(temp),
-                Path(temp) / ".env",
                 dict(os.environ),
                 runner,
             )
@@ -240,7 +236,6 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 "forgejo_runner",
                 ("canonical-inventory.json",),
                 Path(temp),
-                Path(temp) / ".env",
                 base_env,
                 runner,
                 service_environment={"FORGEJO_RUNNER_REGISTRATION_SECRET": "runtime-secret"},
@@ -417,7 +412,6 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 "forgejo_runner",
                 ("canonical-inventory.json",),
                 Path(temp),
-                Path(temp) / ".env",
                 dict(os.environ),
                 runner,
                 ("-e", "@canonical-vars.json"),
@@ -426,7 +420,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(commands[0][0:6], ["ansible-playbook", "-i", "canonical-inventory.json", "-e", "@canonical-vars.json", "infra/ansible/playbooks/forgejo-runner.yml"])
 
-    def test_technitium_dns_bootstraps_token_before_dns_sync(self) -> None:
+    def test_technitium_dns_invokes_standalone_token_bootstrap_before_dns_sync(self) -> None:
         commands: list[list[str]] = []
 
         def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
@@ -434,18 +428,10 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             return 0
 
         with tempfile.TemporaryDirectory() as temp:
-            env_path = Path(temp) / ".env"
-            env_path.write_text(
-                'export TECHNITIUM_API_URL="http://192.0.2.53:5380/api"\n'
-                'export TECHNITIUM_API_TOKEN="REPLACE_AFTER_TOKEN_CREATION"\n'
-                'export DNS_RECORDS_FILE="values/dns-records.local.json"\n',
-                encoding="utf-8",
-            )
             result = apply_ansible_services.run_service(
                 "technitium",
                 ("inventory.yml",),
                 Path(temp),
-                env_path,
                 dict(os.environ),
                 runner,
             )
@@ -456,21 +442,59 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             [
                 ["ansible-playbook", "-i", "inventory.yml", "infra/ansible/playbooks/technitium.yml"],
                 ["ansible-playbook", "-i", "inventory.yml", "infra/ansible/playbooks/caddy-proxy.yml"],
-                ["python", "scripts/bootstrap-technitium-api-token.py", "--env-file", str(env_path)],
+                ["python", "scripts/bootstrap-technitium-api-token.py"],
                 ["ansible-playbook", "-i", "inventory.yml", "infra/ansible/playbooks/technitium-dns.yml"],
             ],
         )
 
-    def test_enabled_services_can_filter_to_one_service(self) -> None:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
-            handle.write('{"services":["technitium","forgejo"]}\n')
-            path = Path(handle.name)
-        try:
-            self.assertEqual(apply_ansible_services.enabled_services(path, "forgejo"), ["forgejo"])
-            with self.assertRaises(apply_ansible_services.settings.SettingsError):
-                apply_ansible_services.enabled_services(path, "hermes")
-        finally:
-            path.unlink()
+    def test_canonical_technitium_service_does_not_invoke_legacy_dotenv_bootstrap(self) -> None:
+        commands: list[list[str]] = []
+
+        def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
+            commands.append(command)
+            return 0
+
+        with tempfile.TemporaryDirectory() as temp:
+            result = apply_ansible_services.run_service(
+                "technitium",
+                ("canonical-inventory.json",),
+                Path(temp),
+                {},
+                runner,
+                bootstrap_technitium=False,
+            )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertNotIn(["python", "scripts/bootstrap-technitium-api-token.py"], commands)
+
+    def test_canonical_enabled_services_selects_only_enabled_model_services(self) -> None:
+        model = SimpleNamespace(
+            services={
+                "technitium": SimpleNamespace(enabled=True),
+                "forgejo": SimpleNamespace(enabled=True),
+                "hermes": SimpleNamespace(enabled=False),
+            }
+        )
+
+        class Context:
+            canonical_site_path = Path("/canonical/site.yaml")
+            site = "canonical"
+
+        with mock.patch.object(apply_ansible_services, "load_site", return_value=model):
+            self.assertEqual(
+                apply_ansible_services.canonical_enabled_services(Context()),
+                ["technitium", "forgejo"],
+            )
+            self.assertEqual(
+                apply_ansible_services.canonical_enabled_services(Context(), "forgejo"),
+                ["forgejo"],
+            )
+            with self.assertRaisesRegex(RuntimeError, "not enabled"):
+                apply_ansible_services.canonical_enabled_services(Context(), "hermes")
+
+    def test_canonical_enabled_services_requires_a_selected_canonical_site(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "selected canonical site"):
+            apply_ansible_services.canonical_enabled_services(SimpleNamespace(canonical_site_path=None))
 
     def test_summary_identifies_unattempted_services(self) -> None:
         result = apply_ansible_services.ServiceResult("forgejo", (), 0, Path("/tmp/forgejo.log"))
@@ -496,7 +520,6 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 ["forgejo", "hermes"],
                 ("inventory.yml",),
                 Path(temp),
-                Path(temp) / ".env",
                 dict(os.environ),
                 runner,
             )

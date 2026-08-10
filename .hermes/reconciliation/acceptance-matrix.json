@@ -1,0 +1,47 @@
+{
+  "environments": [
+    "development",
+    "isolated-recovery",
+    "production"
+  ],
+  "columns": [
+    "plan",
+    "apply",
+    "health-idempotence",
+    "service-restore",
+    "infrastructure-recovery",
+    "hermes-integration",
+    "rollback"
+  ],
+  "rows": {
+    "development": {
+      "plan": "evidenced",
+      "apply": "evidenced",
+      "health-idempotence": "evidenced",
+      "service-restore": "evidenced",
+      "infrastructure-recovery": "not-evidenced",
+      "hermes-integration": "not-evidenced",
+      "rollback": "not-evidenced"
+    },
+    "isolated-recovery": {
+      "plan": "not-evidenced",
+      "apply": "not-evidenced",
+      "health-idempotence": "not-evidenced",
+      "service-restore": "not-evidenced",
+      "infrastructure-recovery": "not-evidenced",
+      "hermes-integration": "not-evidenced",
+      "rollback": "not-evidenced"
+    },
+    "production": {
+      "plan": "not-evidenced",
+      "apply": "not-evidenced",
+      "health-idempotence": "not-evidenced",
+      "service-restore": "not-evidenced",
+      "infrastructure-recovery": "not-evidenced",
+      "hermes-integration": "not-evidenced",
+      "rollback": "not-evidenced"
+    }
+  },
+  "evidence_boundary": "Development evidence is recorded only in the development row. No row implies evidence in another environment.",
+  "development_source": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:10"
+}

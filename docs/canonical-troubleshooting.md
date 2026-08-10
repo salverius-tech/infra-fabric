@@ -8,7 +8,7 @@ Use the selected site context for every diagnostic. Do not print protected value
 
 ## Site and schema errors
 
-Confirm `VALUES_SITE=<site>` is set and that `values/sites/<site>/site.yaml` exists. Run `just validate` and fix the first schema path reported. Do not edit generated projections to silence a validation error.
+Confirm `VALUES_SITE=<site>` is set and that `values/sites/<site>/site.yaml` exists. If it is missing, restore or create it with `just setup "" <site>` before rerunning the canonical recipe; legacy files are not a normal workflow fallback. Run `just validate` and fix the first schema path reported. Do not edit generated projections to silence a validation error.
 
 ## SOPS and secret-path errors
 

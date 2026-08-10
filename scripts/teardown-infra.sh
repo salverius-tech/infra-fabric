@@ -22,6 +22,7 @@ fi
 
 # shellcheck disable=SC2016
 INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh bash -euo pipefail -c '
+source scripts/site-context.sh
 umask 077
 python scripts/workspace-preflight.py --require-values --require-secrets
 python scripts/settings.py policy --action destroy --canonical
@@ -29,12 +30,7 @@ python scripts/settings.py policy --action destroy --canonical
 plan_path="${INFRA_VALUES_DIR}/destroy.tfplan"
 metadata_path="${INFRA_VALUES_DIR}/destroy.tfplan.meta.json"
 if [[ "${1}" == "plan" ]]; then
-  for required_projection in manifest.json terraform.auto.tfvars.json ansible-inventory.json ansible-vars.json dns-records.json; do
-    if [[ ! -f "${INFRA_VALUES_DIR}/generated/${required_projection}" ]]; then
-      printf "Canonical teardown requires a complete verified projection set. Run just plan after correcting canonical inputs.\n" >&2
-      exit 1
-    fi
-  done
+  require_canonical_projection_set "${INFRA_VALUES_DIR}/generated"
   python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
   tofu -chdir=infra/opentofu init
   plan_tmp="$(mktemp "${INFRA_VALUES_DIR}/.destroy-tfplan-next.XXXXXX")"

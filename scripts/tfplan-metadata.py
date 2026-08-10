@@ -465,10 +465,9 @@ def verify_metadata(
     if expected_inputs != current_inputs:
         raise MetadataError("Saved tfplan inputs changed. Run `just plan` again.")
 
-    expected_commit = data.get("git_commit")
-    current_commit = git_commit(repo)
-    if expected_commit and current_commit and expected_commit != current_commit:
-        raise MetadataError("Saved tfplan git commit changed. Run `just plan` again.")
+    # git_commit is provenance only. Operational inputs, plan hash, canonical identity,
+    # scope, and expiry above are the validity gate, so documentation/test-only commits
+    # do not unnecessarily invalidate an otherwise identical saved plan.
 
     if data["scope"] != plan_scope(target_service, replace_service):
         raise MetadataError("Saved tfplan scope differs from this apply. Run `just plan` again.")

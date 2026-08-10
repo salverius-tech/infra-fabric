@@ -19,9 +19,10 @@ class RunInfraTests(unittest.TestCase):
         root = Path(temp_dir.name)
         values = root / "values"
         values.mkdir()
-        selected_values = values / "sites" / site if site else values
+        selected_site = site or "dev"
+        selected_values = values / "sites" / selected_site
         selected_values.mkdir(parents=True, exist_ok=True)
-        (selected_values / ".env").write_text("PVE_HOST=proxmox.example.internal\n", encoding="utf-8")
+        (selected_values / "site.yaml").write_text("schema_version: 1\n", encoding="utf-8")
         fakebin = root / "bin"
         fakebin.mkdir()
         record = root / "record"
@@ -31,21 +32,7 @@ class RunInfraTests(unittest.TestCase):
                 f"""
                 #!/usr/bin/env bash
                 set -euo pipefail
-                if printf '%s\n' "$@" | grep -qx -- "scripts/parse-env.py"; then
-                  printf 'PVE_HOST=proxmox.example.internal\n'
-                  exit 0
-                fi
-                env_file=""
-                while [[ $# -gt 0 ]]; do
-                  if [[ "$1" == "--env-from-file" ]]; then
-                    env_file="$2"
-                    break
-                  fi
-                  shift
-                done
-                test -f "$env_file"
-                mode="$(stat -c '%a' "$env_file")"
-                echo "$env_file $mode" > "{record}"
+                echo "$*" > "{record}"
                 exit {exit_code}
                 """
             ).strip()
@@ -61,10 +48,7 @@ class RunInfraTests(unittest.TestCase):
                 "TMPDIR": str(root),
             }
         )
-        if site:
-            env["VALUES_SITE"] = site
-        else:
-            env.pop("VALUES_SITE", None)
+        env["VALUES_SITE"] = selected_site
         result = subprocess.run(
             ["bash", "scripts/run-infra.sh", "true"],
             cwd=REPO,
@@ -75,7 +59,7 @@ class RunInfraTests(unittest.TestCase):
         )
         return result, root
 
-    def test_temp_env_file_removed_on_success(self) -> None:
+    def test_runtime_workspace_is_removed_on_success(self) -> None:
         result, root = self.run_with_fake_docker(0)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(list(root.glob("run-infra.*")))
@@ -85,7 +69,7 @@ class RunInfraTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(list(root.glob("run-infra.*")))
 
-    def test_temp_env_file_removed_on_failure(self) -> None:
+    def test_runtime_workspace_is_removed_on_failure(self) -> None:
         result, root = self.run_with_fake_docker(7)
         self.assertEqual(result.returncode, 7)
         self.assertFalse(list(root.glob("run-infra.*")))
