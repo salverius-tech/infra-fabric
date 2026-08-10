@@ -18,8 +18,11 @@ from typing import Callable, Any
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 from canonical_values import CanonicalValuesError, load_site
+from values_context import ValuesContextError, from_environment
 
-SCHEMA_VERSION = 3
+# Keep this aligned with scripts/tfplan-metadata.py, the canonical saved-plan
+# producer and verifier consumed by the operator bridge.
+SCHEMA_VERSION = 7
 MAX_OUTPUT = 6000
 PRIVATE_IP_RE = re.compile(
     r"(?<![0-9.])(?:10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|"
@@ -95,8 +98,17 @@ def enabled_services(repo: Path) -> list[str]:
     return services
 
 
+def plan_metadata_path(repo: Path) -> Path:
+    """Resolve saved-plan metadata from the selected canonical site context."""
+    try:
+        context = from_environment(repo)
+    except ValuesContextError as error:
+        raise OperatorError(str(error)) from error
+    return context.values_dir / "tfplan.meta.json" if context.site else repo / "tfplan.meta.json"
+
+
 def load_plan_summary(repo: Path) -> dict[str, Any] | None:
-    path = repo / "tfplan.meta.json"
+    path = plan_metadata_path(repo)
     if not path.is_file():
         return None
     try:
@@ -285,7 +297,7 @@ def run_action(
         "ok": returncode == 0,
         "output": safe_output,
     }
-    if action in {"plan", "apply"} and (repo / "tfplan.meta.json").is_file():
+    if action in {"plan", "apply"} and plan_metadata_path(repo).is_file():
         response["plan"] = load_plan_summary(repo)
     write_audit_record(repo, action, returncode, response)
     return response

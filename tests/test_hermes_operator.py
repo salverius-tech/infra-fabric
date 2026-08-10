@@ -61,6 +61,39 @@ class HermesOperatorTests(unittest.TestCase):
             with self.assertRaises(hermes_operator.OperatorError):
                 hermes_operator.run_action(root, "apply", approve=True, runner=lambda *_: 0)
 
+    def test_selected_site_plan_summary_uses_canonical_values_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            site_dir = root / "values" / "sites" / "dev"
+            site_dir.mkdir(parents=True)
+            metadata = site_dir / "tfplan.meta.json"
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "schema_version": hermes_operator.SCHEMA_VERSION,
+                        "summary": {
+                            "resource_changes": {"create": 0, "update": 0, "replace": 0, "delete": 0},
+                            "destructive": False,
+                            "stateful_changes": [],
+                            "stateful_targets": [],
+                            "stateful_services": [],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            previous = os.environ.get("VALUES_SITE")
+            os.environ["VALUES_SITE"] = "dev"
+            try:
+                result = hermes_operator.run_action(root, "plan", runner=lambda *_: (0, "ok\n"))
+            finally:
+                if previous is None:
+                    os.environ.pop("VALUES_SITE", None)
+                else:
+                    os.environ["VALUES_SITE"] = previous
+            self.assertEqual(result["plan"]["resource_changes"]["create"], 0)
+            self.assertFalse(result["plan"]["destructive"])
+
     def test_action_writes_audit_record_without_command_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
