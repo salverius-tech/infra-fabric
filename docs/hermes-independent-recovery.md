@@ -27,6 +27,31 @@ Each mutating step requires its own reviewed plan and explicit approval.
    with `HERMES_OPERATOR_AUDIT_PATH` pointed at that journal. A malformed or broken
    hash chain is a stop condition; retain it for investigation and use a separately
    protected emergency journal rather than overwriting history.
+
+   Controller operators may create and verify a protected snapshot without exposing
+   journal contents:
+
+   ```bash
+   python scripts/hermes-audit-snapshot.py create \
+     --journal "$HERMES_OPERATOR_AUDIT_PATH" \
+     --backup-dir "$INFRA_AUDIT_BACKUP_DIR"
+   python scripts/hermes-audit-snapshot.py verify \
+     --snapshot "$INFRA_AUDIT_SNAPSHOT"
+   ```
+
+   Restore requires an explicit replacement acknowledgement and re-verifies the
+   checksum and complete hash chain before installing the journal:
+
+   ```bash
+   python scripts/hermes-audit-snapshot.py restore \
+     --snapshot "$INFRA_AUDIT_SNAPSHOT" \
+     --journal "$HERMES_OPERATOR_AUDIT_PATH" \
+     --replace-existing
+   ```
+
+   These commands are controller-side recovery tools; do not run them through the
+   one-shot validation container, and do not create a replacement journal when the
+   protected historical journal or backup is unavailable.
 5. **Restore state and trust metadata.** Recover the private OpenTofu state snapshot,
    execution snapshots, service-state archives, known-hosts material, and controller
    identities separately. Verify checksums, site identity, permissions, and scope.
