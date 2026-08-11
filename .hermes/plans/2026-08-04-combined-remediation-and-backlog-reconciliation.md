@@ -969,15 +969,16 @@ verifiable Git reference to frozen lossless history.
 
 ### Package P10-B — Finish canonical-only operational cutover
 
-**Status: complete (2026-08-09).** Normal setup and lifecycle commands now require an
-explicit selected canonical site. The bounded legacy importer is hidden behind the
-recovery/forensics-only recipe and has no normal lifecycle caller.
+**Status: complete (2026-08-11).** Normal setup and lifecycle commands now require an
+explicit selected canonical site. The private legacy forensics recipe emits only the
+value-redacted discovery report and has no normal lifecycle caller; mutating recovery
+CLIs remain separately invoked behind the P10-E retention boundary.
 
 - [x] Make site selection and `site.yaml` mandatory for every normal public command.
 - [x] Remove legacy branches from setup, values check, validation, run, plan, apply, and
   Ansible orchestration.
-- [x] Move any still-required forensic importer behind a recovery-only name and prove no
-  normal recipe imports or invokes it.
+- [x] Expose the still-required forensic discovery only through a recovery-only name and prove no
+  normal recipe imports or invokes mutating legacy recovery.
 - [x] Preserve public-safe static fixtures without presenting them as normal authoring
   files.
 - [x] Add command-level tests proving legacy inputs fail with one explicit canonical
@@ -1053,7 +1054,7 @@ and the operator has explicitly authorized deletion.
 
 ### Package P10-F — Publish the versioned Onramp handoff projection
 
-**Status: source-complete (2026-08-10); external cutover acceptance remains pending.**
+**Status: source-complete (2026-08-11); external cutover acceptance remains pending.**
 Canonical rendering now emits a manifest-bound, non-secret `onramp-handoff.json` artifact.
 Disabled sites emit an explicit disabled state. Enabled sites bind the handoff to canonical
 site, service, shared-host resource, non-provider VM identity, hostname, address, Debian 13
@@ -1072,10 +1073,10 @@ workload definitions remain outside the handoff.
 Exit gate: met for source — the versioned handoff is generated and identity-bound. Deployment,
 consumer verification, rollback, and temporary SearXNG retirement remain external gates.
 
-Verification evidence (2026-08-11): `scripts/validate-public.sh` passed all stages with
-915 unit/contract tests and 73% aggregate script coverage; a fresh disposable
-`hermes-verify-*` probe passed 94 focused handoff, operator, audit, catalog, lifecycle,
-and reconciliation tests plus compilation and `git diff --check`.
+Verification evidence (2026-08-11): `just validate-public` passed all stages with
+925 unit/contract tests and 73% aggregate script coverage after the source-contract review;
+the focused handoff/catalog/canonical/projection suite passed 106 tests, and compilation
+plus `git diff --check` passed.
 
 ## Simplification verification strategy
 
