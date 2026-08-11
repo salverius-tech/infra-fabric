@@ -56,8 +56,7 @@ class ActionsMonitorContextTests(unittest.TestCase):
 
     def test_monitor_rejects_unselected_site(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(monitor.MonitorError):
-                monitor.main(["status"])
+            self.assertEqual(monitor.main(["status"]), 2)
 
     def test_monitor_rejects_missing_canonical_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -71,8 +70,7 @@ class ActionsMonitorContextTests(unittest.TestCase):
                 {"VALUES_DIR": str(Path(temp) / "values"), "VALUES_SITE": "dev"},
                 clear=True,
             ):
-                with self.assertRaises(monitor.MonitorError):
-                    monitor.main(["status"])
+                self.assertEqual(monitor.main(["status"]), 2)
 
     def test_monitor_verifies_complete_projection_set_and_handoff_identity(
         self,
