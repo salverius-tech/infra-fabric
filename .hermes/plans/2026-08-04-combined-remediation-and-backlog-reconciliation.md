@@ -1045,12 +1045,20 @@ migration/discovery tools remain intact and were not refactored or deleted.
 - [ ] Complete and record isolated infrastructure/controller recovery acceptance.
 - [x] Inventory remaining callers of every bounded migration/discovery tool in
   [`docs/legacy-recovery-tool-inventory.md`](../../docs/legacy-recovery-tool-inventory.md); retain the implementation until the remaining trigger conditions pass.
+- [x] Seal the retained forensic recipe behind an exact zero-argument wrapper, read-only
+  source/root mounts, disabled networking, temporary-only caches, and default no-registry
+  discovery; keep mutation and network-capable resolution as separate direct CLI opt-ins.
 - [ ] Obtain separate operator authorization for permanent compatibility removal.
 - [ ] Delete the retired implementation, mapping exclusions, scaffold surfaces, and tests
   together; do not leave forwarding shims that recreate a second normal workflow.
 
 Exit gate: canonical rebuild/recovery is accepted, no caller depends on legacy tooling,
 and the operator has explicitly authorized deletion.
+
+Retained-boundary evidence (2026-08-11): `just validate-public` passed all stages with
+948 tests and 74% aggregate script coverage; the integrated audit/forensics suite passed
+208 tests, and a fresh `hermes-verify-integrated-*` probe exercised strict audit semantics
+plus real read-only/no-network recipe execution without changing its public fixture tree.
 
 ### Package P10-F — Publish the versioned Onramp handoff projection
 
