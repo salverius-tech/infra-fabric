@@ -1,6 +1,6 @@
 # Package source completion
 
-Compact active reconciliation authorities; lossless per-claim provenance is frozen in Git history.
+Active authority for source-package completion only. Static repository evidence does not establish provider, live-service, recovery, or production acceptance; lossless per-claim provenance is frozen in Git history.
 
 Frozen lossless provenance: `git show e04aed2ef2f0133368cdd26ed57d9c9ba3b2a548:.hermes/reconciliation/design-implementation-ledger.json` (919 records).
 

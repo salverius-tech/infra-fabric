@@ -1144,6 +1144,9 @@ class HermesControlConfiguration(StrictModel):
 class HermesConfiguration(StrictModel):
     runtime_user: StrictStr | None = None
     repository_path: StrictStr | None = None
+    operator_mutation_enabled: StrictBool = False
+    operator_audit_path: StrictStr = ""
+    operator_audit_backup_dir: StrictStr = ""
     allow_legacy_runtime: StrictBool | None = None
     compose_version: StrictStr | None = None
     caddy_artifact: ReviewedArtifactPin | None = None
@@ -1168,9 +1171,39 @@ class HermesConfiguration(StrictModel):
         if value is None:
             return None
         path = PurePosixPath(value)
-        if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+        if (
+            any(ord(char) < 32 or ord(char) == 127 for char in value)
+            or not value.startswith("/")
+            or value != str(path)
+            or any(part in {"", ".", ".."} for part in path.parts)
+        ):
             raise ValueError("Hermes repository_path must be a normalized absolute POSIX path")
         return value
+
+    @field_validator("operator_audit_path", "operator_audit_backup_dir")
+    @classmethod
+    def validate_operator_audit_path(cls, value: str) -> str:
+        if value == "":
+            return value
+        path = PurePosixPath(value)
+        if (
+            any(ord(char) < 32 or ord(char) == 127 for char in value)
+            or not value.startswith("/")
+            or value != str(path)
+            or any(part in {"", ".", ".."} for part in path.parts)
+        ):
+            raise ValueError("Hermes operator audit paths must be normalized absolute POSIX paths")
+        return value
+
+    @model_validator(mode="after")
+    def validate_mutation_activation(self) -> "HermesConfiguration":
+        if self.operator_mutation_enabled and (
+            not self.operator_audit_path or not self.operator_audit_backup_dir
+        ):
+            raise ValueError(
+                "Hermes operator mutation requires explicit audit and audit-backup paths"
+            )
+        return self
 
     @field_validator("compose_version")
     @classmethod

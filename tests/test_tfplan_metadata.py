@@ -17,7 +17,7 @@ tfplan_metadata = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tfplan_metadata)
 
 sys.path.insert(0, str(SCRIPT.parent))
-from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+from canonical_projections import render_projection_set
 from canonical_values import load_site, model_digest
 from projection_manifest import build_manifest
 from service_catalog import load_catalog
@@ -74,12 +74,7 @@ class TfplanMetadataTests(unittest.TestCase):
         )
         model = load_site(site / "site.yaml", expected_site="dev", catalog_path=repo / "infra" / "services.json")
         catalog = load_catalog(repo / "infra" / "services.json")
-        projections = {
-            "terraform.auto.tfvars.json": render_opentofu_variables(model),
-            "ansible-inventory.json": render_ansible_inventory(model, catalog),
-            "ansible-vars.json": render_ansible_vars(model, catalog),
-            "dns-records.json": render_dns_records(model),
-        }
+        projections = render_projection_set(model, catalog)
         generated = site / "generated"
         generated.mkdir(mode=0o700)
         for name, value in projections.items():

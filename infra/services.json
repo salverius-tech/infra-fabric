@@ -588,6 +588,9 @@
           "hermes_domain": "endpoints.public_names.0",
           "hermes_runtime_user": "configuration.runtime_user",
           "hermes_repo_path": "configuration.repository_path",
+          "hermes_operator_mutation_enabled": "configuration.operator_mutation_enabled",
+          "hermes_operator_audit_path": "configuration.operator_audit_path",
+          "hermes_operator_audit_backup_dir": "configuration.operator_audit_backup_dir",
           "hermes_control_enabled": "configuration.control.enabled",
           "hermes_control_domain": "configuration.control.domain",
           "hermes_control_source_url": "configuration.control.source_url",
@@ -727,6 +730,29 @@
         "supported_types": [
           "vm"
         ]
+      },
+      "handoff": {
+        "api_version": "infra-fabric.onramp-handoff/v1",
+        "consumer": "onramp-vNext",
+        "operating_system": {
+          "family": "debian",
+          "major_version": 13,
+          "architecture": "amd64"
+        },
+        "container_runtime": {
+          "engine": "podman",
+          "rootless": true,
+          "compose_command": "podman-compose"
+        },
+        "proxy": {
+          "implementation": "caddy",
+          "configuration_owner": "infra-fabric",
+          "consumer_writable": false,
+          "ingress_tcp_ports": [
+            80,
+            443
+          ]
+        }
       },
       "configuration_schema": "ResourceOwnedConfiguration",
       "release_sources": [],

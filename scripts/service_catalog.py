@@ -23,6 +23,26 @@ _UPDATE_POLICY_STATUSES = frozenset(("managed", "manual", "unmanaged"))
 _SCHEMA_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,127}$")
 _RELEASE_SOURCES = frozenset(("package", "container", "binary", "image"))
 _RUNTIME_TYPES = frozenset(("lxc", "vm"))
+_ONRAMP_HANDOFF = {
+    "api_version": "infra-fabric.onramp-handoff/v1",
+    "consumer": "onramp-vNext",
+    "operating_system": {
+        "family": "debian",
+        "major_version": 13,
+        "architecture": "amd64",
+    },
+    "container_runtime": {
+        "engine": "podman",
+        "rootless": True,
+        "compose_command": "podman-compose",
+    },
+    "proxy": {
+        "implementation": "caddy",
+        "configuration_owner": "infra-fabric",
+        "consumer_writable": False,
+        "ingress_tcp_ports": [80, 443],
+    },
+}
 
 
 def _path_value(value: Any, path: str) -> Any:
@@ -69,6 +89,7 @@ class ServiceCapability:
     state_capable: bool
     runtime_owner: RuntimeOwner
     runtime: "RuntimeMetadata | None"
+    handoff: dict[str, object] | None
     configuration_schema: str | None
     release_sources: tuple[str, ...]
     required_fields: tuple[str, ...]
@@ -285,17 +306,16 @@ class ServiceCatalog:
                     **getattr(resources, "shared_hosts", {}),
                 }
                 resource = resource_map.get(resource_name)
-                if resource is not None:
-                    replacement_addresses = self.get(name).raw.get("terraform_replace_addresses", {})
-                    supported: set[str] = (
-                        {str(runtime) for runtime in replacement_addresses}
-                        if isinstance(replacement_addresses, Mapping)
-                        else set()
+                runtime = self.get(name).runtime
+                supported = set(runtime.supported_types) if runtime is not None else set()
+                if (
+                    resource is not None
+                    and supported
+                    and getattr(resource, "type", None) not in supported
+                ):
+                    raise ServiceCatalogError(
+                        f"service {name} resource type {getattr(resource, 'type', None)!r} is not supported by catalog"
                     )
-                    if supported and getattr(resource, "type", None) not in supported:
-                        raise ServiceCatalogError(
-                            f"service {name} resource type {getattr(resource, 'type', None)!r} is not supported by catalog"
-                        )
 
     def _validate_acyclic(self) -> None:
         visiting: set[str] = set()
@@ -431,6 +451,17 @@ def load_catalog(path: Path) -> ServiceCatalog:
                 default_type=runtime_raw["default_type"],
                 supported_types=tuple(runtime_raw["supported_types"]),
             )
+        handoff_raw = raw.get("handoff")
+        if name == "onramp_host":
+            if handoff_raw != _ONRAMP_HANDOFF:
+                raise ServiceCatalogError(
+                    "service onramp_host handoff metadata must match the reviewed v1 contract"
+                )
+        elif handoff_raw is not None:
+            raise ServiceCatalogError(
+                f"service {name} may not declare Onramp handoff metadata"
+            )
+        handoff = dict(handoff_raw) if isinstance(handoff_raw, dict) else None
         update_policy = raw.get("update_policy")
         if update_policy is not None and (
             not isinstance(update_policy, dict)
@@ -447,6 +478,7 @@ def load_catalog(path: Path) -> ServiceCatalog:
             state_capable=raw.get("state_capable") is True,
             runtime_owner=runtime_owner,
             runtime=runtime,
+            handoff=handoff,
             configuration_schema=configuration_schema,
             release_sources=tuple(release_sources),
             required_fields=tuple(required_fields),

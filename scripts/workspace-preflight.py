@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 try:
-    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+    from canonical_projections import render_projection_set
     from canonical_values import load_site, model_digest
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
@@ -32,7 +32,7 @@ try:
     )
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables
+    from canonical_projections import render_projection_set
     from canonical_values import load_site, model_digest
     from projection_manifest import build_manifest, verify_manifest
     from service_catalog import load_catalog
@@ -175,12 +175,7 @@ def check_canonical_projection(repo: Path) -> None:
     catalog_path = repo / "infra" / "services.json"
     model = load_site(site_file, expected_site=context.site, catalog_path=catalog_path)
     catalog = load_catalog(catalog_path)
-    projections = {
-        "terraform.auto.tfvars.json": render_opentofu_variables(model),
-        "ansible-inventory.json": render_ansible_inventory(model, catalog),
-        "ansible-vars.json": render_ansible_vars(model, catalog),
-        "dns-records.json": render_dns_records(model),
-    }
+    projections = render_projection_set(model, catalog)
     with tempfile.TemporaryDirectory(prefix="canonical-preflight-") as temporary:
         output = Path(temporary)
         output.chmod(0o700)

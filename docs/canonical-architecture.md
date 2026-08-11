@@ -17,6 +17,7 @@ canonical renderer and validators
        +--> generated/ansible-inventory.json ------ Ansible inventory
        +--> generated/ansible-vars.json ------------ Ansible variables
        +--> generated/dns-records.json ------------- DNS synchronization input
+       +--> generated/onramp-handoff.json ----------- versioned non-secret substrate handoff
        +--> generated/manifest.json ---------------- identity and provenance
        |
        +--> OpenTofu ------------------------------- Proxmox resources and storage

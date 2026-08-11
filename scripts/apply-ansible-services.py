@@ -23,7 +23,7 @@ if SETTINGS_SPEC is None or SETTINGS_SPEC.loader is None:
 settings = importlib.util.module_from_spec(SETTINGS_SPEC)
 SETTINGS_SPEC.loader.exec_module(settings)
 try:
-    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
+    from canonical_projections import render_projection_set, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
     from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements, without_protected_environment
@@ -32,7 +32,7 @@ try:
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(REPO / "scripts"))
-    from canonical_projections import render_ansible_inventory, render_ansible_vars, render_dns_records, render_opentofu_variables, verify_cross_projection_identity
+    from canonical_projections import render_projection_set, verify_cross_projection_identity
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
     from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements, without_protected_environment
@@ -167,12 +167,7 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     catalog_path = REPO / "infra" / "services.json"
     model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=catalog_path)
     catalog = load_catalog(catalog_path)
-    expected_projections = {
-        "terraform.auto.tfvars.json": render_opentofu_variables(model),
-        "ansible-inventory.json": render_ansible_inventory(model, catalog),
-        "ansible-vars.json": render_ansible_vars(model, catalog),
-        "dns-records.json": render_dns_records(model),
-    }
+    expected_projections = render_projection_set(model, catalog)
     generated_path = getattr(context, "generated_path")
     projections: dict[str, object] = {}
     try:

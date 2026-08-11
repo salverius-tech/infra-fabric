@@ -40,6 +40,7 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
                 "ansible-inventory.json",
                 "ansible-vars.json",
                 "dns-records.json",
+                "onramp-handoff.json",
             ):
                 (generated / name).write_text("{}\n", encoding="utf-8")
             complete = subprocess.run(

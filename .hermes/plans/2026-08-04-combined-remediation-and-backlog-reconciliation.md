@@ -1042,13 +1042,40 @@ not complete and no separate permanent-removal authorization was granted, so bou
 migration/discovery tools remain intact and were not refactored or deleted.
 
 - [ ] Complete and record isolated infrastructure/controller recovery acceptance.
-- [ ] Inventory remaining callers of every bounded migration/discovery tool.
+- [x] Inventory remaining callers of every bounded migration/discovery tool in
+  [`docs/legacy-recovery-tool-inventory.md`](../../docs/legacy-recovery-tool-inventory.md); retain the implementation until the remaining trigger conditions pass.
 - [ ] Obtain separate operator authorization for permanent compatibility removal.
 - [ ] Delete the retired implementation, mapping exclusions, scaffold surfaces, and tests
   together; do not leave forwarding shims that recreate a second normal workflow.
 
 Exit gate: canonical rebuild/recovery is accepted, no caller depends on legacy tooling,
 and the operator has explicitly authorized deletion.
+
+### Package P10-F — Publish the versioned Onramp handoff projection
+
+**Status: source-complete (2026-08-10); external cutover acceptance remains pending.**
+Canonical rendering now emits a manifest-bound, non-secret `onramp-handoff.json` artifact.
+Disabled sites emit an explicit disabled state. Enabled sites bind the handoff to canonical
+site, service, shared-host resource, non-provider VM identity, hostname, address, Debian 13
+rootless Podman/Caddy capabilities, and ownership exclusions. Provider IDs and temporary
+workload definitions remain outside the handoff.
+
+- [x] Define a stable `infra-fabric.onramp-handoff/v1` consumer contract.
+- [x] Generate it from the canonical model rather than a second values source.
+- [x] Include it in render, verification, apply-preflight, Forgejo monitor, execution
+  snapshot, shell lifecycle, and dynamic inventory projection sets.
+- [x] Reject non-VM or non-shared-host placement, sensitive key names, and identity drift.
+- [x] Add public-safe enabled, disabled, tamper, placement, manifest, and monitor coverage.
+- [x] Document ownership, consumption, and evidence boundaries without claiming live
+  Onramp or SearXNG cutover acceptance.
+
+Exit gate: met for source — the versioned handoff is generated and identity-bound. Deployment,
+consumer verification, rollback, and temporary SearXNG retirement remain external gates.
+
+Verification evidence (2026-08-11): `scripts/validate-public.sh` passed all stages with
+915 unit/contract tests and 73% aggregate script coverage; a fresh disposable
+`hermes-verify-*` probe passed 94 focused handoff, operator, audit, catalog, lifecycle,
+and reconciliation tests plus compilation and `git diff --check`.
 
 ## Simplification verification strategy
 

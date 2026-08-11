@@ -13,6 +13,10 @@ from fastapi import APIRouter, HTTPException, Request
 router = APIRouter()
 
 
+def _mutation_enabled() -> bool:
+    return os.environ.get("HERMES_OPERATOR_MUTATION_ENABLED", "").strip() == "1"
+
+
 def _bridge(action: str, *extra: str) -> dict[str, Any]:
     repo_value = os.environ.get("HERMES_OPERATOR_REPO_PATH", "").strip()
     if not repo_value:
@@ -55,6 +59,10 @@ def plan() -> dict[str, Any]:
 
 @router.post("/apply")
 async def apply(request: Request) -> dict[str, Any]:
+    if not _mutation_enabled():
+        raise HTTPException(
+            status_code=404, detail="infrastructure mutation is not activated"
+        )
     try:
         body = await request.json()
     except Exception as error:

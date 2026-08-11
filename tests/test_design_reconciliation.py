@@ -104,6 +104,22 @@ class DesignReconciliationTests(unittest.TestCase):
         self.assertEqual(
             matrix["rows"]["production"]["service-restore"], "not-evidenced"
         )
+        self.assertEqual(
+            set(matrix["evidence"]),
+            {
+                "development/plan",
+                "development/apply",
+                "development/health-idempotence",
+                "development/service-restore",
+            },
+        )
+        for cell, evidence in matrix["evidence"].items():
+            environment, category = cell.split("/", 1)
+            self.assertEqual(evidence["environment"], environment)
+            self.assertEqual(evidence["category"], category)
+            self.assertRegex(evidence["audited_commit"], r"^[0-9a-f]{40}$")
+            self.assertEqual(evidence["result"], "passed")
+            self.assertTrue(evidence["boundary"])
 
     def test_frozen_lossless_history_is_a_resolvable_git_reference(self):
         reference = self.completion["historical_ledger"]
@@ -127,6 +143,29 @@ class DesignReconciliationTests(unittest.TestCase):
             "service-restore"
         ] = "evidenced"
         self.assertTrue(self.module.validate(invalid, self.audit, self.backlog))
+
+    def test_validation_rejects_evidenced_cell_without_record(self):
+        invalid = copy.deepcopy(self.completion)
+        del invalid["acceptance_matrix"]["evidence"]["development/plan"]
+        self.assertTrue(self.module.validate(invalid, self.audit, self.backlog))
+
+    def test_validation_rejects_wrong_environment_or_commit(self):
+        invalid = copy.deepcopy(self.completion)
+        record = invalid["acceptance_matrix"]["evidence"]["development/plan"]
+        record["environment"] = "production"
+        record["audited_commit"] = "0" * 40
+        errors = self.module.validate(invalid, self.audit, self.backlog)
+        self.assertTrue(any("identity mismatch" in error for error in errors))
+        self.assertTrue(any("commit mismatch" in error for error in errors))
+
+    def test_validation_rejects_dangling_or_private_evidence(self):
+        invalid = copy.deepcopy(self.completion)
+        record = invalid["acceptance_matrix"]["evidence"]["development/plan"]
+        record["citation"] = {"path": "missing.md", "lines": "1"}
+        record["boundary"] = "see /home/operator/values/site.yaml"
+        errors = self.module.validate(invalid, self.audit, self.backlog)
+        self.assertTrue(any("invalid citation" in error for error in errors))
+        self.assertTrue(any("not public-safe" in error for error in errors))
 
     def test_validation_fails_closed_for_frontier_or_decision_regression(self):
         invalid = copy.deepcopy(self.completion)

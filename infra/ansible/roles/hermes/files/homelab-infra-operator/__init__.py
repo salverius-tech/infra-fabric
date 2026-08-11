@@ -33,6 +33,10 @@ _SCHEMA = {
 }
 
 
+def _mutation_enabled() -> bool:
+    return os.environ.get("HERMES_OPERATOR_MUTATION_ENABLED", "").strip() == "1"
+
+
 def _repo() -> Path:
     value = os.environ.get("HERMES_OPERATOR_REPO_PATH", "").strip()
     if not value:
@@ -47,6 +51,10 @@ def _repo() -> Path:
 def _run(action: str, extra: tuple[str, ...] = ()) -> str:
     if action not in _ACTIONS and action != "apply":
         return json.dumps({"ok": False, "error": "unsupported operator action"})
+    if action == "apply" and not _mutation_enabled():
+        return json.dumps(
+            {"ok": False, "error": "infrastructure mutation is not activated"}
+        )
     repo = _repo()
     command = [
         sys.executable,
@@ -111,13 +119,14 @@ def register(ctx) -> None:
         description="Reviewed read-only homelab-infra operator actions.",
         emoji="🏠",
     )
-    ctx.register_command(
-        name="infra-apply",
-        help="Apply the current reviewed homelab-infra plan",
-        handler=_handle_apply,
-        description=(
-            "Explicitly apply the saved homelab-infra plan. The operator must "
-            "invoke this command; destructive changes require an extra flag."
-        ),
-        args_hint="[--allow-destructive] [--allow-stateful-batch]",
-    )
+    if _mutation_enabled():
+        ctx.register_command(
+            name="infra-apply",
+            help="Apply the current reviewed homelab-infra plan",
+            handler=_handle_apply,
+            description=(
+                "Explicitly apply the saved homelab-infra plan. The operator must "
+                "invoke this command; destructive changes require an extra flag."
+            ),
+            args_hint="[--allow-destructive] [--allow-stateful-batch]",
+        )

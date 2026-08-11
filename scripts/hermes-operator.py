@@ -13,6 +13,7 @@ import re
 import stat
 import subprocess
 import sys
+import uuid
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ from hermes_audit_chain import (
     read_audit_chain,
     read_audit_stream,
 )
+from hermes_audit_snapshot import AuditSnapshotError, create_snapshot, verify_snapshot
 from private_files import PrivateFileError, _fsync_descriptor, _private_directory_fd
 from values_context import ValuesContextError, from_environment
 
@@ -207,6 +209,18 @@ def audit_path(repo: Path) -> Path:
     )
 
 
+def audit_backup_dir() -> Path:
+    configured = os.environ.get("HERMES_OPERATOR_AUDIT_BACKUP_DIR", "").strip()
+    if not configured:
+        raise OperatorError(
+            "apply requires HERMES_OPERATOR_AUDIT_BACKUP_DIR for pre-execution durability"
+        )
+    destination = Path(configured).expanduser()
+    if not destination.is_absolute():
+        raise OperatorError("Hermes operator audit backup directory must be absolute")
+    return destination
+
+
 @contextlib.contextmanager
 def audit_writer_lock(path: Path):
     """Hold one no-follow audit parent through lock, chain read, and append."""
@@ -245,8 +259,17 @@ def audit_writer_lock(path: Path):
 
 
 def write_audit_record(
-    repo: Path, action: str, returncode: int, result: dict[str, Any]
+    repo: Path,
+    action: str,
+    returncode: int | None,
+    result: dict[str, Any],
+    *,
+    phase: str = "completed",
+    correlation_id: str | None = None,
 ) -> None:
+    if phase not in {"intent", "completed", "failed"}:
+        raise OperatorError("Hermes operator audit phase is invalid")
+    correlation_id = correlation_id or uuid.uuid4().hex
     path = audit_path(repo)
     with audit_writer_lock(path) as (parent_fd, _created_lock):
         try:
@@ -277,9 +300,11 @@ def write_audit_record(
                 )
                 record = {
                     "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
+                    "correlation_id": correlation_id,
+                    "phase": phase,
                     "action": action,
                     "returncode": returncode,
-                    "ok": returncode == 0,
+                    "ok": None if phase == "intent" else returncode == 0,
                     "plan": {
                         "destructive": bool(summary and summary.get("destructive")),
                         "resource_changes": (
@@ -332,7 +357,10 @@ def run_action(
 ) -> dict[str, Any]:
     if action not in {"validate", "plan", "apply"}:
         raise OperatorError(f"unsupported operator action: {action}")
+    summary: dict[str, Any] | None = None
     if action == "apply":
+        if os.environ.get("HERMES_OPERATOR_MUTATION_ENABLED", "").strip() != "1":
+            raise OperatorError("infrastructure mutation is not activated")
         if not approve:
             raise OperatorError("apply requires explicit approval via --approve")
         summary = load_plan_summary(repo)
@@ -351,7 +379,46 @@ def run_action(
     if allow_stateful_batch:
         env["INFRA_ALLOW_STATEFUL_BATCH"] = "1"
     command = ["just", action]
-    result = runner(command, env, repo)
+    correlation_id = uuid.uuid4().hex
+    intent: dict[str, Any] = {}
+    if action == "apply":
+        intent["plan"] = summary
+    write_audit_record(
+        repo,
+        action,
+        None,
+        intent,
+        phase="intent",
+        correlation_id=correlation_id,
+    )
+    if action == "apply":
+        try:
+            snapshot = create_snapshot(audit_path(repo), audit_backup_dir())
+            verify_snapshot(snapshot)
+        except (AuditSnapshotError, OSError, OperatorError) as error:
+            write_audit_record(
+                repo,
+                action,
+                1,
+                intent,
+                phase="failed",
+                correlation_id=correlation_id,
+            )
+            raise OperatorError(
+                "apply blocked because the pre-execution audit snapshot failed"
+            ) from error
+    try:
+        result = runner(command, env, repo)
+    except Exception as error:
+        write_audit_record(
+            repo,
+            action,
+            1,
+            intent,
+            phase="failed",
+            correlation_id=correlation_id,
+        )
+        raise OperatorError("operator action execution failed") from error
     if isinstance(result, tuple):
         returncode, output = result
     else:
@@ -359,13 +426,21 @@ def run_action(
     safe_output = redact_output(output)
     response: dict[str, Any] = {
         "action": action,
+        "correlation_id": correlation_id,
         "returncode": returncode,
         "ok": returncode == 0,
         "output": safe_output,
     }
     if action in {"plan", "apply"} and plan_metadata_path(repo).is_file():
         response["plan"] = load_plan_summary(repo)
-    write_audit_record(repo, action, returncode, response)
+    write_audit_record(
+        repo,
+        action,
+        returncode,
+        response,
+        phase="completed" if returncode == 0 else "failed",
+        correlation_id=correlation_id,
+    )
     return response
 
 

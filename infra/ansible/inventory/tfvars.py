@@ -43,6 +43,7 @@ CANONICAL_PROJECTION_FILES = (
     "ansible-inventory.json",
     "ansible-vars.json",
     "dns-records.json",
+    "onramp-handoff.json",
 )
 
 

@@ -280,14 +280,18 @@ class ServiceCatalogTests(unittest.TestCase):
                     )
                 )
 
-    def test_enabled_service_resource_type_must_match_catalog_replacements(self) -> None:
+    def test_enabled_service_resource_type_must_match_catalog_runtime(self) -> None:
         catalog = load_catalog(
             self.write_catalog(
                 {
                     "services": {
                         "app": {
                             "dependencies": [],
-                            "terraform_replace_addresses": {"lxc": ["module.app"]},
+                            "runtime_owner": "guest",
+                            "runtime": {
+                                "default_type": "lxc",
+                                "supported_types": ["lxc"],
+                            },
                         }
                     }
                 }

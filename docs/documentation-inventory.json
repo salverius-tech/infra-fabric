@@ -83,6 +83,7 @@
     "docs/hermes-state-backup.md": "operator guidance",
     "docs/hermes-tuning.md": "operator guidance",
     "docs/just-recipes.md": "operator guidance",
+    "docs/legacy-recovery-tool-inventory.md": "current authority",
     "docs/normalized-plan-equivalence.md": "working design",
     "docs/onramp-app-platform-contract.md": "operator guidance",
     "docs/onramp-host-runbook.md": "operator guidance",

@@ -28,7 +28,7 @@ OPERATOR = load_module(
     "hermes_operator_for_snapshot", ROOT / "scripts" / "hermes-operator.py"
 )
 SNAPSHOT = load_module(
-    "hermes_audit_snapshot", ROOT / "scripts" / "hermes-audit-snapshot.py"
+    "hermes_audit_snapshot", ROOT / "scripts" / "hermes_audit_snapshot.py"
 )
 
 
@@ -60,7 +60,7 @@ class HermesAuditSnapshotTests(unittest.TestCase):
             journal = self._journal(root)
             snapshot = SNAPSHOT.create_snapshot(journal, root / "backups")
             manifest = SNAPSHOT.verify_snapshot(snapshot)
-            self.assertEqual(manifest["record_count"], 2)
+            self.assertEqual(manifest["record_count"], 4)
             self.assertEqual(snapshot.stat().st_mode & 0o777, 0o700)
             self.assertEqual(
                 (snapshot / "hermes-operator-audit.jsonl").stat().st_mode & 0o777, 0o600
@@ -112,7 +112,7 @@ class HermesAuditSnapshotTests(unittest.TestCase):
             with self.assertRaisesRegex(SNAPSHOT.AuditSnapshotError, "acknowledgement"):
                 SNAPSHOT.restore_snapshot(snapshot, destination)
             SNAPSHOT.restore_snapshot(snapshot, destination, replace_existing=True)
-            self.assertEqual(hermes_audit_chain.read_audit_chain(destination)[1], 2)
+            self.assertEqual(hermes_audit_chain.read_audit_chain(destination)[1], 4)
             self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
 
     def test_create_rejects_same_size_journal_replacement_after_chain_validation(

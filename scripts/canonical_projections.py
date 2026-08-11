@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any, Mapping
 
-from canonical_values import CanonicalSite
+from canonical_values import CanonicalSite, model_digest
 from service_catalog import ServiceCatalog, load_catalog
 
 
@@ -17,6 +17,7 @@ class ProjectionError(ValueError):
 
 _SENSITIVE_KEY = re.compile(r"(?:password|passphrase|secret|token|private[_-]?key|api[_-]?key|credential)", re.IGNORECASE)
 _ENVIRONMENT_KEY = re.compile(r"^[A-Z][A-Z0-9_]*$")
+ONRAMP_HANDOFF_API_VERSION = "infra-fabric.onramp-handoff/v1"
 
 
 def _is_sensitive_key(key: str, value: Any) -> bool:
@@ -501,6 +502,119 @@ def render_dns_records(model: CanonicalSite) -> dict[str, Any]:
     }
 
 
+def render_onramp_handoff(model: CanonicalSite, catalog: ServiceCatalog) -> dict[str, Any]:
+    """Render the versioned, non-secret shared-host contract for Onramp.
+
+    The projection describes substrate identity and ownership boundaries only.
+    It deliberately grants no Proxmox lifecycle authority and contains no SSH
+    keys, provider inputs, generated-file write authority, protected values, VMID,
+    datastore, image-acquisition metadata, or application definitions.
+    """
+    service = model.services.get("onramp_host")
+    capability = catalog.get("onramp_host")
+    handoff = capability.handoff
+    if capability.runtime_owner != "shared_host" or capability.runtime is None:
+        raise ProjectionError("onramp_host catalog ownership must remain VM shared_host")
+    if handoff is None or handoff.get("api_version") != ONRAMP_HANDOFF_API_VERSION:
+        raise ProjectionError("onramp_host catalog handoff metadata is unavailable")
+    enabled = bool(service and service.enabled)
+    resource_id = service.resource if enabled and service is not None else None
+    result: dict[str, Any] = {
+        "api_version": ONRAMP_HANDOFF_API_VERSION,
+        "kind": "OnrampSubstrate",
+        "metadata": {
+            "canonical_site": model.site.name,
+            "canonical_model_digest": model_digest(model),
+            "canonical_service": "onramp_host",
+            "canonical_resource": resource_id,
+            "enabled": enabled,
+        },
+        "spec": None,
+    }
+    if not enabled:
+        _assert_non_secret(result, "onramp_handoff")
+        return result
+    assert service is not None
+    if not service.resource:
+        raise ProjectionError("enabled onramp_host service has no canonical resource")
+    resource = model.resources.shared_hosts.get(service.resource)
+    if resource is None:
+        raise ProjectionError("onramp handoff resource must be owned by resources.shared_hosts")
+    if resource.type != "vm" or resource.type not in capability.runtime.supported_types:
+        raise ProjectionError("onramp handoff requires a catalog-supported VM shared host")
+    address = _address(resource)
+    if not address:
+        raise ProjectionError("onramp handoff requires a deterministic resource address")
+    try:
+        address = str(ipaddress.IPv4Address(address))
+    except ValueError as error:
+        raise ProjectionError("onramp handoff requires a valid deterministic IPv4 address") from error
+    deploy_user = resource.security.deploy_user
+    deploy_dir = resource.security.deploy_dir
+    if not deploy_user or deploy_user == "root" or not deploy_dir:
+        raise ProjectionError("onramp handoff requires a non-root deploy user and directory")
+    if resource.security.password_authentication or resource.security.permit_root_login:
+        raise ProjectionError("onramp handoff requires password and root SSH login to remain disabled")
+
+    result["spec"] = {
+        "identity": {
+            "canonical_resource": service.resource,
+            "resource_type": resource.type,
+            "hostname": resource.identity.hostname,
+        },
+        "connection": {
+            "address": address,
+            "ssh_port": 22,
+            "user": deploy_user,
+        },
+        "substrate": {
+            "operating_system": handoff["operating_system"],
+            "deployment_root": deploy_dir,
+            "container_runtime": handoff["container_runtime"],
+            "proxy": handoff["proxy"],
+        },
+        "authority": {
+            "infrastructure_owner": "infra-fabric",
+            "application_owner": handoff["consumer"],
+            "onramp_permissions": {
+                "application_definitions": True,
+                "application_lifecycle": True,
+                "application_health": True,
+                "application_rollback": True,
+                "application_data_lifecycle": True,
+                "proxmox_lifecycle": False,
+                "network_or_storage_mutation": False,
+                "host_security_mutation": False,
+                "base_proxy_mutation": False,
+                "generated_projection_write": False,
+            },
+        },
+    }
+    _assert_non_secret(result, "onramp_handoff")
+    return result
+
+
+def render_projection_set(model: CanonicalSite, catalog: ServiceCatalog) -> dict[str, Any]:
+    """Render the complete stable non-secret projection set."""
+    return {
+        "terraform.auto.tfvars.json": render_opentofu_variables(model, catalog),
+        "ansible-inventory.json": render_ansible_inventory(model, catalog),
+        "ansible-vars.json": render_ansible_vars(model, catalog),
+        "dns-records.json": render_dns_records(model),
+        "onramp-handoff.json": render_onramp_handoff(model, catalog),
+    }
+
+
+def verify_onramp_handoff_identity(
+    model: CanonicalSite,
+    catalog: ServiceCatalog,
+    handoff: Mapping[str, Any],
+) -> None:
+    """Fail closed unless the handoff exactly matches canonical identity."""
+    if handoff != render_onramp_handoff(model, catalog):
+        raise ProjectionError("onramp handoff identity disagrees with the selected canonical model")
+
+
 def verify_cross_projection_identity(
     *,
     site: str,
@@ -555,11 +669,15 @@ def verify_cross_projection_identity(
 
 
 __all__ = [
+    "ONRAMP_HANDOFF_API_VERSION",
     "ProjectionError",
     "render_runtime_env",
     "render_ansible_inventory",
     "render_ansible_vars",
     "render_dns_records",
+    "render_onramp_handoff",
     "render_opentofu_variables",
+    "render_projection_set",
     "verify_cross_projection_identity",
+    "verify_onramp_handoff_identity",
 ]

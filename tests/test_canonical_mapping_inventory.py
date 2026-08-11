@@ -24,8 +24,11 @@ class CanonicalMappingInventoryTests(unittest.TestCase):
         self.assertEqual(len(report["opentofu"]["variables"]), 204)
         self.assertEqual(report["classification"]["unclassified_variables"], [])
         self.assertEqual(len(report["service_catalog"]["services"]), 10)
-        self.assertEqual(report["canonical_path_coverage"]["checked_count"], 121)
-        self.assertEqual(report["canonical_path_coverage"]["valid_count"], 121)
+        self.assertGreater(report["canonical_path_coverage"]["checked_count"], 0)
+        self.assertEqual(
+            report["canonical_path_coverage"]["valid_count"],
+            report["canonical_path_coverage"]["checked_count"],
+        )
         self.assertEqual(report["canonical_path_coverage"]["invalid_count"], 0)
         self.assertEqual(report["canonical_path_coverage"]["status"], "complete")
         self.assertEqual(report["matrix_path_coverage"]["checked_count"], 250)

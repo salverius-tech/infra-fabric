@@ -87,6 +87,45 @@ MATRIX_ROWS = {
     "isolated-recovery": {column: "not-evidenced" for column in MATRIX_COLUMNS},
     "production": {column: "not-evidenced" for column in MATRIX_COLUMNS},
 }
+DEVELOPMENT_ACCEPTANCE_COMMIT = "d88a66a65675a920f4930d0cbb6c470a9a49a9a1"
+MATRIX_EVIDENCE = {
+    f"development/{category}": {
+        "environment": "development",
+        "category": category,
+        "audited_commit": DEVELOPMENT_ACCEPTANCE_COMMIT,
+        "citation": {"path": PLAN_PATH, "lines": lines},
+        "procedure_id": procedure,
+        "result": "passed",
+        "date": "2026-08-09",
+        "boundary": boundary,
+    }
+    for category, lines, procedure, boundary in (
+        (
+            "plan",
+            "635-648",
+            "phase-9-gate-1",
+            "Disposable development plan only; no prior normalized baseline established semantic equivalence.",
+        ),
+        (
+            "apply",
+            "635-648",
+            "phase-9-gate-2",
+            "Reviewed disposable development apply only; no isolated-recovery or production acceptance.",
+        ),
+        (
+            "health-idempotence",
+            "635-648",
+            "phase-9-gate-3",
+            "Direct development health and second-run idempotence only.",
+        ),
+        (
+            "service-restore",
+            "635-648",
+            "phase-9-gate-4",
+            "Enabled disposable development stateful services only; not controller or infrastructure recovery.",
+        ),
+    )
+}
 RETIRED_ARTIFACTS = (
     "audit-package-evidence-registry.json", "audit-package-evidence-registry.md",
     "backlog.json", "contradiction-register.md", "decision-register.md",
@@ -168,11 +207,14 @@ def build() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
         "environments": list(MATRIX_ROWS),
         "columns": list(MATRIX_COLUMNS),
         "rows": MATRIX_ROWS,
+        "evidence": MATRIX_EVIDENCE,
         "evidence_boundary": (
-            "Development evidence is recorded only in the development row. "
-            "No row implies evidence in another environment."
+            "Active authority for environment-specific external acceptance only. "
+            "An evidenced cell applies only to its exact environment, audited commit, "
+            "procedure, result, citation, date, and stated boundary; source completion "
+            "does not populate this matrix."
         ),
-        "development_source": f"{PLAN_PATH}:10",
+        "development_source": f"{PLAN_PATH}:635-648",
     }
     completion = {
         "schema_version": 1,
@@ -184,7 +226,7 @@ def build() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
         "acceptance_matrix": matrix,
     }
     audit = {"schema_version": 1, "historical_ledger": HISTORICAL_LEDGER, "findings": findings}
-    coverage = "Compact active reconciliation authorities; lossless per-claim provenance is frozen in Git history."
+    coverage = "Active authority for source-package completion only. Static repository evidence does not establish provider, live-service, recovery, or production acceptance; lossless per-claim provenance is frozen in Git history."
     return completion, audit, completion, coverage
 
 
@@ -243,6 +285,46 @@ def validate(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any
         row = matrix.get("rows", {}).get(environment, {})
         if set(row) != set(MATRIX_COLUMNS) or not set(row.values()) <= {"evidenced", "not-evidenced"}:
             errors.append(f"invalid acceptance matrix row: {environment}")
+    expected_evidence_cells = {
+        f"{environment}/{category}"
+        for environment in matrix.get("environments", [])
+        for category, status in matrix.get("rows", {}).get(environment, {}).items()
+        if status == "evidenced"
+    }
+    evidence = matrix.get("evidence", {})
+    if not isinstance(evidence, dict) or set(evidence) != expected_evidence_cells:
+        errors.append("every evidenced acceptance cell must have exactly one evidence record")
+    else:
+        for cell, record in evidence.items():
+            environment, category = cell.split("/", 1)
+            if not isinstance(record, dict):
+                errors.append(f"invalid acceptance evidence record: {cell}")
+                continue
+            if record.get("environment") != environment or record.get("category") != category:
+                errors.append(f"acceptance evidence cell identity mismatch: {cell}")
+            commit = record.get("audited_commit", "")
+            if commit != MATRIX_EVIDENCE.get(cell, {}).get("audited_commit") or not re.fullmatch(r"[0-9a-f]{40}", commit):
+                errors.append(f"acceptance evidence audited commit mismatch: {cell}")
+            elif subprocess.run(
+                ["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=ROOT
+            ).returncode:
+                errors.append(f"acceptance evidence commit is not resolvable: {cell}")
+            citation = record.get("citation")
+            if not isinstance(citation, dict):
+                errors.append(f"acceptance evidence citation is missing: {cell}")
+            else:
+                errors.extend(citation_errors(citation))
+            if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(record.get("procedure_id", ""))):
+                errors.append(f"acceptance evidence procedure is invalid: {cell}")
+            if record.get("result") != "passed":
+                errors.append(f"acceptance evidence result is not passed: {cell}")
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(record.get("date", ""))):
+                errors.append(f"acceptance evidence date is invalid: {cell}")
+            if not str(record.get("boundary", "")).strip():
+                errors.append(f"acceptance evidence boundary is missing: {cell}")
+            serialized = json.dumps(record, sort_keys=True)
+            if re.search(r"(?:/home/|/workspace/|values/|192\.168\.|10\.\d+\.\d+\.\d+)", serialized):
+                errors.append(f"acceptance evidence is not public-safe: {cell}")
     if matrix.get("rows", {}).get("isolated-recovery", {}).get("service-restore") == "evidenced":
         errors.append("development service-restore evidence must not be promoted to isolated recovery")
     if matrix.get("rows", {}).get("production", {}).get("service-restore") == "evidenced":
@@ -264,7 +346,16 @@ def artifacts(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, An
     decisions_md = "\n".join(["# Explicit approved decisions", "", "No unresolved decisions remain; consequently there is no active `DECISIONS` package.", "", markdown_table(["Decision", "Title", "Source"], decision_rows), ""])
     matrix = completion["acceptance_matrix"]
     matrix_rows = [[environment, *[matrix["rows"][environment][column] for column in matrix["columns"]]] for environment in matrix["environments"]]
-    matrix_md = "\n".join(["# Environment-specific acceptance matrix", "", matrix["evidence_boundary"], "", markdown_table(["Environment", *matrix["columns"]], matrix_rows), "", f"Development evidence source: `{matrix['development_source']}`. This source does not establish recovery or production evidence.", ""])
+    evidence_lines = []
+    for cell, record in matrix["evidence"].items():
+        citation = record["citation"]
+        evidence_lines.append(
+            f"- `{cell}` — commit `{record['audited_commit']}`; procedure "
+            f"`{record['procedure_id']}`; result `{record['result']}` on "
+            f"`{record['date']}`; evidence `{citation['path']}:{citation['lines']}`; "
+            f"boundary: {record['boundary']}"
+        )
+    matrix_md = "\n".join(["# Environment-specific acceptance matrix", "", matrix["evidence_boundary"], "", markdown_table(["Environment", *matrix["columns"]], matrix_rows), "", "## Evidence records", "", *evidence_lines, "", f"Historical development evidence source: `{matrix['development_source']}`. This source does not establish isolated-recovery or production acceptance.", ""])
     backlog_md = "\n".join(["# Evidence-backed canonical backlog", "", "Active reconciliation is intentionally compact. Package source completion, original audit dispositions, approved decisions, and environment acceptance are the active authorities; the full per-claim ledger is frozen in Git history.", "", "- [Package source completion](../.hermes/reconciliation/package-completion.md)", "- [Original audit finding dispositions](../.hermes/reconciliation/audit-dispositions.md)", "- [Explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md)", "- [Environment-specific acceptance matrix](../.hermes/reconciliation/acceptance-matrix.md)", "", "Only external acceptance remains active; no incomplete source package or unresolved decision is reported as frontier work.", ""])
     return {
         RECON / "package-completion.json": json.dumps(completion, indent=2) + "\n",

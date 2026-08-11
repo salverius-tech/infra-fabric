@@ -72,7 +72,7 @@ guests:
       cloud_init_user: operator
 shared_hosts:
   onramp-host:
-    type: lxc
+    type: vm
     identity:
       vmid: 203
       hostname: onramp-host
@@ -95,7 +95,10 @@ shared_hosts:
     runtime:
       started: true
       start_on_boot: true
-      unprivileged: true
+      firmware: uefi
+      machine: q35
+      guest_agent: true
+      cloud_init_user: operator
     security:
       password_authentication: false
       permit_root_login: false

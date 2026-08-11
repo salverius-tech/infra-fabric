@@ -33,7 +33,8 @@ canonical_projection_names() {
     terraform.auto.tfvars.json \
     ansible-inventory.json \
     ansible-vars.json \
-    dns-records.json
+    dns-records.json \
+    onramp-handoff.json
 }
 
 require_canonical_projection_set() {

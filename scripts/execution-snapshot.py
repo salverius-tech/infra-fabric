@@ -47,6 +47,7 @@ GENERATED_FILES = (
     "ansible-inventory.json",
     "ansible-vars.json",
     "dns-records.json",
+    "onramp-handoff.json",
 )
 SITE_FILES = ("site.yaml", "secrets.sops.yaml", ".sops.yaml")
 

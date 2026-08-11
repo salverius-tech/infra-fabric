@@ -2,6 +2,9 @@
 hermes_runtime_user: anvil
 hermes_runtime_passwordless_sudo: false
 hermes_allow_legacy_runtime: false
+hermes_operator_mutation_enabled: false
+hermes_operator_audit_path: ""
+hermes_operator_audit_backup_dir: ""
 hermes_ssh_public_keys: []
 hermes_default_soul_sha256:
   - 2765a846e1bb371d78d3b93b403dfb0f8d1ba1a9895edb5f608367abfe81194d

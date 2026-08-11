@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from canonical_values import CanonicalValuesError, load_site, model_digest
-from canonical_projections import ProjectionError, verify_cross_projection_identity
+from canonical_projections import ProjectionError, verify_cross_projection_identity, verify_onramp_handoff_identity
 from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
 from service_catalog import ServiceCatalogError, load_catalog
 
@@ -17,6 +17,7 @@ PROJECTION_FILES = (
     "ansible-inventory.json",
     "ansible-vars.json",
     "dns-records.json",
+    "onramp-handoff.json",
 )
 
 
@@ -28,7 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         model = load_site(args.site_file, catalog_path=args.catalog)
-        load_catalog(args.catalog)
+        catalog = load_catalog(args.catalog)
         verify_projection_permissions(args.generated_dir)
         manifest = json.loads((args.generated_dir / "manifest.json").read_text(encoding="utf-8"))
         projections = {
@@ -41,6 +42,7 @@ def main(argv: list[str] | None = None) -> int:
             inventory=projections["ansible-inventory.json"],
             ansible_vars=projections["ansible-vars.json"],
         )
+        verify_onramp_handoff_identity(model, catalog, projections["onramp-handoff.json"])
         verify_manifest(
             manifest,
             site=model.site.name,

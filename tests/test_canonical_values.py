@@ -501,6 +501,24 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(configuration.control.api_port, 8787)
         self.assertEqual(configuration.control.workspace_root, "/srv/hermes")
         self.assertEqual(configuration.control.project_roots, ["/srv/hermes/projects", "/opt/shared"])
+        self.assertEqual(configuration.operator_audit_path, "")
+        self.assertEqual(configuration.operator_audit_backup_dir, "")
+        activated = HermesConfiguration.model_validate(
+            {
+                "operator_mutation_enabled": True,
+                "operator_audit_path": "/var/lib/hermes/operator-audit.jsonl",
+                "operator_audit_backup_dir": "/var/backups/hermes-audit",
+            }
+        )
+        self.assertTrue(activated.operator_mutation_enabled)
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"operator_mutation_enabled": True})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate({"operator_audit_path": "relative/audit.jsonl"})
+        with self.assertRaises(ValueError):
+            HermesConfiguration.model_validate(
+                {"operator_audit_path": "/var/lib/hermes/audit.jsonl\nINJECTED=1"}
+            )
         with self.assertRaises(ValueError):
             HermesConfiguration.model_validate({"runtime_user": "root"})
         with self.assertRaises(ValueError):
@@ -821,6 +839,7 @@ class CanonicalValuesTests(unittest.TestCase):
                 "ansible-vars.json",
                 "dns-records.json",
                 "manifest.json",
+                "onramp-handoff.json",
                 "terraform.auto.tfvars.json",
             ],
         )

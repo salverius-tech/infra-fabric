@@ -15,7 +15,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from values_context import from_environment
-from canonical_projections import render_ansible_inventory, render_ansible_vars, render_opentofu_variables, verify_cross_projection_identity
+from canonical_projections import render_projection_set, verify_cross_projection_identity
 from canonical_values import load_site, model_digest
 from projection_manifest import verify_manifest
 from service_catalog import load_catalog
@@ -120,7 +120,8 @@ def verify_canonical_monitor_inputs(context: object) -> Path:
         catalog = load_catalog(catalog_path)
     except Exception as error:
         raise MonitorError("canonical monitor site or catalog is invalid") from error
-    names = ("terraform.auto.tfvars.json", "ansible-inventory.json", "ansible-vars.json")
+    expected = render_projection_set(model, catalog)
+    names = tuple(expected)
     projections: dict[str, dict[str, Any]] = {}
     try:
         for name in names:
@@ -133,11 +134,6 @@ def verify_canonical_monitor_inputs(context: object) -> Path:
             raise MonitorError("canonical monitor manifest is not an object")
     except (OSError, json.JSONDecodeError) as error:
         raise MonitorError("canonical monitor projections or manifest are unavailable") from error
-    expected = {
-        "terraform.auto.tfvars.json": render_opentofu_variables(model),
-        "ansible-inventory.json": render_ansible_inventory(model, catalog),
-        "ansible-vars.json": render_ansible_vars(model, catalog),
-    }
     if projections != expected:
         raise MonitorError("canonical monitor projections do not match the selected model")
     try:

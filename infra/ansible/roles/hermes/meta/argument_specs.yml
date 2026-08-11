@@ -64,6 +64,19 @@ argument_specs:
         type: str
         required: false
         description: "Repository path written into the landing page helper (default: /srv/homelab-infra)."
+      hermes_operator_mutation_enabled:
+        type: bool
+        required: false
+        default: false
+        description: "Fail-closed activation gate for all Hermes infrastructure mutation surfaces."
+      hermes_operator_audit_path:
+        type: str
+        required: false
+        description: "Private append-only operator journal path; required when mutation is activated."
+      hermes_operator_audit_backup_dir:
+        type: str
+        required: false
+        description: "Private externally backed audit snapshot directory; required when mutation is activated."
       hermes_runtime_user:
         type: str
         required: false

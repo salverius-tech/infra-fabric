@@ -1,6 +1,6 @@
 # Hermes Control Integration Plan
 
-**Status:** Implementation in progress — authority model approved; no live guest deployment, plan, or apply has been performed.
+**Status:** Working design — the `infra-fabric` source contract is complete and HC-01 is complete in `hermes-control`; disposable guest lifecycle/plugin/Caddy/DNS/WebSocket smoke checks, upstream compatibility, deployed five-state/update behavior, rollback, and live acceptance remain external gates. The [package completion](../reconciliation/package-completion.md) and [acceptance matrix](../reconciliation/acceptance-matrix.md) are the active status authorities. No live or production acceptance is implied here.
 
 ## Decision
 
@@ -36,6 +36,8 @@ Hermes gateway
 The operator approved implementation on the active working branches. The Control source/ref and private inputs remain deployment prerequisites. Do not run manual installation commands, `just plan`, or `just apply` while preparing this work. Production deployment remains a reviewed `just plan` followed by explicit approval for `just apply`.
 
 ## Ordered tasks
+
+The checkboxes below preserve the original combined source-and-live task wording. They are not the current completion authority because several entries mix implemented source behavior with still-pending guest evidence. Use the evidence log and environment-specific acceptance matrix for current status.
 
 ### HC-01 — Enforce the infrastructure authority model in Hermes Control
 

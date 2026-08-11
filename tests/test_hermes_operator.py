@@ -20,6 +20,28 @@ spec.loader.exec_module(hermes_operator)
 
 
 class HermesOperatorTests(unittest.TestCase):
+    def write_safe_plan(self, root: Path) -> None:
+        (root / "tfplan.meta.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": hermes_operator.SCHEMA_VERSION,
+                    "summary": {
+                        "resource_changes": {
+                            "create": 0,
+                            "update": 0,
+                            "replace": 0,
+                            "delete": 0,
+                        },
+                        "destructive": False,
+                        "stateful_changes": [],
+                        "stateful_targets": [],
+                        "stateful_services": [],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
     def test_redaction_removes_secrets_private_addresses_and_paths(self) -> None:
         text = (
             "TOKEN=super-secret-value host=192.168.10.20 "  # public-safety: allow-ip # public-safety: allow-secret
@@ -78,6 +100,103 @@ class HermesOperatorTests(unittest.TestCase):
                     root, "apply", approve=True, runner=lambda *_: 0
                 )
 
+    def test_apply_snapshots_durable_intent_before_runner_and_correlates_result(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_safe_plan(root)
+            audit = root / "private" / "audit.jsonl"
+            backups = root / "durable-backups"
+            observed: list[str] = []
+
+            def runner(*_):
+                records = [json.loads(line) for line in audit.read_text().splitlines()]
+                self.assertEqual([record["phase"] for record in records], ["intent"])
+                snapshots = list(backups.iterdir())
+                self.assertEqual(len(snapshots), 1)
+                manifest = hermes_operator.verify_snapshot(snapshots[0])
+                self.assertEqual(manifest["record_count"], 1)
+                observed.append(records[0]["correlation_id"])
+                return 0, "applied\n"
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "VALUES_SITE": "",
+                    "HERMES_OPERATOR_MUTATION_ENABLED": "1",
+                    "HERMES_OPERATOR_AUDIT_PATH": str(audit),
+                    "HERMES_OPERATOR_AUDIT_BACKUP_DIR": str(backups),
+                },
+            ):
+                result = hermes_operator.run_action(
+                    root, "apply", approve=True, runner=runner
+                )
+
+            records = [json.loads(line) for line in audit.read_text().splitlines()]
+            self.assertEqual(
+                [record["phase"] for record in records], ["intent", "completed"]
+            )
+            self.assertEqual(observed, [result["correlation_id"]])
+            self.assertEqual(records[1]["correlation_id"], result["correlation_id"])
+
+    def test_apply_snapshot_failure_is_audited_and_never_invokes_runner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_safe_plan(root)
+            audit = root / "private" / "audit.jsonl"
+            runner = mock.Mock()
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "VALUES_SITE": "",
+                        "HERMES_OPERATOR_MUTATION_ENABLED": "1",
+                        "HERMES_OPERATOR_AUDIT_PATH": str(audit),
+                        "HERMES_OPERATOR_AUDIT_BACKUP_DIR": str(root / "backups"),
+                    },
+                ),
+                mock.patch.object(
+                    hermes_operator,
+                    "create_snapshot",
+                    side_effect=hermes_operator.AuditSnapshotError("unavailable"),
+                ),
+                self.assertRaisesRegex(
+                    hermes_operator.OperatorError, "snapshot failed"
+                ),
+            ):
+                hermes_operator.run_action(root, "apply", approve=True, runner=runner)
+            runner.assert_not_called()
+            records = [json.loads(line) for line in audit.read_text().splitlines()]
+            self.assertEqual(
+                [record["phase"] for record in records], ["intent", "failed"]
+            )
+            self.assertEqual(records[0]["correlation_id"], records[1]["correlation_id"])
+
+    def test_apply_without_configured_backup_fails_before_runner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_safe_plan(root)
+            runner = mock.Mock()
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "VALUES_SITE": "",
+                        "HERMES_OPERATOR_MUTATION_ENABLED": "1",
+                        "HERMES_OPERATOR_AUDIT_PATH": str(
+                            root / "private" / "audit.jsonl"
+                        ),
+                        "HERMES_OPERATOR_AUDIT_BACKUP_DIR": "",
+                    },
+                ),
+                self.assertRaisesRegex(
+                    hermes_operator.OperatorError, "snapshot failed"
+                ),
+            ):
+                hermes_operator.run_action(root, "apply", approve=True, runner=runner)
+            runner.assert_not_called()
+
     def test_selected_site_plan_summary_uses_canonical_values_path(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -130,10 +249,17 @@ class HermesOperatorTests(unittest.TestCase):
                 ),
             )
             self.assertTrue(result["ok"])
-            audit = json.loads(
-                (root / ".tmp" / "hermes-operator-audit.jsonl").read_text()
+            records = [
+                json.loads(line)
+                for line in (root / ".tmp" / "hermes-operator-audit.jsonl")
+                .read_text()
+                .splitlines()
+            ]
+            self.assertEqual(
+                [record["phase"] for record in records], ["intent", "completed"]
             )
-            self.assertEqual(audit["action"], "validate")
+            self.assertEqual(records[0]["correlation_id"], records[1]["correlation_id"])
+            self.assertEqual(records[1]["action"], "validate")
             self.assertNotIn(
                 "secret-value",
                 (root / ".tmp" / "hermes-operator-audit.jsonl").read_text(),
@@ -426,7 +552,7 @@ class HermesOperatorTests(unittest.TestCase):
             hermes_operator.run_action(root, "validate", runner=lambda *_: (0, "ok\n"))
             result = hermes_operator.verify_audit(root)
             self.assertEqual(result["action"], "audit-verify")
-            self.assertEqual(result["record_count"], 1)
+            self.assertEqual(result["record_count"], 2)
             self.assertEqual(len(result["head_hash"]), 64)
             self.assertNotIn(str(root), json.dumps(result))
 
@@ -816,7 +942,7 @@ class HermesOperatorTests(unittest.TestCase):
                 )
                 self.assertTrue(result["ok"])
                 verified = hermes_operator.verify_audit(root)
-            self.assertEqual(verified["record_count"], 1)
+            self.assertEqual(verified["record_count"], 2)
             self.assertTrue(audit_path.is_file())
 
     def test_status_is_machine_readable_and_does_not_include_private_values(

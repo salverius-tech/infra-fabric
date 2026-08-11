@@ -10,12 +10,7 @@ import tempfile
 from pathlib import Path
 
 from atomic_output import atomic_output_directory
-from canonical_projections import (
-    render_ansible_inventory,
-    render_ansible_vars,
-    render_dns_records,
-    render_opentofu_variables,
-)
+from canonical_projections import render_projection_set
 from canonical_values import CanonicalValuesError, load_site, model_digest
 from projection_manifest import ManifestError, build_manifest
 from service_catalog import ServiceCatalogError, load_catalog
@@ -26,6 +21,7 @@ PROJECTION_FILES = {
     "ansible-inventory.json": "ansible",
     "ansible-vars.json": "ansible-vars",
     "dns-records.json": "dns",
+    "onramp-handoff.json": "onramp-handoff",
 }
 
 
@@ -54,12 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         model = load_site(args.site_file, catalog_path=args.catalog)
         catalog = load_catalog(args.catalog)
-        projections = {
-            "terraform.auto.tfvars.json": render_opentofu_variables(model, catalog),
-            "ansible-inventory.json": render_ansible_inventory(model, catalog),
-            "ansible-vars.json": render_ansible_vars(model, catalog),
-            "dns-records.json": render_dns_records(model),
-        }
+        projections = render_projection_set(model, catalog)
         manifest = build_manifest(
             site=model.site.name,
             schema_version=model.schema_version,
