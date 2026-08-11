@@ -18,8 +18,7 @@
       - hermes_max_spawn_depth | default(2) | int <= 3
       - hermes_runtime_user | default('anvil') is match('^[a-z_][a-z0-9_-]{0,31}$')
       - hermes_runtime_user | default('anvil') != 'root'
-      - not (hermes_operator_mutation_enabled | default(false) | bool) or (hermes_operator_audit_path | default('') is match('^/[^\r\n]*$'))
-      - not (hermes_operator_mutation_enabled | default(false) | bool) or (hermes_operator_audit_backup_dir | default('') is match('^/[^\r\n]*$'))
+      - not (hermes_operator_mutation_enabled | default(false) | bool)
       - hermes_node_version is defined
       - hermes_node_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
       - hermes_node_sha256_amd64 is defined
@@ -29,8 +28,9 @@
     fail_msg: >-
       hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token,
       non-empty dashboard auth variables, sane Hermes tuning values, a
-      non-root runtime user, absolute audit paths when operator mutation is
-      activated, and complete managed Node.js pins are required.
+      non-root runtime user, a disabled Hermes mutation gate for the hard read-only
+      pilot, and complete managed Node.js pins are required. Mutation reactivation
+      requires a reviewed source change after trusted principal acceptance.
 - name: Check whether Hermes Caddy has Cloudflare DNS module
   tags: [validation]
   ansible.builtin.command:

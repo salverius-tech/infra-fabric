@@ -208,7 +208,9 @@ class ActionsMonitorOutputSafetyTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertNotIn("forgejo-actions-monitor", adapter)
         self.assertNotIn("unsafe-no-redact", adapter)
-        self.assertIn('"status", "validate", "plan"', adapter)
+        self.assertIn(
+            '_ACTIONS = ("status", "audit-verify", "validate", "plan")', adapter
+        )
 
 
 if __name__ == "__main__":

@@ -503,16 +503,17 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(configuration.control.project_roots, ["/srv/hermes/projects", "/opt/shared"])
         self.assertEqual(configuration.operator_audit_path, "")
         self.assertEqual(configuration.operator_audit_backup_dir, "")
-        activated = HermesConfiguration.model_validate(
-            {
-                "operator_mutation_enabled": True,
-                "operator_audit_path": "/var/lib/hermes/operator-audit.jsonl",
-                "operator_audit_backup_dir": "/var/backups/hermes-audit",
-            }
-        )
-        self.assertTrue(activated.operator_mutation_enabled)
-        with self.assertRaises(ValueError):
-            HermesConfiguration.model_validate({"operator_mutation_enabled": True})
+        with self.assertRaisesRegex(
+            ValueError, "hard read-only pilot"
+        ):
+            HermesConfiguration.model_validate(
+                {
+                    "operator_mutation_enabled": True,
+                    "operator_audit_path": "/var/lib/hermes/operator-audit.jsonl",
+                    "operator_audit_backup_dir": "/var/backups/hermes-audit",
+                }
+            )
+        self.assertFalse(HermesConfiguration().operator_mutation_enabled)
         with self.assertRaises(ValueError):
             HermesConfiguration.model_validate({"operator_audit_path": "relative/audit.jsonl"})
         with self.assertRaises(ValueError):

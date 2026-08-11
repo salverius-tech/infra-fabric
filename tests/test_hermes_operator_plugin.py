@@ -92,19 +92,17 @@ class HermesOperatorPluginTests(unittest.TestCase):
         assert isinstance(schema, dict)
         self.assertEqual(
             schema["parameters"]["properties"]["action"]["enum"],
-            ["status", "validate", "plan"],
+            ["status", "audit-verify", "validate", "plan"],
         )
         self.assertEqual(context.commands, [])
 
-    def test_explicit_activation_registers_separate_apply_command(self) -> None:
+    def test_environment_activation_does_not_register_apply_command(self) -> None:
         context = FakeContext()
         with patch.dict(
             os.environ, {"HERMES_OPERATOR_MUTATION_ENABLED": "1"}, clear=True
         ):
             plugin.register(context)
-        self.assertEqual(
-            [command["name"] for command in context.commands], ["infra-apply"]
-        )
+        self.assertEqual(context.commands, [])
 
     def test_tool_handler_dispatches_action_without_apply_arguments(self) -> None:
         context = FakeContext()
@@ -120,11 +118,9 @@ class HermesOperatorPluginTests(unittest.TestCase):
         self.assertEqual(json.loads(result)["action"], "status")
         run.assert_called_once_with("status")
 
-    def test_apply_command_requires_only_explicit_approved_flags(self) -> None:
+    def test_future_apply_handler_keeps_strict_flag_contract(self) -> None:
         context = FakeContext()
-        with patch.dict(
-            os.environ, {"HERMES_OPERATOR_MUTATION_ENABLED": "1"}, clear=True
-        ):
+        with patch.object(plugin, "_mutation_enabled", return_value=True):
             plugin.register(context)
         handler = cast(object, context.commands[0]["handler"])
         assert callable(handler)
@@ -138,9 +134,11 @@ class HermesOperatorPluginTests(unittest.TestCase):
         run.assert_called_once_with("apply", ("--approve", "--allow-stateful-batch"))
         self.assertIn("unsupported apply argument", cast(str, handler("--unexpected")))
 
-    def test_disabled_direct_apply_dispatch_fails_before_subprocess(self) -> None:
+    def test_direct_apply_dispatch_ignores_environment_activation(self) -> None:
         with (
-            patch.dict(os.environ, {}, clear=True),
+            patch.dict(
+                os.environ, {"HERMES_OPERATOR_MUTATION_ENABLED": "1"}, clear=True
+            ),
             patch.object(plugin.subprocess, "run") as run,
         ):
             result = json.loads(plugin._run("apply", ("--approve",)))
@@ -148,24 +146,34 @@ class HermesOperatorPluginTests(unittest.TestCase):
         self.assertIn("not activated", result["error"])
         run.assert_not_called()
 
-    def test_dashboard_apply_is_fail_closed_until_activated(self) -> None:
-        with patch.dict(os.environ, {}, clear=True):
+    def test_dashboard_apply_ignores_environment_activation(self) -> None:
+        with (
+            patch.dict(
+                os.environ, {"HERMES_OPERATOR_MUTATION_ENABLED": "1"}, clear=True
+            ),
+            patch.object(dashboard, "_bridge") as bridge,
+        ):
             with self.assertRaises(dashboard.HTTPException) as context:
                 asyncio.run(dashboard.apply(FakeRequest({"confirm": "APPLY"})))
         self.assertEqual(context.exception.status_code, 404)
+        bridge.assert_not_called()
 
-    def test_dashboard_apply_still_requires_confirmation_after_activation(self) -> None:
-        with patch.dict(
-            os.environ, {"HERMES_OPERATOR_MUTATION_ENABLED": "1"}, clear=True
-        ):
+    def test_dashboard_exposes_read_only_audit_verification(self) -> None:
+        with patch.object(
+            dashboard, "_bridge", return_value={"action": "audit-verify", "ok": True}
+        ) as bridge:
+            result = dashboard.audit_verify()
+        self.assertTrue(result["ok"])
+        bridge.assert_called_once_with("audit-verify")
+
+    def test_dashboard_future_apply_contract_retains_confirmation(self) -> None:
+        with patch.object(dashboard, "_mutation_enabled", return_value=True):
             with self.assertRaises(dashboard.HTTPException) as context:
                 asyncio.run(dashboard.apply(FakeRequest({})))
         self.assertEqual(context.exception.status_code, 400)
 
         with (
-            patch.dict(
-                os.environ, {"HERMES_OPERATOR_MUTATION_ENABLED": "1"}, clear=True
-            ),
+            patch.object(dashboard, "_mutation_enabled", return_value=True),
             patch.object(dashboard, "_bridge", return_value={"ok": True}) as bridge,
         ):
             result = asyncio.run(
@@ -186,15 +194,12 @@ class HermesOperatorPluginTests(unittest.TestCase):
         completed = plugin.subprocess.CompletedProcess(
             args=[], returncode=1, stdout=json.dumps(payload)
         )
-        environment = {
-            "HERMES_OPERATOR_MUTATION_ENABLED": "1",
-            "HERMES_OPERATOR_REPO_PATH": str(ROOT),
-        }
+        environment = {"HERMES_OPERATOR_REPO_PATH": str(ROOT)}
         with (
             patch.dict(os.environ, environment, clear=True),
             patch.object(plugin.subprocess, "run", return_value=completed),
         ):
-            plugin_result = json.loads(plugin._run("apply", ("--approve",)))
+            plugin_result = json.loads(plugin._run("validate"))
         self.assertEqual(plugin_result["correlation_id"], correlation)
         self.assertEqual(plugin_result["error"]["code"], "operator_error")
 
@@ -207,7 +212,7 @@ class HermesOperatorPluginTests(unittest.TestCase):
                 dashboard.subprocess, "run", return_value=dashboard_completed
             ),
         ):
-            dashboard_result = dashboard._bridge("apply", "--approve")
+            dashboard_result = dashboard._bridge("validate")
         self.assertEqual(dashboard_result["correlation_id"], correlation)
         self.assertEqual(dashboard_result["error"]["message"], "snapshot failed")
 

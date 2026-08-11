@@ -68,7 +68,7 @@ argument_specs:
         type: bool
         required: false
         default: false
-        description: "Fail-closed activation gate for all Hermes infrastructure mutation surfaces."
+        description: "Reserved future activation gate; true is rejected by the hard read-only pilot role until a reviewed source change."
       hermes_operator_audit_path:
         type: str
         required: false

@@ -39,24 +39,15 @@
 
     useEffect(function () { run("status"); }, []);
 
-    function apply() {
-      if (!window.confirm("Apply the current reviewed homelab-infra plan?")) return;
-      run("apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm: "APPLY" })
-      });
-    }
-
     return h("div", { className: "p-6 max-w-4xl" },
       h("h1", { className: "text-2xl font-semibold mb-2" }, "Homelab Infra"),
       h("p", { className: "text-muted-foreground mb-6" },
-        "Review validation and plans before applying infrastructure changes."),
+        "Hard read-only pilot: inspect status, validation, plans, and audit integrity."),
       h("div", { className: "flex gap-2 mb-6" },
         h(Button, { disabled: busy, onClick: function () { run("status"); } }, "Status"),
+        h(Button, { disabled: busy, onClick: function () { run("audit-verify"); } }, "Verify audit"),
         h(Button, { disabled: busy, onClick: function () { run("validate", { method: "POST" }); } }, "Validate"),
-        h(Button, { disabled: busy, onClick: function () { run("plan", { method: "POST" }); } }, "Plan"),
-        h(Button, { disabled: busy, onClick: apply }, "Apply reviewed plan")
+        h(Button, { disabled: busy, onClick: function () { run("plan", { method: "POST" }); } }, "Plan")
       ),
       error ? h("pre", { className: "text-red-500 whitespace-pre-wrap mb-4" }, error) : null,
       result ? h("pre", { className: "bg-muted rounded p-4 whitespace-pre-wrap overflow-auto" },

@@ -56,13 +56,45 @@ class HermesOperatorTests(unittest.TestCase):
         self.assertNotIn("/workspace/values/.env", redacted)
         self.assertIn("<redacted>", redacted)
 
-    def test_apply_requires_explicit_approval(self) -> None:
-        with tempfile.TemporaryDirectory() as temp, self.assertRaises(
-            hermes_operator.OperatorError
-        ):
-            hermes_operator.run_action(
-                Path(temp), "apply", approve=False, runner=lambda *_: 0
-            )
+    def test_apply_is_source_disabled_even_with_environment_activation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runner = mock.Mock()
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"HERMES_OPERATOR_MUTATION_ENABLED": "1"},
+                    clear=True,
+                ),
+                self.assertRaisesRegex(
+                    hermes_operator.OperatorError, "hard read-only pilot"
+                ),
+            ):
+                hermes_operator.run_action(
+                    Path(temp), "apply", approve=True, runner=runner
+                )
+            runner.assert_not_called()
+
+    def test_cli_apply_is_source_disabled_even_with_all_flags(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"HERMES_OPERATOR_MUTATION_ENABLED": "1"},
+                    clear=True,
+                ),
+                mock.patch.object(sys, "stderr"),
+            ):
+                returncode = hermes_operator.main(
+                    [
+                        "apply",
+                        "--repo",
+                        temp,
+                        "--approve",
+                        "--allow-destructive",
+                        "--allow-stateful-batch",
+                    ]
+                )
+            self.assertEqual(returncode, 1)
 
     def test_apply_does_not_allow_destructive_plan_without_second_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -97,7 +129,12 @@ class HermesOperatorTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            with self.assertRaises(hermes_operator.OperatorError):
+            with (
+                mock.patch.object(
+                    hermes_operator, "mutation_enabled", return_value=True
+                ),
+                self.assertRaises(hermes_operator.OperatorError),
+            ):
                 hermes_operator.run_action(
                     root, "apply", approve=True, runner=lambda *_: 0
                 )
@@ -122,14 +159,19 @@ class HermesOperatorTests(unittest.TestCase):
                 observed.append(records[0]["correlation_id"])
                 return 0, "applied\n"
 
-            with mock.patch.dict(
-                os.environ,
-                {
-                    "VALUES_SITE": "",
-                    "HERMES_OPERATOR_MUTATION_ENABLED": "1",
-                    "HERMES_OPERATOR_AUDIT_PATH": str(audit),
-                    "HERMES_OPERATOR_AUDIT_BACKUP_DIR": str(backups),
-                },
+            with (
+                mock.patch.object(
+                    hermes_operator, "mutation_enabled", return_value=True
+                ),
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "VALUES_SITE": "",
+                        "HERMES_OPERATOR_MUTATION_ENABLED": "1",
+                        "HERMES_OPERATOR_AUDIT_PATH": str(audit),
+                        "HERMES_OPERATOR_AUDIT_BACKUP_DIR": str(backups),
+                    },
+                ),
             ):
                 result = hermes_operator.run_action(
                     root, "apply", approve=True, runner=runner
@@ -149,6 +191,9 @@ class HermesOperatorTests(unittest.TestCase):
             audit = root / "private" / "audit.jsonl"
             runner = mock.Mock()
             with (
+                mock.patch.object(
+                    hermes_operator, "mutation_enabled", return_value=True
+                ),
                 mock.patch.dict(
                     os.environ,
                     {
@@ -181,6 +226,9 @@ class HermesOperatorTests(unittest.TestCase):
             self.write_safe_plan(root)
             runner = mock.Mock()
             with (
+                mock.patch.object(
+                    hermes_operator, "mutation_enabled", return_value=True
+                ),
                 mock.patch.dict(
                     os.environ,
                     {

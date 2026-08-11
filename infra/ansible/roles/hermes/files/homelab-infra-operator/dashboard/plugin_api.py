@@ -14,7 +14,9 @@ router = APIRouter()
 
 
 def _mutation_enabled() -> bool:
-    return os.environ.get("HERMES_OPERATOR_MUTATION_ENABLED", "").strip() == "1"
+    # No trusted sender/principal boundary exists yet. Environment configuration
+    # cannot reactivate mutation; that requires a later reviewed source change.
+    return False
 
 
 def _bridge(action: str, *extra: str) -> dict[str, Any]:
@@ -55,6 +57,11 @@ def validate() -> dict[str, Any]:
 @router.post("/plan")
 def plan() -> dict[str, Any]:
     return _bridge("plan")
+
+
+@router.get("/audit-verify")
+def audit_verify() -> dict[str, Any]:
+    return _bridge("audit-verify")
 
 
 @router.post("/apply")

@@ -16,7 +16,7 @@ The homelab infrastructure workflow is repo-driven and intentionally cautious: s
 
 Hermes is now available as a managed LXC with a browser-facing dashboard. The next product question is how to use Hermes as an operator cockpit for this repository without bypassing the audited runbook workflow, leaking private values, or turning the infra repo into a general application catalog.
 
-The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `audit-verify`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. External backup/central durability and operator identity binding remain outstanding acceptance gates. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding.
+The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `audit-verify`, `validate`, and `plan` actions. The future `apply` design retains its approval, saved-plan, destructive-change, and audit-durability requirements, but every tracked canonical, deployment, CLI, plugin, and dashboard surface now rejects activation unconditionally. Environment or private configuration cannot override this hard read-only pilot gate. Reactivation requires a later reviewed source change after a trustworthy sender/principal boundary, external audit durability, development acceptance, and recovery verification exist. The dashboard/gateway loads the read-only plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding.
 
 ## Goals
 
@@ -59,6 +59,9 @@ Repo automation may run validation, planning, deployment, and status checks, but
 5. Hermes summarizes creates, updates, replacements, deletes, and destructive changes without exposing private values.
 
 ### Scenario: apply a reviewed plan
+
+This is a future post-pilot scenario and is not activatable by deployment values or
+environment variables in the hard read-only pilot.
 
 1. Operator explicitly approves applying the current plan.
 2. Hermes runs the repo-native apply workflow.
@@ -167,9 +170,10 @@ For this pilot specifically:
   trustworthy approval identity, development acceptance, and recovery verification.
   The current stable Hermes slash-command API passes only raw argument text to plugin
   handlers and does not expose a trusted sender identity; the dashboard bridge also
-  has no accepted principal-propagation contract. Therefore
-  `hermes_operator_mutation_enabled` must remain `false` until an upstream or
-  server-side identity boundary is implemented and verified.
+  has no accepted principal-propagation contract. Until those gates are evidenced,
+  tracked source hard-disables mutation at canonical validation, role/runtime, CLI,
+  plugin, and dashboard boundaries. Reactivation is a separate reviewed source change,
+  not a values or environment toggle.
 - The Onramp handoff is a versioned non-secret Debian 13 VM shared-host substrate;
   Onramp owns applications but receives no Proxmox lifecycle authority.
 - Private-values editing is excluded from the pilot. Any future feature uses typed,

@@ -57,6 +57,15 @@ class OperatorError(RuntimeError):
         self.correlation_id = correlation_id
 
 
+def mutation_enabled() -> bool:
+    """Return the source-controlled pilot mutation gate.
+
+    No configuration or environment value may override this until a trusted
+    sender/principal boundary is accepted in a later reviewed source change.
+    """
+    return False
+
+
 def redact_output(text: str, secret_values: set[str] | None = None) -> str:
     """Remove known secret values and private-looking data before returning output."""
     redacted = text
@@ -417,8 +426,10 @@ def run_action(
         raise OperatorError(f"unsupported operator action: {action}")
     summary: dict[str, Any] | None = None
     if action == "apply":
-        if os.environ.get("HERMES_OPERATOR_MUTATION_ENABLED", "").strip() != "1":
-            raise OperatorError("infrastructure mutation is not activated")
+        if not mutation_enabled():
+            raise OperatorError(
+                "infrastructure mutation is unavailable during the hard read-only pilot"
+            )
         if not approve:
             raise OperatorError("apply requires explicit approval via --approve")
         summary = load_plan_summary(repo)

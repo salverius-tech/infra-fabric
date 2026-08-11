@@ -1224,11 +1224,10 @@ class HermesConfiguration(StrictModel):
 
     @model_validator(mode="after")
     def validate_mutation_activation(self) -> "HermesConfiguration":
-        if self.operator_mutation_enabled and (
-            not self.operator_audit_path or not self.operator_audit_backup_dir
-        ):
+        if self.operator_mutation_enabled:
             raise ValueError(
-                "Hermes operator mutation requires explicit audit and audit-backup paths"
+                "Hermes operator mutation is unavailable during the hard read-only pilot; "
+                "reactivation requires a reviewed source change after trusted principal acceptance"
             )
         return self
 
