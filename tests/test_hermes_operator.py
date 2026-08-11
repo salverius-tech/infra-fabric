@@ -11,6 +11,7 @@ import threading
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "hermes-operator.py"
@@ -22,6 +23,46 @@ spec.loader.exec_module(hermes_operator)
 
 
 class HermesOperatorTests(unittest.TestCase):
+    def write_hash_valid_audit(self, path: Path, records: list[dict[str, Any]]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        previous_hash = "0" * 64
+        encoded: list[str] = []
+        for supplied in records:
+            remove = supplied.get("_remove", [])
+            record = {
+                "timestamp": "2026-08-11T00:00:00+00:00",
+                "correlation_id": "a" * 32,
+                "phase": "intent",
+                "action": "validate",
+                "returncode": None,
+                "ok": None,
+                "plan": {"destructive": False, "resource_changes": {}},
+                "previous_hash": previous_hash,
+            }
+            record.update(
+                {key: value for key, value in supplied.items() if key != "_remove"}
+            )
+            for key in remove if isinstance(remove, list) else []:
+                record.pop(str(key), None)
+            record["previous_hash"] = previous_hash
+            record["record_hash"] = hermes_operator.audit_record_hash(record)
+            previous_hash = str(record["record_hash"])
+            encoded.append(json.dumps(record, sort_keys=True, separators=(",", ":")))
+        path.write_text("\n".join(encoded) + "\n", encoding="utf-8")
+
+    def assert_hash_valid_audit_rejected(
+        self, records: list[dict[str, Any]], message: str
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            audit = root / "private" / "audit.jsonl"
+            self.write_hash_valid_audit(audit, records)
+            with (
+                mock.patch.dict(os.environ, {"HERMES_OPERATOR_AUDIT_PATH": str(audit)}),
+                self.assertRaisesRegex(hermes_operator.OperatorError, message),
+            ):
+                hermes_operator.verify_audit(root)
+
     def write_safe_plan(self, root: Path) -> None:
         (root / "tfplan.meta.json").write_text(
             json.dumps(
@@ -606,6 +647,178 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertEqual(len(result["head_hash"]), 64)
             self.assertNotIn(str(root), json.dumps(result))
 
+    def test_audit_verify_accepts_valid_interleaved_operations(self) -> None:
+        first = "a" * 32
+        second = "b" * 32
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            audit = root / "private" / "audit.jsonl"
+            self.write_hash_valid_audit(
+                audit,
+                [
+                    {"correlation_id": first, "action": "validate"},
+                    {"correlation_id": second, "action": "plan"},
+                    {
+                        "correlation_id": second,
+                        "phase": "failed",
+                        "action": "plan",
+                        "returncode": 7,
+                        "ok": False,
+                    },
+                    {
+                        "correlation_id": first,
+                        "phase": "completed",
+                        "action": "validate",
+                        "returncode": 0,
+                        "ok": True,
+                    },
+                ],
+            )
+            with mock.patch.dict(
+                os.environ, {"HERMES_OPERATOR_AUDIT_PATH": str(audit)}
+            ):
+                result = hermes_operator.verify_audit(root)
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["record_count"], 4)
+            self.assertEqual(result["unresolved_correlations"], [])
+
+    def test_audit_verify_rejects_empty_and_unsupported_actions(self) -> None:
+        for action in ("", "status", "VALIDATE"):
+            with self.subTest(action=action):
+                self.assert_hash_valid_audit_rejected(
+                    [{"action": action}], "action is empty or unsupported"
+                )
+
+    def test_audit_verify_rejects_intent_with_non_null_result_fields(self) -> None:
+        for invalid in ({"returncode": 0}, {"ok": False}):
+            with self.subTest(invalid=invalid):
+                self.assert_hash_valid_audit_rejected(
+                    [invalid], "intent result shape is invalid"
+                )
+
+    def test_audit_verify_rejects_invalid_completed_result_shape(self) -> None:
+        terminal_base: dict[str, object] = {
+            "phase": "completed",
+            "returncode": 0,
+            "ok": True,
+        }
+        for invalid in (
+            {"returncode": 1, "ok": True},
+            {"returncode": 0, "ok": False},
+            {"returncode": True, "ok": True},
+            {"returncode": "0", "ok": True},
+        ):
+            with self.subTest(invalid=invalid):
+                self.assert_hash_valid_audit_rejected(
+                    [{}, terminal_base | invalid], "completed result shape is invalid"
+                )
+
+    def test_audit_verify_rejects_invalid_failed_result_shape(self) -> None:
+        terminal_base: dict[str, object] = {
+            "phase": "failed",
+            "returncode": 1,
+            "ok": False,
+        }
+        for invalid in (
+            {"returncode": 0, "ok": False},
+            {"returncode": 1, "ok": True},
+            {"returncode": False, "ok": False},
+            {"returncode": None, "ok": False},
+        ):
+            with self.subTest(invalid=invalid):
+                self.assert_hash_valid_audit_rejected(
+                    [{}, terminal_base | invalid], "failed result shape is invalid"
+                )
+
+    def test_audit_verify_rejects_missing_phase_specific_fields(self) -> None:
+        for missing in ("returncode", "ok"):
+            with self.subTest(missing=missing):
+                self.assert_hash_valid_audit_rejected(
+                    [{"_remove": [missing]}], "lifecycle record shape is invalid"
+                )
+
+    def test_audit_verify_rejects_invalid_phase_metadata(self) -> None:
+        for invalid in (
+            {"phase": ""},
+            {"phase": "started"},
+            {"phase": []},
+            {"correlation_id": "A" * 32},
+            {"correlation_id": "a" * 31},
+        ):
+            with self.subTest(invalid=invalid):
+                self.assert_hash_valid_audit_rejected(
+                    [invalid], "lifecycle metadata is invalid"
+                )
+
+    def test_audit_verify_rejects_terminal_before_intent(self) -> None:
+        self.assert_hash_valid_audit_rejected(
+            [{"phase": "completed", "returncode": 0, "ok": True}],
+            "terminal record has no intent",
+        )
+
+    def test_audit_verify_rejects_duplicate_terminal(self) -> None:
+        terminal = {"phase": "completed", "returncode": 0, "ok": True}
+        self.assert_hash_valid_audit_rejected(
+            [{}, terminal, terminal], "duplicate terminal records"
+        )
+
+    def test_audit_verify_rejects_reused_correlation_id(self) -> None:
+        self.assert_hash_valid_audit_rejected(
+            [
+                {},
+                {"phase": "completed", "returncode": 0, "ok": True},
+                {},
+            ],
+            "correlation is reused",
+        )
+
+    def test_audit_verify_rejects_action_change_within_lifecycle(self) -> None:
+        self.assert_hash_valid_audit_rejected(
+            [
+                {},
+                {
+                    "phase": "completed",
+                    "action": "plan",
+                    "returncode": 0,
+                    "ok": True,
+                },
+            ],
+            "lifecycle action changed",
+        )
+
+    def test_dangling_intent_fails_explicit_verify_but_allows_terminal_append(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            audit = root / "private" / "audit.jsonl"
+            correlation = "c" * 32
+            with mock.patch.dict(
+                os.environ, {"HERMES_OPERATOR_AUDIT_PATH": str(audit)}
+            ):
+                hermes_operator.write_audit_record(
+                    root,
+                    "validate",
+                    None,
+                    {},
+                    phase="intent",
+                    correlation_id=correlation,
+                )
+                self.assertEqual(hermes_operator.read_audit_chain(audit)[1], 1)
+                unresolved = hermes_operator.verify_audit(root)
+                self.assertFalse(unresolved["ok"])
+                self.assertEqual(unresolved["unresolved_correlations"], [correlation])
+                hermes_operator.write_audit_record(
+                    root,
+                    "validate",
+                    0,
+                    {},
+                    phase="completed",
+                    correlation_id=correlation,
+                )
+                resolved = hermes_operator.verify_audit(root)
+            self.assertTrue(resolved["ok"])
+
     def test_audit_verify_fails_closed_when_journal_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp, self.assertRaisesRegex(
             hermes_operator.OperatorError, "audit journal is unavailable"
@@ -1150,7 +1363,7 @@ class HermesOperatorTests(unittest.TestCase):
                     correlation_id=correlation,
                 )
                 with self.assertRaisesRegex(
-                    hermes_operator.OperatorError, "inconsistent"
+                    hermes_operator.OperatorError, "duplicate terminal"
                 ):
                     hermes_operator.verify_audit(root)
 

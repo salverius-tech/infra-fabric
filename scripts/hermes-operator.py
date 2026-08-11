@@ -27,6 +27,7 @@ from hermes_audit_chain import (
     read_audit_chain,  # noqa: F401 - compatibility export used by snapshot/tests
     read_audit_records,
     read_audit_stream,
+    validate_audit_lifecycles,
 )
 from hermes_audit_snapshot import AuditSnapshotError, create_snapshot, verify_snapshot
 from private_files import PrivateFileError, _fsync_descriptor, _private_directory_fd
@@ -228,36 +229,9 @@ def verify_audit(repo: Path) -> dict[str, Any]:
     """Verify private journal integrity and one-intent/one-terminal lifecycles."""
     try:
         head_hash, records = read_audit_records(audit_path(repo))
+        unresolved = validate_audit_lifecycles(records)
     except AuditChainError as error:
         raise OperatorError(str(error)) from error
-    lifecycles: dict[str, dict[str, object]] = {}
-    for record in records:
-        correlation_id = record.get("correlation_id")
-        phase = record.get("phase")
-        action = record.get("action")
-        if (
-            not isinstance(correlation_id, str)
-            or not re.fullmatch(r"[0-9a-f]{32}", correlation_id)
-            or phase not in {"intent", "completed", "failed"}
-            or not isinstance(action, str)
-        ):
-            raise OperatorError("Hermes operator audit lifecycle metadata is invalid")
-        lifecycle = lifecycles.get(correlation_id)
-        if phase == "intent":
-            if lifecycle is not None:
-                raise OperatorError("Hermes operator audit correlation is reused")
-            lifecycles[correlation_id] = {"action": action, "terminal": None}
-            continue
-        if lifecycle is None:
-            raise OperatorError("Hermes operator audit terminal record has no intent")
-        if lifecycle["action"] != action or lifecycle["terminal"] is not None:
-            raise OperatorError("Hermes operator audit lifecycle is inconsistent")
-        lifecycle["terminal"] = phase
-    unresolved = sorted(
-        correlation_id
-        for correlation_id, lifecycle in lifecycles.items()
-        if lifecycle["terminal"] is None
-    )
     return {
         "action": "audit-verify",
         "ok": not unresolved,
