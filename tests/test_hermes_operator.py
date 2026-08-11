@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import stat
@@ -8,6 +9,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -965,6 +967,155 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertEqual(status["enabled_services"], ["hermes"])
             self.assertNotIn("settings.local.json", json.dumps(status))
             self.assertNotIn("terraform.tfvars", json.dumps(status))
+
+    def test_plan_summary_rejects_non_count_data_before_audit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            cases = (
+                (
+                    "extra key",
+                    lambda summary: summary["resource_changes"].update(
+                        {"private": {"token": "SECRET_SENTINEL_DO_NOT_PRINT"}}
+                    ),
+                ),
+                (
+                    "string count",
+                    lambda summary: summary["resource_changes"].update({"create": "1"}),
+                ),
+                (
+                    "negative count",
+                    lambda summary: summary["resource_changes"].update({"delete": -1}),
+                ),
+                (
+                    "boolean count",
+                    lambda summary: summary["resource_changes"].update(
+                        {"update": True}
+                    ),
+                ),
+                (
+                    "private target",
+                    lambda summary: summary.update(
+                        {"stateful_targets": ["private.example.internal"]}
+                    ),
+                ),
+            )
+            for label, mutate in cases:
+                with self.subTest(label=label):
+                    self.write_safe_plan(root)
+                    path = root / "tfplan.meta.json"
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                    mutate(payload["summary"])
+                    path.write_text(json.dumps(payload), encoding="utf-8")
+                    with self.assertRaisesRegex(
+                        hermes_operator.OperatorError, "unsafe"
+                    ):
+                        hermes_operator.load_plan_summary(root)
+            self.assertFalse((root / ".tmp").exists())
+
+    def test_post_runner_metadata_failure_gets_correlated_terminal_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_safe_plan(root)
+
+            def corrupting_runner(*_):
+                (root / "tfplan.meta.json").write_text(
+                    '{"schema_version": 7, "summary": {"resource_changes": "bad"}}',
+                    encoding="utf-8",
+                )
+                return 0, "plan complete"
+
+            with self.assertRaises(hermes_operator.OperatorError) as caught:
+                hermes_operator.run_action(root, "plan", runner=corrupting_runner)
+            records = [
+                json.loads(line)
+                for line in (root / ".tmp" / "hermes-operator-audit.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+            ]
+            self.assertEqual(
+                [record["phase"] for record in records], ["intent", "failed"]
+            )
+            self.assertEqual(records[0]["correlation_id"], records[1]["correlation_id"])
+            self.assertEqual(
+                caught.exception.correlation_id, records[0]["correlation_id"]
+            )
+
+    def test_invalid_runner_result_gets_correlated_terminal_record(self) -> None:
+        for invalid in ((0,), ("zero", "output"), (0, b"bytes")):
+            with self.subTest(invalid=invalid), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                with self.assertRaises(hermes_operator.OperatorError) as caught:
+                    hermes_operator.run_action(
+                        root, "validate", runner=lambda *_: invalid
+                    )
+                records = [
+                    json.loads(line)
+                    for line in (root / ".tmp" / "hermes-operator-audit.jsonl")
+                    .read_text(encoding="utf-8")
+                    .splitlines()
+                ]
+                self.assertEqual(
+                    [record["phase"] for record in records], ["intent", "failed"]
+                )
+                self.assertEqual(
+                    caught.exception.correlation_id, records[0]["correlation_id"]
+                )
+                self.assertEqual(
+                    records[0]["correlation_id"], records[1]["correlation_id"]
+                )
+
+    def test_audit_verification_reports_orphan_and_rejects_impossible_lifecycle(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            audit = root / "private" / "audit.jsonl"
+            correlation = "a" * 32
+            with mock.patch.dict(
+                os.environ, {"HERMES_OPERATOR_AUDIT_PATH": str(audit)}
+            ):
+                hermes_operator.write_audit_record(
+                    root,
+                    "validate",
+                    None,
+                    {},
+                    phase="intent",
+                    correlation_id=correlation,
+                )
+                unresolved = hermes_operator.verify_audit(root)
+                self.assertFalse(unresolved["ok"])
+                self.assertEqual(unresolved["unresolved_correlations"], [correlation])
+                hermes_operator.write_audit_record(
+                    root,
+                    "validate",
+                    0,
+                    {},
+                    phase="completed",
+                    correlation_id=correlation,
+                )
+                hermes_operator.write_audit_record(
+                    root,
+                    "validate",
+                    1,
+                    {},
+                    phase="failed",
+                    correlation_id=correlation,
+                )
+                with self.assertRaisesRegex(
+                    hermes_operator.OperatorError, "inconsistent"
+                ):
+                    hermes_operator.verify_audit(root)
+
+    def test_json_cli_errors_are_structured(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                returncode = hermes_operator.main(["status", "--repo", temp, "--json"])
+            self.assertEqual(returncode, 1)
+            payload = json.loads(stream.getvalue())
+            self.assertFalse(payload["ok"])
+            self.assertEqual(payload["error"]["code"], "operator_error")
+            self.assertIsInstance(payload["error"]["message"], str)
 
 
 if __name__ == "__main__":

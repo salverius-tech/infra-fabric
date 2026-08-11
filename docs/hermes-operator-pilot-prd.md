@@ -165,6 +165,11 @@ For this pilot specifically:
   local.
 - Mutation activation requires durable private append-only audit persistence,
   trustworthy approval identity, development acceptance, and recovery verification.
+  The current stable Hermes slash-command API passes only raw argument text to plugin
+  handlers and does not expose a trusted sender identity; the dashboard bridge also
+  has no accepted principal-propagation contract. Therefore
+  `hermes_operator_mutation_enabled` must remain `false` until an upstream or
+  server-side identity boundary is implemented and verified.
 - The Onramp handoff is a versioned non-secret Debian 13 VM shared-host substrate;
   Onramp owns applications but receives no Proxmox lifecycle authority.
 - Private-values editing is excluded from the pilot. Any future feature uses typed,

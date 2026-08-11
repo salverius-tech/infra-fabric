@@ -24,7 +24,8 @@ from canonical_values import CanonicalValuesError, load_site
 from hermes_audit_chain import (
     AuditChainError,
     audit_record_hash,
-    read_audit_chain,
+    read_audit_chain,  # noqa: F401 - compatibility export used by snapshot/tests
+    read_audit_records,
     read_audit_stream,
 )
 from hermes_audit_snapshot import AuditSnapshotError, create_snapshot, verify_snapshot
@@ -51,7 +52,9 @@ HOSTNAME_RE = re.compile(
 
 
 class OperatorError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, correlation_id: str | None = None):
+        super().__init__(message)
+        self.correlation_id = correlation_id
 
 
 def redact_output(text: str, secret_values: set[str] | None = None) -> str:
@@ -152,7 +155,33 @@ def load_plan_summary(repo: Path) -> dict[str, Any] | None:
         data.get("summary"), dict
     ):
         raise OperatorError("saved plan metadata is unsupported; run just plan again")
-    return data["summary"]
+    summary = data["summary"]
+    counts = summary.get("resource_changes")
+    expected_counts = {"create", "update", "replace", "delete"}
+    if (
+        not isinstance(counts, dict)
+        or set(counts) != expected_counts
+        or any(
+            isinstance(counts[key], bool)
+            or not isinstance(counts[key], int)
+            or counts[key] < 0
+            for key in expected_counts
+        )
+        or not isinstance(summary.get("destructive"), bool)
+    ):
+        raise OperatorError("saved plan metadata is unsafe; run just plan again")
+    stateful_targets = summary.get("stateful_targets", [])
+    if not isinstance(stateful_targets, list) or any(
+        not isinstance(target, str)
+        or not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", target)
+        for target in stateful_targets
+    ):
+        raise OperatorError("saved plan metadata is unsafe; run just plan again")
+    return {
+        "resource_changes": {key: counts[key] for key in sorted(expected_counts)},
+        "destructive": summary["destructive"],
+        "stateful_targets": list(stateful_targets),
+    }
 
 
 def git_dirty(repo: Path) -> bool:
@@ -187,16 +216,45 @@ def status(repo: Path) -> dict[str, Any]:
 
 
 def verify_audit(repo: Path) -> dict[str, Any]:
-    """Verify the private operator journal and return only safe metadata."""
+    """Verify private journal integrity and one-intent/one-terminal lifecycles."""
     try:
-        head_hash, record_count = read_audit_chain(audit_path(repo))
+        head_hash, records = read_audit_records(audit_path(repo))
     except AuditChainError as error:
         raise OperatorError(str(error)) from error
+    lifecycles: dict[str, dict[str, object]] = {}
+    for record in records:
+        correlation_id = record.get("correlation_id")
+        phase = record.get("phase")
+        action = record.get("action")
+        if (
+            not isinstance(correlation_id, str)
+            or not re.fullmatch(r"[0-9a-f]{32}", correlation_id)
+            or phase not in {"intent", "completed", "failed"}
+            or not isinstance(action, str)
+        ):
+            raise OperatorError("Hermes operator audit lifecycle metadata is invalid")
+        lifecycle = lifecycles.get(correlation_id)
+        if phase == "intent":
+            if lifecycle is not None:
+                raise OperatorError("Hermes operator audit correlation is reused")
+            lifecycles[correlation_id] = {"action": action, "terminal": None}
+            continue
+        if lifecycle is None:
+            raise OperatorError("Hermes operator audit terminal record has no intent")
+        if lifecycle["action"] != action or lifecycle["terminal"] is not None:
+            raise OperatorError("Hermes operator audit lifecycle is inconsistent")
+        lifecycle["terminal"] = phase
+    unresolved = sorted(
+        correlation_id
+        for correlation_id, lifecycle in lifecycles.items()
+        if lifecycle["terminal"] is None
+    )
     return {
         "action": "audit-verify",
-        "ok": True,
-        "record_count": record_count,
+        "ok": not unresolved,
+        "record_count": len(records),
         "head_hash": head_hash,
+        "unresolved_correlations": unresolved,
     }
 
 
@@ -405,10 +463,31 @@ def run_action(
                 correlation_id=correlation_id,
             )
             raise OperatorError(
-                "apply blocked because the pre-execution audit snapshot failed"
+                "apply blocked because the pre-execution audit snapshot failed",
+                correlation_id=correlation_id,
             ) from error
     try:
         result = runner(command, env, repo)
+        if isinstance(result, tuple):
+            if len(result) != 2:
+                raise ValueError("runner returned an invalid result tuple")
+            returncode, output = result
+        else:
+            returncode, output = result, ""
+        if isinstance(returncode, bool) or not isinstance(returncode, int):
+            raise ValueError("runner return code is invalid")
+        if not isinstance(output, str):
+            raise ValueError("runner output is invalid")
+        safe_output = redact_output(output)
+        response: dict[str, Any] = {
+            "action": action,
+            "correlation_id": correlation_id,
+            "returncode": returncode,
+            "ok": returncode == 0,
+            "output": safe_output,
+        }
+        if action in {"plan", "apply"} and plan_metadata_path(repo).is_file():
+            response["plan"] = load_plan_summary(repo)
     except Exception as error:
         write_audit_record(
             repo,
@@ -418,21 +497,10 @@ def run_action(
             phase="failed",
             correlation_id=correlation_id,
         )
-        raise OperatorError("operator action execution failed") from error
-    if isinstance(result, tuple):
-        returncode, output = result
-    else:
-        returncode, output = result, ""
-    safe_output = redact_output(output)
-    response: dict[str, Any] = {
-        "action": action,
-        "correlation_id": correlation_id,
-        "returncode": returncode,
-        "ok": returncode == 0,
-        "output": safe_output,
-    }
-    if action in {"plan", "apply"} and plan_metadata_path(repo).is_file():
-        response["plan"] = load_plan_summary(repo)
+        raise OperatorError(
+            "operator action execution or result validation failed",
+            correlation_id=correlation_id,
+        ) from error
     write_audit_record(
         repo,
         action,
@@ -474,7 +542,14 @@ def main(argv: list[str] | None = None) -> int:
                 allow_stateful_batch=args.allow_stateful_batch,
             )
     except OperatorError as error:
-        print(str(error), file=sys.stderr)
+        failure: dict[str, Any] = {
+            "ok": False,
+            "error": {"code": "operator_error", "message": str(error)},
+        }
+        if error.correlation_id is not None:
+            failure["correlation_id"] = error.correlation_id
+        encoded = json.dumps(failure, sort_keys=True)
+        print(encoded, file=sys.stdout if args.json else sys.stderr)
         return 1
     if args.json:
         print(json.dumps(result, sort_keys=True))

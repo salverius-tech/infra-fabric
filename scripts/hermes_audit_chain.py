@@ -27,9 +27,9 @@ def audit_record_hash(record: dict[str, object]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def read_audit_stream(handle) -> tuple[str, int]:
+def _validated_records(handle) -> tuple[str, list[dict[str, object]]]:
     previous_hash = "0" * 64
-    count = 0
+    records: list[dict[str, object]] = []
     try:
         handle.seek(0)
         lines = handle.read().decode("utf-8").splitlines()
@@ -50,9 +50,28 @@ def read_audit_stream(handle) -> tuple[str, int]:
             raise AuditChainError(
                 "Hermes operator audit journal failed integrity verification"
             )
-        previous_hash = record["record_hash"]
-        count += 1
-    return previous_hash, count
+        previous_hash = str(record["record_hash"])
+        records.append(record)
+    return previous_hash, records
+
+
+def read_audit_stream(handle) -> tuple[str, int]:
+    previous_hash, records = _validated_records(handle)
+    return previous_hash, len(records)
+
+
+def read_audit_records(path: Path) -> tuple[str, list[dict[str, object]]]:
+    try:
+        with open_regular_file(path, "Hermes operator audit journal") as handle:
+            return _validated_records(handle)
+    except PrivateFileError as error:
+        if isinstance(error.__cause__, FileNotFoundError):
+            raise AuditChainError(
+                "Hermes operator audit journal is unavailable"
+            ) from error
+        raise AuditChainError("cannot read Hermes operator audit journal") from error
+    except OSError as error:
+        raise AuditChainError("cannot read Hermes operator audit journal") from error
 
 
 def read_audit_chain(path: Path, *, allow_missing: bool = False) -> tuple[str, int]:

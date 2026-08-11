@@ -176,6 +176,41 @@ class HermesOperatorPluginTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         bridge.assert_called_once_with("apply", "--approve", "--allow-destructive")
 
+    def test_adapters_preserve_structured_nonzero_errors_and_correlation(self) -> None:
+        correlation = "a" * 32
+        payload = {
+            "ok": False,
+            "error": {"code": "operator_error", "message": "snapshot failed"},
+            "correlation_id": correlation,
+        }
+        completed = plugin.subprocess.CompletedProcess(
+            args=[], returncode=1, stdout=json.dumps(payload)
+        )
+        environment = {
+            "HERMES_OPERATOR_MUTATION_ENABLED": "1",
+            "HERMES_OPERATOR_REPO_PATH": str(ROOT),
+        }
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch.object(plugin.subprocess, "run", return_value=completed),
+        ):
+            plugin_result = json.loads(plugin._run("apply", ("--approve",)))
+        self.assertEqual(plugin_result["correlation_id"], correlation)
+        self.assertEqual(plugin_result["error"]["code"], "operator_error")
+
+        dashboard_completed = dashboard.subprocess.CompletedProcess(
+            args=[], returncode=1, stdout=json.dumps(payload)
+        )
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch.object(
+                dashboard.subprocess, "run", return_value=dashboard_completed
+            ),
+        ):
+            dashboard_result = dashboard._bridge("apply", "--approve")
+        self.assertEqual(dashboard_result["correlation_id"], correlation)
+        self.assertEqual(dashboard_result["error"]["message"], "snapshot failed")
+
 
 if __name__ == "__main__":
     unittest.main()
