@@ -29,7 +29,6 @@ _ONRAMP_HANDOFF = {
     "operating_system": {
         "family": "debian",
         "major_version": 13,
-        "architecture": "amd64",
     },
     "container_runtime": {
         "engine": "podman",

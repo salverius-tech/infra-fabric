@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import copy
 import json
+import stat
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -17,7 +21,8 @@ from canonical_projections import (  # noqa: E402
     render_projection_set,
     verify_onramp_handoff_identity,
 )
-from canonical_values import CanonicalSite  # noqa: E402
+from canonical_values import CanonicalSite, load_site, model_digest  # noqa: E402
+from projection_manifest import build_manifest, content_digest  # noqa: E402
 from service_catalog import ServiceCatalogError, load_catalog  # noqa: E402
 
 SITE = {
@@ -83,6 +88,12 @@ SITE = {
                     "allow_passwordless_sudo": False,
                     "allowed_ssh_cidrs": ["192.0.2.0/24"],
                 },
+                "artifacts": {
+                    "caddy_cloudflare": {
+                        "version": "2.8.4",
+                        "checksums": {"amd64": "b" * 64, "arm64": "c" * 64},
+                    }
+                },
             }
         }
     },
@@ -146,8 +157,9 @@ class OnrampHandoffProjectionTests(unittest.TestCase):
         )
         self.assertEqual(
             spec["substrate"]["operating_system"],
-            {"family": "debian", "major_version": 13, "architecture": "amd64"},
+            {"family": "debian", "major_version": 13},
         )
+        self.assertNotIn("architecture", spec["substrate"]["operating_system"])
         self.assertEqual(
             spec["substrate"]["container_runtime"],
             {
@@ -218,6 +230,19 @@ class OnrampHandoffProjectionTests(unittest.TestCase):
             ):
                 render_onramp_handoff(self.model(data), self.catalog)
 
+    def test_canonical_resource_rejects_invalid_handoff_connection_identity(self) -> None:
+        cases = (
+            ("deploy_user", "root"),
+            ("deploy_user", "Bad User"),
+            ("deploy_dir", "relative/path"),
+            ("deploy_dir", "/srv/../root"),
+        )
+        for field, value in cases:
+            data = copy.deepcopy(SITE)
+            data["resources"]["shared_hosts"]["onramp-node"]["security"][field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                self.model(data)
+
     def test_catalog_handoff_metadata_is_strict(self) -> None:
         catalog_path = ROOT / "infra" / "services.json"
         catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
@@ -242,6 +267,113 @@ class OnrampHandoffProjectionTests(unittest.TestCase):
                 "onramp-handoff.json",
             },
         )
+
+    def _render_enabled_fixture(self, root: Path) -> tuple[Path, Path]:
+        site_dir = root / "dev"
+        site_dir.mkdir()
+        site = site_dir / "site.yaml"
+        site.write_text(yaml.safe_dump(SITE, sort_keys=False), encoding="utf-8")
+        generated = site_dir / "generated"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "scripts" / "canonical-render.py"),
+                "--site-file",
+                str(site),
+                "--catalog",
+                str(ROOT / "infra" / "services.json"),
+                "--output-dir",
+                str(generated),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return site, generated
+
+    def test_enabled_handoff_cli_render_manifest_and_verify_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            site, generated = self._render_enabled_fixture(Path(temporary))
+            self.assertEqual(stat.S_IMODE(generated.stat().st_mode), 0o700)
+            for path in generated.iterdir():
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600, path.name)
+            manifest = json.loads(
+                (generated / "manifest.json").read_text(encoding="utf-8")
+            )
+            handoff = json.loads(
+                (generated / "onramp-handoff.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["projections"]["onramp-handoff.json"]["digest"],
+                content_digest(handoff),
+            )
+            verify = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "verify-projections.py"),
+                    "--site-file",
+                    str(site),
+                    "--catalog",
+                    str(ROOT / "infra" / "services.json"),
+                    "--generated-dir",
+                    str(generated),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(verify.returncode, 0, verify.stderr)
+
+    def test_verify_rejects_tampered_handoff_with_rebuilt_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            site, generated = self._render_enabled_fixture(Path(temporary))
+            manifest_path = generated / "manifest.json"
+            original_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            projections = {
+                name: json.loads((generated / name).read_text(encoding="utf-8"))
+                for name in original_manifest["projections"]
+            }
+            projections["onramp-handoff.json"]["spec"]["authority"][
+                "onramp_permissions"
+            ]["proxmox_lifecycle"] = True
+            handoff_path = generated / "onramp-handoff.json"
+            handoff_path.write_text(
+                json.dumps(projections["onramp-handoff.json"]) + "\n",
+                encoding="utf-8",
+            )
+            handoff_path.chmod(0o600)
+            model = load_site(
+                site, catalog_path=ROOT / "infra" / "services.json"
+            )
+            rebuilt = build_manifest(
+                site=model.site.name,
+                schema_version=model.schema_version,
+                model_digest=model_digest(model),
+                secret_digest=None,
+                projections=projections,
+                renderer_version=original_manifest["renderer_version"],
+                source_commit=original_manifest["source_commit"],
+            )
+            manifest_path.write_text(json.dumps(rebuilt) + "\n", encoding="utf-8")
+            manifest_path.chmod(0o600)
+            verify = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "verify-projections.py"),
+                    "--site-file",
+                    str(site),
+                    "--catalog",
+                    str(ROOT / "infra" / "services.json"),
+                    "--generated-dir",
+                    str(generated),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(verify.returncode, 1)
+            self.assertIn("handoff identity disagrees", verify.stderr)
 
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ When enabled, the contract contains only public/non-secret infrastructure metada
 - the infrastructure/application ownership split;
 - the fact that temporary host-contained workload ownership remains with `infra-fabric`, without exporting those workload definitions.
 
-The projection intentionally excludes VMIDs and other provider IDs, temporary workload definitions, SSH keys, provider inputs, protected values, tokens, credentials, state, plans, and generated-file write authority. Its projection-manifest digest binds the bytes to the selected canonical model; `verify-projections.py` also regenerates and compares the handoff contract to reject identity or ownership tampering.
+The projection intentionally excludes VMIDs and other provider IDs, CPU architecture until it has canonical resource provenance, temporary workload definitions, SSH keys, provider inputs, protected values, tokens, credentials, state, plans, and generated-file write authority. Its projection-manifest digest binds the bytes to the selected canonical model; `verify-projections.py` also regenerates and compares the handoff contract to reject identity or ownership tampering.
 
 ## Ownership boundary
 

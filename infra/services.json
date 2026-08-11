@@ -736,8 +736,7 @@
         "consumer": "onramp-vNext",
         "operating_system": {
           "family": "debian",
-          "major_version": 13,
-          "architecture": "amd64"
+          "major_version": 13
         },
         "container_runtime": {
           "engine": "podman",

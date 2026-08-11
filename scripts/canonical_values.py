@@ -447,6 +447,33 @@ class ResourceSecurity(StrictModel):
     allowed_ssh_cidrs: list[StrictStr] = Field(default_factory=list)
     ssh_public_keys: list[StrictStr] = Field(default_factory=list)
 
+    @field_validator("deploy_user")
+    @classmethod
+    def validate_deploy_user(cls, value: str | None) -> str | None:
+        if value is not None and (
+            value == "root" or not _HERMES_USER_RE.fullmatch(value)
+        ):
+            raise ValueError(
+                "resource security.deploy_user must be a non-root Linux user identifier"
+            )
+        return value
+
+    @field_validator("deploy_dir")
+    @classmethod
+    def validate_deploy_dir(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        path = PurePosixPath(value)
+        if (
+            not re.fullmatch(r"/[A-Za-z0-9_./:-]+", value)
+            or value != str(path)
+            or ".." in path.parts
+        ):
+            raise ValueError(
+                "resource security.deploy_dir must be a normalized absolute POSIX path"
+            )
+        return value
+
 
 class ReviewedArtifactPin(StrictModel):
     """A reviewed, architecture-specific executable cache identity."""
