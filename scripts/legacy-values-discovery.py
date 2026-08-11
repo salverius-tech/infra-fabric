@@ -57,12 +57,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--candidate-output", type=Path, help="write a public candidate YAML outside the legacy values directory")
     parser.add_argument("--assessment-base", type=Path, help="approved canonical base for a value-free mapping assessment")
     parser.add_argument("--site", help="override candidate site.name")
+    parser.add_argument(
+        "--resolve-tagged-images",
+        action="store_true",
+        help="explicitly allow registry lookup for tagged images (direct CLI only)",
+    )
     args = parser.parse_args(argv)
     try:
         report = discover_legacy(
             args.values_dir,
             repo=args.repo,
             ansible_inventory=args.ansible_inventory,
+            resolve_tagged_images=args.resolve_tagged_images,
         )
         payload = render_migration_report(report)
         if args.assessment_base is not None:

@@ -38,10 +38,10 @@ status-values:
 check-values:
     scripts/values.sh check
 
-# Read-only legacy discovery report for explicit recovery/forensics; never a normal lifecycle fallback
+# Read-only, non-network legacy discovery report for explicit recovery/forensics; never a normal lifecycle fallback
 [private]
 recover-legacy-values-forensics:
-    @values_dir="${VALUES_DIR:-values}"; [[ "${values_dir}" =~ ^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$ && "/${values_dir}/" != *"/./"* && "/${values_dir}/" != *"/../"* ]] || { printf 'VALUES_DIR must be a normalized workspace-relative path.\n' >&2; exit 2; }; scripts/python.sh scripts/legacy-values-discovery.py --values-dir "/workspace/${values_dir}" --repo /workspace
+    @scripts/legacy-values-forensics.sh
 
 # Validate public-safety rules for tracked source and scaffold templates
 [private]

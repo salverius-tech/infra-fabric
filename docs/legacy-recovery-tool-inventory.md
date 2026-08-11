@@ -14,7 +14,7 @@ Do not use these tools as a fallback from `setup`, `validate`, `plan`, `apply`, 
 
 | Artifact | Current caller or entrypoint | Retained recovery purpose | Normal lifecycle edge |
 | --- | --- | --- | --- |
-| `just recover-legacy-values-forensics` | Explicit private recipe in `justfile` | Emits a value-redacted, read-only legacy discovery report; mutation requires a separately invoked recovery CLI | None; operational cutover tests prohibit calls from normal recipes |
+| `just recover-legacy-values-forensics` | Explicit private recipe in `justfile`, fixed zero-argument wrapper, and isolated Compose service | Emits a value-redacted report with repository/read-only-filesystem and no-network enforcement; mutation and tagged-image registry resolution require separately invoked direct CLIs | None; operational cutover tests prohibit calls from normal recipes and argument forwarding |
 | `scripts/migrate-values.py` | Direct recovery CLI; dynamically loaded by the two discovery modules; parsed by mapping inventory | Inspect/normalize old dotenv, tfvars, inventory, and generated-secret-era layouts; backup/restore helpers support bounded repair | None |
 | `scripts/migrate-site-values.py` | Direct recovery CLI/tests; parsed by mapping inventory | Plan or explicitly apply movement of old root-layout values and operational artifacts into a selected site directory with backup metadata | None |
 | `scripts/legacy-values-discovery.py` | Thin CLI over `legacy_values_discovery.py`; called by the explicit forensic recipe | Read-only report for old private-value layouts | None |
@@ -63,7 +63,7 @@ Security tests for traversal, symlinks, exclusive creation, restrictive permissi
 
 ## Confirmed normal-workflow isolation
 
-The public `justfile` exposes a read-only legacy discovery report as the private `recover-legacy-values-forensics` recipe. Mutating recovery importers remain direct, explicit CLIs. Normal setup, site validation, planning, apply, teardown, update, and Ansible execution require an explicit canonical site and do not invoke the importer or remote-discovery helper. `tests/test_operational_cutover.py` and `tests/test_plan_projection_lifecycle.py` guard this boundary.
+The public `justfile` exposes a read-only legacy discovery report as the private `recover-legacy-values-forensics` recipe. Its exact zero-argument wrapper selects a dedicated Compose service with `network_mode: none`, read-only repository/root mounts, temporary cache paths, and no protected SSH/provider mounts. Tagged image references remain unresolved in default reports. Mutating recovery importers and the network-capable tagged-image resolver remain direct, explicit CLI opt-ins. Normal setup, site validation, planning, apply, teardown, update, and Ansible execution require an explicit canonical site and do not invoke the importer or remote-discovery helper. `tests/test_operational_cutover.py` and `tests/test_plan_projection_lifecycle.py` guard this boundary.
 
 Whole-suite public test discovery and static OpenTofu/DNS/Ansible scaffold checks are normal-validation edges, not runtime lifecycle edges. They still prevent deletion until replacement canonical-fixture and test contracts are defined.
 

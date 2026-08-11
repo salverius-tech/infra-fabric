@@ -10,7 +10,7 @@ export VALUES_SITE=<site>
 
 Private implementation recipes are not operator commands.
 
-The only retained legacy-layout recipe is the private `recover-legacy-values-forensics` report. It performs value-redacted, stdout-only discovery without rewriting the legacy source and is never a substitute for setup, validate, plan, apply, teardown, or Ansible execution; see [canonical model operations](canonical-values-migration.md#executable-compatibility-boundary).
+The only retained legacy-layout recipe is the private `recover-legacy-values-forensics` report. It performs value-redacted, stdout-only discovery in a read-only, non-network container without rewriting either the legacy source or repository source. It accepts no arguments and cannot forward write-capable or network-capable options. It is never a substitute for setup, validate, plan, apply, teardown, or Ansible execution; see [canonical model operations](canonical-values-migration.md#executable-compatibility-boundary).
 
 ## `default`
 

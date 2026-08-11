@@ -50,6 +50,7 @@ class FieldObservation:
 @dataclass
 class DiscoveryReport:
     values_dir: str
+    resolve_tagged_images: bool = False
     observations: list[FieldObservation] = field(default_factory=list)
     conflicts: list[dict[str, Any]] = field(default_factory=list)
     files: list[str] = field(default_factory=list)
@@ -531,18 +532,26 @@ def _resolve_container_image_digest(reference: str) -> str:
 def _normalize_searxng_container_image(
     value: Any,
     *,
-    resolve_digest: Any = _resolve_container_image_digest,
-) -> dict[str, str]:
+    resolve_digest: Any | None = None,
+) -> dict[str, Any]:
     if not isinstance(value, str) or not value.strip():
         raise DiscoveryError("SearXNG container image must be a non-empty reference")
     immutable = re.fullmatch(r"([a-z0-9][a-z0-9./_-]*)@(sha256:[0-9a-f]{64})", value)
     if immutable is not None:
         image, digest = immutable.groups()
     else:
-        registry, repository, _tag = _split_container_image_reference(value)
+        registry, repository, tag = _split_container_image_reference(value)
         image = f"{registry}/{repository}"
         if registry == "docker.io" and repository.startswith("library/") and "/" not in value.split(":", 1)[0]:
             image = f"docker.io/{repository.removeprefix('library/')}"
+        if resolve_digest is None:
+            return {
+                "image": image,
+                "tag": tag,
+                "digest": None,
+                "source": "container",
+                "resolution": "not-requested",
+            }
         digest = resolve_digest(value)
         if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
             raise DiscoveryError("container image resolver returned an invalid SHA-256 digest")
@@ -692,7 +701,10 @@ def _observe(
     if proposed_path == "services.forgejo.endpoints.ports.ssh":
         public = _normalize_port(public)
     if proposed_path == "services.searxng_onramp.release":
-        public = _normalize_searxng_container_image(value)
+        public = _normalize_searxng_container_image(
+            value,
+            resolve_digest=_resolve_container_image_digest if report.resolve_tagged_images else None,
+        )
     if proposed_path == "services.forgejo.configuration.database":
         public = _normalize_forgejo_database(public)
     if proposed_path == "platform.images.lxc.debian.url":
@@ -1492,13 +1504,19 @@ def discover_legacy(
     values_dir: Path,
     repo: Path | None = None,
     ansible_inventory: Path | None = None,
+    *,
+    resolve_tagged_images: bool = False,
 ) -> DiscoveryReport:
-    """Read legacy inputs and return a redacted migration review report."""
+    """Read legacy inputs and return a redacted migration review report.
+
+    Registry resolution is network-capable and denied unless the direct caller
+    makes the separate explicit opt-in.
+    """
     values = values_dir.resolve()
     if not values.is_dir():
         raise DiscoveryError(f"legacy values directory does not exist: {values}")
     migration = _load_migration_module()
-    report = DiscoveryReport(values_dir=str(values))
+    report = DiscoveryReport(values_dir=str(values), resolve_tagged_images=resolve_tagged_images)
     site_metadata = values / "site.json"
     if site_metadata.is_file():
         report.files.append(site_metadata.relative_to(values).as_posix())
