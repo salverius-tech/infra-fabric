@@ -61,12 +61,12 @@ VALUES_SITE=<site> just plan
 VALUES_SITE=<site> just apply
 ```
 
-The bounded legacy importer is intentionally hidden from the public command surface and is reachable only through its explicit forensic name:
+The bounded legacy discovery report is intentionally hidden from the public command surface and is reachable only through its explicit forensic name:
 
 ```bash
 env -u VALUES_SITE just recover-legacy-values-forensics
 ```
 
-Use it only to inspect/import a reviewed legacy root layout during recovery or migration analysis. It deliberately bypasses canonical site preflight because that preflight would make a legacy-only recovery source unreachable. It is not invoked by setup, validation, planning, apply, teardown, or Ansible execution; select the recovered canonical site and return to `just validate` after the bounded investigation.
+Use it only to inspect a reviewed legacy root layout during recovery or migration analysis. The recipe emits a value-redacted JSON report to stdout and does not rewrite, normalize, move, delete, or generate files. It deliberately bypasses canonical site preflight because that preflight would make a legacy-only recovery source unreachable. It is not invoked by setup, validation, planning, apply, teardown, or Ansible execution; select the recovered canonical site and return to `just validate` after the bounded investigation. Separately retained recovery CLIs remain subject to their own explicit authorization and safety contracts.
 
 Do not recover with direct `site.yml`, raw OpenTofu/Terraform lifecycle commands, a legacy `.env`, or manually edited projections. Those paths bypass the selected-site and immutable-plan checks. For state-capable services, use the managed, separately authorized archive workflow in [service operations](service-operations.md#managed-state-recovery), validate its archive, and record post-restore health as external evidence.

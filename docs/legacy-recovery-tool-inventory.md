@@ -14,17 +14,17 @@ Do not use these tools as a fallback from `setup`, `validate`, `plan`, `apply`, 
 
 | Artifact | Current caller or entrypoint | Retained recovery purpose | Normal lifecycle edge |
 | --- | --- | --- | --- |
-| `just recover-legacy-values-forensics` | Explicit private recipe in `justfile` | Names the only supported legacy-values forensics entrypoint | None; operational cutover tests prohibit calls from normal recipes |
-| `scripts/migrate-values.py` | The explicit recipe; dynamically loaded by the two discovery modules; parsed by mapping inventory | Inspect/normalize old dotenv, tfvars, inventory, and generated-secret-era layouts; backup/restore helpers support bounded repair | None |
+| `just recover-legacy-values-forensics` | Explicit private recipe in `justfile` | Emits a value-redacted, read-only legacy discovery report; mutation requires a separately invoked recovery CLI | None; operational cutover tests prohibit calls from normal recipes |
+| `scripts/migrate-values.py` | Direct recovery CLI; dynamically loaded by the two discovery modules; parsed by mapping inventory | Inspect/normalize old dotenv, tfvars, inventory, and generated-secret-era layouts; backup/restore helpers support bounded repair | None |
 | `scripts/migrate-site-values.py` | Direct recovery CLI/tests; parsed by mapping inventory | Plan or explicitly apply movement of old root-layout values and operational artifacts into a selected site directory with backup metadata | None |
-| `scripts/legacy-values-discovery.py` | Thin CLI over `legacy_values_discovery.py` | Read-only report for old private-value layouts | None |
+| `scripts/legacy-values-discovery.py` | Thin CLI over `legacy_values_discovery.py`; called by the explicit forensic recipe | Read-only report for old private-value layouts | None |
 | `scripts/legacy_values_discovery.py` | Legacy discovery CLI, site-layout migration, semantic discovery, and focused tests | Value-redacted field classification, conflict reporting, candidate refusal, and ancillary-artifact metadata | None |
 | `scripts/ansible_semantic_discovery.py` | Direct report CLI/tests | Static inventory-consumer evidence for legacy Ansible input identities | None |
 | `scripts/migration_backup.py` | `migrate-values.py`, `migrate-site-values.py`, focused tests | Restrictive, manifest-bound backup and restore of explicitly selected migration files | None |
 | `scripts/migrate-secret-bundle.py` | Direct protected recovery CLI documented in secret operations | Dry-run-by-default migration of encrypted logical secret paths | None |
 | `scripts/secret_bundle_migration.py` | Secret-bundle CLI, canonical secret recovery, reconciliation validation, tests | SOPS-aware encrypted-bundle transformation primitives; shared canonical recovery use means it is not automatically deletable with layout migration | None |
 | `scripts/discover-values-remote.sh` | No production caller; a regression test proves setup does not invoke it | Historical remote discovery only | None |
-| `scripts/canonical-mapping-inventory.py` | Mapping documentation/tests and reconciliation validation | Historical source-to-canonical mapping evidence and retirement/exclusion accounting | No mutation edge; public validation may still exercise its contracts |
+| `scripts/canonical-mapping-inventory.py` | Mapping documentation and direct tests; reconciliation records cite its test evidence | Historical source-to-canonical mapping evidence and retirement/exclusion accounting | No mutation edge; public validation directly exercises its contracts through whole-suite test discovery |
 
 ## Public scaffold and mapping surfaces tied to retirement
 
@@ -63,9 +63,9 @@ Security tests for traversal, symlinks, exclusive creation, restrictive permissi
 
 ## Confirmed normal-workflow isolation
 
-The public `justfile` exposes the legacy importer only as the private `recover-legacy-values-forensics` recipe. Normal setup, validation, planning, apply, teardown, update, and Ansible execution require an explicit canonical site and do not invoke the importer or remote-discovery helper. `tests/test_operational_cutover.py` and `tests/test_plan_projection_lifecycle.py` guard this boundary.
+The public `justfile` exposes a read-only legacy discovery report as the private `recover-legacy-values-forensics` recipe. Mutating recovery importers remain direct, explicit CLIs. Normal setup, site validation, planning, apply, teardown, update, and Ansible execution require an explicit canonical site and do not invoke the importer or remote-discovery helper. `tests/test_operational_cutover.py` and `tests/test_plan_projection_lifecycle.py` guard this boundary.
 
-A public-validation test importing a legacy module is a quality-gate caller, not a runtime lifecycle edge. It still prevents deletion until the replacement test contract is defined.
+Whole-suite public test discovery and static OpenTofu/DNS/Ansible scaffold checks are normal-validation edges, not runtime lifecycle edges. They still prevent deletion until replacement canonical-fixture and test contracts are defined.
 
 ## Triggered deletion manifest
 
