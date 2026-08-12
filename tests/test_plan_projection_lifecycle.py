@@ -126,6 +126,21 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
         self.assertNotIn('rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"', content)
 
+    def test_apply_requires_canonical_proxmox_identity_before_snapshot_or_provider_mutation(self) -> None:
+        # Safety category: pre-mutation ordering. The provider path is live, so
+        # retain this narrow guard instead of exercising apply in a test fixture.
+        source = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
+        identity_guard = 'Canonical apply requires the SOPS-backed Proxmox management SSH identity'
+        snapshot_create = 'execution_snapshot="$(python scripts/execution-snapshot.py create'
+        provider_apply = 'apply_command=(tofu -chdir=infra/opentofu apply'
+        self.assertIn(identity_guard, source)
+        self.assertIn(
+            'printf "Canonical apply requires the SOPS-backed Proxmox management SSH identity.\\n" >&2',
+            source,
+        )
+        self.assertLess(source.index(identity_guard), source.index(snapshot_create))
+        self.assertLess(source.index(identity_guard), source.index(provider_apply))
+
     def test_teardown_uses_a_distinct_metadata_bound_destroy_contract(self) -> None:
         # Safety category: approval sentinel. Running teardown would require a live
         # provider mutation, so retain the explicit source-level guard.

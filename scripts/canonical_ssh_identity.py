@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +47,7 @@ def materialize_private_key(
     public_keys: list[str] | tuple[str, ...],
     logical_path: str = "secrets.bootstrap.ssh_private_key",
 ) -> Path:
-    """Write one verified private key with mode 0600 and return its path."""
+    """Atomically install one verified private key with mode 0600 and return its path."""
     try:
         private_key = provider.resolve(logical_path)
     except Exception as error:
@@ -57,20 +58,33 @@ def materialize_private_key(
     if not expected:
         raise CanonicalSshIdentityError("canonical bootstrap SSH public-key set is empty")
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    parent = destination.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    if parent.is_symlink() or not parent.is_dir():
+        raise CanonicalSshIdentityError("canonical SSH identity directory is unsafe")
+    if destination.is_symlink() or (destination.exists() and not destination.is_file()):
+        raise CanonicalSshIdentityError("canonical SSH identity destination is unsafe")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", dir=parent, text=True
+    )
+    temporary = Path(temporary_name)
     try:
-        destination.write_text(private_key, encoding="utf-8")
-        os.chmod(destination, 0o600)
-        actual = derive_public_key(destination)
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(private_key)
+            handle.flush()
+            os.fsync(handle.fileno())
+        actual = derive_public_key(temporary)
         if actual not in expected:
             raise CanonicalSshIdentityError("bootstrap SSH private key does not match site public keys")
+        os.replace(temporary, destination)
         return destination
     except BaseException:
-        destination.unlink(missing_ok=True)
+        temporary.unlink(missing_ok=True)
         raise
 
 
-def _load_runtime() -> tuple[Path, Path, list[str]]:
+def _load_runtime(kind: str) -> tuple[Path, str, list[str]] | None:
     import sys
 
     repo = Path("/workspace")
@@ -83,15 +97,22 @@ def _load_runtime() -> tuple[Path, Path, list[str]]:
     site_file = values_dir / "site.yaml"
     bundle_file = values_dir / "secrets.sops.yaml"
     model = load_site(site_file, expected_site=os.environ.get("VALUES_SITE"), catalog_path=repo / "infra" / "services.json")
-    public_keys = list(model.bootstrap.ssh.public_keys)
-    for keys in model.bootstrap.ssh.host_additional_keys.values():
-        public_keys.extend(keys)
-    return bundle_file, site_file, public_keys
+    if kind == "bootstrap":
+        public_keys = list(model.bootstrap.ssh.public_keys)
+        for keys in model.bootstrap.ssh.host_additional_keys.values():
+            public_keys.extend(keys)
+        return bundle_file, "secrets.bootstrap.ssh_private_key", public_keys
+    management = model.platform.proxmox.management
+    if management is None or management.ssh_public_key is None:
+        return None
+    return bundle_file, management.ssh_private_key_secret_ref, [management.ssh_public_key]
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--destination", type=Path, required=True)
+    parser.add_argument("--kind", choices=("bootstrap", "proxmox-management"), default="bootstrap")
+    parser.add_argument("--optional", action="store_true", help="succeed when the selected identity is intentionally unconfigured")
     args = parser.parse_args()
     import sys
 
@@ -99,10 +120,15 @@ def main() -> int:
     sys.path.insert(0, str(repo / "scripts"))
     from secret_provider import SopsAgeProvider
 
-    bundle_file, _site_file, public_keys = _load_runtime()
+    runtime = _load_runtime(args.kind)
+    if runtime is None:
+        if args.optional:
+            return 0
+        raise CanonicalSshIdentityError("canonical Proxmox management SSH identity is not configured")
+    bundle_file, logical_path, public_keys = runtime
     key_file = Path(os.environ["SOPS_AGE_KEY_FILE"])
-    provider = SopsAgeProvider(bundle_file, key_file=key_file, required_paths={"secrets.bootstrap.ssh_private_key"})
-    materialize_private_key(provider, destination=args.destination, public_keys=public_keys)
+    provider = SopsAgeProvider(bundle_file, key_file=key_file, required_paths={logical_path})
+    materialize_private_key(provider, destination=args.destination, public_keys=public_keys, logical_path=logical_path)
     return 0
 
 

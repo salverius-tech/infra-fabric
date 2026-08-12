@@ -55,7 +55,7 @@ For a selected state-capable service, the executable public sequence is:
 VALUES_SITE=<site> just validate
 # Create or select the site-local managed archive through the documented service-state wrapper.
 VALUES_SITE=<site> scripts/service-state.sh backup <service>
-VALUES_SITE=<site> scripts/service-state.sh restore <service> values/service-backups/<service>/<archive>.tar.gz
+VALUES_SITE=<site> scripts/service-state.sh restore <service> values/sites/<site>/service-backups/<service>/<archive>.tar.gz
 VALUES_SITE=<site> just validate
 ```
 

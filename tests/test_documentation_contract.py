@@ -218,6 +218,15 @@ class DocumentationContractTests(unittest.TestCase):
         for recipe in ("update", "validate", "plan", "apply"):
             self.assertRegex(update_policy, rf"VALUES_SITE=<site> just {recipe}", recipe)
 
+    def test_apply_docs_distinguish_canonical_proxmox_identity_from_guest_bootstrap(self) -> None:
+        for relative in ("docs/canonical-quick-start.md", "docs/just-recipes.md"):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("secrets.providers.proxmox.ssh_private_key", text, relative)
+            self.assertIn("platform.proxmox.management.ssh_public_key", text, relative)
+            self.assertIn("guest bootstrap identity", text, relative)
+            self.assertNotIn("INFRA_PVE_SSH_IDENTITY_FILE", text, relative)
+            self.assertIn("guest bootstrap key", text.lower(), relative)
+
     def test_operator_bash_lifecycle_examples_establish_site_context(self) -> None:
         inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
         for relative, classification in inventory["documents"].items():
@@ -270,6 +279,29 @@ class DocumentationContractTests(unittest.TestCase):
         for stage in ("canonical-input", "provider-plan", "host-trust", "service-health", "state-recovery"):
             self.assertIn(stage, matrix)
             self.assertIn(stage, troubleshooting)
+
+    def test_service_state_operator_docs_use_selected_site_paths(self) -> None:
+        for relative in ("docs/service-operations.md", "docs/service-state-backup.md", "docs/hermes-state-backup.md", "docs/sssf.md"):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("VALUES_SITE=<site> scripts/service-state.sh", text, relative)
+            self.assertNotIn(" values/service-backups/", text, relative)
+        hermes = (ROOT / "docs/hermes-state-backup.md").read_text(encoding="utf-8")
+        self.assertIn("VALUES_SITE=<site> scripts/hermes-state.sh", hermes)
+        shared = (ROOT / "docs/service-state-backup.md").read_text(encoding="utf-8")
+        self.assertIn("values/sites/<site>/service-backups/", shared)
+
+    def test_maintained_docs_do_not_present_legacy_or_ambient_authority_as_normal(self) -> None:
+        prd = (ROOT / "docs/hermes-operator-pilot-prd.md").read_text(encoding="utf-8")
+        self.assertIn("Private selected-site inputs", prd)
+        self.assertNotIn("current tfvars, inventory, DNS records, environment values", prd)
+
+        sssf = (ROOT / "docs/sssf.md").read_text(encoding="utf-8")
+        self.assertIn("must not use an ambient inventory", sssf)
+        self.assertNotRegex(sssf, r"(?m)^ansible\s+sssf\b")
+
+        state = (ROOT / "docs/service-state-backup.md").read_text(encoding="utf-8")
+        self.assertIn("generated inventory and variables", state)
+        self.assertNotIn("normal direct Ansible inventory group", state)
 
 
 if __name__ == "__main__":

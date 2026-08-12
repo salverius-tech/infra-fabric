@@ -45,6 +45,8 @@ execution_plan="${INFRA_VALUES_DIR}/tfplan"
 execution_metadata="${INFRA_VALUES_DIR}/tfplan.meta.json"
 execution_values_dir="${INFRA_VALUES_DIR}"
 execution_snapshot=""
+execution_snapshot_root="${INFRA_EXECUTION_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/execution-snapshots}"
+state_snapshot_root="${INFRA_STATE_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/state-backups}"
 
 target_service="${1:-}"
 replace_service="${2:-}"
@@ -70,11 +72,19 @@ require_canonical_projection_set "${INFRA_VALUES_DIR}/generated"
 python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
 ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
 
+# The selected canonical site has a distinct SOPS-backed Proxmox-management
+# identity materialized before this lifecycle payload starts. Check it before snapshots or
+# provider mutation so an incomplete canonical secret contract fails closed.
+if [[ ! -f "${HOME}/.ssh/canonical-proxmox-management" ]]; then
+  printf "Canonical apply requires the SOPS-backed Proxmox management SSH identity.\n" >&2
+  exit 2
+fi
+
 execution_snapshot="$(python scripts/execution-snapshot.py create \
   --values-dir "${INFRA_VALUES_DIR}" \
   --plan "${execution_plan}" \
   --metadata "${execution_metadata}" \
-  --destination-root "${INFRA_VALUES_DIR}/execution-snapshots" \
+  --destination-root "${execution_snapshot_root}" \
   --site "${VALUES_SITE}")"
 python scripts/execution-snapshot.py verify --snapshot "${execution_snapshot}"
 execution_plan="${execution_snapshot}/tfplan"
@@ -122,7 +132,7 @@ else
 fi
 python scripts/state-snapshot.py create \
   --state "${INFRA_VALUES_DIR}/terraform.tfstate" \
-  --backup-dir "${INFRA_VALUES_DIR}/state-backups"
+  --backup-dir "${state_snapshot_root}"
 
 # A saved plan already contains its variable values. Do not let TF_VAR_* values
 # from the runtime env be compared against those values during apply.
@@ -132,7 +142,11 @@ python scripts/state-snapshot.py create \
       TF_VAR_*) unset "${variable}" ;;
     esac
   done < <(env)
-  apply_command=(tofu -chdir=infra/opentofu apply -state=../../${INFRA_VALUES_DIR}/terraform.tfstate ../../${execution_plan})
+  execution_plan_argument="${execution_plan}"
+  if [[ "${execution_plan_argument}" != /* ]]; then
+    execution_plan_argument="../../${execution_plan_argument}"
+  fi
+  apply_command=(tofu -chdir=infra/opentofu apply -state=../../${INFRA_VALUES_DIR}/terraform.tfstate "${execution_plan_argument}")
   python scripts/canonical-provider-env.py -- "${apply_command[@]}"
 )
 

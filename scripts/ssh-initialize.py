@@ -18,7 +18,8 @@ from canonical_ssh_identity import derive_public_key
 from canonical_values import load_site
 from secret_provider import SopsAgeProvider, SecretProviderError, canonical_sops_filename
 
-LOGICAL_PATH = "secrets.bootstrap.ssh_private_key"
+BOOTSTRAP_LOGICAL_PATH = "secrets.bootstrap.ssh_private_key"
+MANAGEMENT_LOGICAL_PATH = "secrets.providers.proxmox.ssh_private_key"
 
 
 class SshInitializationError(ValueError):
@@ -91,8 +92,8 @@ def _sops_yaml(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) ->
     return result.stdout.encode("utf-8")
 
 
-def _generate_key(directory: Path) -> tuple[str, str]:
-    private = directory / "bootstrap"
+def _generate_key(directory: Path, name: str = "bootstrap") -> tuple[str, str]:
+    private = directory / name
     result = subprocess.run(
         ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(private)],
         capture_output=True,
@@ -163,30 +164,24 @@ def initialize(site_file: Path, bundle: Path, key_file: Path, *, sops: str = "so
     if not public_keys:
         raise SshInitializationError("bootstrap.ssh.public_keys must contain at least one key")
 
-    existing_private = None
+    management = model.platform.proxmox.management
+    if management is None or management.ssh_public_key is None:
+        raise SshInitializationError("platform.proxmox.management.ssh_public_key is required")
+    existing_private: dict[str, str] = {}
     if bundle.is_file():
         try:
             provider = SopsAgeProvider(bundle, key_file=key_file)
         except (SecretProviderError, OSError) as error:
             raise SshInitializationError("existing SOPS bundle could not be decrypted") from error
         try:
-            if LOGICAL_PATH in provider.discover():
-                existing_private = provider.resolve(LOGICAL_PATH)
+            discovered = set(provider.discover())
+            for logical_path in (BOOTSTRAP_LOGICAL_PATH, management.ssh_private_key_secret_ref):
+                if logical_path in discovered:
+                    existing_private[logical_path] = provider.resolve(logical_path)
         except (SecretProviderError, OSError) as error:
             raise SshInitializationError("existing SOPS bundle could not resolve bootstrap SSH identity") from error
 
-    if existing_private:
-        with tempfile.TemporaryDirectory(prefix="ssh-initialize-") as temp_dir:
-            private = Path(temp_dir) / "bootstrap"
-            private.write_text(existing_private, encoding="utf-8")
-            os.chmod(private, 0o600)
-            actual = derive_public_key(private)
-        if actual not in {tuple(key.strip().split()[:2]) for key in public_keys}:
-            raise SshInitializationError("existing bootstrap SSH private key does not match site public keys")
-        return "already initialized"
-
     with tempfile.TemporaryDirectory(prefix="ssh-initialize-") as temp_dir:
-        private_text, public = _generate_key(Path(temp_dir))
         encrypted_data: dict[str, Any] = {}
         if bundle.is_file():
             try:
@@ -194,7 +189,26 @@ def initialize(site_file: Path, bundle: Path, key_file: Path, *, sops: str = "so
                 encrypted_data = existing._data.copy()  # validated in-memory bundle only
             except (SecretProviderError, OSError) as error:
                 raise SshInitializationError("existing SOPS bundle could not be decrypted") from error
-        _set_path(encrypted_data, LOGICAL_PATH, private_text)
+        expected = {
+            BOOTSTRAP_LOGICAL_PATH: {tuple(key.strip().split()[:2]) for key in public_keys},
+            management.ssh_private_key_secret_ref: {tuple(management.ssh_public_key.split()[:2])},
+        }
+        for logical_path, private_text in existing_private.items():
+            private = Path(temp_dir) / logical_path.rsplit(".", 1)[-1]
+            private.write_text(private_text, encoding="utf-8")
+            os.chmod(private, 0o600)
+            if derive_public_key(private) not in expected[logical_path]:
+                raise SshInitializationError("existing canonical SSH private key does not match its declared public key")
+
+        generated: dict[str, tuple[str, str]] = {}
+        if BOOTSTRAP_LOGICAL_PATH not in existing_private:
+            generated[BOOTSTRAP_LOGICAL_PATH] = _generate_key(Path(temp_dir), "bootstrap")
+        if management.ssh_private_key_secret_ref not in existing_private:
+            generated[management.ssh_private_key_secret_ref] = _generate_key(Path(temp_dir), "proxmox-management")
+        if not generated:
+            return "already initialized"
+        for logical_path, (private_text, _public) in generated.items():
+            _set_path(encrypted_data, logical_path, private_text)
         ciphertext = _sops_yaml(sops, bundle, encrypted_data, key_file)
 
         site_yaml = _yaml()
@@ -203,11 +217,17 @@ def initialize(site_file: Path, bundle: Path, key_file: Path, *, sops: str = "so
         ssh = bootstrap.setdefault("ssh", {})
         declared = list(ssh.setdefault("public_keys", []))
         scaffold_placeholder = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIpublicsafeexample public@example.invalid"
-        if scaffold_placeholder in declared:
-            declared[declared.index(scaffold_placeholder)] = public
-        elif public not in declared:
-            declared.append(public)
+        bootstrap_generated = generated.get(BOOTSTRAP_LOGICAL_PATH)
+        if bootstrap_generated is not None:
+            public = bootstrap_generated[1]
+            if scaffold_placeholder in declared:
+                declared[declared.index(scaffold_placeholder)] = public
+            elif public not in declared:
+                declared.append(public)
         ssh["public_keys"] = declared
+        management_generated = generated.get(management.ssh_private_key_secret_ref)
+        if management_generated is not None:
+            site_data["platform"]["proxmox"]["management"]["ssh_public_key"] = management_generated[1]
 
         site_buffer = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=site_file.parent, prefix=f".{site_file.name}.", delete=False)
         site_temp = Path(site_buffer.name)

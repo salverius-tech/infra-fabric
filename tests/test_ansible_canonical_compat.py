@@ -35,7 +35,10 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             "-o UserKnownHostsFile=/workspace/values/sites/dev/ansible/known_hosts -o StrictHostKeyChecking=yes",
         )
         enabled = {name for name, service in self.model.services.items() if service.enabled}
-        self.assertEqual(set(inventory["all"]["children"]), {self.catalog.get(name).inventory["group"] for name in enabled})
+        self.assertEqual(
+            set(inventory["all"]["children"]),
+            {self.catalog.get(name).inventory["group"] for name in enabled} | {"proxmox"},
+        )
         for name in enabled:
             capability = self.catalog.get(name)
             host = capability.inventory["host"]

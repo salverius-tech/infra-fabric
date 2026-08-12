@@ -15,6 +15,7 @@ CADDY_TASK_FILES = (
     REPO / "infra" / "ansible" / "roles" / "hermes" / "tasks" / "main.yml",
     REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "tasks" / "main.yml",
 )
+TECHNITIUM_DNS_PLAYBOOK = REPO / "infra" / "ansible" / "playbooks" / "technitium-dns.yml"
 ANSIBLE_TASK_FILES = tuple((REPO / "infra" / "ansible" / "roles").glob("*/tasks/*.yml"))
 SERVICE_SMOKE_TASK_FILES = (
     REPO / "infra" / "ansible" / "roles" / "technitium" / "tasks" / "main.yml",
@@ -91,6 +92,11 @@ class AnsibleSafetyTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("caddy fmt --overwrite", text, str(path))
             self.assertIn("caddy validate --config /etc/caddy/Caddyfile", text, str(path))
+
+    def test_dns_sync_requires_the_canonical_generated_projection_transport(self) -> None:
+        playbook = TECHNITIUM_DNS_PLAYBOOK.read_text(encoding="utf-8")
+        self.assertIn("lookup('env', 'DNS_RECORDS_FILE')", playbook)
+        self.assertNotIn("dns-records.local.json", playbook)
 
     def test_curl_output_is_not_accidentally_streamed_to_ansible(self) -> None:
         for path in ANSIBLE_TASK_FILES:
@@ -215,6 +221,12 @@ class AnsibleSafetyTests(unittest.TestCase):
         self.assertNotIn("0.0.0.0:{{ searxng_onramp_container_port }}:8080", text)  # public-safety: allow-ip
         task = task_by_name(REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "tasks" / "main.yml", "Validate SearXNG onramp required variables")
         self.assertIn("searxng_onramp_bind_address in ['127.0.0.1', '::1']", str(task))  # public-safety: allow-ip
+
+    def test_searxng_onramp_allows_json_search_for_hermes_consumer(self) -> None:
+        settings = REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "templates" / "settings.yml.j2"
+        text = settings.read_text(encoding="utf-8")
+        self.assertIn("formats:", text)
+        self.assertRegex(text, r"(?m)^\s+- json$")
 
 
 if __name__ == "__main__":

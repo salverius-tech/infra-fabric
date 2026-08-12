@@ -14,6 +14,7 @@ RESTORE = ROOT / "infra" / "ansible" / "playbooks" / "service-state-restore.yml"
 ONRAMP_DEFAULTS = ROOT / "infra" / "ansible" / "roles" / "onramp_host" / "defaults" / "main.yml"
 COMPOSE = ROOT / "compose.yaml"
 SERVICE_STATE_CLI = ROOT / "scripts" / "service-state.sh"
+HERMES_STATE_CLI = ROOT / "scripts" / "hermes-state.sh"
 
 
 class ServiceStateTests(unittest.TestCase):
@@ -58,6 +59,8 @@ class ServiceStateTests(unittest.TestCase):
     def test_restore_uses_selected_site_root_and_local_preflight(self) -> None:
         restore = RESTORE.read_text(encoding="utf-8")
         self.assertIn("service_state_backup_root | regex_escape", restore)
+        self.assertNotIn("/workspace/values/service-backups", restore)
+        self.assertIn("service_state_backup_root | length > 0", restore)
         self.assertIn("delegate_to: localhost", restore)
 
     def test_cli_derives_targets_from_state_catalog_and_uses_verified_projection_pair(self) -> None:
@@ -80,6 +83,13 @@ class ServiceStateTests(unittest.TestCase):
         self.assertNotIn('grep -Fxq "${requested}"', cli)
         self.assertIn("/home/anvil/.ssh/canonical-bootstrap", cli)
         self.assertIn("StrictHostKeyChecking=yes", cli)
+        self.assertEqual(cli.count("INFRA_SSH_IDENTITY_SOURCE=sops"), 2)
+
+    def test_hermes_compatibility_wrapper_requires_selected_site_paths(self) -> None:
+        wrapper = HERMES_STATE_CLI.read_text(encoding="utf-8")
+        self.assertIn("VALUES_SITE=<site> scripts/hermes-state.sh", wrapper)
+        self.assertIn("values/sites/<site>/service-backups/hermes/", wrapper)
+        self.assertNotIn("values/service-backups/hermes/", wrapper)
 
     def test_forgejo_database_state_contract_fails_closed_without_projection(self) -> None:
         for path in (BACKUP, RESTORE):

@@ -213,6 +213,9 @@ def check_canonical_required_secrets(repo: Path, *, require_secrets: bool) -> tu
         return report
     paths: set[str] = {str(entry["path"]) for entry in report}
     paths.update({BOOTSTRAP_SSH_PRIVATE_KEY_PATH, PROXMOX_PROVIDER_PATH})
+    management = model.platform.proxmox.management
+    if management is not None and management.ssh_public_key is not None:
+        paths.add(management.ssh_private_key_secret_ref)
     paths.update(requirement.path for requirement in operator_password_requirements())
     resource_ids = sorted(
         {

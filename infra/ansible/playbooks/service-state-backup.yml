@@ -6,7 +6,7 @@
   vars_files:
     - ../vars/service-state.yml
   vars:
-    service_state_backup_root: "{{ lookup('env', 'SERVICE_STATE_BACKUP_ROOT') | default('/workspace/values/service-backups', true) }}"
+    service_state_backup_root: "{{ lookup('env', 'SERVICE_STATE_BACKUP_ROOT') }}"
   tasks:
     - name: Validate service-state backup input
       tags: [backup]
@@ -15,6 +15,7 @@
           - service_state_service is defined
           - service_state_service in managed_service_state_catalog
           - service_state_hosts is defined
+          - service_state_backup_root | length > 0
           - service_state_service != "forgejo" or forgejo_database is defined
           - service_state_service != "forgejo" or forgejo_database.type is defined
           - service_state_service != "forgejo" or forgejo_database.name is defined

@@ -389,9 +389,25 @@ class ExecutionSnapshotTests(unittest.TestCase):
         self.assertIn(
             "${execution_values_dir}/generated/terraform.auto.tfvars.json", source
         )
-        self.assertIn("../../${execution_plan}", source)
+        self.assertIn('execution_plan_argument="${execution_plan}"', source)
+        self.assertIn('if [[ "${execution_plan_argument}" != /* ]]', source)
+        self.assertIn('execution_plan_argument="../../${execution_plan_argument}"', source)
+        self.assertIn('"${execution_plan_argument}"', source)
         self.assertLess(source.index(create), source.index(storage))
         self.assertLess(source.index(create), source.index(apply))
+
+    def test_lifecycle_snapshot_root_override_preserves_the_default_and_container_boundary(self) -> None:
+        apply_source = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
+        teardown_source = (ROOT / "scripts" / "teardown-infra.sh").read_text(encoding="utf-8")
+        wrapper_source = (ROOT / "scripts" / "run-infra.sh").read_text(encoding="utf-8")
+        default = '"${INFRA_EXECUTION_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/execution-snapshots}"'
+        self.assertIn(default, apply_source)
+        self.assertIn(default, teardown_source)
+        self.assertIn('--destination-root "${execution_snapshot_root}"', apply_source)
+        self.assertIn('--destination-root "${execution_snapshot_root}"', teardown_source)
+        self.assertIn('must be an absolute private host path', wrapper_source)
+        self.assertIn('must not be a symlink', wrapper_source)
+        self.assertIn('INFRA_EXECUTION_SNAPSHOT_ROOT=/run/infra-fabric/execution-snapshots', wrapper_source)
 
 
 if __name__ == "__main__":

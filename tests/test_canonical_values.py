@@ -151,6 +151,44 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(model.bootstrap.ssh.public_keys[0].split()[0], "ssh-ed25519")
         self.assertIn("forgejo", model.bootstrap.ssh.host_additional_keys)
 
+    def test_proxmox_management_identity_requires_a_valid_distinct_public_key(self) -> None:
+        site = canonical_values.YAML(typ="safe").load(VALID_SITE)
+        site["platform"]["proxmox"]["management"] = {
+            "host": "pve.example.internal",
+            "ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIpublicsafeexample management@example.invalid",
+        }
+        model = canonical_values.CanonicalSite.model_validate(site)
+        management = model.platform.proxmox.management
+        assert management is not None
+        self.assertEqual(management.ssh_private_key_secret_ref, "secrets.providers.proxmox.ssh_private_key")
+        site["platform"]["proxmox"]["management"]["ssh_public_key"] = "not-a-key"
+        with self.assertRaises(ValueError):
+            canonical_values.CanonicalSite.model_validate(site)
+
+    def test_proxmox_management_identity_requires_a_public_key_and_fixed_secret_path(self) -> None:
+        site = canonical_values.YAML(typ="safe").load(VALID_SITE)
+        site["platform"]["proxmox"]["management"] = {"host": "pve.example.internal"}
+        with self.assertRaises(ValueError):
+            canonical_values.CanonicalSite.model_validate(site)
+        site["platform"]["proxmox"]["management"] = {
+            "host": "pve.example.internal",
+            "ssh_public_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIpublicsafeexample management@example.invalid",
+            "ssh_private_key_secret_ref": "secrets.providers.proxmox.other_key",
+        }
+        with self.assertRaises(ValueError):
+            canonical_values.CanonicalSite.model_validate(site)
+
+    def test_proxmox_management_identity_rejects_bootstrap_key_reuse(self) -> None:
+        site = canonical_values.YAML(typ="safe").load(VALID_SITE)
+        bootstrap_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIbootstrap bootstrap@example.invalid"
+        site["bootstrap"] = {"ssh": {"public_keys": [bootstrap_key]}}
+        site["platform"]["proxmox"]["management"] = {
+            "host": "pve.example.internal",
+            "ssh_public_key": bootstrap_key,
+        }
+        with self.assertRaisesRegex(ValueError, "must be distinct from bootstrap"):
+            canonical_values.CanonicalSite.model_validate(site)
+
     def test_bootstrap_ssh_keys_project_by_canonical_resource(self) -> None:
         site = canonical_values.YAML(typ="safe").load(VALID_SITE)
         site["bootstrap"] = {

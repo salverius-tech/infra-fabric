@@ -58,7 +58,7 @@ After the site model, SOPS policy, encrypted bundle, and external age identity a
 just ssh-initialize SITE=<site>
 ```
 
-This is an explicit secret-dependent operation. It validates the declared bootstrap public-key contract, updates the encrypted private identity, and refreshes derived projections. Setup, validation, planning, and apply do not invoke it automatically.
+This is an explicit secret-dependent operation. It validates or creates the distinct bootstrap and Proxmox-management key pairs, updates their encrypted private logical values and public pins, and refreshes derived projections. Setup, validation, planning, and apply do not invoke it automatically.
 
 ## 5. Validate
 
@@ -93,6 +93,14 @@ VALUES_SITE=<site> just apply
 ```
 
 Apply requires a fresh verified plan and explicit operator approval. It mutates infrastructure and runs the approved service orchestration chain. Afterward, verify service health, direct endpoints, DNS/HTTPS, and a repeat plan for drift.
+
+Before a service-converging apply, configure the selected site's distinct Proxmox-management identity. Keep the public half at `platform.proxmox.management.ssh_public_key` and its encrypted private half at `secrets.providers.proxmox.ssh_private_key`; it is separate from the guest bootstrap identity:
+
+```bash
+VALUES_SITE=<site> just apply
+```
+
+The wrapper materializes both identities only inside the protected tooling boundary and retains strict host-key checking. Do not use an ambient controller-key selector, reuse the guest bootstrap key, or place private material in `site.yaml`, projections, plans, or state.
 
 ## Source ownership
 

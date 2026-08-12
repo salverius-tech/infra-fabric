@@ -168,6 +168,7 @@ class WorkspacePreflightTests(unittest.TestCase):
 
         required = provider.validate_required.call_args.args[0]
         self.assertIn("secrets.bootstrap.ssh_private_key", required)
+        self.assertIn("secrets.providers.proxmox.ssh_private_key", required)
         self.assertIn("secrets.providers.proxmox.api_token", required)
         self.assertIn("secrets.providers.cloudflare.api_token", required)
         self.assertIn("secrets.operator.password", required)

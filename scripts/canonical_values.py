@@ -179,6 +179,8 @@ class PlatformIngress(StrictModel):
 class ProxmoxManagement(StrictModel):
     host: StrictStr
     user: StrictStr = "root"
+    ssh_public_key: StrictStr
+    ssh_private_key_secret_ref: Literal["secrets.providers.proxmox.ssh_private_key"] = "secrets.providers.proxmox.ssh_private_key"
 
     @field_validator("host")
     @classmethod
@@ -188,6 +190,12 @@ class ProxmoxManagement(StrictModel):
             raise ValueError("platform.proxmox.management.host must be a valid hostname")
         return normalized
 
+    @field_validator("ssh_public_key")
+    @classmethod
+    def validate_ssh_public_key(cls, value: str | None) -> str | None:
+        if value is not None and not _SSH_PUBLIC_KEY_RE.fullmatch(value):
+            raise ValueError("platform.proxmox.management.ssh_public_key must be a valid SSH public key")
+        return value
 
 class ProxmoxPlatform(StrictModel):
     endpoint: StrictStr
@@ -1441,6 +1449,21 @@ class CanonicalSite(StrictModel):
     def validate_service_ownership(self) -> "CanonicalSite":
         if self.bootstrap.ssh.user == self.operator.user:
             raise ValueError("bootstrap.ssh.user and operator.user must be distinct")
+        management = self.platform.proxmox.management
+        if management is not None and management.ssh_public_key is not None:
+            management_identity = " ".join(management.ssh_public_key.split()[:2])
+            bootstrap_identities = {
+                " ".join(public_key.split()[:2])
+                for public_key in self.bootstrap.ssh.public_keys
+            }
+            for public_keys in self.bootstrap.ssh.host_additional_keys.values():
+                bootstrap_identities.update(
+                    " ".join(public_key.split()[:2]) for public_key in public_keys
+                )
+            if management_identity in bootstrap_identities:
+                raise ValueError(
+                    "platform.proxmox.management.ssh_public_key must be distinct from bootstrap SSH public keys"
+                )
         resource_ids = set(self.resources.guests) | set(self.resources.shared_hosts)
         unknown_overrides = sorted(set(self.bootstrap.root_password.host_overrides) - resource_ids)
         if unknown_overrides:

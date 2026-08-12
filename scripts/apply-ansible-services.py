@@ -431,16 +431,12 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
         os.close(file_descriptor)
         vars_path.unlink(missing_ok=True)
         raise
-    pve_identity = os.environ.get("INFRA_PVE_SSH_IDENTITY_FILE", "").strip()
-    if not re.fullmatch(r"[A-Za-z0-9._-]+", pve_identity):
-        vars_path.unlink(missing_ok=True)
-        raise RuntimeError("canonical Ansible execution requires an explicit Proxmox SSH identity")
     runtime_inventory_path = log_dir / ".canonical-proxmox-identity.json"
     runtime_inventory_path.write_text(
         json.dumps(
             {
                 "all": {"vars": {"ansible_ssh_private_key_file": str(Path.home() / ".ssh" / "canonical-bootstrap")}},
-                "proxmox": {"vars": {"ansible_ssh_private_key_file": str(Path.home() / ".ssh" / pve_identity)}},
+                "proxmox": {"vars": {"ansible_ssh_private_key_file": str(Path.home() / ".ssh" / "canonical-proxmox-management")}},
             },
             sort_keys=True,
         )

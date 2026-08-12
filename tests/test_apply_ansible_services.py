@@ -172,11 +172,9 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 def path(name: str) -> Path:
                     return root / name
 
-            with (
-                mock.patch.object(apply_ansible_services, "canonical_dns_environment", return_value={}),
-                mock.patch.dict(os.environ, {"INFRA_PVE_SSH_IDENTITY_FILE": "pve-management"}, clear=False),
-            ):
+            with mock.patch.object(apply_ansible_services, "canonical_dns_environment", return_value={}):
                 transport = apply_ansible_services.canonical_ansible_transport(Context(), root)
+            runtime_inventory = json.loads(transport.runtime_inventory_path.read_text(encoding="utf-8"))
 
         assert transport is not None
         self.assertIn(
@@ -189,6 +187,12 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             ),
             transport.extra_args,
         )
+        self.assertEqual(
+            runtime_inventory["proxmox"]["vars"]["ansible_ssh_private_key_file"],
+            str(Path.home() / ".ssh" / "canonical-proxmox-management"),
+        )
+        self.assertNotIn("ssh_public_key", runtime_inventory)
+
 
     def test_runtime_known_hosts_path_uses_live_values_dir_during_snapshot_execution(self) -> None:
         class Context:

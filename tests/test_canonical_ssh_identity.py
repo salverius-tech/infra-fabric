@@ -15,11 +15,12 @@ spec.loader.exec_module(module)
 
 
 class FakeProvider:
-    def __init__(self, value: str) -> None:
+    def __init__(self, value: str, path: str = "secrets.bootstrap.ssh_private_key") -> None:
         self.value = value
+        self.path = path
 
     def resolve(self, path: str) -> str:
-        if path != "secrets.bootstrap.ssh_private_key":
+        if path != self.path:
             raise ValueError("unexpected path")
         return self.value
 
@@ -61,6 +62,54 @@ class CanonicalSshIdentityTests(unittest.TestCase):
                     public_keys=["ssh-ed25519 AAAA_not_the_matching_key"],
                 )
             self.assertFalse(destination.exists())
+
+    def test_rejects_symlink_destination_without_touching_its_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            private, public = self.make_key(directory)
+            target = directory / "target"
+            target.write_text("unchanged", encoding="utf-8")
+            destination = directory / "materialized"
+            destination.symlink_to(target)
+            with self.assertRaisesRegex(module.CanonicalSshIdentityError, "destination is unsafe"):
+                module.materialize_private_key(
+                    FakeProvider(private.read_text(encoding="utf-8")),
+                    destination=destination,
+                    public_keys=[public],
+                )
+            self.assertEqual(target.read_text(encoding="utf-8"), "unchanged")
+
+    def test_rejects_symlink_identity_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            private, public = self.make_key(directory)
+            target_directory = directory / "target"
+            target_directory.mkdir()
+            destination_directory = directory / "materialized"
+            destination_directory.symlink_to(target_directory, target_is_directory=True)
+            with self.assertRaisesRegex(module.CanonicalSshIdentityError, "directory is unsafe"):
+                module.materialize_private_key(
+                    FakeProvider(private.read_text(encoding="utf-8")),
+                    destination=destination_directory / "identity",
+                    public_keys=[public],
+                )
+
+    def test_materializes_management_identity_only_from_the_fixed_proxmox_secret_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            private, public = self.make_key(directory)
+            destination = directory / "materialized" / "proxmox-management"
+            result = module.materialize_private_key(
+                FakeProvider(
+                    private.read_text(encoding="utf-8"),
+                    path="secrets.providers.proxmox.ssh_private_key",
+                ),
+                destination=destination,
+                public_keys=[public],
+                logical_path="secrets.providers.proxmox.ssh_private_key",
+            )
+            self.assertEqual(result, destination)
+            self.assertEqual(destination.stat().st_mode & 0o777, 0o600)
 
     def test_rejects_passphrase_protected_key_without_prompt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -62,15 +62,21 @@ fi
 python scripts/tfplan-metadata.py verify \
   --plan "${plan_path}" --metadata "${metadata_path}" --operation destroy --allow-destroy --allow-stateful-batch
 python scripts/tfplan-metadata.py summary --metadata "${metadata_path}"
+execution_snapshot_root="${INFRA_EXECUTION_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/execution-snapshots}"
+state_snapshot_root="${INFRA_STATE_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/state-backups}"
 execution_snapshot="$(python scripts/execution-snapshot.py create \
   --values-dir "${INFRA_VALUES_DIR}" --plan "${plan_path}" --metadata "${metadata_path}" \
-  --destination-root "${INFRA_VALUES_DIR}/execution-snapshots" --site "${VALUES_SITE}")"
+  --destination-root "${execution_snapshot_root}" --site "${VALUES_SITE}")"
 cleanup_artifacts() { rm -f "${plan_path}" "${metadata_path}"; }
 trap cleanup_artifacts EXIT
 python scripts/execution-snapshot.py verify --snapshot "${execution_snapshot}"
 python scripts/state-snapshot.py create \
-  --state "${INFRA_VALUES_DIR}/terraform.tfstate" --backup-dir "${INFRA_VALUES_DIR}/state-backups"
+  --state "${INFRA_VALUES_DIR}/terraform.tfstate" --backup-dir "${state_snapshot_root}"
 python scripts/execution-snapshot.py verify --snapshot "${execution_snapshot}"
+execution_plan_argument="${execution_snapshot}/tfplan"
+if [[ "${execution_plan_argument}" != /* ]]; then
+  execution_plan_argument="../../${execution_plan_argument}"
+fi
 (
   while IFS="=" read -r variable _; do
     case "${variable}" in TF_VAR_*) unset "${variable}" ;; esac
@@ -78,7 +84,7 @@ python scripts/execution-snapshot.py verify --snapshot "${execution_snapshot}"
   python scripts/canonical-provider-env.py -- \
     tofu -chdir=infra/opentofu apply \
       -state="../../${INFRA_VALUES_DIR}/terraform.tfstate" \
-      "../../${execution_snapshot}/tfplan"
+      "${execution_plan_argument}"
 )
 python scripts/execution-snapshot.py verify --snapshot "${execution_snapshot}"
 printf "Guarded teardown completed. Verify provider state before removing any retained recovery artifacts.\n"

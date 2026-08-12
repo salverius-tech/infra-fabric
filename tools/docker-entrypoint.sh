@@ -55,15 +55,8 @@ if [[ -d /ssh-ro ]]; then
       exit 2
     fi
     python3 /workspace/scripts/canonical_ssh_identity.py --destination "${ssh_dir}/canonical-bootstrap"
+    python3 /workspace/scripts/canonical_ssh_identity.py --kind proxmox-management --destination "${ssh_dir}/canonical-proxmox-management"
     export INFRA_SSH_IDENTITY_FILE=canonical-bootstrap
-    pve_identity_file="${INFRA_PVE_SSH_IDENTITY_FILE:-}"
-    if [[ -n "${pve_identity_file}" ]]; then
-      if [[ ! "${pve_identity_file}" =~ ^[A-Za-z0-9._-]+$ ]] || [[ ! -f "/ssh-ro/${pve_identity_file}" ]]; then
-        printf 'Configured Proxmox SSH identity is unavailable.\n' >&2
-        exit 2
-      fi
-      cp "/ssh-ro/${pve_identity_file}" "${ssh_dir}/${pve_identity_file}"
-    fi
   fi
 
   for path in /ssh-ro/known_hosts /ssh-ro/config /ssh-ro/*.pub; do

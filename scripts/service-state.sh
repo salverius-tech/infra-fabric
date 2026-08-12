@@ -6,11 +6,11 @@ usage() {
 Usage:
   scripts/service-state.sh list
   scripts/service-state.sh backup <service|all>
-  scripts/service-state.sh restore <service> values/service-backups/<service>/<archive>.tar.gz
-  scripts/service-state.sh restore-if-present <service> [values/service-backups/<service>/<archive>.tar.gz]
+  VALUES_SITE=<site> scripts/service-state.sh restore <service> values/sites/<site>/service-backups/<service>/<archive>.tar.gz
+  VALUES_SITE=<site> scripts/service-state.sh restore-if-present <service> [values/sites/<site>/service-backups/<service>/<archive>.tar.gz]
 
 Managed service-state archives are private operational state. They are written
-under values/service-backups/ in the ignored private values repo.
+under the selected site's values/sites/<site>/service-backups/ directory.
 USAGE
 }
 
@@ -163,12 +163,14 @@ run_playbook() {
 
   if [[ "${mode}" == "backup" ]]; then
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
+      INFRA_SSH_IDENTITY_SOURCE=sops \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       scripts/run-infra.sh bash -lc \
       "export PATH=/opt/ansible/bin:\$PATH; python /workspace/scripts/flatten-ansible-vars.py --input ${vars_file@Q} --output ${flat_vars_file@Q}; ansible-playbook -i ${inventory@Q} -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml; rc=\$?; rm -f ${flat_vars_file@Q}; exit \$rc"
   else
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
+      INFRA_SSH_IDENTITY_SOURCE=sops \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       SERVICE_STATE_RESTORE_FILE="${restore_file}" \

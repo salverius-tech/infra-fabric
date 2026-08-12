@@ -14,7 +14,7 @@ values/
         └── generated/       # derived; never edit
 ```
 
-`site.yaml` contains non-secret platform, resource, service, endpoint, release, storage, and state configuration. `secrets.sops.yaml` contains only encrypted canonical logical secret paths. The SOPS policy and age identities are private deployment material. Generated projections, plans, state, backups, and local credentials remain private derived artifacts.
+`site.yaml` contains non-secret platform, resource, service, endpoint, release, storage, state configuration, and the Proxmox-management SSH public-key pin. `secrets.sops.yaml` contains only encrypted canonical logical secret paths, including the matching Proxmox-management private key. The SOPS policy and age identities are private deployment material. Generated projections, plans, state, backups, and local credentials remain private derived artifacts.
 
 For a new public-safe starting shape, use the site created by `just setup "" <site>` and replace the rendered site identity and all example values before private validation. The template disables apply and destroy by default.
 

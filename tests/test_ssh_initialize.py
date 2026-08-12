@@ -16,17 +16,18 @@ spec.loader.exec_module(module)
 
 
 class FakeProvider:
-    def __init__(self, data: dict, private: str | None = None) -> None:
+    def __init__(self, data: dict, private: str | None = None, identities: dict[str, str] | None = None) -> None:
         self._data = data
         self.private = private
+        self.identities = identities or ({"secrets.bootstrap.ssh_private_key": private} if private is not None else {})
 
     def resolve(self, path: str) -> str:
-        if self.private is None:
+        if path not in self.identities:
             raise KeyError(path)
-        return self.private
+        return self.identities[path]
 
     def discover(self) -> tuple[str, ...]:
-        return ("secrets.bootstrap.ssh_private_key",) if self.private is not None else ()
+        return tuple(self.identities)
 
 
 class SshInitializeTests(unittest.TestCase):
@@ -69,11 +70,13 @@ class SshInitializeTests(unittest.TestCase):
                 result = module.initialize(site_file, bundle, key_file)
             self.assertEqual(result, "initialized")
             self.assertIn("secrets", encrypted["data"])
+            self.assertIn("ssh_private_key", encrypted["data"]["secrets"]["providers"]["proxmox"])
             site_text = site_file.read_text(encoding="utf-8")
-            self.assertEqual(site_text.count("ssh-ed25519"), 2)
+            self.assertEqual(site_text.count("ssh-ed25519"), 3)
             self.assertEqual(site_text.count("publicsafeexample"), 1)
+            self.assertNotIn("proxmoxmanagementexample", site_text)
 
-    def test_existing_matching_key_is_not_regenerated(self) -> None:
+    def test_existing_matching_identities_are_not_regenerated(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "dev"
             root.mkdir()
@@ -89,7 +92,18 @@ class SshInitializeTests(unittest.TestCase):
             os.chmod(key_file, 0o600)
             bundle = root / "bundle"
             bundle.write_text("ciphertext\n", encoding="utf-8")
-            with patch.object(module, "SopsAgeProvider", return_value=FakeProvider({}, private_path.read_text(encoding="utf-8"))):
+            management_private, management_public = module._generate_key(root, "management-source")
+            site_file.write_text(
+                site_file.read_text(encoding="utf-8").replace(
+                    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIproxmoxmanagementexample proxmox-management@example.invalid",
+                    management_public,
+                ),
+                encoding="utf-8",
+            )
+            with patch.object(module, "SopsAgeProvider", return_value=FakeProvider({}, identities={
+                "secrets.bootstrap.ssh_private_key": private_path.read_text(encoding="utf-8"),
+                "secrets.providers.proxmox.ssh_private_key": management_private,
+            })):
                 self.assertEqual(module.initialize(site_file, bundle, key_file), "already initialized")
 
     def test_sops_yaml_uses_exact_site_filename_and_adjacent_policy(self) -> None:

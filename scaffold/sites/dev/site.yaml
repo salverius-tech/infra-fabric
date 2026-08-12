@@ -30,6 +30,10 @@ platform:
     endpoint: https://proxmox.example.internal:8006/
     node: pve
     insecure: true
+    management:
+      host: proxmox.example.internal
+      user: root
+      ssh_public_key: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIproxmoxmanagementexample proxmox-management@example.invalid
   network:
     default_bridge: vmbr0
     default_gateway: 192.0.2.1

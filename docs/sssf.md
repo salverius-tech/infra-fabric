@@ -28,20 +28,16 @@ commit de31374882e7a4e3e5b7bb9bd09e69dc2f779356
 ## Operator workflow
 
 After a selected site has been validated, planned, and explicitly approved for
-apply, connect directly to the service VM using the generated inventory and the
-canonical non-root access path:
+apply, use the canonical service workflow to establish access and collect
+service-health evidence. Raw `ansible` or `ansible-playbook` commands without
+the selected site's verified generated inventory, generated variables, and SSH
+trust transport are unsupported; they must not use an ambient inventory.
 
-```bash
-ansible sssf -m ping
-ansible sssf -b -m command -a /usr/local/bin/sssf-health
-ansible sssf -b -m command -a "/usr/local/bin/sssf-init https://git.example.internal/example/project.git"
-```
-
-The last command creates an isolated workspace below `/srv/sssf/workspaces/`.
-Run the upstream installer from that workspace root as `sssf` when the target
-repository is ready for SSSF stamping. Do not run it as root and do not run it
-against the infrastructure or private-values repository unless that repository
-has been explicitly approved and allow-listed.
+For an approved target repository, run `/usr/local/bin/sssf-init` as the
+non-root `sssf` user through the same selected-site access transport. It creates
+an isolated workspace below `/srv/sssf/workspaces/`. Do not run it as root and
+do not run it against the infrastructure or private-values repository unless
+that repository has been explicitly approved and allow-listed.
 
 The runtime trace database and raw session files live under `/var/lib/sssf/`.
 The workspace root is `/srv/sssf/workspaces/`. Both are private service state.
@@ -90,9 +86,9 @@ an explicitly approved apply.
 Use the managed service-state workflow:
 
 ```bash
-scripts/service-state.sh backup sssf
-scripts/service-state.sh restore-if-present sssf
-scripts/service-state.sh restore sssf values/service-backups/sssf/sssf-state-<timestamp>.tar.gz
+VALUES_SITE=<site> scripts/service-state.sh backup sssf
+VALUES_SITE=<site> scripts/service-state.sh restore-if-present sssf
+VALUES_SITE=<site> scripts/service-state.sh restore sssf values/sites/<site>/service-backups/sssf/sssf-state-<timestamp>.tar.gz
 ```
 
 Archives include the pinned checkout, factory configuration, SQLite traces,

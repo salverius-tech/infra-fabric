@@ -142,7 +142,9 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 ## Dependencies
 
 - Hermes management LXC and dashboard deployment.
-- Private `values/` repo with current tfvars, inventory, DNS records, environment values, and OpenTofu state.
+- Private selected-site inputs: `site.yaml`, `secrets.sops.yaml`, private SOPS
+  policy/age identity, and required derived operational artifacts such as state,
+  plans, and trust material. Legacy files are recovery/migration-only.
 - Working local tooling container for `just validate`, `just plan`, and `just apply`.
 - Forgejo and private values repo workflow if remote deployment or monitoring is in scope.
 - `onramp-vNext` direction if plugin backends are treated as app-platform services, plus a handoff path for retiring the temporary `searxng_onramp` exception.

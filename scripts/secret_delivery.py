@@ -43,6 +43,7 @@ class DeliveredSecret:
 
 
 BOOTSTRAP_SSH_PRIVATE_KEY_PATH = "secrets.bootstrap.ssh_private_key"
+PROXMOX_MANAGEMENT_SSH_PRIVATE_KEY_PATH = "secrets.providers.proxmox.ssh_private_key"
 PROXMOX_PROVIDER_PATH = "secrets.providers.proxmox.api_token"
 _ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 

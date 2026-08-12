@@ -4,8 +4,8 @@ set -euo pipefail
 usage() {
   cat >&2 <<'USAGE'
 Usage:
-  scripts/hermes-state.sh backup
-  scripts/hermes-state.sh restore values/service-backups/hermes/hermes-state-YYYYmmddTHHMMSSZ.tar.gz
+  VALUES_SITE=<site> scripts/hermes-state.sh backup
+  VALUES_SITE=<site> scripts/hermes-state.sh restore values/sites/<site>/service-backups/hermes/hermes-state-YYYYmmddTHHMMSSZ.tar.gz
 
 Compatibility wrapper for scripts/service-state.sh. Hermes backups contain the
 runtime user's .hermes directory, including memory/soul files, config, history,

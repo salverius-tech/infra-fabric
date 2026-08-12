@@ -44,7 +44,7 @@ Opens the selected encrypted SOPS bundle with the host `sops` binary when availa
 just ssh-initialize SITE=<site>
 ```
 
-The explicit bootstrap-identity operation. It decrypts only within the protected tooling boundary, validates the private identity against declared public keys, updates the encrypted canonical bundle, and refreshes derived projections. It requires complete canonical site/SOPS prerequisites and must not be used as a substitute for operator secret review.
+The explicit canonical SSH-identity operation. It decrypts only within the protected tooling boundary, validates or creates the distinct bootstrap and Proxmox-management private identities against their public pins, updates the encrypted canonical bundle, and refreshes derived projections. It requires complete canonical site/SOPS prerequisites and must not be used as a substitute for operator secret review.
 
 ## `update`
 
@@ -86,6 +86,16 @@ VALUES_SITE=<site> just apply
 ```
 
 Verifies the saved plan and its input metadata, mutates infrastructure, runs the approved Ansible service chains, and performs configured post-apply checks. Use only after explicit approval of the fresh plan.
+
+Canonical service convergence uses a distinct selected-site SOPS-backed Proxmox-management SSH identity. Its public key is declared at `platform.proxmox.management.ssh_public_key`; its encrypted private key is stored only at `secrets.providers.proxmox.ssh_private_key`:
+
+```bash
+VALUES_SITE=<site> just apply
+```
+
+This identity is distinct from the SOPS-backed guest bootstrap identity. The wrapper materializes it transiently, verifies the matching key pair, and keeps strict host-key checking enabled. Do not provide an ambient controller-key selector, substitute a guest bootstrap key, or place private material in site values, generated projections, or state.
+
+Execution snapshots default to `values/sites/<site>/execution-snapshots/`, and state backups default to `values/sites/<site>/state-backups/`. When the private values filesystem cannot support atomic Linux no-replace directory publication (for example, some NFS mounts), set both `INFRA_EXECUTION_SNAPSHOT_ROOT` and `INFRA_STATE_SNAPSHOT_ROOT` to absolute private controller-local directories on a supporting filesystem before `just apply` or `just teardown-apply --approve`. This selects only sealed snapshot destinations; it does not weaken verification, permit replacement, or provide a fallback when either selected destination is unsafe.
 
 Additional acknowledgements are required for plans containing the corresponding risk classes:
 

@@ -314,6 +314,18 @@ class StateSnapshotTests(unittest.TestCase):
         self.assertLess(source.index(snapshot_call), source.index(apply_command))
         self.assertIn("Diagnostic only: mutation was authorized", source)
 
+    def test_lifecycle_state_snapshot_root_override_preserves_the_default_and_container_boundary(self) -> None:
+        apply_source = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
+        teardown_source = (ROOT / "scripts" / "teardown-infra.sh").read_text(encoding="utf-8")
+        wrapper_source = (ROOT / "scripts" / "run-infra.sh").read_text(encoding="utf-8")
+        default = '"${INFRA_STATE_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/state-backups}"'
+        self.assertIn(default, apply_source)
+        self.assertIn(default, teardown_source)
+        self.assertIn('--backup-dir "${state_snapshot_root}"', apply_source)
+        self.assertIn('--backup-dir "${state_snapshot_root}"', teardown_source)
+        self.assertIn('must be an absolute private host path', wrapper_source)
+        self.assertIn('INFRA_STATE_SNAPSHOT_ROOT=/run/infra-fabric/state-backups', wrapper_source)
+
 
 if __name__ == "__main__":
     unittest.main()

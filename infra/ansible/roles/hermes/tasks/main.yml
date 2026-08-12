@@ -3,6 +3,8 @@
   tags: [validation]
   ansible.builtin.assert:
     that:
+      - canonical_site is defined
+      - canonical_site is match('^[a-z0-9][a-z0-9-]{0,63}$')
       - hermes_vmid is defined
       - hermes_domain is defined
       - caddy_email is defined
@@ -26,7 +28,7 @@
       - hermes_node_sha256_arm64 is defined
       - hermes_node_sha256_arm64 is match('^[0-9a-f]{64}$')
     fail_msg: >-
-      hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token,
+      canonical_site, hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token,
       non-empty dashboard auth variables, sane Hermes tuning values, a
       non-root runtime user, a disabled Hermes mutation gate for the hard read-only
       pilot, and complete managed Node.js pins are required. Mutation reactivation

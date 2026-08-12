@@ -74,6 +74,8 @@ class HermesOperatorTests(unittest.TestCase):
                             "update": 0,
                             "replace": 0,
                             "delete": 0,
+                            "read": 0,
+                            "no_op": 0,
                         },
                         "destructive": False,
                         "stateful_changes": [],
@@ -151,6 +153,8 @@ class HermesOperatorTests(unittest.TestCase):
                                 "update": 0,
                                 "replace": 1,
                                 "delete": 0,
+                                "read": 0,
+                                "no_op": 0,
                             },
                             "destructive": True,
                             "destructive_changes": [
@@ -304,6 +308,8 @@ class HermesOperatorTests(unittest.TestCase):
                                 "update": 0,
                                 "replace": 0,
                                 "delete": 0,
+                                "read": 0,
+                                "no_op": 0,
                             },
                             "destructive": False,
                             "stateful_changes": [],
@@ -1208,7 +1214,7 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertEqual(verified["record_count"], 2)
             self.assertTrue(audit_path.is_file())
 
-    def test_status_is_machine_readable_and_does_not_include_private_values(
+    def test_status_requires_a_selected_canonical_site_and_does_not_read_legacy_settings(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -1223,10 +1229,38 @@ class HermesOperatorTests(unittest.TestCase):
             (root / "settings.local.json").write_text(
                 '{"services":["hermes"]}\n', encoding="utf-8"
             )
-            status = hermes_operator.status(root)
+            with (
+                mock.patch.dict(os.environ, {"VALUES_SITE": ""}, clear=False),
+                self.assertRaisesRegex(
+                    hermes_operator.OperatorError,
+                    "VALUES_SITE is required",
+                ),
+            ):
+                hermes_operator.status(root)
+
+    def test_status_is_machine_readable_for_the_selected_canonical_site(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "infra").mkdir()
+            (root / "infra" / "services.json").write_text(
+                json.dumps({"default_services": [], "services": {"hermes": {}}}),
+                encoding="utf-8",
+            )
+            canonical = root / "values" / "sites" / "dev" / "site.yaml"
+            canonical.parent.mkdir(parents=True)
+            canonical.write_text("site: {}\n", encoding="utf-8")
+            model = type(
+                "CanonicalModel",
+                (),
+                {"services": {"hermes": type("Service", (), {"enabled": True})()}},
+            )()
+            with (
+                mock.patch.dict(os.environ, {"VALUES_SITE": "dev"}, clear=False),
+                mock.patch.object(hermes_operator, "load_site", return_value=model),
+            ):
+                status = hermes_operator.status(root)
             self.assertEqual(status["action"], "status")
             self.assertEqual(status["enabled_services"], ["hermes"])
-            self.assertNotIn("settings.local.json", json.dumps(status))
             self.assertNotIn("terraform.tfvars", json.dumps(status))
 
     def test_plan_summary_rejects_non_count_data_before_audit(self) -> None:
@@ -1272,6 +1306,22 @@ class HermesOperatorTests(unittest.TestCase):
                     ):
                         hermes_operator.load_plan_summary(root)
             self.assertFalse((root / ".tmp").exists())
+
+    def test_plan_summary_accepts_canonical_read_only_counts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.write_safe_plan(root)
+            path = root / "tfplan.meta.json"
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["summary"]["resource_changes"].update({"read": 2, "no_op": 9})
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            summary = hermes_operator.load_plan_summary(root)
+
+            self.assertEqual(
+                summary["resource_changes"],
+                {"create": 0, "delete": 0, "replace": 0, "update": 0},
+            )
 
     def test_post_runner_metadata_failure_gets_correlated_terminal_record(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
