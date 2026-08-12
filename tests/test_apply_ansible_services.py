@@ -19,6 +19,29 @@ spec.loader.exec_module(apply_ansible_services)
 
 
 class ApplyAnsibleServicesTests(unittest.TestCase):
+    def test_canonical_bootstrap_targets_restricts_to_selected_resources(self) -> None:
+        model = SimpleNamespace(
+            services={
+                "technitium": SimpleNamespace(enabled=True, resource="technitium"),
+                "forgejo_runner": SimpleNamespace(enabled=True, resource="forgejo_runner"),
+            }
+        )
+        catalog = SimpleNamespace(
+            get=lambda service: SimpleNamespace(inventory={"host": f"{service}_host"}),
+        )
+        context = SimpleNamespace(canonical_site_path=Path("/canonical/site.yaml"), site="dev")
+
+        with (
+            mock.patch.object(apply_ansible_services, "load_site", return_value=model),
+            mock.patch.object(apply_ansible_services, "load_catalog", return_value=catalog),
+        ):
+            targets = apply_ansible_services.canonical_bootstrap_targets(
+                context,
+                selected_resources={"technitium"},
+            )
+
+        self.assertEqual(targets, (("technitium", "technitium_host"),))
+
     def test_canonical_identity_args_keep_proxmox_lifecycle_root_skip_enabled(self) -> None:
         with mock.patch.dict(os.environ, {"INFRA_HOST_IDENTITY_SKIP_ROOT": "false"}, clear=False):
             result = apply_ansible_services.canonical_identity_extra_args()

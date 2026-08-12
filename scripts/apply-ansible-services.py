@@ -209,7 +209,11 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     }
 
 
-def canonical_bootstrap_targets(context: object) -> tuple[tuple[str, str], ...]:
+def canonical_bootstrap_targets(
+    context: object,
+    *,
+    selected_resources: set[str] | None = None,
+) -> tuple[tuple[str, str], ...]:
     """Return unique canonical resource IDs and inventory hosts for enabled services."""
     site_file = getattr(context, "canonical_site_path", None)
     if site_file is None:
@@ -221,6 +225,8 @@ def canonical_bootstrap_targets(context: object) -> tuple[tuple[str, str], ...]:
     targets: dict[str, str] = {}
     for service_name, service in model.services.items():
         if not service.enabled or service.resource is None:
+            continue
+        if selected_resources is not None and service.resource not in selected_resources:
             continue
         if selected_resource and service.resource != selected_resource:
             continue
@@ -239,6 +245,7 @@ def run_canonical_bootstrap(
     base_env: dict[str, str],
     extra_args: tuple[str, ...] = (),
     runner: RunCommand | None = None,
+    selected_resources: set[str] | None = None,
 ) -> int:
     """Deliver and rotate one host credential at a time for canonical execution."""
     try:
@@ -254,7 +261,7 @@ def run_canonical_bootstrap(
     model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
     policy = model.bootstrap.root_password
     runner = runner or default_runner
-    for resource_id, host in canonical_bootstrap_targets(context):
+    for resource_id, host in canonical_bootstrap_targets(context, selected_resources=selected_resources):
         requirements = root_password_requirements(
             [resource_id],
             default_secret=policy.default_secret,
@@ -282,6 +289,7 @@ def run_canonical_host_identity(
     base_env: dict[str, str],
     extra_args: tuple[str, ...] = (),
     runner: RunCommand | None = None,
+    selected_resources: set[str] | None = None,
 ) -> int:
     """Converge canonical accounts before any service role executes."""
     try:
@@ -296,7 +304,7 @@ def run_canonical_host_identity(
     site_file = getattr(context, "canonical_site_path")
     model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
     resources = {**model.resources.guests, **model.resources.shared_hosts}
-    for resource_id, host in canonical_bootstrap_targets(context):
+    for resource_id, host in canonical_bootstrap_targets(context, selected_resources=selected_resources):
         resource = resources[resource_id]
         root_requirements = root_password_requirements(
             [resource_id],
@@ -361,15 +369,19 @@ def run_canonical_direct_access_ready(
     extra_args: tuple[str, ...] = (),
     enroll_only: bool = False,
     runner: RunCommand | None = None,
+    selected_resources: set[str] | None = None,
 ) -> int:
     """Enroll and verify guest SSH trust before the first canonical connection."""
     runner = runner or default_runner
     known_hosts = runtime_known_hosts_path(context)
     ready_hosts = "all:!proxmox"
     selected_resource = os.environ.get("INFRA_HOST_IDENTITY_ONLY", "").strip()
-    if selected_resource:
-        selected_targets = dict(canonical_bootstrap_targets(context))
-        ready_hosts = selected_targets.get(selected_resource, ready_hosts)
+    if selected_resource or selected_resources is not None:
+        selected_targets = dict(canonical_bootstrap_targets(context, selected_resources=selected_resources))
+        if selected_resource:
+            ready_hosts = selected_targets.get(selected_resource, ready_hosts)
+        else:
+            ready_hosts = ":".join(sorted(selected_targets.values()))
     command = [
         "ansible-playbook",
         *inventory_args(inventories),
@@ -665,6 +677,22 @@ def main(argv: list[str] | None = None) -> int:
     except (settings.SettingsError, RuntimeError, ValueError) as error:
         print(error, file=sys.stderr)
         return 1
+    selected_resources: set[str] | None = None
+    if args.service:
+        selected_site_file = context.canonical_site_path
+        if selected_site_file is None:
+            print("canonical Ansible execution requires a selected canonical site", file=sys.stderr)
+            return 1
+        selected_model = load_site(
+            selected_site_file,
+            expected_site=context.site,
+            catalog_path=REPO / "infra" / "services.json",
+        )
+        selected_resource = selected_model.services[args.service].resource
+        if selected_resource is None:
+            print("selected canonical service has no execution resource", file=sys.stderr)
+            return 1
+        selected_resources = {selected_resource}
     inventories: tuple[str, ...] = ()
     timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     log_dir = args.log_dir or Path(".tmp") / f"apply-ansible-{timestamp.replace(':', '')}"
@@ -688,11 +716,19 @@ def main(argv: list[str] | None = None) -> int:
                 base_env,
                 extra_args=extra_args,
                 enroll_only=True,
+                selected_resources=selected_resources,
             )
         if direct_access_rc != 0:
             print(f"canonical direct access readiness failed with exit code {direct_access_rc}", file=sys.stderr)
             return 1
-        host_identity_rc = run_canonical_host_identity(context, inventories, log_dir, base_env, extra_args=extra_args)
+        host_identity_rc = run_canonical_host_identity(
+            context,
+            inventories,
+            log_dir,
+            base_env,
+            extra_args=extra_args,
+            selected_resources=selected_resources,
+        )
         if host_identity_rc != 0:
             print(f"canonical host identity convergence failed with exit code {host_identity_rc}", file=sys.stderr)
             return 1
@@ -702,6 +738,7 @@ def main(argv: list[str] | None = None) -> int:
                 log_dir,
                 base_env,
                 extra_args=extra_args,
+                selected_resources=selected_resources,
             )
         if direct_access_rc != 0:
             print(f"canonical direct service readiness failed with exit code {direct_access_rc}", file=sys.stderr)
