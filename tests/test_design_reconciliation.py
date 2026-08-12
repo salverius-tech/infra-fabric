@@ -104,6 +104,7 @@ class DesignReconciliationTests(unittest.TestCase):
         self.assertEqual(
             matrix["rows"]["development"]["hermes-integration"], "evidenced"
         )
+        self.assertEqual(matrix["rows"]["development"]["rollback"], "evidenced")
         self.assertEqual(
             matrix["rows"]["isolated-recovery"]["service-restore"],
             "not-evidenced",
@@ -120,6 +121,7 @@ class DesignReconciliationTests(unittest.TestCase):
                 "development/service-restore",
                 "development/infrastructure-recovery",
                 "development/hermes-integration",
+                "development/rollback",
             },
         )
         for cell, evidence in matrix["evidence"].items():

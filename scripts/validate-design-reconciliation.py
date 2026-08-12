@@ -82,7 +82,7 @@ MATRIX_ROWS = {
     "development": {
         "plan": "evidenced", "apply": "evidenced", "health-idempotence": "evidenced",
         "service-restore": "evidenced", "infrastructure-recovery": "evidenced",
-        "hermes-integration": "evidenced", "rollback": "not-evidenced",
+        "hermes-integration": "evidenced", "rollback": "evidenced",
     },
     "isolated-recovery": {column: "not-evidenced" for column in MATRIX_COLUMNS},
     "production": {column: "not-evidenced" for column in MATRIX_COLUMNS},
@@ -142,6 +142,16 @@ MATRIX_EVIDENCE["development/hermes-integration"]["audited_commit"] = (
     "e142d4490765fd0d2a20000e9deb326fa9694ba1"
 )
 MATRIX_EVIDENCE["development/hermes-integration"]["date"] = "2026-08-12"
+MATRIX_EVIDENCE["development/rollback"] = {
+    "environment": "development",
+    "category": "rollback",
+    "audited_commit": "1ec7f520e4cf6b29d29a1c50a99fb8b089c92228",
+    "citation": {"path": PLAN_PATH, "lines": "676-687"},
+    "procedure_id": "phase-9-gate-7-development-hermes-rollback",
+    "result": "passed",
+    "date": "2026-08-12",
+    "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance.",
+}
 RETIRED_ARTIFACTS = (
     "audit-package-evidence-registry.json", "audit-package-evidence-registry.md",
     "backlog.json", "contradiction-register.md", "decision-register.md",

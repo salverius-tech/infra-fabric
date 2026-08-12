@@ -632,7 +632,7 @@ Exit gate:
 
 # Phase 9 — Separately approved external acceptance
 
-**Status:** Development gates 1–4 completed under separate approval; remaining gates are not authorized by this plan.
+**Status:** All development gates are completed under separate approval; production gates remain separately protected.
 
 When the operator explicitly approves it in a later session, execute in increasing risk order:
 
@@ -641,8 +641,9 @@ When the operator explicitly approves it in a later session, execute in increasi
 3. ~~direct health and second-run idempotence checks~~ — completed, including Forgejo Runner registration and service activity;
 4. ~~service-state backup and restore rehearsal~~ — completed for every enabled disposable stateful service, with archive validation and post-restore health evidence;
 5. ~~infrastructure-state recovery rehearsal~~ — completed for disposable `dev` on 2026-08-12: verified a controller-local private state snapshot, restored it through the site lock, revalidated the canonical model, and confirmed a fresh provider-backed plan with zero create/update/replace/delete actions; this is development-only evidence and does not establish isolated-recovery or production acceptance;
-6. Hermes operator/live integration validation, including external audit durability and approval identity;
-7. production plan and separately approved production apply.
+6. ~~Hermes operator/live integration validation~~ — completed for the read-only development bridge only; authenticated dashboard/API and WebSocket acceptance, external audit durability, and approval identity remain deferred;
+7. ~~development rollback rehearsal~~ — completed for the guarded Hermes managed-release rollback path on disposable `dev`;
+8. production plan and separately approved production apply.
 
 Each step requires its own approval, evidence, rollback plan, and public-safe summary. Do not collapse these into one authorization.
 
@@ -671,6 +672,19 @@ plan reported zero create, update, replace, and delete actions. This is developm
 read-only bridge evidence. It does not establish authenticated dashboard/API or WebSocket
 acceptance, external audit durability, mutation approval identity, rollback,
 isolated-recovery, or production acceptance.
+
+### Development Hermes rollback rehearsal evidence — 2026-08-12
+
+For disposable `dev`, the guarded development-only Hermes rollback rehearsal required a
+literal acknowledgement and an existing managed release link. It deliberately switched
+the runtime link to a nonexistent target, confirmed the expected activation failure, and
+entered Ansible rescue. Rescue restored the exact prior managed virtual-environment link,
+restarted the Hermes dashboard and gateway, and verified the gateway unit plus the local
+dashboard login health check. A subsequent canonical service convergence succeeded, and a
+fresh provider-backed plan reported zero create, update, replace, and delete actions.
+This is development-only evidence for the Hermes managed-release rollback path; it does
+not establish rollback for other services, isolated-recovery, external audit durability,
+or production acceptance.
 
 ## Audit finding coverage matrix
 

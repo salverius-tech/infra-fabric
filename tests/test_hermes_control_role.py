@@ -193,7 +193,9 @@ class HermesControlRoleTests(unittest.TestCase):
         self.assertIn("hermes_rollback_rehearsal_approved", rehearsal)
         self.assertIn("rollback-rehearsal-missing", rehearsal)
         self.assertIn("rescue:", rehearsal)
-        self.assertIn("Enter rollback rescue after invalid rehearsal activation", rehearsal)
+        self.assertIn(
+            "Enter rollback rescue after invalid rehearsal activation", rehearsal
+        )
         self.assertIn("hermes_rollback_rehearsal_retained_target", rehearsal)
         self.assertIn("argv: [readlink, -e", rehearsal)
         self.assertIn(

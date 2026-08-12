@@ -421,7 +421,7 @@
         "service-restore": "evidenced",
         "infrastructure-recovery": "evidenced",
         "hermes-integration": "evidenced",
-        "rollback": "not-evidenced"
+        "rollback": "evidenced"
       },
       "isolated-recovery": {
         "plan": "not-evidenced",
@@ -520,6 +520,19 @@
         "result": "passed",
         "date": "2026-08-12",
         "boundary": "Disposable development deployed-plugin read-only status and audit verification only; uses a non-secret service-ID context and guest-local private empty audit baseline. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance."
+      },
+      "development/rollback": {
+        "environment": "development",
+        "category": "rollback",
+        "audited_commit": "1ec7f520e4cf6b29d29a1c50a99fb8b089c92228",
+        "citation": {
+          "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+          "lines": "676-687"
+        },
+        "procedure_id": "phase-9-gate-7-development-hermes-rollback",
+        "result": "passed",
+        "date": "2026-08-12",
+        "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance."
       }
     },
     "evidence_boundary": "Active authority for environment-specific external acceptance only. An evidenced cell applies only to its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix.",
