@@ -159,7 +159,9 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             root = Path(temporary)
             generated = root / "generated"
             generated.mkdir()
-            (generated / "ansible-vars.json").write_text('{"services": {}}\n', encoding="utf-8")
+            (generated / "ansible-vars.json").write_text(
+                '{"services": {"hermes": {}, "forgejo": {}}}\n', encoding="utf-8"
+            )
 
             class Context:
                 canonical_site_path = root / "site.yaml"
@@ -175,6 +177,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             with mock.patch.object(apply_ansible_services, "canonical_dns_environment", return_value={}):
                 transport = apply_ansible_services.canonical_ansible_transport(Context(), root)
             runtime_inventory = json.loads(transport.runtime_inventory_path.read_text(encoding="utf-8"))
+            flattened = json.loads(transport.vars_path.read_text(encoding="utf-8"))
 
         assert transport is not None
         self.assertIn(
@@ -192,6 +195,8 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             str(Path.home() / ".ssh" / "canonical-proxmox-management"),
         )
         self.assertNotIn("ssh_public_key", runtime_inventory)
+        self.assertEqual(flattened["canonical_enabled_services"], ["forgejo", "hermes"])
+        self.assertNotIn("services", flattened)
 
 
     def test_runtime_known_hosts_path_uses_live_values_dir_during_snapshot_execution(self) -> None:

@@ -175,6 +175,26 @@
     group: "{{ hermes_runtime_user | default('anvil') }}"
     mode: '0700'
 
+- name: Ensure Hermes operator audit directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ (hermes_operator_audit_path | default('/var/lib/hermes/operator-audit.jsonl', true)) | dirname }}"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0700'
+
+- name: Initialize empty Hermes operator audit journal
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ hermes_operator_audit_path | default('/var/lib/hermes/operator-audit.jsonl', true) }}"
+    state: touch
+    access_time: preserve
+    modification_time: preserve
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0600'
+
 - name: Enable linger for Hermes runtime user services
   tags: [service]
   ansible.builtin.command:
@@ -245,6 +265,49 @@
       - -lc
       - "install -d -m 0755 /srv /var/www/hermes; install -d -m 0755 -o {{ (hermes_runtime_user | default('anvil')) | quote }} -g {{ (hermes_runtime_user | default('anvil')) | quote }} {{ hermes_repo_path | default('/srv/homelab-infra') | quote }}"  # yamllint disable-line rule:line-length
   changed_when: false
+
+- name: Ensure homelab-infra operator runtime directories exist
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ hermes_operator_runtime_path | default('/usr/local/lib/homelab-infra-operator') }}/scripts"
+      mode: '0755'
+    - path: "{{ (hermes_operator_context_path | default('/etc/homelab-infra-operator/context.json')) | dirname }}"
+      mode: '0755'
+
+- name: Install homelab-infra operator runtime bundle
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../../scripts/{{ item }}"
+    dest: "{{ hermes_operator_runtime_path | default('/usr/local/lib/homelab-infra-operator') }}/scripts/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - hermes-operator.py
+    - hermes_audit_chain.py
+    - private_files.py
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway
+
+- name: Install homelab-infra operator context
+  tags: [config]
+  ansible.builtin.copy:
+    dest: "{{ hermes_operator_context_path | default('/etc/homelab-infra-operator/context.json') }}"
+    content: "{{ {'site': canonical_site, 'enabled_services': (canonical_enabled_services | default([]) | sort)} | to_nice_json }}\n"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway
+
 - name: Install Hermes landing page
   tags: [packages]
   ansible.builtin.template:

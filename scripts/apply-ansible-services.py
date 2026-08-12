@@ -405,6 +405,7 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
     flattened: dict[str, object] = {
         key: value for key, value in projection.items() if key != "services"
     }
+    flattened["canonical_enabled_services"] = sorted(services)
     for service, values in sorted(services.items()):
         legacy_vars = values.get("legacy_vars", {}) if isinstance(values, dict) else None
         if not isinstance(legacy_vars, dict):

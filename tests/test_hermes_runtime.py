@@ -125,6 +125,7 @@ class HermesRuntimeContractTests(unittest.TestCase):
         self.assertIn("homelab-infra-operator/__init__.py", self.main)
         self.assertIn("plugins", self.main)
         self.assertIn("HERMES_OPERATOR_REPO_PATH", self.gateway_unit)
+        self.assertIn("HERMES_OPERATOR_CONTEXT_PATH", self.gateway_unit)
         self.assertIn('Environment="VALUES_SITE={{ canonical_site }}"', self.gateway_unit)
         self.assertIn("HERMES_OPERATOR_MUTATION_ENABLED=0", self.gateway_unit)
         self.assertNotIn("ternary('1', '0')", self.gateway_unit)
@@ -135,8 +136,13 @@ class HermesRuntimeContractTests(unittest.TestCase):
         )
         self.assertIn("hermes_operator_audit_path", self.gateway_unit)
         self.assertIn("hermes_operator_audit_backup_dir", self.gateway_unit)
+        self.assertIn("Ensure Hermes operator audit directory exists", self.main)
+        self.assertIn("Initialize empty Hermes operator audit journal", self.main)
+        self.assertIn("mode: '0700'", self.main)
+        self.assertIn("mode: '0600'", self.main)
         env = ENV.read_text(encoding="utf-8")
         self.assertIn("HERMES_OPERATOR_REPO_PATH", env)
+        self.assertIn("HERMES_OPERATOR_CONTEXT_PATH", env)
         self.assertIn("VALUES_SITE={{ canonical_site }}", env)
         self.assertIn("HERMES_OPERATOR_MUTATION_ENABLED=0", env)
         self.assertNotIn("ternary('1', '0')", env)
@@ -155,6 +161,16 @@ class HermesRuntimeContractTests(unittest.TestCase):
         self.assertIn('run("audit-verify")', self.operator_dashboard_js)
         self.assertNotIn("Apply reviewed plan", self.operator_dashboard_js)
         self.assertIn('registry.register("homelab-infra-operator"', self.operator_dashboard_js)
+
+    def test_operator_runtime_bundle_is_public_and_receives_only_non_secret_context(self) -> None:
+        self.assertIn("Install homelab-infra operator runtime bundle", self.main)
+        self.assertIn("hermes-operator.py", self.main)
+        self.assertIn("hermes_audit_chain.py", self.main)
+        self.assertIn("private_files.py", self.main)
+        self.assertIn("Install homelab-infra operator context", self.main)
+        self.assertIn("enabled_services", self.main)
+        self.assertNotIn("secrets.sops.yaml", self.main)
+        self.assertNotIn("site.yaml", self.main)
 
     def test_full_state_bootstrap_restore_is_guarded_and_validated(self) -> None:
         self.assertIn("Restore guarded private Hermes state during bootstrap", self.main)

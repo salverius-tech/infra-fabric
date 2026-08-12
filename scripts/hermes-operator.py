@@ -20,7 +20,6 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
-from canonical_values import CanonicalValuesError, load_site
 from hermes_audit_chain import (
     AuditChainError,
     audit_record_hash,
@@ -29,9 +28,37 @@ from hermes_audit_chain import (
     read_audit_stream,
     validate_audit_lifecycles,
 )
-from hermes_audit_snapshot import AuditSnapshotError, create_snapshot, verify_snapshot
 from private_files import PrivateFileError, _fsync_descriptor, _private_directory_fd
-from values_context import ValuesContextError, from_environment
+
+# Controller-only dependencies are loaded only by actions that need them. The
+# deployed read-only bundle intentionally carries neither canonical values nor
+# snapshot code; status/audit-verify use only their allow-listed context/audit
+# journal inputs. These public symbols preserve testable controller boundaries.
+load_site = None
+
+
+class AuditSnapshotError(RuntimeError):
+    """Compatibility boundary for controller-only audit snapshots."""
+
+
+def create_snapshot(*args: Any, **kwargs: Any) -> Any:
+    from hermes_audit_snapshot import AuditSnapshotError as implementation_error
+    from hermes_audit_snapshot import create_snapshot as implementation
+
+    try:
+        return implementation(*args, **kwargs)
+    except implementation_error as error:
+        raise AuditSnapshotError(str(error)) from error
+
+
+def verify_snapshot(*args: Any, **kwargs: Any) -> Any:
+    from hermes_audit_snapshot import AuditSnapshotError as implementation_error
+    from hermes_audit_snapshot import verify_snapshot as implementation
+
+    try:
+        return implementation(*args, **kwargs)
+    except implementation_error as error:
+        raise AuditSnapshotError(str(error)) from error
 
 # Keep this aligned with scripts/tfplan-metadata.py, the canonical saved-plan
 # producer and verifier consumed by the operator bridge.
@@ -93,7 +120,32 @@ def load_registry(repo: Path) -> dict[str, Any]:
     return data
 
 
+def deployed_context() -> list[str] | None:
+    """Load the fixed non-secret context installed with the read-only bridge."""
+    path_value = os.environ.get("HERMES_OPERATOR_CONTEXT_PATH", "").strip()
+    if not path_value:
+        return None
+    try:
+        payload = json.loads(Path(path_value).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise OperatorError("deployed Hermes operator context is unavailable") from error
+    selected_site = os.environ.get("VALUES_SITE", "").strip()
+    services = payload.get("enabled_services") if isinstance(payload, dict) else None
+    if payload.get("site") != selected_site:
+        raise OperatorError("deployed Hermes operator context site does not match VALUES_SITE")
+    if (
+        not isinstance(services, list)
+        or not all(isinstance(service, str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", service) for service in services)
+        or len(services) != len(set(services))
+    ):
+        raise OperatorError("deployed Hermes operator context services are unsafe")
+    return sorted(services)
+
+
 def enabled_services(repo: Path) -> list[str]:
+    deployed = deployed_context()
+    if deployed is not None:
+        return deployed
     load_registry(repo)
     selected_site = os.environ.get("VALUES_SITE", "")
     if not selected_site:
@@ -102,12 +154,15 @@ def enabled_services(repo: Path) -> list[str]:
     if not canonical_path.is_file():
         raise OperatorError(f"selected canonical site is missing: {selected_site}")
     try:
-        model = load_site(
+        loader = load_site
+        if loader is None:
+            from canonical_values import load_site as loader
+        model = loader(
             canonical_path,
             expected_site=selected_site,
             catalog_path=repo / "infra" / "services.json",
         )
-    except CanonicalValuesError as error:
+    except Exception as error:
         raise OperatorError(
             f"selected canonical site is invalid: {error}"
         ) from error
@@ -117,8 +172,10 @@ def enabled_services(repo: Path) -> list[str]:
 def plan_metadata_path(repo: Path) -> Path:
     """Resolve saved-plan metadata from the selected canonical site context."""
     try:
+        from values_context import ValuesContextError, from_environment
+
         context = from_environment(repo)
-    except ValuesContextError as error:
+    except Exception as error:
         raise OperatorError(str(error)) from error
     return (
         context.values_dir / "tfplan.meta.json"
@@ -187,13 +244,15 @@ def git_dirty(repo: Path) -> bool:
 
 def status(repo: Path) -> dict[str, Any]:
     """Return only safe operator state, never private values or inventory."""
-    plan = load_plan_summary(repo)
+    deployed = deployed_context() is not None
+    plan = None if deployed else load_plan_summary(repo)
     return {
         "action": "status",
         "repository": repo.name,
         "git_dirty": git_dirty(repo),
         "enabled_services": enabled_services(repo),
-        "values_configured": (repo / "values").is_dir(),
+        "values_configured": deployed or (repo / "values").is_dir(),
+        "canonical_context": "deployed-projection" if deployed else "selected-site",
         "saved_plan": {
             "present": plan is not None,
             "destructive": bool(plan and plan.get("destructive")),
@@ -412,10 +471,11 @@ def run_action(
         correlation_id=correlation_id,
     )
     if action == "apply":
+        snapshot_error = AuditSnapshotError
         try:
             snapshot = create_snapshot(audit_path(repo), audit_backup_dir())
             verify_snapshot(snapshot)
-        except (AuditSnapshotError, OSError, OperatorError) as error:
+        except (snapshot_error, OSError, OperatorError) as error:
             write_audit_record(
                 repo,
                 action,

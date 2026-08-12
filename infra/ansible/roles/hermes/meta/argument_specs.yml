@@ -77,6 +77,14 @@ argument_specs:
         type: str
         required: false
         description: "Private externally backed audit snapshot directory; required when mutation is activated."
+      hermes_operator_runtime_path:
+        type: str
+        required: false
+        description: "Root-owned public read-only Hermes operator runtime bundle path."
+      hermes_operator_context_path:
+        type: str
+        required: false
+        description: "Root-owned generated non-secret Hermes operator context path."
       hermes_runtime_user:
         type: str
         required: false

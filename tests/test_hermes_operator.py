@@ -1263,6 +1263,46 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertEqual(status["enabled_services"], ["hermes"])
             self.assertNotIn("terraform.tfvars", json.dumps(status))
 
+    def test_status_uses_deployed_non_secret_context_without_canonical_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            context = root / "operator-context.json"
+            context.write_text(
+                json.dumps({"site": "dev", "enabled_services": ["hermes", "forgejo"]}),
+                encoding="utf-8",
+            )
+            with mock.patch.dict(
+                os.environ,
+                {"VALUES_SITE": "dev", "HERMES_OPERATOR_CONTEXT_PATH": str(context)},
+                clear=False,
+            ):
+                status = hermes_operator.status(root)
+            self.assertEqual(status["enabled_services"], ["forgejo", "hermes"])
+            self.assertTrue(status["values_configured"])
+            self.assertEqual(status["canonical_context"], "deployed-projection")
+
+    def test_deployed_context_rejects_site_mismatch_or_unsafe_service_data(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            context = root / "operator-context.json"
+            cases = (
+                ({"site": "other", "enabled_services": ["hermes"]}, "site"),
+                ({"site": "dev", "enabled_services": ["bad/service"]}, "services"),
+                ({"site": "dev", "enabled_services": ["hermes", "hermes"]}, "services"),
+            )
+            for payload, error in cases:
+                with self.subTest(payload=payload):
+                    context.write_text(json.dumps(payload), encoding="utf-8")
+                    with (
+                        mock.patch.dict(
+                            os.environ,
+                            {"VALUES_SITE": "dev", "HERMES_OPERATOR_CONTEXT_PATH": str(context)},
+                            clear=False,
+                        ),
+                        self.assertRaisesRegex(hermes_operator.OperatorError, error),
+                    ):
+                        hermes_operator.status(root)
+
     def test_plan_summary_rejects_non_count_data_before_audit(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
