@@ -58,6 +58,9 @@ CADDYFILE = (
     ROOT / "infra" / "ansible" / "roles" / "hermes" / "templates" / "Caddyfile.j2"
 )
 OPERATIONS_DOC = ROOT / "docs" / "hermes-control-operations.md"
+ROLLBACK_REHEARSAL = (
+    ROOT / "infra" / "ansible" / "playbooks" / "hermes-rollback-rehearsal.yml"
+)
 
 
 class HermesControlRoleTests(unittest.TestCase):
@@ -181,6 +184,31 @@ class HermesControlRoleTests(unittest.TestCase):
             restore.index("Stop managed user services before restore"),
             restore.index("      always:"),
         )
+
+    def test_development_rollback_rehearsal_restores_the_prior_managed_link(
+        self,
+    ) -> None:
+        rehearsal = ROLLBACK_REHEARSAL.read_text(encoding="utf-8")
+        self.assertIn("canonical_site == 'dev'", rehearsal)
+        self.assertIn("hermes_rollback_rehearsal_approved", rehearsal)
+        self.assertIn("rollback-rehearsal-missing", rehearsal)
+        self.assertIn("rescue:", rehearsal)
+        self.assertIn(
+            "Restore prior managed Hermes virtual environment link", rehearsal
+        )
+        self.assertIn("Verify restored Hermes gateway", rehearsal)
+        self.assertIn("Verify restored Hermes dashboard login page", rehearsal)
+        self.assertLess(
+            rehearsal.index(
+                "Switch Hermes virtual environment to invalid rehearsal target"
+            ),
+            rehearsal.index("Restore prior managed Hermes virtual environment link"),
+        )
+        self.assertLess(
+            rehearsal.index("Restore prior managed Hermes virtual environment link"),
+            rehearsal.index("Verify restored Hermes dashboard login page"),
+        )
+        self.assertIsInstance(yaml.safe_load(rehearsal), list)
 
     def test_control_role_exposes_only_loopback_api_through_private_caddy(self) -> None:
         caddy = CADDYFILE.read_text(encoding="utf-8")

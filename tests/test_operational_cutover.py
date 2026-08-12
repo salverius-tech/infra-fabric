@@ -48,9 +48,21 @@ class OperationalCutoverTests(unittest.TestCase):
             "validate-values.sh",
             "plan-infra.sh",
             "apply-infra.sh",
+            "rehearse-development-rollback.sh",
         ):
             result = subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, msg=f"{name}: {result.stderr}")
+
+    def test_development_rollback_rehearsal_is_explicit_and_dev_only(self) -> None:
+        script = (ROOT / "scripts" / "rehearse-development-rollback.sh").read_text(
+            encoding="utf-8"
+        )
+        justfile = (ROOT / "justfile").read_text(encoding="utf-8")
+        self.assertIn("--approve-development-rollback", script)
+        self.assertIn('"${VALUES_SITE}" != "dev"', script)
+        self.assertIn("StrictHostKeyChecking=yes", script)
+        self.assertIn("hermes_rollback_rehearsal_approved", script)
+        self.assertIn("rehearse-development-rollback approval=\"\":", justfile)
 
     def test_no_legacy_recovery_entrypoint_remains(self) -> None:
         justfile = (ROOT / "justfile").read_text(encoding="utf-8")

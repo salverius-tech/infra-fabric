@@ -111,6 +111,11 @@ apply:
     just check-values
     scripts/apply-infra.sh
 
+# Exercise the guarded Hermes failed-activation rollback path on disposable dev only
+rehearse-development-rollback approval="":
+    scripts/require-site-context.sh
+    scripts/rehearse-development-rollback.sh "{{approval}}"
+
 # Create a guarded full-site destroy plan; review before the separately approved teardown apply
 teardown-plan:
     scripts/require-site-context.sh
