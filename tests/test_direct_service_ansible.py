@@ -72,6 +72,7 @@ class DirectServiceAnsibleHelperTests(unittest.TestCase):
         self.assertIn("/ansible/known_hosts", playbook)
         self.assertIn("direct_access_ready_accept_host_key_change", playbook)
         self.assertIn("SSH host key changed", playbook)
+        self.assertIn('flock -x 9', playbook)
         self.assertNotIn("ssh-keygen -R {{ hostvars", playbook)
         self.assertIn("host={{ ansible_host | quote }}", playbook)
         self.assertNotIn("run_once: true", playbook)

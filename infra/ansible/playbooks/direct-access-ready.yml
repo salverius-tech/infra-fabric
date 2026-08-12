@@ -29,6 +29,8 @@
         install -d -m 0700 "$(dirname "${known_hosts}")"
         touch "${known_hosts}"
         chmod 0600 "${known_hosts}"
+        exec 9>"${known_hosts}.lock"
+        flock -x 9
         tmp="$(mktemp)"
         trap 'rm -f "${tmp}"' EXIT
         deadline=$((SECONDS + {{ direct_access_ready_ssh_scan_timeout | default(180) }}))
