@@ -28,12 +28,38 @@
           - hermes_rollback_rehearsal_active.stat.islnk | default(false)
         fail_msg: Hermes rollback rehearsal requires an existing managed venv link.
 
-    - name: Resolve prior managed Hermes virtual environment
+    - name: Resolve active managed Hermes virtual environment when healthy
       tags: [validation]
       ansible.builtin.command:
         argv: [readlink, -f, "{{ hermes_rollback_rehearsal_install_root }}/venv"]
       changed_when: false
-      register: hermes_rollback_rehearsal_previous
+      failed_when: false
+      register: hermes_rollback_rehearsal_active_target
+
+    - name: Resolve retained Hermes rollback virtual environment when recovery is required
+      tags: [validation]
+      ansible.builtin.command:
+        argv: [readlink, -f, "{{ hermes_rollback_rehearsal_install_root }}/previous"]
+      changed_when: false
+      failed_when: false
+      register: hermes_rollback_rehearsal_retained_target
+
+    - name: Require a resolvable managed Hermes rollback target
+      tags: [validation]
+      ansible.builtin.assert:
+        that:
+          - >-
+            hermes_rollback_rehearsal_active_target.rc == 0 or
+            hermes_rollback_rehearsal_retained_target.rc == 0
+        fail_msg: Hermes rollback rehearsal cannot resolve an active or retained managed venv target.
+
+    - name: Select managed Hermes rollback target
+      tags: [validation]
+      ansible.builtin.set_fact:
+        hermes_rollback_rehearsal_previous: >-
+          {{ hermes_rollback_rehearsal_active_target.stdout
+             if hermes_rollback_rehearsal_active_target.rc == 0
+             else hermes_rollback_rehearsal_retained_target.stdout }}
 
     - name: Initialize Hermes rollback rehearsal milestones
       tags: [config]
@@ -56,6 +82,7 @@
             dest: "{{ hermes_rollback_rehearsal_install_root }}/venv"
             state: link
             force: true
+            follow: false
 
         - name: Record rehearsal activation switch
           tags: [config]
@@ -74,7 +101,19 @@
             argv: [systemctl, is-active, hermes-gateway]
           changed_when: false
           register: hermes_rollback_rehearsal_invalid_health
-          failed_when: hermes_rollback_rehearsal_invalid_health.rc == 0
+          failed_when: false
+
+        - name: Enter rollback rescue after invalid rehearsal activation
+          tags: [validation]
+          ansible.builtin.fail:
+            msg: Invalid development rollback rehearsal activation failed as required.
+          when: hermes_rollback_rehearsal_invalid_health.rc != 0
+
+        - name: Reject an unexpectedly healthy invalid rehearsal activation
+          tags: [validation]
+          ansible.builtin.fail:
+            msg: Invalid development rollback rehearsal activation unexpectedly remained healthy.
+          when: hermes_rollback_rehearsal_invalid_health.rc == 0
       rescue:
         - name: Stop invalid Hermes rehearsal services
           tags: [config]
@@ -87,7 +126,7 @@
         - name: Restore prior managed Hermes virtual environment link
           tags: [restore]
           ansible.builtin.file:
-            src: "{{ hermes_rollback_rehearsal_previous.stdout }}"
+            src: "{{ hermes_rollback_rehearsal_previous }}"
             dest: "{{ hermes_rollback_rehearsal_install_root }}/venv"
             state: link
             force: true
