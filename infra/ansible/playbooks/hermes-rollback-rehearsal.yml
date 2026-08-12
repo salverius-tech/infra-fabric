@@ -31,7 +31,7 @@
     - name: Resolve active managed Hermes virtual environment when healthy
       tags: [validation]
       ansible.builtin.command:
-        argv: [readlink, -f, "{{ hermes_rollback_rehearsal_install_root }}/venv"]
+        argv: [readlink, -e, "{{ hermes_rollback_rehearsal_install_root }}/venv"]
       changed_when: false
       failed_when: false
       register: hermes_rollback_rehearsal_active_target
@@ -39,7 +39,7 @@
     - name: Resolve retained Hermes rollback virtual environment when recovery is required
       tags: [validation]
       ansible.builtin.command:
-        argv: [readlink, -f, "{{ hermes_rollback_rehearsal_install_root }}/previous"]
+        argv: [readlink, -e, "{{ hermes_rollback_rehearsal_install_root }}/previous"]
       changed_when: false
       failed_when: false
       register: hermes_rollback_rehearsal_retained_target
@@ -130,6 +130,7 @@
             dest: "{{ hermes_rollback_rehearsal_install_root }}/venv"
             state: link
             force: true
+            follow: false
           when: hermes_rollback_rehearsal_switched | bool
 
         - name: Restart restored Hermes services

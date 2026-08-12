@@ -195,6 +195,7 @@ class HermesControlRoleTests(unittest.TestCase):
         self.assertIn("rescue:", rehearsal)
         self.assertIn("Enter rollback rescue after invalid rehearsal activation", rehearsal)
         self.assertIn("hermes_rollback_rehearsal_retained_target", rehearsal)
+        self.assertIn("argv: [readlink, -e", rehearsal)
         self.assertIn(
             "Restore prior managed Hermes virtual environment link", rehearsal
         )
