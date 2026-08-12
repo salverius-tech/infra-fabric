@@ -506,7 +506,7 @@
         "procedure_id": "phase-9-gate-5",
         "result": "passed",
         "date": "2026-08-09",
-        "boundary": "Disposable development state restore plus canonical validation and zero-change provider plan only; no isolated-controller, external-durability, rollback, or production acceptance."
+        "boundary": "Disposable development controller/infrastructure recovery rehearsal: private audit and state snapshots were verified and restored through guarded paths, post-recovery canonical convergence and redacted connectivity passed, and fresh provider plans were zero-change. It does not establish independent external audit durability, rollback, or production acceptance."
       },
       "development/hermes-integration": {
         "environment": "development",

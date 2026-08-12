@@ -649,14 +649,16 @@ Each step requires its own approval, evidence, rollback plan, and public-safe su
 
 ### Development infrastructure-state recovery evidence — 2026-08-12
 
-For disposable `dev`, the controller-local snapshot root was verified private and on a
-local filesystem. A verified state snapshot was restored through the selected-site
-lock into the disposable state artifact. The restored state remained a regular private
-file, canonical validation passed, and a fresh provider-backed plan reported zero
-create, update, replace, and delete actions. The temporary development audit chain
-was also verified with no unresolved correlations. This is development-only recovery
-evidence: it does not establish isolated-controller recovery, external audit
-durability, rollback acceptance, or production acceptance.
+For disposable `dev`, controller-local execution, state, and audit snapshot roots were
+verified private and local. A private audit-journal snapshot and a private state snapshot
+were each created, verified, and restored through their guarded paths; state restoration
+held the selected-site lock. The restored audit chain had no unresolved correlations, the
+restored state remained a regular private file, canonical validation passed, and fresh
+provider-backed plans before and after canonical convergence reported zero create, update,
+replace, and delete actions. All enabled services converged and redacted direct-service
+connectivity passed after recovery. This is development-only controller/infrastructure
+recovery evidence: it does not establish independent external audit durability, rollback
+acceptance, or production acceptance.
 
 ### Development Hermes read-only bridge evidence — 2026-08-12
 
