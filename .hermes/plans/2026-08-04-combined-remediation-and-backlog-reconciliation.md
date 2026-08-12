@@ -642,8 +642,7 @@ When the operator explicitly approves it in a later session, execute in increasi
 4. ~~service-state backup and restore rehearsal~~ — completed for every enabled disposable stateful service, with archive validation and post-restore health evidence;
 5. ~~infrastructure-state recovery rehearsal~~ — completed for disposable `dev` on 2026-08-12: verified a controller-local private state snapshot, restored it through the site lock, revalidated the canonical model, and confirmed a fresh provider-backed plan with zero create/update/replace/delete actions; this is development-only evidence and does not establish isolated-recovery or production acceptance;
 6. Hermes operator/live integration validation, including external audit durability and approval identity;
-7. Onramp handoff/cutover evidence and retirement of the temporary SearXNG ownership exception;
-8. production plan and separately approved production apply.
+7. production plan and separately approved production apply.
 
 Each step requires its own approval, evidence, rollback plan, and public-safe summary. Do not collapse these into one authorization.
 
@@ -1083,9 +1082,14 @@ Retained-boundary evidence (2026-08-11): `just validate-public` passed all stage
 208 tests, and a fresh `hermes-verify-integrated-*` probe exercised strict audit semantics
 plus real read-only/no-network recipe execution without changing its public fixture tree.
 
-### Package P10-F — Publish the versioned Onramp handoff projection
+### Package P10-F — Historical source-only Onramp handoff projection
 
-**Status: source-complete (2026-08-11); external cutover acceptance remains pending.**
+**Status: source-complete (2026-08-11); removed from the active reconciliation frontier
+on 2026-08-12.** The generated projection has no corresponding consumer requirement or
+implementation in the authorized `onramp-vNext` repository. It is not an accepted
+cross-repository contract, does not create a consumer cutover obligation, and cannot
+justify temporary workload retirement. Any future consumer integration requires its own
+consumer-owned requirement and separately authorized implementation.
 Canonical rendering now emits a manifest-bound, non-secret `onramp-handoff.json` artifact.
 Disabled sites emit an explicit disabled state. Enabled sites bind the handoff to canonical
 site, service, shared-host resource, non-provider VM identity, hostname, address, Debian 13
@@ -1101,8 +1105,8 @@ workload definitions remain outside the handoff.
 - [x] Document ownership, consumption, and evidence boundaries without claiming live
   Onramp or SearXNG cutover acceptance.
 
-Exit gate: met for source — the versioned handoff is generated and identity-bound. Deployment,
-consumer verification, rollback, and temporary SearXNG retirement remain external gates.
+Exit gate: met for the historical source artifact only. No consumer deployment, verification,
+rollback, or temporary SearXNG retirement gate is tracked by this reconciliation plan.
 
 Verification evidence (2026-08-11): `just validate-public` passed all stages with
 925 unit/contract tests and 73% aggregate script coverage after the source-contract review;

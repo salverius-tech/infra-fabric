@@ -1,8 +1,8 @@
 # Onramp substrate and SearXNG handoff
 
-The selected canonical site owns a versioned, identity-bound, non-secret handoff projection for the Debian 13 Onramp shared-host substrate. The projection is generated as `values/sites/<site>/generated/onramp-handoff.json`, is covered by the canonical projection manifest, and must never be edited manually.
+The selected canonical site generates a versioned, identity-bound, non-secret substrate projection at `values/sites/<site>/generated/onramp-handoff.json`. It is covered by the canonical projection manifest and must never be edited manually.
 
-Generating the contract is source-complete. Consuming it from `onramp-vNext`, proving a live cutover, and retiring the temporary `searxng_onramp` implementation remain separate external acceptance gates.
+The projection is source-only compatibility work. The authorized `onramp-vNext` repository has no corresponding consumer requirement or implementation, so this repository does not treat it as an active cross-repository contract, a cutover plan, or evidence for retiring `searxng_onramp`.
 
 ## Canonical lifecycle
 
@@ -40,7 +40,7 @@ The projection intentionally excludes VMIDs and other provider IDs, CPU architec
 - rootless Podman prerequisites; and
 - base proxy capability.
 
-`onramp-vNext` owns, after an accepted handoff:
+An independently specified application-platform consumer would own:
 
 - application definitions and deployment;
 - application health and rollback; and
@@ -48,9 +48,9 @@ The projection intentionally excludes VMIDs and other provider IDs, CPU architec
 
 The handoff grants no Proxmox authority, provider access, protected-value access, or permission to edit generated projections.
 
-## Consumer requirements
+## Future consumer requirements
 
-Before using the projection, an Onramp consumer must:
+If a future consumer explicitly adopts this projection, it must:
 
 1. require the exact supported `api_version` and `kind`;
 2. require `metadata.enabled: true` and a non-null `spec`;
@@ -59,14 +59,14 @@ Before using the projection, an Onramp consumer must:
 5. treat the projection as read-only input; and
 6. obtain secrets through its separately approved protected-input workflow, never through this artifact.
 
-Consumer compatibility tests should use tracked public fixtures. Live deployment, endpoint, secret-delivery, backup/restore, health, rollback, and cutover evidence must be recorded in the environment-specific acceptance authority rather than inferred from source tests.
+Consumer compatibility tests should use tracked public fixtures. No consumer acceptance work is implied until that consumer owns a requirement and implementation.
 
 ## Temporary workload retirement
 
-SearXNG and other host-contained workloads remain owned by `infra-fabric` until `onramp-vNext` proves deployment, secret delivery, proxying, direct and HTTPS health, backup/restore, rollback, Hermes consumption, and development cutover. Their definitions are deliberately not exported in the substrate handoff. Retirement is evidence-triggered, not date-triggered.
+SearXNG and other host-contained workloads remain owned by `infra-fabric`. Their definitions are deliberately not exported in the substrate projection. The projection alone is not an ownership-transfer or retirement trigger.
 
-After those gates pass, removal still requires an explicit reviewed source change and any live mutation requires its own plan/apply approval. Do not delete the temporary implementation merely because a handoff projection exists.
+Any future ownership transfer or removal requires a consumer-owned requirement, explicit reviewed source change, and separately authorized live mutation. Do not delete the temporary implementation merely because a projection exists.
 
 ## Verification
 
-Source-only verification may render the tracked public fixtures, verify projection identity/permissions, and exercise schema and tamper failures. Environment acceptance must separately verify the direct endpoint, intended HTTPS route, DNS, protected secret delivery, rootless runtime health, repeat plan, backup/restore, rollback, and consumer behavior without printing private URLs, query credentials, tokens, or certificate material.
+Source-only verification may render the tracked public fixtures, verify projection identity/permissions, and exercise schema and tamper failures. It does not establish a consumer, deployment, endpoint, secret delivery, health, restore, rollback, or cutover result.
