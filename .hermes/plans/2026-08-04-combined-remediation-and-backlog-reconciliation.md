@@ -640,12 +640,23 @@ When the operator explicitly approves it in a later session, execute in increasi
 2. ~~reviewed development apply~~ — completed with provider and Ansible convergence;
 3. ~~direct health and second-run idempotence checks~~ — completed, including Forgejo Runner registration and service activity;
 4. ~~service-state backup and restore rehearsal~~ — completed for every enabled disposable stateful service, with archive validation and post-restore health evidence;
-5. infrastructure-state recovery rehearsal;
+5. ~~infrastructure-state recovery rehearsal~~ — completed for disposable `dev` on 2026-08-12: verified a controller-local private state snapshot, restored it through the site lock, revalidated the canonical model, and confirmed a fresh provider-backed plan with zero create/update/replace/delete actions; this is development-only evidence and does not establish isolated-recovery or production acceptance;
 6. Hermes operator/live integration validation, including external audit durability and approval identity;
 7. Onramp handoff/cutover evidence and retirement of the temporary SearXNG ownership exception;
 8. production plan and separately approved production apply.
 
 Each step requires its own approval, evidence, rollback plan, and public-safe summary. Do not collapse these into one authorization.
+
+### Development infrastructure-state recovery evidence — 2026-08-12
+
+For disposable `dev`, the controller-local snapshot root was verified private and on a
+local filesystem. A verified state snapshot was restored through the selected-site
+lock into the disposable state artifact. The restored state remained a regular private
+file, canonical validation passed, and a fresh provider-backed plan reported zero
+create, update, replace, and delete actions. The temporary development audit chain
+was also verified with no unresolved correlations. This is development-only recovery
+evidence: it does not establish isolated-controller recovery, external audit
+durability, rollback acceptance, or production acceptance.
 
 ## Audit finding coverage matrix
 

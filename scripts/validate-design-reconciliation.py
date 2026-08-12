@@ -81,7 +81,7 @@ MATRIX_COLUMNS = (
 MATRIX_ROWS = {
     "development": {
         "plan": "evidenced", "apply": "evidenced", "health-idempotence": "evidenced",
-        "service-restore": "evidenced", "infrastructure-recovery": "not-evidenced",
+        "service-restore": "evidenced", "infrastructure-recovery": "evidenced",
         "hermes-integration": "not-evidenced", "rollback": "not-evidenced",
     },
     "isolated-recovery": {column: "not-evidenced" for column in MATRIX_COLUMNS},
@@ -123,6 +123,12 @@ MATRIX_EVIDENCE = {
             "635-648",
             "phase-9-gate-4",
             "Enabled disposable development stateful services only; not controller or infrastructure recovery.",
+        ),
+        (
+            "infrastructure-recovery",
+            "635-658",
+            "phase-9-gate-5",
+            "Disposable development state restore plus canonical validation and zero-change provider plan only; no isolated-controller, external-durability, rollback, or production acceptance.",
         ),
     )
 }

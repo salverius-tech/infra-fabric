@@ -19,7 +19,7 @@
       "apply": "evidenced",
       "health-idempotence": "evidenced",
       "service-restore": "evidenced",
-      "infrastructure-recovery": "not-evidenced",
+      "infrastructure-recovery": "evidenced",
       "hermes-integration": "not-evidenced",
       "rollback": "not-evidenced"
     },
@@ -94,6 +94,19 @@
       "result": "passed",
       "date": "2026-08-09",
       "boundary": "Enabled disposable development stateful services only; not controller or infrastructure recovery."
+    },
+    "development/infrastructure-recovery": {
+      "environment": "development",
+      "category": "infrastructure-recovery",
+      "audited_commit": "d88a66a65675a920f4930d0cbb6c470a9a49a9a1",
+      "citation": {
+        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+        "lines": "635-658"
+      },
+      "procedure_id": "phase-9-gate-5",
+      "result": "passed",
+      "date": "2026-08-09",
+      "boundary": "Disposable development state restore plus canonical validation and zero-change provider plan only; no isolated-controller, external-durability, rollback, or production acceptance."
     }
   },
   "evidence_boundary": "Active authority for environment-specific external acceptance only. An evidenced cell applies only to its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix.",
