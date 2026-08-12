@@ -58,6 +58,13 @@ class ValidTokenFakeClient(FakeClient):
 
 
 class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
+    def test_status_invalid_token_marks_api_ready(self) -> None:
+        client = bootstrap_token.TechnitiumBootstrapClient("http://example.invalid/api")
+        with mock.patch.object(client, "call", side_effect=bootstrap_token.BootstrapError("invalid-token")):
+            status = client.wait_for_status(retries=1, delay=0)
+
+        self.assertEqual(status, {"status": "ok", "hasDefaultCredentials": False})
+
     def test_canonical_bootstrap_rotates_invalid_token_without_dotenv(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

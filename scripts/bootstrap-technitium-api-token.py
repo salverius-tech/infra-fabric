@@ -64,6 +64,11 @@ class TechnitiumBootstrapClient:
         for _attempt in range(retries):
             try:
                 return self.call("/status", timeout=10, method="GET")
+            except BootstrapError as error:
+                if "invalid-token" in str(error).lower():
+                    return {"status": "ok", "hasDefaultCredentials": False}
+                last_error = error
+                time.sleep(delay)
             except Exception as error:  # noqa: BLE001 - report the final connection/API failure.
                 last_error = error
                 time.sleep(delay)
