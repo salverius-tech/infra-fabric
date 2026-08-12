@@ -57,6 +57,26 @@ class ValidTokenFakeClient(FakeClient):
         self.valid_existing_token = True
 
 
+class DefaultCredentialsFakeClient(FakeClient):
+    def __init__(self, api_url: str) -> None:
+        super().__init__(api_url)
+        self.password_changed = False
+
+    def call(
+        self,
+        path: str,
+        params: dict[str, str] | None = None,
+        token: str | None = None,
+        timeout: int = 30,
+        method: str = "POST",
+    ) -> dict[str, object]:
+        if path == "/user/login" and (params or {}).get("pass") == "REPLACE_ADMIN_PASSWORD" and not self.password_changed:
+            raise bootstrap_token.BootstrapError("invalid administrator password")
+        if path == "/user/changePassword":
+            self.password_changed = True
+        return super().call(path, params, token, timeout, method)
+
+
 class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
     def test_status_invalid_token_marks_api_ready(self) -> None:
         client = bootstrap_token.TechnitiumBootstrapClient("http://example.invalid/api")
@@ -107,6 +127,35 @@ class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
         self.assertEqual(stored, [(bundle, "services.technitium.secrets.api_token", "REPLACE_API_TOKEN_VALUE", key_file)])
         assert FakeClient.last is not None
         self.assertIn(("/user/createToken", {"tokenName": "infra-fabric"}, "REPLACE_SESSION_TOKEN"), FakeClient.last.calls)
+
+    def test_canonical_bootstrap_replaces_default_admin_password_before_token_rotation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bundle = root / "secrets.sops.yaml"
+            key_file = root / "site.age"
+            bundle.write_text("ciphertext\n", encoding="utf-8")
+            key_file.write_text("identity\n", encoding="utf-8")
+            with (
+                mock.patch.object(bootstrap_token, "TechnitiumBootstrapClient", DefaultCredentialsFakeClient),
+                mock.patch.object(bootstrap_token, "set_canonical_secret", return_value="updated"),
+            ):
+                changed = bootstrap_token.bootstrap_canonical(
+                    api_url="http://example.invalid/api",
+                    api_token="REPLACE_OLD_TOKEN",
+                    admin_password="REPLACE_ADMIN_PASSWORD",
+                    bundle=bundle,
+                    key_file=key_file,
+                    retries=1,
+                    delay=0,
+                    token_name="infra-fabric",
+                )
+
+        self.assertTrue(changed)
+        assert FakeClient.last is not None
+        self.assertIn(
+            ("/user/changePassword", {"pass": "admin", "newPass": "REPLACE_ADMIN_PASSWORD"}, "REPLACE_SESSION_TOKEN"),
+            FakeClient.last.calls,
+        )
 
     def test_canonical_bootstrap_leaves_valid_token_unchanged(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

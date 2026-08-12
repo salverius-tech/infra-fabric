@@ -119,7 +119,16 @@ def bootstrap_canonical(
     if validate_existing_token(client, api_token):
         print("Canonical Technitium API token already works.")
         return False
-    api_token = create_api_token(client, login(client, admin_password), token_name)
+    try:
+        session_token = login(client, admin_password)
+    except BootstrapError as configured_login_error:
+        try:
+            default_session_token = login(client, "admin")
+        except BootstrapError:
+            raise configured_login_error
+        client.call("/user/changePassword", {"pass": "admin", "newPass": admin_password}, token=default_session_token)
+        session_token = login(client, admin_password)
+    api_token = create_api_token(client, session_token, token_name)
     try:
         set_canonical_secret(bundle, CANONICAL_API_CREDENTIAL_PATH, api_token, key_file, replace=True, sops="sops")
     except Exception as error:  # noqa: BLE001 - preserve a redacted canonical persistence boundary.
