@@ -53,6 +53,11 @@ class OperationalCutoverTests(unittest.TestCase):
             result = subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, msg=f"{name}: {result.stderr}")
 
+    def test_canonical_lifecycle_wrappers_are_executable(self) -> None:
+        for name in ("plan-infra.sh", "apply-infra.sh", "teardown-infra.sh"):
+            with self.subTest(name=name):
+                self.assertTrue((ROOT / "scripts" / name).stat().st_mode & 0o111)
+
     def test_development_rollback_rehearsal_is_explicit_and_dev_only(self) -> None:
         script = (ROOT / "scripts" / "rehearse-development-rollback.sh").read_text(
             encoding="utf-8"
