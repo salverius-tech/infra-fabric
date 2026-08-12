@@ -469,7 +469,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(commands[0][0:6], ["ansible-playbook", "-i", "canonical-inventory.json", "-e", "@canonical-vars.json", "infra/ansible/playbooks/forgejo-runner.yml"])
 
-    def test_technitium_dns_invokes_standalone_token_bootstrap_before_dns_sync(self) -> None:
+    def test_technitium_dns_invokes_canonical_token_bootstrap_before_dns_sync(self) -> None:
         commands: list[list[str]] = []
 
         def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
@@ -481,7 +481,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 "technitium",
                 ("inventory.yml",),
                 Path(temp),
-                dict(os.environ),
+                {"INFRA_VALUES_DIR": "/values/sites/dev", "SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
                 runner,
             )
 
@@ -491,12 +491,19 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             [
                 ["ansible-playbook", "-i", "inventory.yml", "infra/ansible/playbooks/technitium.yml"],
                 ["ansible-playbook", "-i", "inventory.yml", "infra/ansible/playbooks/caddy-proxy.yml"],
-                ["python", "scripts/bootstrap-technitium-api-token.py"],
+                [
+                    "python",
+                    "scripts/bootstrap-technitium-api-token.py",
+                    "--bundle",
+                    "/values/sites/dev/secrets.sops.yaml",
+                    "--key-file",
+                    "/run/secrets/sops-age-key",
+                ],
                 ["ansible-playbook", "-i", "inventory.yml", "infra/ansible/playbooks/technitium-dns.yml"],
             ],
         )
 
-    def test_canonical_technitium_service_does_not_invoke_legacy_dotenv_bootstrap(self) -> None:
+    def test_technitium_token_bootstrap_requires_canonical_sops_inputs(self) -> None:
         commands: list[list[str]] = []
 
         def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
@@ -504,17 +511,38 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             return 0
 
         with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaisesRegex(RuntimeError, "selected SOPS inputs"):
+                apply_ansible_services.run_service(
+                    "technitium",
+                    ("canonical-inventory.json",),
+                    Path(temp),
+                    {},
+                    runner,
+                )
+
+        self.assertEqual(len(commands), 2)
+
+    def test_technitium_dns_refreshes_canonical_token_after_rotation(self) -> None:
+        commands: list[tuple[list[str], dict[str, str]]] = []
+
+        def runner(command: list[str], log_path: Path, env: dict[str, str]) -> int:
+            commands.append((command, dict(env)))
+            return 0
+
+        with tempfile.TemporaryDirectory() as temp:
             result = apply_ansible_services.run_service(
                 "technitium",
-                ("canonical-inventory.json",),
+                ("inventory.yml",),
                 Path(temp),
-                {},
+                {"INFRA_VALUES_DIR": "/values/sites/dev", "SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
                 runner,
-                bootstrap_technitium=False,
+                service_environment={"TECHNITIUM_API_TOKEN": "REPLACE_OLD_TOKEN"},
+                refresh_service_environment=lambda service: {"TECHNITIUM_API_TOKEN": "REPLACE_NEW_TOKEN"},
             )
 
         self.assertEqual(result.returncode, 0)
-        self.assertNotIn(["python", "scripts/bootstrap-technitium-api-token.py"], commands)
+        self.assertEqual(commands[-1][0][-1], "infra/ansible/playbooks/technitium-dns.yml")
+        self.assertEqual(commands[-1][1]["TECHNITIUM_API_TOKEN"], "REPLACE_NEW_TOKEN")
 
     def test_canonical_enabled_services_selects_only_enabled_model_services(self) -> None:
         model = SimpleNamespace(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import tempfile
 import unittest
@@ -34,6 +35,7 @@ class FakeClient:
         params: dict[str, str] | None = None,
         token: str | None = None,
         timeout: int = 30,
+        method: str = "POST",
     ) -> dict[str, object]:
         self.calls.append((path, params or {}, token))
         if path == "/user/session/get":
@@ -56,48 +58,73 @@ class ValidTokenFakeClient(FakeClient):
 
 
 class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
-    def write_env(self, content: str) -> Path:
-        handle = tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False)
-        with handle:
-            handle.write(content)
-        return Path(handle.name)
+    def test_canonical_bootstrap_rotates_invalid_token_without_dotenv(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bundle = root / "secrets.sops.yaml"
+            key_file = root / "site.age"
+            bundle.write_text("ciphertext\n", encoding="utf-8")
+            key_file.write_text("identity\n", encoding="utf-8")
+            stored: list[tuple[Path, str, str, Path]] = []
 
-    def test_generates_admin_password_and_api_token_from_default_credentials(self) -> None:
-        path = self.write_env(
-            "export TECHNITIUM_API_URL='http://192.0.2.53:5380/api'\n"
-            "export TECHNITIUM_API_TOKEN='REPLACE_AFTER_TOKEN_CREATION'\n"
-        )
-        try:
-            with mock.patch.object(bootstrap_token, "TechnitiumBootstrapClient", FakeClient), mock.patch.object(
-                bootstrap_token.secrets, "token_urlsafe", return_value="REPLACE_GENERATED_ADMIN_PASSWORD"
+            def set_secret(
+                bundle_path: Path,
+                path: str,
+                value: str,
+                selected_key: Path,
+                *,
+                replace: bool,
+                sops: str,
+            ) -> str:
+                self.assertTrue(replace)
+                self.assertEqual(sops, "sops")
+                stored.append((bundle_path, path, value, selected_key))
+                return "updated"
+
+            with (
+                mock.patch.object(bootstrap_token, "TechnitiumBootstrapClient", FakeClient),
+                mock.patch.object(bootstrap_token, "set_canonical_secret", side_effect=set_secret),
             ):
-                changed = bootstrap_token.bootstrap(path, retries=1, delay=0, token_name="homelab-infra")
+                changed = bootstrap_token.bootstrap_canonical(
+                    api_url="http://example.invalid/api",
+                    api_token="REPLACE_OLD_TOKEN",
+                    admin_password="REPLACE_ADMIN_PASSWORD",
+                    bundle=bundle,
+                    key_file=key_file,
+                    retries=1,
+                    delay=0,
+                    token_name="infra-fabric",
+                )
 
-            self.assertTrue(changed)
-            text = path.read_text(encoding="utf-8")
-            self.assertIn("TECHNITIUM_ADMIN_PASSWORD=REPLACE_GENERATED_ADMIN_PASSWORD", text)
-            self.assertIn("TECHNITIUM_API_TOKEN=REPLACE_API_TOKEN_VALUE", text)
-            assert FakeClient.last is not None
-            self.assertIn(("/user/changePassword", {"pass": "admin", "newPass": "REPLACE_GENERATED_ADMIN_PASSWORD"}, "REPLACE_SESSION_TOKEN"), FakeClient.last.calls)
-            self.assertIn(("/user/createToken", {"tokenName": "homelab-infra"}, "REPLACE_SESSION_TOKEN"), FakeClient.last.calls)
-        finally:
-            path.unlink()
+        self.assertTrue(changed)
+        self.assertEqual(stored, [(bundle, "services.technitium.secrets.api_token", "REPLACE_API_TOKEN_VALUE", key_file)])
+        assert FakeClient.last is not None
+        self.assertIn(("/user/createToken", {"tokenName": "infra-fabric"}, "REPLACE_SESSION_TOKEN"), FakeClient.last.calls)
 
-    def test_existing_valid_token_is_left_unchanged(self) -> None:
-        path = self.write_env(
-            "export TECHNITIUM_API_URL='http://192.0.2.53:5380/api'\n"
-            "export TECHNITIUM_API_TOKEN='example-token'\n"  # public-safety: allow-secret
-        )
-        try:
-            with mock.patch.object(bootstrap_token, "TechnitiumBootstrapClient", ValidTokenFakeClient):
-                changed = bootstrap_token.bootstrap(path, retries=1, delay=0, token_name="homelab-infra")
+    def test_canonical_bootstrap_leaves_valid_token_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bundle = root / "secrets.sops.yaml"
+            key_file = root / "site.age"
+            bundle.write_text("ciphertext\n", encoding="utf-8")
+            key_file.write_text("identity\n", encoding="utf-8")
+            with (
+                mock.patch.object(bootstrap_token, "TechnitiumBootstrapClient", ValidTokenFakeClient),
+                mock.patch.object(bootstrap_token, "set_canonical_secret") as set_secret,
+            ):
+                changed = bootstrap_token.bootstrap_canonical(
+                    api_url="http://example.invalid/api",
+                    api_token="REPLACE_VALID_TOKEN",
+                    admin_password="REPLACE_ADMIN_PASSWORD",
+                    bundle=bundle,
+                    key_file=key_file,
+                    retries=1,
+                    delay=0,
+                    token_name="infra-fabric",
+                )
 
-            self.assertFalse(changed)
-            text = path.read_text(encoding="utf-8")
-            self.assertIn("TECHNITIUM_API_TOKEN='example-token'", text)  # public-safety: allow-secret
-            self.assertNotIn("TECHNITIUM_ADMIN_PASSWORD", text)
-        finally:
-            path.unlink()
+        self.assertFalse(changed)
+        set_secret.assert_not_called()
 
 
 if __name__ == "__main__":

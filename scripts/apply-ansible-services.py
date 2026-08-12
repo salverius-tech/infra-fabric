@@ -465,8 +465,19 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
 
 
 def bootstrap_technitium_token(log_path: Path, env: dict[str, str], runner: RunCommand) -> int:
+    values_dir = env.get("INFRA_VALUES_DIR", "")
+    age_key_file = env.get("SOPS_AGE_KEY_FILE", "")
+    if not values_dir or not age_key_file:
+        raise RuntimeError("canonical Technitium token bootstrap requires selected SOPS inputs")
     return runner(
-        ["python", "scripts/bootstrap-technitium-api-token.py"],
+        [
+            "python",
+            "scripts/bootstrap-technitium-api-token.py",
+            "--bundle",
+            str(Path(values_dir) / "secrets.sops.yaml"),
+            "--key-file",
+            age_key_file,
+        ],
         log_path,
         env,
     )
@@ -517,6 +528,7 @@ def run_service(
     extra_args: tuple[str, ...] = (),
     service_environment: Mapping[str, str] | None = None,
     bootstrap_technitium: bool = True,
+    refresh_service_environment: Callable[[str], Mapping[str, str]] | None = None,
 ) -> ServiceResult:
     playbooks = tuple(settings.SERVICES[service]["playbooks"])
     log_path = log_dir / f"{service}.log"
@@ -528,6 +540,8 @@ def run_service(
             rc = bootstrap_technitium_token(log_path, env, runner)
             if rc != 0:
                 return ServiceResult(service, playbooks, rc, log_path)
+            if refresh_service_environment is not None:
+                env.update(refresh_service_environment(service))
         command = ["ansible-playbook", *inventory_args(inventories), *extra_args, playbook]
         rc = runner(command, log_path, env)
         if rc != 0:
@@ -544,6 +558,7 @@ def run_sequential(
     extra_args: tuple[str, ...] = (),
     service_environments: Mapping[str, Mapping[str, str]] | None = None,
     bootstrap_technitium: bool = True,
+    refresh_service_environment: Callable[[str], Mapping[str, str]] | None = None,
 ) -> list[ServiceResult]:
     results: list[ServiceResult] = []
     for service in services:
@@ -557,6 +572,7 @@ def run_sequential(
             extra_args,
             (service_environments or {}).get(service),
             bootstrap_technitium,
+            refresh_service_environment,
         )
         results.append(result)
         if result.returncode != 0:
@@ -576,6 +592,7 @@ def run_parallel(
     service_environments: Mapping[str, Mapping[str, str]] | None = None,
     execution_resources: Mapping[str, str] | None = None,
     bootstrap_technitium: bool = True,
+    refresh_service_environment: Callable[[str], Mapping[str, str]] | None = None,
 ) -> list[ServiceResult]:
     results: list[ServiceResult] = []
     resources = dict(execution_resources or execution_resource_keys(services))
@@ -593,6 +610,7 @@ def run_parallel(
                     extra_args,
                     (service_environments or {}).get(service),
                     bootstrap_technitium,
+                    refresh_service_environment,
                 ): service
                 for service in wave
             }
@@ -711,6 +729,16 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 for selected_service in services
             }
+
+        def refresh_service_environment(selected_service: str) -> Mapping[str, str]:
+            refreshed_provider = SopsAgeProvider(context.path("secrets.sops.yaml"))
+            return deliver_services_environment(
+                refreshed_provider,
+                catalog,
+                model.services,
+                selected_services=[selected_service],
+            )
+
         base_env = without_protected_environment(base_env, catalog)
         if args.mode == "sequential":
             results = run_sequential(
@@ -720,7 +748,8 @@ def main(argv: list[str] | None = None) -> int:
                 base_env,
                 extra_args=extra_args,
                 service_environments=service_environments,
-                bootstrap_technitium=False,
+                bootstrap_technitium=True,
+                refresh_service_environment=refresh_service_environment,
             )
         else:
             results = run_parallel(
@@ -732,7 +761,8 @@ def main(argv: list[str] | None = None) -> int:
                 extra_args=extra_args,
                 service_environments=service_environments,
                 execution_resources=execution_resources,
-                bootstrap_technitium=False,
+                bootstrap_technitium=True,
+                refresh_service_environment=refresh_service_environment,
             )
         print("==> canonical host bootstrap", flush=True)
         bootstrap_rc = run_canonical_bootstrap(context, inventories, log_dir, base_env, extra_args=extra_args)
