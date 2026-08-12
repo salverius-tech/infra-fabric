@@ -15,8 +15,13 @@ git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
 docker compose run --rm -v "${git_common_dir}:${git_common_dir}:ro" infra bash -euo pipefail -c '
 stages=()
 current_stage=""
+fixture_root=""
+cleanup_fixture_root() {
+  [[ -z "${fixture_root}" ]] || rm -rf -- "${fixture_root}"
+}
 print_summary() {
   status=$?
+  cleanup_fixture_root
   if [[ ${status} -ne 0 && -n ${current_stage} ]]; then
     stages+=("FAIL ${current_stage}")
   fi
@@ -35,11 +40,37 @@ run_stage() {
 }
 trap print_summary EXIT
 
+fixture_root="$(mktemp -d)"
+fixture_site="${fixture_root}/public-validation"
+mkdir -p "${fixture_site}"
+python - "scaffold/sites/_template/site.yaml" "${fixture_site}/site.yaml" <<'"'"'PY'"'"'
+from pathlib import Path
+from ruamel.yaml import YAML
+
+source, target = map(Path, __import__("sys").argv[1:])
+yaml = YAML()
+data = yaml.load(source.read_text(encoding="utf-8"))
+data["site"]["name"] = target.parent.name
+with target.open("w", encoding="utf-8") as handle:
+    yaml.dump(data, handle)
+PY
+python scripts/canonical-render.py \
+  --site-file "${fixture_site}/site.yaml" \
+  --output-dir "${fixture_root}/generated" \
+  --source-commit public-validation >/dev/null
+python scripts/verify-projections.py \
+  --site-file "${fixture_site}/site.yaml" \
+  --generated-dir "${fixture_root}/generated" >/dev/null
+fixture_tfvars="${fixture_root}/generated/terraform.auto.tfvars.json"
+fixture_inventory="${fixture_root}/generated/ansible-inventory.json"
+fixture_vars="${fixture_root}/generated/ansible-vars.json"
+
 run_stage "preflight" python scripts/workspace-preflight.py
 run_stage "opentofu" bash -euo pipefail -c "
   tofu -chdir=infra/opentofu init -backend=false
-  tofu fmt -check -recursive infra/opentofu scaffold/terraform.tfvars
+  tofu fmt -check -recursive infra/opentofu
   tofu -chdir=infra/opentofu validate
+  tofu -chdir=infra/opentofu console -var-file=\"${fixture_tfvars}\" <<<\"length(var.enabled_services)\" >/dev/null
   tflint --chdir=infra/opentofu --minimum-failure-severity=error
 "
 run_stage "shell" shellcheck scripts/*.sh tools/docker-entrypoint.sh
@@ -64,11 +95,9 @@ run_stage "contracts" bash -euo pipefail -c "
   coverage report --fail-under=70
 "
 run_stage "ansible" bash -euo pipefail -c "
-  export ANSIBLE_TFVARS_FILE=scaffold/terraform.tfvars
-  export INFRA_SETTINGS_FILE=settings.example.json
-  ansible-inventory -i scaffold/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py --list >/dev/null
-  mapfile -t playbooks < <(python scripts/settings.py --settings settings.example.json ansible-playbooks --all)
-  ansible-playbook -i scaffold/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py --syntax-check \\
+  ansible-inventory -i \"${fixture_inventory}\" --list >/dev/null
+  mapfile -t playbooks < <(python scripts/settings.py ansible-playbooks --projection \"${fixture_tfvars}\")
+  ansible-playbook -i \"${fixture_inventory}\" -e @\"${fixture_vars}\" --syntax-check \\
     infra/ansible/playbooks/storage-prep.yml \\
     infra/ansible/playbooks/guest-mount-feature-preflight.yml \\
     \"\${playbooks[@]}\"

@@ -12,9 +12,8 @@ git ls-files >"${tracked_file}"
 : >"${ignored_file}"
 for path in \
   scaffold/.env.example \
-  scaffold/terraform.tfvars \
   scaffold/dns-records.local.json \
-  scaffold/ansible/inventory/local.yml \
+  scaffold/sites/_template/site.yaml \
   settings.example.json; do
   if git check-ignore -q -- "${path}"; then
     printf '%s\n' "${path}" >>"${ignored_file}"

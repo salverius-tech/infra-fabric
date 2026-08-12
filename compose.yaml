@@ -29,28 +29,6 @@ services:
       SERVICE_STATE_RESTORE_FILE: ${SERVICE_STATE_RESTORE_FILE:-}
       SOPS_AGE_KEY_FILE: /run/secrets/sops-age-key
 
-  # Isolated report-only boundary for legacy source forensics. Keep this
-  # separate from `infra`: source, root filesystem, and networking are sealed.
-  legacy-values-forensics:
-    build:
-      context: .
-      dockerfile: tools/Dockerfile
-    image: homelab-infra-tooling:local
-    pull_policy: never
-    entrypoint: []
-    working_dir: /workspace
-    user: "${INFRA_HOST_UID:-1000}:${INFRA_HOST_GID:-1000}"
-    read_only: true
-    network_mode: none
-    volumes:
-      - .:/workspace:ro
-    tmpfs:
-      - /tmp:mode=1777
-    environment:
-      HOME: /tmp/legacy-values-forensics-home
-      PYTHONDONTWRITEBYTECODE: "1"
-      PYTHONPYCACHEPREFIX: /tmp/legacy-values-forensics-pycache
-
 volumes:
   tofu-plugin-cache:
   ansible-cache:

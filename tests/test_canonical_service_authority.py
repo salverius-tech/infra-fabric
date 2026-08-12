@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import os
+import json
 from pathlib import Path
 import re
 import shutil
@@ -37,21 +38,50 @@ ONRAMP_CHECKS_TF = ROOT / "infra/opentofu/onramp-host-checks.tf"
 
 class CanonicalServiceAuthorityTests(unittest.TestCase):
     @staticmethod
-    def tofu_console(expression: str, *variables: str) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
-            [
-                "tofu",
-                "-chdir=infra/opentofu",
-                "console",
-                "-var-file=../../scaffold/terraform.tfvars",
-                *variables,
-            ],
-            cwd=ROOT,
-            input=f"{expression}\n",
-            text=True,
-            capture_output=True,
-            check=False,
+    def tofu_plan(*variables: str) -> subprocess.CompletedProcess[str]:
+        model = load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
+        projection = render_opentofu_variables(model, load_catalog(CATALOG_PATH))
+        projection.update(
+            {
+                "debian_template_url": "https://images.example.internal/debian.tar.zst",
+                "debian_template_file_name": "debian.tar.zst",
+                "debian_template_checksum_algorithm": "sha256",
+                "debian_template_checksum": "a" * 64,
+                "guest_vm_image_checksum_algorithm": "sha256",
+                "guest_vm_image_checksum": "b" * 64,
+            }
         )
+        with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8") as handle:
+            json.dump(projection, handle)
+            handle.flush()
+            return subprocess.run(
+                [
+                    "tofu",
+                    "-chdir=infra/opentofu",
+                    "plan",
+                    "-refresh=false",
+                    "-input=false",
+                    "-lock=false",
+                    f"-var-file={handle.name}",
+                    *variables,
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+    @staticmethod
+    def tofu_console(expression: str, *variables: str) -> subprocess.CompletedProcess[str]:
+        model = load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
+        projection = render_opentofu_variables(model, load_catalog(CATALOG_PATH))
+        with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8") as handle:
+            json.dump(projection, handle)
+            handle.flush()
+            return subprocess.run(
+                ["tofu", "-chdir=infra/opentofu", "console", f"-var-file={handle.name}", *variables],
+                cwd=ROOT, input=f"{expression}\n", text=True, capture_output=True, check=False,
+            )
 
     def test_tailscale_selection_projects_to_tofu_and_inventory_without_legacy_gate(self) -> None:
         data = yaml.safe_load((ROOT / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8"))
@@ -86,13 +116,16 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
     def test_retired_opentofu_selection_aliases_fail_closed(self) -> None:
         variables = VARIABLES_TF.read_text(encoding="utf-8")
         services = SERVICES_TF.read_text(encoding="utf-8")
-        scaffold = (ROOT / "scaffold/terraform.tfvars").read_text(encoding="utf-8")
+
 
         self.assertRegex(variables, r'(?s)variable "forgejo_runtime" \{.*?default\s+=\s+null')
         self.assertRegex(variables, r'(?s)variable "tailscale_client_enabled" \{.*?default\s+=\s+null')
         self.assertIn("var.forgejo_runtime == null", services)
         self.assertIn("var.tailscale_client_enabled == null", services)
-        self.assertNotIn("tailscale_client_enabled", scaffold)
+        projection = render_opentofu_variables(
+            load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH), load_catalog(CATALOG_PATH)
+        )
+        self.assertNotIn("tailscale_client_enabled", projection)
 
     def test_runtime_selection_defaults_and_acceptance_are_catalog_backed(self) -> None:
         catalog = load_catalog(CATALOG_PATH)
@@ -154,23 +187,7 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
         )
         for variable, expected in cases:
             with self.subTest(variable=variable):
-                result = subprocess.run(
-                    [
-                        "tofu",
-                        "-chdir=infra/opentofu",
-                        "plan",
-                        "-refresh=false",
-                        "-input=false",
-                        "-lock=false",
-                        "-var-file=../../scaffold/terraform.tfvars",
-                        '-var=enabled_services=[]',
-                        variable,
-                    ],
-                    cwd=ROOT,
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                )
+                result = self.tofu_plan('-var=enabled_services=[]', variable)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(expected, result.stdout + result.stderr)
 

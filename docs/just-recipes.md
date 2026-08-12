@@ -8,9 +8,7 @@ Select a site before every normal operator workflow (including values checks and
 export VALUES_SITE=<site>
 ```
 
-Private implementation recipes are not operator commands.
-
-The only retained legacy-layout recipe is the private `recover-legacy-values-forensics` report. It performs value-redacted, stdout-only discovery in a read-only, non-network container without rewriting either the legacy source or repository source. It accepts no arguments and cannot forward write-capable or network-capable options. It is never a substitute for setup, validate, plan, apply, teardown, or Ansible execution; see [canonical model operations](canonical-values-migration.md#executable-compatibility-boundary).
+Private implementation recipes are not operator commands. Legacy-layout recovery/import recipes are retired; canonical selected-site workflows are the only supported operator surface.
 
 ## `default`
 

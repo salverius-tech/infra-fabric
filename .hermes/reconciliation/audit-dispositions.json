@@ -414,8 +414,8 @@
           "role": "production"
         },
         "verification": {
-          "path": "tests/test_canonical_mapping_inventory.py",
-          "lines": "1-100",
+          "path": "tests/test_canonical_service_authority.py",
+          "lines": "1-180",
           "role": "verification"
         }
       },
@@ -437,8 +437,8 @@
           "role": "production"
         },
         "verification": {
-          "path": "tests/test_canonical_mapping_inventory.py",
-          "lines": "1-100",
+          "path": "tests/test_canonical_service_authority.py",
+          "lines": "1-180",
           "role": "verification"
         }
       },
@@ -851,8 +851,8 @@
           "role": "production"
         },
         "verification": {
-          "path": "tests/test_canonical_mapping_inventory.py",
-          "lines": "1-100",
+          "path": "tests/test_canonical_service_authority.py",
+          "lines": "1-180",
           "role": "verification"
         }
       },

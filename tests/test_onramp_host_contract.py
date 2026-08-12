@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-import re
 import unittest
 from pathlib import Path
+
+import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 VARIABLES = REPO / "infra" / "opentofu" / "variables.tf"
 ONRAMP_HOST_TF = REPO / "infra" / "opentofu" / "onramp-host.tf"
-SCAFFOLD_TFVARS = REPO / "scaffold" / "terraform.tfvars"
+CANONICAL_SITE = REPO / "scaffold" / "sites" / "_template" / "site.yaml"
 ONRAMP_HOST_TASKS = REPO / "infra" / "ansible" / "roles" / "onramp_host" / "tasks" / "main.yml"
 
 
@@ -40,11 +41,12 @@ class OnrampHostContractTests(unittest.TestCase):
         ):
             self.assertIn(f'variable "{name}"', text)
 
-    def test_scaffold_onramp_host_vmid_and_address_are_unique(self) -> None:
-        text = SCAFFOLD_TFVARS.read_text(encoding="utf-8")
-        vmids = re.findall(r"(?m)^\w+(?:_container)?_vmid\s*=\s*(\d+)", text)
+    def test_canonical_fixture_resource_vmids_and_addresses_are_unique(self) -> None:
+        data = yaml.safe_load(CANONICAL_SITE.read_text(encoding="utf-8"))
+        resources = {**data["resources"].get("guests", {}), **data["resources"].get("shared_hosts", {})}
+        vmids = [resource["identity"]["vmid"] for resource in resources.values()]
         self.assertEqual(len(vmids), len(set(vmids)))
-        addresses = [match.split("/", 1)[0] for match in re.findall(r'(?m)^\w+(?:_container)?_ipv4_address\s*=\s*"([^\"]+)"', text) if match != "dhcp"]
+        addresses = [resource["network"]["address"].split("/", 1)[0] for resource in resources.values() if resource["network"]["address"] != "dhcp"]
         self.assertEqual(len(addresses), len(set(addresses)))
 
     def test_onramp_host_role_declares_hardening_and_no_host_published_ports_contract(self) -> None:

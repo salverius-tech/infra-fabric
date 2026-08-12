@@ -41,17 +41,6 @@ VALUES_SITE=<site> just validate
 
 Secret delivery resolves only required paths for the selected enabled services, passes values transiently to the approved consumer boundary, and removes protected temporary material on completion and failure. Do not put secrets in `site.yaml`, generated projections, OpenTofu variables, state, plans, command arguments, or logs.
 
-## Namespace migration
-
-The migration command is a dry run unless `--apply` is supplied:
-
-```bash
-scripts/migrate-secret-bundle.py values/sites/<site>/secrets.sops.yaml
-scripts/migrate-secret-bundle.py values/sites/<site>/secrets.sops.yaml --apply
-```
-
-Migration accepts only the bounded legacy aliases `operator.systemboss_password`, `operator.password`, and `services.providers.cloudflare.secrets.api_token`. It writes `secrets.operator.password` and `secrets.providers.cloudflare.api_token`, removes empty legacy parents, and fails closed when legacy and canonical values differ. Runtime consumers do not resolve legacy aliases.
-
 ## Rotation
 
 1. Generate a replacement site identity through the approved private workflow.

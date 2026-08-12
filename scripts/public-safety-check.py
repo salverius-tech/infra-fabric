@@ -12,9 +12,8 @@ from pathlib import Path
 
 REQUIRED_SCAFFOLD = (
     "scaffold/.env.example",
-    "scaffold/terraform.tfvars",
     "scaffold/dns-records.local.json",
-    "scaffold/ansible/inventory/local.yml",
+    "scaffold/sites/_template/site.yaml",
     "settings.example.json",
 )
 

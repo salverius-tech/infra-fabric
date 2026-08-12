@@ -89,6 +89,8 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("coverage run", text)
         self.assertIn("coverage report --fail-under=", text)
         self.assertIn('stages+=("FAIL ${current_stage}")', text)
+        self.assertIn("scripts/canonical-render.py", text)
+        self.assertIn("scripts/verify-projections.py", text)
 
     def test_workflow_scans_dependencies_and_image_on_manual_schedule_only(
         self,

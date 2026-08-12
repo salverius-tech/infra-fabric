@@ -1064,22 +1064,19 @@ mutation paths.
 
 ### Package P10-E — Triggered legacy retirement
 
-**Status: blocked by design.** Isolated infrastructure/controller recovery acceptance is
-not complete and no separate permanent-removal authorization was granted, so bounded
-migration/discovery tools remain intact and were not refactored or deleted.
+**Status: complete (2026-08-12).** The recorded disposable-development
+controller/infrastructure recovery rehearsal satisfied the development recovery-evidence
+gate for evaluation, and the authorized removal scope retired the bounded legacy
+compatibility surface as one package. This source retirement is not isolated-recovery or
+production acceptance.
 
-- [ ] Complete and record isolated infrastructure/controller recovery acceptance.
-- [x] Inventory remaining callers of every bounded migration/discovery tool in
-  [`docs/legacy-recovery-tool-inventory.md`](../../docs/legacy-recovery-tool-inventory.md); retain the implementation until the remaining trigger conditions pass.
-- [x] Seal the retained forensic recipe behind an exact zero-argument wrapper, read-only
-  source/root mounts, disabled networking, temporary-only caches, and default no-registry
-  discovery; keep mutation and network-capable resolution as separate direct CLI opt-ins.
-- [ ] Obtain separate operator authorization for permanent compatibility removal.
-- [ ] Delete the retired implementation, mapping exclusions, scaffold surfaces, and tests
-  together; do not leave forwarding shims that recreate a second normal workflow.
+- [x] Record development controller/infrastructure recovery acceptance evidence.
+- [x] Inventory the legacy callers before removal and retain the historical inventory as provenance.
+- [x] Replace static legacy public fixtures with rendered, verified temporary canonical projections.
+- [x] Delete legacy import/discovery/forensics, mapping, fixture, entrypoint, and focused-test surfaces together; retain only canonical encrypted-bundle recovery primitives.
 
-Exit gate: canonical rebuild/recovery is accepted, no caller depends on legacy tooling,
-and the operator has explicitly authorized deletion.
+Exit gate: met — no caller depends on legacy tooling, public validation consumes only
+generated canonical projections, and normal operation has no compatibility fallback.
 
 Retained-boundary evidence (2026-08-11): `just validate-public` passed all stages with
 948 tests and 74% aggregate script coverage; the integrated audit/forensics suite passed

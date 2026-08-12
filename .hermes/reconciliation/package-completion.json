@@ -244,7 +244,7 @@
         "infra/opentofu/modules/debian-vm",
         "infra/opentofu/modules/debian-lxc",
         "scripts/canonical_projections.py",
-        "tests/test_canonical_mapping_inventory.py"
+        "tests/test_canonical_service_authority.py"
       ],
       "source_status": "source-complete",
       "evidence": {
@@ -253,8 +253,8 @@
           "lines": "1-170"
         },
         "verification": {
-          "path": "tests/test_canonical_mapping_inventory.py",
-          "lines": "1-100"
+          "path": "tests/test_canonical_service_authority.py",
+          "lines": "1-180"
         }
       }
     },

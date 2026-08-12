@@ -38,11 +38,6 @@ status-values:
 check-values:
     scripts/values.sh check
 
-# Read-only, non-network legacy discovery report for explicit recovery/forensics; never a normal lifecycle fallback
-[private]
-recover-legacy-values-forensics:
-    @scripts/legacy-values-forensics.sh
-
 # Validate public-safety rules for tracked source and scaffold templates
 [private]
 validate-public-safety:

@@ -11,12 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PlanProjectionLifecycleTests(unittest.TestCase):
-    def test_setup_requires_an_explicit_remote_and_does_not_discover_legacy_settings(self) -> None:
+    def test_setup_requires_an_explicit_remote_and_has_no_legacy_discovery_entrypoint(self) -> None:
         # Safety category: pre-mutation ordering. Setup can initialize or clone a
         # private values repository, so retain this narrow public entrypoint guard.
         justfile = (ROOT / "justfile").read_text(encoding="utf-8")
         setup_recipe = justfile.split("# Initialize the selected canonical site's bootstrap SSH identity", 1)[0]
-        self.assertNotIn("discover-values-remote.sh", setup_recipe)
+        self.assertFalse((ROOT / "scripts" / "discover-values-remote.sh").exists())
         self.assertIn('selected_remote="{{remote}}"', setup_recipe)
 
     def test_shared_projection_set_helper_fails_closed_and_accepts_complete_set(self) -> None:

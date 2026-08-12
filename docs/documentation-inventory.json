@@ -70,7 +70,8 @@
     "docs/canonical-service-authoring.md": "working design",
     "docs/canonical-teardown.md": "operator guidance",
     "docs/canonical-troubleshooting.md": "operator guidance",
-    "docs/canonical-values-mapping-v1.md": "current authority",
+
+    "docs/canonical-values-mapping-v1.md": "historical reference",
     "docs/canonical-values-migration.md": "operator guidance",
     "docs/canonical-values-model-blockers.md": "working design",
     "docs/canonical-values-secret-operations.md": "operator guidance",
@@ -83,7 +84,8 @@
     "docs/hermes-state-backup.md": "operator guidance",
     "docs/hermes-tuning.md": "operator guidance",
     "docs/just-recipes.md": "operator guidance",
-    "docs/legacy-recovery-tool-inventory.md": "current authority",
+    "docs/legacy-recovery-tool-inventory.md": "historical reference",
+
     "docs/normalized-plan-equivalence.md": "working design",
     "docs/onramp-app-platform-contract.md": "operator guidance",
     "docs/onramp-host-runbook.md": "operator guidance",

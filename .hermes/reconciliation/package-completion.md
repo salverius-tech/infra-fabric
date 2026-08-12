@@ -15,7 +15,7 @@ Frozen lossless provenance: `git show e04aed2ef2f0133368cdd26ed57d9c9ba3b2a548:.
 | O2 | Host-aware Ansible scheduling | source-complete | production: `scripts/apply-ansible-services.py:84-155`; verification: `tests/test_apply_ansible_services.py:20-70` |
 | O3 | Immutable runtime and image supply chain | source-complete | production: `infra/ansible/tasks/reviewed-artifact-cache.yml:1-62`; verification: `tests/test_artifact_projection.py:1-130` |
 | Q1 | Ansible convergence and check mode | source-complete | production: `scripts/check-direct-service-ansible.py:1-120`; verification: `tests/test_ansible_convergence_contract.py:1-100` |
-| Q2 | OpenTofu module and projection contracts | source-complete | production: `infra/opentofu/services.tf:1-170`; verification: `tests/test_canonical_mapping_inventory.py:1-100` |
+| Q2 | OpenTofu module and projection contracts | source-complete | production: `infra/opentofu/services.tf:1-170`; verification: `tests/test_canonical_service_authority.py:1-180` |
 | Q3 | Update workflow parity | source-complete | production: `scripts/update.py:1-100`; verification: `tests/test_update.py:1-230` |
 | DOCS | Documentation authority and operations | source-complete | production: `docs/service-operations.md:1-70`; verification: `tests/test_documentation_contract.py:39-245` |
 | CI | Tooling, CI, and quality gates | source-complete | production: `tools/Dockerfile:1-60`; verification: `tests/test_phase7_tooling_contract.py:1-80` |

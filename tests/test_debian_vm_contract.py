@@ -57,7 +57,7 @@ class DebianVmImageContractTests(unittest.TestCase):
             "disk requires a non-empty datastore_id and a positive size_gb.",
             "mount_points require non-empty volumes and absolute unique guest paths.",
             "ipv4_address must be dhcp or an IPv4 CIDR address.",
-            "ipv4_gateway must be an IPv4 address.",
+            "ipv4_gateway must be null or an IPv4 address.",
             "vlan_id must be 1 through 4094.",
         ):
             self.assertIn(contract, variables)

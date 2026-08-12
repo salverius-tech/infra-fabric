@@ -4,7 +4,7 @@
 .env.*
 !.env.example
 terraform.tfvars
-!scaffold/terraform.tfvars
+
 *.tfstate
 *.tfstate.*
 tfplan

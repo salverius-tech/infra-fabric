@@ -140,12 +140,12 @@ variable "ipv4_address" {
 }
 
 variable "ipv4_gateway" {
-  description = "IPv4 gateway for the LXC."
+  description = "IPv4 gateway for the LXC, or null when DHCP supplies it."
   type        = string
 
   validation {
-    condition     = can(cidrhost("${var.ipv4_gateway}/32", 0))
-    error_message = "ipv4_gateway must be an IPv4 address."
+    condition     = var.ipv4_gateway == null || can(cidrhost("${var.ipv4_gateway}/32", 0))
+    error_message = "ipv4_gateway must be null or an IPv4 address."
   }
 }
 
