@@ -658,6 +658,19 @@ was also verified with no unresolved correlations. This is development-only reco
 evidence: it does not establish isolated-controller recovery, external audit
 durability, rollback acceptance, or production acceptance.
 
+### Development Hermes read-only bridge evidence — 2026-08-12
+
+For disposable `dev`, the canonical Ansible convergence installed a root-owned public
+operator runtime bundle and a generated non-secret context containing only the selected
+site identity and enabled service identifiers. The deployed plugin was invoked as its
+runtime user over canonical transport: `status` succeeded using the deployed projection,
+and `audit-verify` succeeded against an empty guest-local private journal baseline with
+no unresolved correlations. Canonical validation passed, and a fresh provider-backed
+plan reported zero create, update, replace, and delete actions. This is development-only
+read-only bridge evidence. It does not establish authenticated dashboard/API or WebSocket
+acceptance, external audit durability, mutation approval identity, rollback,
+isolated-recovery, or production acceptance.
+
 ## Audit finding coverage matrix
 
 | Package | Findings |

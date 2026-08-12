@@ -82,7 +82,7 @@ MATRIX_ROWS = {
     "development": {
         "plan": "evidenced", "apply": "evidenced", "health-idempotence": "evidenced",
         "service-restore": "evidenced", "infrastructure-recovery": "evidenced",
-        "hermes-integration": "not-evidenced", "rollback": "not-evidenced",
+        "hermes-integration": "evidenced", "rollback": "not-evidenced",
     },
     "isolated-recovery": {column: "not-evidenced" for column in MATRIX_COLUMNS},
     "production": {column: "not-evidenced" for column in MATRIX_COLUMNS},
@@ -130,8 +130,18 @@ MATRIX_EVIDENCE = {
             "phase-9-gate-5",
             "Disposable development state restore plus canonical validation and zero-change provider plan only; no isolated-controller, external-durability, rollback, or production acceptance.",
         ),
+        (
+            "hermes-integration",
+            "661-674",
+            "phase-9-gate-6-read-only-bridge",
+            "Disposable development deployed-plugin read-only status and audit verification only; uses a non-secret service-ID context and guest-local private empty audit baseline. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance.",
+        ),
     )
 }
+MATRIX_EVIDENCE["development/hermes-integration"]["audited_commit"] = (
+    "e142d4490765fd0d2a20000e9deb326fa9694ba1"
+)
+MATRIX_EVIDENCE["development/hermes-integration"]["date"] = "2026-08-12"
 RETIRED_ARTIFACTS = (
     "audit-package-evidence-registry.json", "audit-package-evidence-registry.md",
     "backlog.json", "contradiction-register.md", "decision-register.md",

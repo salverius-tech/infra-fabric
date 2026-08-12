@@ -20,7 +20,7 @@
       "health-idempotence": "evidenced",
       "service-restore": "evidenced",
       "infrastructure-recovery": "evidenced",
-      "hermes-integration": "not-evidenced",
+      "hermes-integration": "evidenced",
       "rollback": "not-evidenced"
     },
     "isolated-recovery": {
@@ -107,6 +107,19 @@
       "result": "passed",
       "date": "2026-08-09",
       "boundary": "Disposable development state restore plus canonical validation and zero-change provider plan only; no isolated-controller, external-durability, rollback, or production acceptance."
+    },
+    "development/hermes-integration": {
+      "environment": "development",
+      "category": "hermes-integration",
+      "audited_commit": "e142d4490765fd0d2a20000e9deb326fa9694ba1",
+      "citation": {
+        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+        "lines": "661-674"
+      },
+      "procedure_id": "phase-9-gate-6-read-only-bridge",
+      "result": "passed",
+      "date": "2026-08-12",
+      "boundary": "Disposable development deployed-plugin read-only status and audit verification only; uses a non-secret service-ID context and guest-local private empty audit baseline. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance."
     }
   },
   "evidence_boundary": "Active authority for environment-specific external acceptance only. An evidenced cell applies only to its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix.",

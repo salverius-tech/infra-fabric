@@ -4,7 +4,7 @@ Active authority for environment-specific external acceptance only. An evidenced
 
 | Environment | plan | apply | health-idempotence | service-restore | infrastructure-recovery | hermes-integration | rollback |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| development | evidenced | evidenced | evidenced | evidenced | evidenced | not-evidenced | not-evidenced |
+| development | evidenced | evidenced | evidenced | evidenced | evidenced | evidenced | not-evidenced |
 | isolated-recovery | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced |
 | production | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced |
 
@@ -15,5 +15,6 @@ Active authority for environment-specific external acceptance only. An evidenced
 - `development/health-idempotence` — commit `d88a66a65675a920f4930d0cbb6c470a9a49a9a1`; procedure `phase-9-gate-3`; result `passed` on `2026-08-09`; evidence `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-648`; boundary: Direct development health and second-run idempotence only.
 - `development/service-restore` — commit `d88a66a65675a920f4930d0cbb6c470a9a49a9a1`; procedure `phase-9-gate-4`; result `passed` on `2026-08-09`; evidence `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-648`; boundary: Enabled disposable development stateful services only; not controller or infrastructure recovery.
 - `development/infrastructure-recovery` — commit `d88a66a65675a920f4930d0cbb6c470a9a49a9a1`; procedure `phase-9-gate-5`; result `passed` on `2026-08-09`; evidence `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-658`; boundary: Disposable development state restore plus canonical validation and zero-change provider plan only; no isolated-controller, external-durability, rollback, or production acceptance.
+- `development/hermes-integration` — commit `e142d4490765fd0d2a20000e9deb326fa9694ba1`; procedure `phase-9-gate-6-read-only-bridge`; result `passed` on `2026-08-12`; evidence `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:661-674`; boundary: Disposable development deployed-plugin read-only status and audit verification only; uses a non-secret service-ID context and guest-local private empty audit baseline. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance.
 
 Historical development evidence source: `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-648`. This source does not establish isolated-recovery or production acceptance.
