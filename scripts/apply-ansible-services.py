@@ -310,7 +310,7 @@ def run_canonical_host_identity(
             consumer="ansible-host-identity",
             requirements=(operator_requirement,),
         )
-        skip_root = os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "").strip().lower() != "false"
+        skip_root = os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "").strip().lower() == "true"
         if resource.type == "lxc" and skip_root:
             phases = (("infra", True),)
         else:

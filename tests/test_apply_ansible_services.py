@@ -388,7 +388,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 mock.patch.object(apply_ansible_services, "canonical_bootstrap_targets", return_value=(("technitium", "technitium"),)),
                 mock.patch.object(apply_ansible_services, "SopsAgeProvider", return_value=object()),
                 mock.patch.object(apply_ansible_services, "deliver", side_effect=fake_deliver),
-                mock.patch.dict(os.environ, {"INFRA_HOST_IDENTITY_SKIP_ROOT": "false"}),
+                mock.patch.dict(os.environ, {}, clear=True),
             ):
                 result = apply_ansible_services.run_canonical_host_identity(Context(), ("inventory.json",), root, {}, runner=fake_run)
 
@@ -408,6 +408,46 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 "secrets.bootstrap.root_password",
             ],
         )
+
+    def test_canonical_host_identity_skips_lxc_root_only_when_explicitly_requested(self) -> None:
+        commands: list[list[str]] = []
+        model = SimpleNamespace(
+            resources=SimpleNamespace(guests={"technitium": SimpleNamespace(type="lxc")}, shared_hosts={}),
+            bootstrap=SimpleNamespace(root_password=SimpleNamespace(default_secret="secrets.bootstrap.root_password", host_overrides={})),
+        )
+
+        def fake_deliver(provider: object, *, path: str, consumer: str, requirements: object) -> SimpleNamespace:
+            return SimpleNamespace(environment_name="INFRA_OPERATOR_PASSWORD", value="value")
+
+        def fake_run(command: list[str], log_path: Path, env: dict[str, str]) -> int:
+            commands.append(command)
+            return 0
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "secrets.sops.yaml").write_text("encrypted-placeholder\n", encoding="utf-8")
+
+            class Context:
+                canonical_site_path = apply_ansible_services.REPO / "scaffold/sites/dev/site.yaml"
+                site = "dev"
+
+                @staticmethod
+                def path(name: str) -> Path:
+                    return root / name
+
+            with (
+                mock.patch.object(apply_ansible_services, "load_site", return_value=model),
+                mock.patch.object(apply_ansible_services, "canonical_bootstrap_targets", return_value=(("technitium", "technitium"),)),
+                mock.patch.object(apply_ansible_services, "SopsAgeProvider", return_value=object()),
+                mock.patch.object(apply_ansible_services, "deliver", side_effect=fake_deliver),
+                mock.patch.dict(os.environ, {"INFRA_HOST_IDENTITY_SKIP_ROOT": "true"}, clear=True),
+            ):
+                result = apply_ansible_services.run_canonical_host_identity(Context(), ("inventory.json",), root, {}, runner=fake_run)
+
+        self.assertEqual(result, 0)
+        self.assertEqual(len(commands), 1)
+        self.assertIn("ansible_user=infra", commands[0])
+        self.assertIn("host_identity_root_recovery_enabled=true", commands[0])
 
     def test_run_service_adds_paired_canonical_extra_args(self) -> None:
         commands: list[list[str]] = []
