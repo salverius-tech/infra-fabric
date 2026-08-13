@@ -79,8 +79,26 @@ class OperationalCutoverTests(unittest.TestCase):
             "legacy-values-discovery.py", "legacy-values-forensics.sh",
             "legacy_values_discovery.py", "migrate-secret-bundle.py",
             "migrate-site-values.py", "migrate-values.py", "migration_backup.py",
+            "bootstrap-domain.py", "parse-env.py", "bootstrap-pve-token.sh",
         ):
             self.assertFalse((ROOT / "scripts" / path).exists(), path)
+        self.assertFalse((ROOT / "infra/ansible/inventory/tfvars.py").exists())
+        self.assertFalse((ROOT / "tests/test_tfvars_inventory.py").exists())
+        self.assertFalse((ROOT / "tests/test_bootstrap_domain.py").exists())
+        self.assertFalse((ROOT / "tests/test_parse_env.py").exists())
+        self.assertFalse((ROOT / "scaffold/.env.example").exists())
+
+    def test_lifecycle_projection_helpers_have_no_legacy_input_mode(self) -> None:
+        for relative in (
+            "scripts/storage-vars.py",
+            "scripts/service-runtime.py",
+            "scripts/guest-mount-feature-vars.py",
+        ):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertNotIn("--tfvars", source, relative)
+            self.assertNotIn("--settings", source, relative)
+            self.assertNotIn("load_tfvars", source, relative)
+            self.assertNotIn("import hcl2", source, relative)
 
 if __name__ == "__main__":
     unittest.main()

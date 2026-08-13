@@ -9,35 +9,12 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import settings
 from service_catalog import ServiceCatalogError, load_catalog
-from values_context import from_environment
-
-try:
-    import hcl2
-except ImportError as error:  # pragma: no cover - exercised in tooling container
-    print(f"missing python-hcl2 dependency: {error}", file=sys.stderr)
-    raise SystemExit(1) from error
-
-DEFAULT_TFVARS = from_environment().path("terraform.tfvars")
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "infra" / "services.json"
 
 
 class ServiceRuntimeError(ValueError):
     pass
-
-
-def load_tfvars(path: Path) -> dict[str, Any]:
-    try:
-        with path.open(encoding="utf-8") as file:
-            data = hcl2.load(file)
-    except OSError as error:
-        raise ServiceRuntimeError(f"cannot read {path}: {error}") from error
-    except Exception as error:
-        raise ServiceRuntimeError(f"cannot parse {path}: {error}") from error
-    if not isinstance(data, dict):
-        raise ServiceRuntimeError(f"{path} must contain an object")
-    return data
 
 
 def load_projection(path: Path) -> dict[str, Any]:
@@ -73,24 +50,25 @@ def runtime_type(service: str, tfvars: dict[str, Any]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("service")
-    parser.add_argument("--tfvars", type=Path, default=DEFAULT_TFVARS)
-    parser.add_argument("--projection", type=Path, default=None, help="use a generated canonical OpenTofu JSON projection")
-    parser.add_argument("--settings", type=Path, default=None)
+    parser.add_argument("--projection", type=Path, required=True, help="generated canonical OpenTofu JSON projection")
     args = parser.parse_args(argv)
     try:
-        if args.projection is not None:
-            projection = load_projection(args.projection)
-            enabled = projection.get("enabled_services", [])
-            if not isinstance(enabled, list) or not all(isinstance(item, str) for item in enabled):
-                raise ServiceRuntimeError("canonical projection enabled_services must be a string list")
-            tfvars = projection
-        else:
-            enabled = settings.load_settings(args.settings)["services"]
-            tfvars = load_tfvars(args.tfvars)
+        projection = load_projection(args.projection)
+        enabled = projection.get("enabled_services")
+        if not isinstance(enabled, list) or not all(isinstance(item, str) for item in enabled):
+            raise ServiceRuntimeError("canonical projection enabled_services must be a string list")
+        runtimes = projection.get("service_runtime")
+        if not isinstance(runtimes, dict):
+            raise ServiceRuntimeError("canonical projection service_runtime must be an object")
+        tfvars = projection
         if args.service not in enabled:
             raise ServiceRuntimeError(f"service is not enabled: {args.service}")
+        if not isinstance(runtimes.get(args.service), dict):
+            raise ServiceRuntimeError(
+                f"canonical projection service_runtime.{args.service} must be an object"
+            )
         print(runtime_type(args.service, tfvars))
-    except (settings.SettingsError, ServiceRuntimeError) as error:
+    except ServiceRuntimeError as error:
         print(error, file=sys.stderr)
         return 1
     return 0

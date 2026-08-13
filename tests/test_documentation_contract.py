@@ -127,7 +127,11 @@ class DocumentationContractTests(unittest.TestCase):
         matrix = json.loads((ROOT / ".hermes" / "reconciliation" / "acceptance-matrix.json").read_text(encoding="utf-8"))
         development = matrix["rows"]["development"]
         self.assertEqual(
-            {category for category, status in development.items() if status == "evidenced"},
+            {
+                category
+                for category, status in development.items()
+                if status == "historical-evidence"
+            },
             {"plan", "apply", "health-idempotence", "service-restore", "infrastructure-recovery", "hermes-integration", "rollback"},
         )
         self.assertTrue(all(status == "not-evidenced" for status in matrix["rows"]["isolated-recovery"].values()))
@@ -343,6 +347,19 @@ class DocumentationContractTests(unittest.TestCase):
         state = (ROOT / "docs/service-state-backup.md").read_text(encoding="utf-8")
         self.assertIn("generated inventory and variables", state)
         self.assertNotIn("normal direct Ansible inventory group", state)
+
+        mapping = (ROOT / "docs/canonical-values-mapping-v1.md").read_text(
+            encoding="utf-8"
+        )
+        for retired_path in (
+            "scripts/parse-env.py",
+            "scripts/envfile.py",
+            "infra/ansible/inventory/tfvars.py",
+            "scripts/migrate-values.py",
+            "scaffold/terraform.tfvars",
+        ):
+            self.assertNotIn(retired_path, mapping)
+        self.assertIn("historical inputs to this mapping's provenance only", mapping)
 
 
 if __name__ == "__main__":

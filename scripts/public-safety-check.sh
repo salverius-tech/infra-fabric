@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-tracked_file=".public-safety-tracked.$$"
-ignored_file=".public-safety-ignored.$$"
+ignored_file="$(mktemp .public-safety-ignored.XXXXXX)"
 cleanup() {
-  rm -f -- "${tracked_file}" "${ignored_file}"
+  rm -f -- "${ignored_file}"
 }
 trap cleanup EXIT HUP INT TERM
 
-git ls-files >"${tracked_file}"
 : >"${ignored_file}"
 for path in \
-  scaffold/.env.example \
   scaffold/dns-records.local.json \
   scaffold/sites/_template/site.yaml \
   settings.example.json; do
@@ -21,5 +18,4 @@ for path in \
 done
 
 scripts/python.sh scripts/public-safety-check.py \
-  --tracked-files "${tracked_file}" \
   --ignored-files "${ignored_file}"

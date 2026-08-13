@@ -109,6 +109,7 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
 
         self.assertIn("tailscale_client", tofu["enabled_services"])
         self.assertIn("tailscale_client", inventory)
+        self.assertIn("tailscale_client_lxc", inventory["tailscale_client"]["hosts"])
         self.assertIn('tailscale_client_enabled = local.service_enabled.tailscale_client', services_tf)
         self.assertNotIn('&& var.tailscale_client_enabled', services_tf)
         self.assertIn("local.tailscale_client_enabled", tailscale_tf)

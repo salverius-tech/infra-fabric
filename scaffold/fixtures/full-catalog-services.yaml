@@ -20,6 +20,14 @@ services:
     state:
       capable: true
       disable_policy: retain
+    endpoints:
+      public_names:
+        - git.example.internal
+      public_url: https://git.example.internal/
+      protocols:
+        - ssh
+      ports:
+        ssh: 22
   tailscale_client:
     enabled: true
     resource: example-vm
@@ -55,6 +63,9 @@ services:
     state:
       capable: true
       disable_policy: retain
+    endpoints:
+      public_names:
+        - secrets.example.internal
     configuration:
       caddy_artifact:
         version: 2.8.4
@@ -80,7 +91,35 @@ services:
     state:
       capable: true
       disable_policy: retain
+    endpoints:
+      public_names:
+        - hermes.example.internal
+      ports:
+        dashboard: 8080
     configuration:
+      runtime_user: hermes
+      repository_path: /srv/hermes
+      allow_legacy_runtime: false
+      tuning:
+        compression_threshold: 0.8
+        max_concurrent_children: 2
+        max_spawn_depth: 1
+      node:
+        version: 22.14.0
+        checksums:
+          amd64: "1111111111111111111111111111111111111111111111111111111111111111"
+          arm64: "2222222222222222222222222222222222222222222222222222222222222222"
+      dashboard:
+        enabled: false
+        host: 127.0.0.1
+        auth_username: operator
+      web:
+        searxng_url: https://search.example.internal/
+      control:
+        enabled: true
+        domain: control.example.internal
+        source_url: https://code.example.internal/hermes-control.git
+        source_ref: "3333333333333333333333333333333333333333"
       caddy_artifact:
         version: 2.8.4
         checksums:

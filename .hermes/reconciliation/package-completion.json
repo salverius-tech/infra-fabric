@@ -415,13 +415,13 @@
     ],
     "rows": {
       "development": {
-        "plan": "evidenced",
-        "apply": "evidenced",
-        "health-idempotence": "evidenced",
-        "service-restore": "evidenced",
-        "infrastructure-recovery": "evidenced",
-        "hermes-integration": "evidenced",
-        "rollback": "evidenced"
+        "plan": "historical-evidence",
+        "apply": "historical-evidence",
+        "health-idempotence": "historical-evidence",
+        "service-restore": "historical-evidence",
+        "infrastructure-recovery": "historical-evidence",
+        "hermes-integration": "historical-evidence",
+        "rollback": "historical-evidence"
       },
       "isolated-recovery": {
         "plan": "not-evidenced",
@@ -535,7 +535,7 @@
         "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance."
       }
     },
-    "evidence_boundary": "Active authority for environment-specific external acceptance only. An evidenced cell applies only to its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix.",
+    "evidence_boundary": "Active authority for environment-specific external acceptance only. A historical-evidence cell records a rehearsal at its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix, and later lifecycle changes require revalidation.",
     "development_source": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-648"
   }
 }

@@ -8,50 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import settings
-from values_context import from_environment
-
-try:
-    import hcl2
-except ImportError as error:  # pragma: no cover - exercised in tooling container
-    print(f"missing python-hcl2 dependency: {error}", file=sys.stderr)
-    raise SystemExit(1) from error
-
-DEFAULT_TFVARS = from_environment().path("terraform.tfvars")
-LEGACY_FORGEJO_STORAGE_KEYS = {
-    "dataset": "forgejo_data_dataset",
-    "mountpoint": "forgejo_data_host_path",
-    "uid": "forgejo_data_host_uid",
-    "gid": "forgejo_data_host_gid",
-}
-
-
 class StorageVarsError(ValueError):
     pass
-
-
-def _unquote_hcl_values(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {key: _unquote_hcl_values(child) for key, child in value.items()}
-    if isinstance(value, list):
-        return [_unquote_hcl_values(child) for child in value]
-    if isinstance(value, str) and len(value) >= 2 and value[0] == value[-1] == '"':
-        return value[1:-1]
-    return value
-
-
-def load_tfvars(path: Path) -> dict[str, Any]:
-    try:
-        with path.open("r", encoding="utf-8") as file:
-            data = hcl2.load(file)
-    except OSError as error:
-        raise StorageVarsError(f"cannot read {path}: {error}") from error
-    except Exception as error:
-        raise StorageVarsError(f"cannot parse {path}: {error}") from error
-    if not isinstance(data, dict):
-        raise StorageVarsError(f"{path} must contain an object")
-    return _unquote_hcl_values(data)
 
 
 def load_projection(path: Path) -> dict[str, Any]:
@@ -64,26 +22,6 @@ def load_projection(path: Path) -> dict[str, Any]:
     return data
 
 
-def legacy_forgejo_storage(tfvars: dict[str, Any]) -> dict[str, Any] | None:
-    host_path = tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["mountpoint"])
-    if not host_path:
-        return None
-    return {
-        "type": "bind",
-        "source": host_path,
-        "target": tfvars.get("forgejo_data_mount_path", "/var/lib/forgejo"),
-        "create_source": True,
-        "host_uid": tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["uid"], 100000),
-        "host_gid": tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["gid"], 100000),
-        "mode": "0750",
-        "host_prepare": {
-            "type": "zfs_dataset",
-            "dataset": tfvars.get(LEGACY_FORGEJO_STORAGE_KEYS["dataset"], ""),
-            "mountpoint": host_path,
-        },
-    }
-
-
 def storage_definitions(tfvars: dict[str, Any], service: str) -> dict[str, dict[str, Any]]:
     storage = tfvars.get("service_storage", {})
     if isinstance(storage, dict) and isinstance(storage.get(service), dict):
@@ -92,8 +30,7 @@ def storage_definitions(tfvars: dict[str, Any], service: str) -> dict[str, dict[
             for mount_name, definition in storage[service].items()
             if isinstance(definition, dict)
         }
-    legacy = legacy_forgejo_storage(tfvars) if service == "forgejo" else None
-    return {"data": legacy} if legacy else {}
+    return {}
 
 
 def build_storage_mounts(enabled_services: list[str], tfvars: dict[str, Any]) -> list[dict[str, Any]]:
@@ -148,31 +85,29 @@ def format_storage_summary(mounts: list[dict[str, Any]]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tfvars", type=Path, default=DEFAULT_TFVARS)
-    parser.add_argument("--projection", type=Path, default=None, help="use a generated canonical OpenTofu JSON projection")
-    parser.add_argument("--settings", type=Path, default=None)
+    parser.add_argument("--projection", type=Path, required=True, help="generated canonical OpenTofu JSON projection")
     parser.add_argument("--service", default="")
     parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
 
     try:
-        if args.projection is not None:
-            projection = load_projection(args.projection)
-            enabled_services = projection.get("enabled_services", [])
-            if not isinstance(enabled_services, list) or not all(isinstance(service, str) for service in enabled_services):
-                raise StorageVarsError("canonical projection enabled_services must be a string list")
-            tfvars = projection
-        else:
-            loaded_settings = settings.load_settings(args.settings)
-            enabled_services = loaded_settings["services"]
-            tfvars = load_tfvars(args.tfvars)
+        projection = load_projection(args.projection)
+        enabled_services = projection.get("enabled_services")
+        if not isinstance(enabled_services, list) or not all(isinstance(service, str) for service in enabled_services):
+            raise StorageVarsError("canonical projection enabled_services must be a string list")
+        storage = projection.get("service_storage")
+        if not isinstance(storage, dict):
+            raise StorageVarsError("canonical projection service_storage must be an object")
+        if any(service in storage and not isinstance(storage[service], dict) for service in enabled_services):
+            raise StorageVarsError("canonical projection service_storage entries must be objects")
+        tfvars = projection
         if args.service:
             if args.service not in enabled_services:
                 raise StorageVarsError(f"service is not enabled: {args.service}")
             enabled_services = [args.service]
         mounts = build_storage_mounts(enabled_services, tfvars)
         payload = {"storage_bind_mounts": mounts}
-    except (settings.SettingsError, StorageVarsError, OSError) as error:
+    except (StorageVarsError, OSError) as error:
         print(f"storage vars failed: {error}", file=sys.stderr)
         return 1
     if args.summary:

@@ -1,10 +1,10 @@
 # Environment-specific acceptance matrix
 
-Active authority for environment-specific external acceptance only. An evidenced cell applies only to its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix.
+Active authority for environment-specific external acceptance only. A historical-evidence cell records a rehearsal at its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix, and later lifecycle changes require revalidation.
 
 | Environment | plan | apply | health-idempotence | service-restore | infrastructure-recovery | hermes-integration | rollback |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| development | evidenced | evidenced | evidenced | evidenced | evidenced | evidenced | evidenced |
+| development | historical-evidence | historical-evidence | historical-evidence | historical-evidence | historical-evidence | historical-evidence | historical-evidence |
 | isolated-recovery | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced |
 | production | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced | not-evidenced |
 
@@ -18,4 +18,4 @@ Active authority for environment-specific external acceptance only. An evidenced
 - `development/hermes-integration` — commit `e142d4490765fd0d2a20000e9deb326fa9694ba1`; procedure `phase-9-gate-6-read-only-bridge`; result `passed` on `2026-08-12`; evidence `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:661-674`; boundary: Disposable development deployed-plugin read-only status and audit verification only; uses a non-secret service-ID context and guest-local private empty audit baseline. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance.
 - `development/rollback` — commit `1ec7f520e4cf6b29d29a1c50a99fb8b089c92228`; procedure `phase-9-gate-7-development-hermes-rollback`; result `passed` on `2026-08-12`; evidence `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:676-687`; boundary: Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance.
 
-Historical development evidence source: `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-648`. This source does not establish isolated-recovery or production acceptance.
+Historical development evidence source: `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-648`. These records preserve completed rehearsals but are not current-HEAD acceptance after later lifecycle changes, and they do not establish isolated-recovery or production acceptance.

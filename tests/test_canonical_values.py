@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import subprocess
 import tempfile
@@ -13,7 +14,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import atomic_output
-from atomic_output import atomic_output_directory
+from atomic_output import AtomicOutputError, atomic_output_directory
 from pydantic import ValidationError
 
 import canonical_values
@@ -918,14 +919,9 @@ class CanonicalValuesTests(unittest.TestCase):
         output = root / "generated"
         output.mkdir()
         (output / "previous.json").write_text("previous\n", encoding="utf-8")
-        original_replace = atomic_output.os.replace
-
-        def fail_install(source: str | Path, destination: str | Path) -> None:
-            if Path(source).name.startswith(".generated.tmp-"):
-                raise OSError("simulated replacement failure")
-            original_replace(source, destination)
-
-        with mock.patch("atomic_output.os.replace", side_effect=fail_install):
+        with mock.patch(
+            "atomic_output._renameat2", side_effect=OSError("simulated replacement failure")
+        ):
             with self.assertRaisesRegex(OSError, "simulated replacement failure"):
                 atomic_output_directory(
                     output,
@@ -933,6 +929,94 @@ class CanonicalValuesTests(unittest.TestCase):
                 )
         self.assertEqual((output / "previous.json").read_text(encoding="utf-8"), "previous\n")
         self.assertFalse((output / "new.json").exists())
+
+    def test_atomic_output_stays_bound_to_held_parent_after_ancestor_swap(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: self._remove(root))
+        ancestor = root / "ancestor"
+        ancestor.mkdir()
+        output = ancestor / "generated"
+        output.mkdir()
+        (output / "previous.json").write_text("previous\n", encoding="utf-8")
+        held_ancestor = root / "ancestor-held"
+        attacker = root / "attacker"
+        attacker.mkdir()
+        (attacker / "sentinel").write_text("untouched\n", encoding="utf-8")
+
+        def populate(directory: Path) -> None:
+            ancestor.rename(held_ancestor)
+            ancestor.symlink_to(attacker, target_is_directory=True)
+            (directory / "new.json").write_text("new\n", encoding="utf-8")
+
+        atomic_output_directory(output, populate)
+
+        self.assertEqual((held_ancestor / "generated/new.json").read_text(encoding="utf-8"), "new\n")
+        self.assertEqual((attacker / "sentinel").read_text(encoding="utf-8"), "untouched\n")
+        self.assertFalse((attacker / "generated").exists())
+
+    def test_atomic_output_preserves_destination_created_during_publication(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: self._remove(root))
+        output = root / "generated"
+        original_rename = atomic_output._renameat2
+
+        def create_racer(parent_fd: int, source: str, destination: str, flags: int) -> None:
+            os.mkdir(destination, 0o700, dir_fd=parent_fd)
+            racer_fd = os.open(destination, os.O_RDONLY | os.O_DIRECTORY, dir_fd=parent_fd)
+            try:
+                file_fd = os.open(
+                    "sentinel", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=racer_fd
+                )
+                os.write(file_fd, b"racer\n")
+                os.close(file_fd)
+            finally:
+                os.close(racer_fd)
+            original_rename(parent_fd, source, destination, flags)
+
+        with mock.patch("atomic_output._renameat2", side_effect=create_racer):
+            with self.assertRaisesRegex(AtomicOutputError, "already exists"):
+                atomic_output_directory(
+                    output,
+                    lambda directory: (directory / "new.json").write_text("new\n", encoding="utf-8"),
+                )
+
+        self.assertEqual((output / "sentinel").read_text(encoding="utf-8"), "racer\n")
+        self.assertFalse(any(path.name.startswith(".generated.tmp-") for path in root.iterdir()))
+
+    def test_atomic_output_rejects_symlink_destination_without_touching_target(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: self._remove(root))
+        attacker = root / "attacker"
+        attacker.mkdir()
+        sentinel = attacker / "sentinel"
+        sentinel.write_text("untouched\n", encoding="utf-8")
+        output = root / "generated"
+        output.symlink_to(attacker, target_is_directory=True)
+
+        with self.assertRaisesRegex(AtomicOutputError, "not a directory"):
+            atomic_output_directory(output, lambda directory: None)
+
+        self.assertEqual(sentinel.read_text(encoding="utf-8"), "untouched\n")
+
+    def test_atomic_output_rejects_staged_directory_substitution(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: self._remove(root))
+        output = root / "generated"
+        displaced = root / "displaced"
+
+        def populate(stage: Path) -> None:
+            (stage / "expected").write_text("expected\n", encoding="utf-8")
+            os.rename(stage, displaced)
+            stage.mkdir(mode=0o700)
+            (stage / "attacker").write_text("attacker\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(
+            AtomicOutputError, "generated output stage changed during population"
+        ):
+            atomic_output_directory(output, populate)
+
+        self.assertFalse(output.exists())
+        self.assertEqual((displaced / "expected").read_text(encoding="utf-8"), "expected\n")
 
     def test_cli_summary_is_redacted_and_catalog_validated(self) -> None:
         site_path = self.write_site(VALID_SITE)

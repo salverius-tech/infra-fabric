@@ -22,7 +22,7 @@ Do not recreate these tools as a fallback from `setup`, `validate`, `plan`, `app
 
 ## Retained canonical recovery boundary
 
-`scripts/secret_bundle_migration.py`, `scripts/recover-canonical-secrets.py`, guarded state snapshots, site locking, and selected-site SOPS transport remain. They are canonical recovery primitives, not legacy-layout fallback paths.
+`scripts/secret_bundle_migration.py`, `scripts/recover-canonical-secrets.py`, guarded state snapshots, site locking, and selected-site SOPS transport remain. The bounded `recover-canonical-secrets.py` command may read one allow-listed historical dotenv from private Git only when an operator invokes it explicitly; no normal workflow or tracked scaffold parses or authors dotenv/tfvars/static-inventory inputs. These are canonical recovery primitives, not legacy-layout fallback paths.
 
 ## Retirement verification
 

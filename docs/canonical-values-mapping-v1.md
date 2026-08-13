@@ -40,7 +40,7 @@ A logical service references exactly one resource. VMID, hostname, address, comp
 | `platform.proxmox.endpoint` | URL | `proxmox_endpoint`; `PROXMOX_VE_ENDPOINT` | `proxmox_endpoint` | OpenTofu-only | preserve URL form | normalized URL conflicts fail | provider | provider/state exposure review |
 | `platform.proxmox.node` | identifier | `proxmox_node_name` | `proxmox_node_name` | OpenTofu-only | none | conflict fails | public | resource placement |
 | `platform.proxmox.insecure` | boolean | `proxmox_insecure` | `proxmox_insecure` | OpenTofu-only | strict boolean | conflict fails | public | connectivity |
-| `platform.proxmox.management` | qualified SSH target; host and optional user | `scripts/parse-env.py:PVE_HOST` | generated Proxmox Ansible inventory `ansible_host`, `ansible_user`; canonical fields `management.host`, `management.user` | canonical/catalog | split qualified SSH target at the final `@`; host and user portions are stored separately | malformed or conflicting target fails closed | provider | connectivity/bootstrap identity |
+| `platform.proxmox.management` | qualified SSH target; host and optional user | retired dotenv `PVE_HOST` observation retained only in historical migration evidence | generated Proxmox Ansible inventory `ansible_host`, `ansible_user`; canonical fields `management.host`, `management.user` | canonical/catalog | split qualified SSH target at the final `@`; host and user portions are stored separately | malformed or conflicting target fails closed | provider | connectivity/bootstrap identity |
 | `platform.vm_cloud_init_user` | Linux user identifier; VM default | `guest_vm_cloud_init_user` | `guest_vm_cloud_init_user` | canonical/derived | strict identifier; no default invented | conflicts fail closed | public | bootstrap identity |
 | `platform.lxc_template_download_timeout_seconds` | positive integer | `lxc_template_download_timeout_seconds` | `lxc_template_download_timeout_seconds` | canonical/derived | strict positive integer | conflicts fail closed | public | image download |
 | `platform.network.default_bridge` | string | `*_container_bridge`, inventory defaults | resource bridge vars/inventory | canonical/derived | resource override wins | normalized values must agree | public | network |
@@ -381,17 +381,19 @@ Onramp host security/SSH inputs `onramp_host_ssh_public_keys`, `onramp_host_pass
 - Checksums normalize to lowercase hexadecimal and must match their declared algorithm length.
 - Comments, whitespace, key ordering, and line endings do not affect canonical identity.
 
-## Current-input inventory and review status
+## Source-contract inventory and review status
 
 The matrix is checked by `scripts/canonical-mapping-inventory.py` against tracked repository producers and consumers. Its source reconciliation gate requires every inventoried public input to have exactly one matrix disposition; model-path, classification, and row-level consumer evidence gates must all pass before it reports `semantic-coverage-complete`. This is source-contract evidence only: it does **not** claim provider schema equivalence, a provider-backed plan, state equivalence, or live infrastructure behavior. Those external evidence layers remain separately required.
 
 - `infra/opentofu/variables.tf` — current OpenTofu variable declarations (182 declarations at initial inventory).
 - `infra/services.json` — service capability, dependency, state, playbook, inventory, and OpenTofu address registry.
-- `infra/ansible/inventory/tfvars.py` — dynamic inventory and legacy variable promotion.
-- `scripts/migrate-values.py` — legacy dotenv/tfvars names, generated secrets, normalization, and migration defaults.
-- `scripts/migrate-site-values.py` — site layout movement and metadata contract.
-- `scaffold/terraform.tfvars`, `scaffold/dns-records.local.json`, and scaffold inventory — public-safe legacy starter contract.
-- `scripts/parse-env.py`, `scripts/envfile.py`, and `scripts/run-infra.sh` — dotenv keys and transport behavior.
+- `scripts/canonical_values.py` — typed canonical site model, normalization, and validation.
+- `scripts/canonical_projections.py` and `scripts/projection_manifest.py` — generated consumer projections, identity, and integrity contract.
+- `scripts/canonical-mapping-inventory.py` — source reconciliation against tracked producers and consumers.
+- `scaffold/sites/_template/site.yaml`, `scaffold/fixtures/`, and `scaffold/dns-records.local.json` — public-safe canonical examples and validation fixtures.
+- `scripts/values.sh` and `scripts/run-infra.sh` — selected-site context and protected transport behavior.
+
+The retired dotenv parser, tfvars inventory, and legacy migration utilities remain historical inputs to this mapping's provenance only. They are not current files, compatibility entry points, or normal operator workflows.
 
 Unmapped fields must be written to a migration review report with source path, value classification, proposed canonical owner, and disposition. They must not be dropped by an importer or renderer.
 

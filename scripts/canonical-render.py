@@ -10,9 +10,18 @@ import tempfile
 from pathlib import Path
 
 from atomic_output import atomic_output_directory
-from canonical_projections import render_projection_set
+from canonical_projections import (
+    render_projection_set,
+    verify_cross_projection_identity,
+    verify_onramp_handoff_identity,
+)
 from canonical_values import CanonicalValuesError, load_site, model_digest
-from projection_manifest import ManifestError, build_manifest
+from projection_manifest import (
+    ManifestError,
+    build_manifest,
+    verify_manifest,
+    verify_projection_permissions,
+)
 from service_catalog import ServiceCatalogError, load_catalog
 
 
@@ -64,6 +73,23 @@ def main(argv: list[str] | None = None) -> int:
             for name, value in projections.items():
                 _write_json(directory / name, value)
             _write_json(directory / "manifest.json", manifest)
+            verify_projection_permissions(directory)
+            verify_cross_projection_identity(
+                site=model.site.name,
+                opentofu=projections["terraform.auto.tfvars.json"],
+                inventory=projections["ansible-inventory.json"],
+                ansible_vars=projections["ansible-vars.json"],
+            )
+            verify_onramp_handoff_identity(
+                model, catalog, projections["onramp-handoff.json"]
+            )
+            verify_manifest(
+                manifest,
+                site=model.site.name,
+                model_digest=model_digest(model),
+                secret_digest=None,
+                projections=projections,
+            )
 
         atomic_output_directory(args.output_dir, populate)
         print(f"rendered {len(projections)} non-secret projections for {model.site.name} into {args.output_dir}")

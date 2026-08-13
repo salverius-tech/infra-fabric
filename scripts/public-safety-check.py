@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REQUIRED_SCAFFOLD = (
-    "scaffold/.env.example",
     "scaffold/dns-records.local.json",
     "scaffold/sites/_template/site.yaml",
     "settings.example.json",
@@ -74,7 +73,7 @@ def run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def tracked_files(cwd: Path, tracked_file_list: Path | None = None) -> list[Path]:
     if tracked_file_list is None:
-        result = run_git(["ls-files", "-z"], cwd)
+        result = run_git(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd)
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "git ls-files failed")
         raw_files = result.stdout.split("\0")

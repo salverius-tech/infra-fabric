@@ -241,7 +241,7 @@
         "services.tailscale_client.secrets.auth_key": "TS_AUTHKEY"
       },
       "inventory": {
-        "host": "tailscale_client",
+        "host": "tailscale_client_lxc",
         "group": "tailscale_client",
         "vmid_var": "tailscale_client_vmid",
         "tf_vmid": "tailscale_client_vmid",

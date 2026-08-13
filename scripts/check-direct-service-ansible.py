@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import re
 import subprocess
 import sys
@@ -16,19 +15,12 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 import settings as settings_lib  # noqa: E402
 
-TFVARS = REPO / "infra" / "ansible" / "inventory" / "tfvars.py"
-
-
 def service_groups() -> dict[str, str]:
-    """Load the inventory mapping only for commands that need canonical groups."""
-    tfvars_spec = importlib.util.spec_from_file_location("tfvars_inventory", TFVARS)
-    assert tfvars_spec and tfvars_spec.loader
-    tfvars_inventory = importlib.util.module_from_spec(tfvars_spec)
-    try:
-        tfvars_spec.loader.exec_module(tfvars_inventory)
-    except SystemExit as error:
-        raise InputError("unable to load Ansible inventory service mapping") from error
-    return {name: cfg["group"] for name, cfg in tfvars_inventory.SERVICE_HOSTS.items()}
+    """Derive canonical inventory groups directly from the service catalog."""
+    return {
+        name: str(config["inventory"]["group"])
+        for name, config in settings_lib.SERVICE_REGISTRY_DATA["services"].items()
+    }
 SPECIAL_PLAYBOOK_GROUPS = {
     "infra/ansible/playbooks/caddy-proxy.yml": "technitium",
     "infra/ansible/playbooks/technitium-dns.yml": "localhost",

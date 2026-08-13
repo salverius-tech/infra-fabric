@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -62,6 +66,56 @@ class GuestMountFeatureVarsTests(unittest.TestCase):
         )
 
         self.assertEqual(checks, [])
+
+    def test_main_accepts_canonical_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            projection = Path(temp) / "terraform.auto.tfvars.json"
+            projection.write_text(
+                json.dumps(
+                    {
+                        "enabled_services": ["forgejo"],
+                        "forgejo_container_vmid": 107,
+                        "service_runtime": {"forgejo": {"type": "lxc"}},
+                        "service_storage": {
+                            "forgejo": {
+                                "data": {
+                                    "type": "guest_nfs",
+                                    "target": "/var/lib/forgejo",
+                                }
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                result = guest_mount_feature_vars.main(
+                    ["--projection", str(projection)]
+                )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            json.loads(output.getvalue())["guest_mount_feature_checks"][0]["feature"],
+            "nfs",
+        )
+
+    def test_main_rejects_missing_or_malformed_projection_sections(self) -> None:
+        for payload in (
+            {},
+            {"enabled_services": ["forgejo"], "service_runtime": []},
+            {"enabled_services": ["forgejo"], "service_storage": []},
+        ):
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temp:
+                projection = Path(temp) / "terraform.auto.tfvars.json"
+                projection.write_text(json.dumps(payload), encoding="utf-8")
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(
+                        guest_mount_feature_vars.main(
+                            ["--projection", str(projection)]
+                        ),
+                        1,
+                    )
 
 
 if __name__ == "__main__":

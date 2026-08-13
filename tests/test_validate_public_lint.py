@@ -27,6 +27,24 @@ class ValidatePublicLintTests(unittest.TestCase):
         self.assertIn('ANSIBLE_CONFIG="${lint_root}/ansible.cfg" ansible-lint infra/ansible', text)
         self.assertNotIn("\nansible-lint infra/ansible\n", text)
 
+    def test_public_gate_checks_reconciliation_freshness(self) -> None:
+        text = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("python scripts/validate-design-reconciliation.py --check", text)
+
+    def test_public_gate_renders_every_catalog_service_through_consumers(self) -> None:
+        text = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("scaffold/fixtures/full-catalog-services.yaml", text)
+        self.assertIn("scaffold/fixtures/resource-runtime.yaml", text)
+        self.assertIn('full_catalog_root="${fixture_root}/full-catalog"', text)
+        self.assertIn('full_catalog_inventory="${full_catalog_root}/generated/ansible-inventory.json"', text)
+        self.assertIn('full_catalog_vars="${full_catalog_root}/generated/ansible-vars.json"', text)
+        self.assertIn('full_catalog_playbooks', text)
+
+    def test_public_safety_wrapper_includes_untracked_public_files(self) -> None:
+        text = (SCRIPT.parent / "public-safety-check.sh").read_text(encoding="utf-8")
+        self.assertIn("scripts/python.sh scripts/public-safety-check.py", text)
+        self.assertNotIn("--tracked-files", text)
+
 
 if __name__ == "__main__":
     unittest.main()

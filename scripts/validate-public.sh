@@ -65,6 +65,36 @@ fixture_tfvars="${fixture_root}/generated/terraform.auto.tfvars.json"
 fixture_inventory="${fixture_root}/generated/ansible-inventory.json"
 fixture_vars="${fixture_root}/generated/ansible-vars.json"
 
+full_catalog_root="${fixture_root}/full-catalog"
+mkdir -p "${full_catalog_root}"
+python - \
+  "scaffold/sites/dev/site.yaml" \
+  "scaffold/fixtures/resource-runtime.yaml" \
+  "scaffold/fixtures/full-catalog-services.yaml" \
+  "${full_catalog_root}/site.yaml" <<'"'"'PY'"'"'
+from pathlib import Path
+from ruamel.yaml import YAML
+
+site_path, resources_path, services_path, target = map(Path, __import__("sys").argv[1:])
+yaml = YAML()
+site = yaml.load(site_path.read_text(encoding="utf-8"))
+site["site"]["name"] = target.parent.name
+site["resources"] = yaml.load(resources_path.read_text(encoding="utf-8"))
+site["services"] = yaml.load(services_path.read_text(encoding="utf-8"))["services"]
+with target.open("w", encoding="utf-8") as handle:
+    yaml.dump(site, handle)
+PY
+python scripts/canonical-render.py \
+  --site-file "${full_catalog_root}/site.yaml" \
+  --output-dir "${full_catalog_root}/generated" \
+  --source-commit public-validation-full-catalog >/dev/null
+python scripts/verify-projections.py \
+  --site-file "${full_catalog_root}/site.yaml" \
+  --generated-dir "${full_catalog_root}/generated" >/dev/null
+full_catalog_tfvars="${full_catalog_root}/generated/terraform.auto.tfvars.json"
+full_catalog_inventory="${full_catalog_root}/generated/ansible-inventory.json"
+full_catalog_vars="${full_catalog_root}/generated/ansible-vars.json"
+
 run_stage "preflight" python scripts/workspace-preflight.py
 run_stage "opentofu" bash -euo pipefail -c "
   tofu -chdir=infra/opentofu init -backend=false
@@ -87,9 +117,9 @@ run_stage "python-quality" bash -euo pipefail -c "
 "
 run_stage "contracts" bash -euo pipefail -c "
   python infra/ansible/scripts/apply-technitium-dns.py --check scaffold/dns-records.local.json
-  python scripts/parse-env.py --env-file scaffold/.env.example >/dev/null
   python scripts/settings.py --settings settings.example.json validate >/dev/null
   python scripts/validate-service-contracts.py --repo .
+  python scripts/validate-design-reconciliation.py --check
   coverage erase
   coverage run --source=scripts -m unittest discover -s tests -p '\''test_*.py'\''
   coverage report --fail-under=70
@@ -101,6 +131,12 @@ run_stage "ansible" bash -euo pipefail -c "
     infra/ansible/playbooks/storage-prep.yml \\
     infra/ansible/playbooks/guest-mount-feature-preflight.yml \\
     \"\${playbooks[@]}\"
+  ansible-inventory -i \"${full_catalog_inventory}\" --list >/dev/null
+  mapfile -t full_catalog_playbooks < <(python scripts/settings.py ansible-playbooks --projection \"${full_catalog_tfvars}\")
+  ansible-playbook -i \"${full_catalog_inventory}\" -e @\"${full_catalog_vars}\" --syntax-check \\
+    infra/ansible/playbooks/storage-prep.yml \\
+    infra/ansible/playbooks/guest-mount-feature-preflight.yml \\
+    \"\${full_catalog_playbooks[@]}\"
   lint_root=\"\$(mktemp -d)\"
   cleanup_lint_root() { rm -rf \"\${lint_root}\"; }
   trap cleanup_lint_root EXIT

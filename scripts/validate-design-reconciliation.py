@@ -80,9 +80,11 @@ MATRIX_COLUMNS = (
 )
 MATRIX_ROWS = {
     "development": {
-        "plan": "evidenced", "apply": "evidenced", "health-idempotence": "evidenced",
-        "service-restore": "evidenced", "infrastructure-recovery": "evidenced",
-        "hermes-integration": "evidenced", "rollback": "evidenced",
+        "plan": "historical-evidence", "apply": "historical-evidence",
+        "health-idempotence": "historical-evidence",
+        "service-restore": "historical-evidence",
+        "infrastructure-recovery": "historical-evidence",
+        "hermes-integration": "historical-evidence", "rollback": "historical-evidence",
     },
     "isolated-recovery": {column: "not-evidenced" for column in MATRIX_COLUMNS},
     "production": {column: "not-evidenced" for column in MATRIX_COLUMNS},
@@ -236,9 +238,9 @@ def build() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
         "evidence": MATRIX_EVIDENCE,
         "evidence_boundary": (
             "Active authority for environment-specific external acceptance only. "
-            "An evidenced cell applies only to its exact environment, audited commit, "
+            "A historical-evidence cell records a rehearsal at its exact environment, audited commit, "
             "procedure, result, citation, date, and stated boundary; source completion "
-            "does not populate this matrix."
+            "does not populate this matrix, and later lifecycle changes require revalidation."
         ),
         "development_source": f"{PLAN_PATH}:635-648",
     }
@@ -309,13 +311,13 @@ def validate(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any
         errors.append("acceptance matrix columns are incomplete")
     for environment in matrix.get("environments", []):
         row = matrix.get("rows", {}).get(environment, {})
-        if set(row) != set(MATRIX_COLUMNS) or not set(row.values()) <= {"evidenced", "not-evidenced"}:
+        if set(row) != set(MATRIX_COLUMNS) or not set(row.values()) <= {"historical-evidence", "not-evidenced"}:
             errors.append(f"invalid acceptance matrix row: {environment}")
     expected_evidence_cells = {
         f"{environment}/{category}"
         for environment in matrix.get("environments", [])
         for category, status in matrix.get("rows", {}).get(environment, {}).items()
-        if status == "evidenced"
+        if status == "historical-evidence"
     }
     evidence = matrix.get("evidence", {})
     if not isinstance(evidence, dict) or set(evidence) != expected_evidence_cells:
@@ -351,9 +353,9 @@ def validate(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any
             serialized = json.dumps(record, sort_keys=True)
             if re.search(r"(?:/home/|/workspace/|values/|192\.168\.|10\.\d+\.\d+\.\d+)", serialized):
                 errors.append(f"acceptance evidence is not public-safe: {cell}")
-    if matrix.get("rows", {}).get("isolated-recovery", {}).get("service-restore") == "evidenced":
+    if matrix.get("rows", {}).get("isolated-recovery", {}).get("service-restore") == "historical-evidence":
         errors.append("development service-restore evidence must not be promoted to isolated recovery")
-    if matrix.get("rows", {}).get("production", {}).get("service-restore") == "evidenced":
+    if matrix.get("rows", {}).get("production", {}).get("service-restore") == "historical-evidence":
         errors.append("development service-restore evidence must not be promoted to production")
     return errors
 
@@ -381,7 +383,7 @@ def artifacts(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, An
             f"`{record['date']}`; evidence `{citation['path']}:{citation['lines']}`; "
             f"boundary: {record['boundary']}"
         )
-    matrix_md = "\n".join(["# Environment-specific acceptance matrix", "", matrix["evidence_boundary"], "", markdown_table(["Environment", *matrix["columns"]], matrix_rows), "", "## Evidence records", "", *evidence_lines, "", f"Historical development evidence source: `{matrix['development_source']}`. This source does not establish isolated-recovery or production acceptance.", ""])
+    matrix_md = "\n".join(["# Environment-specific acceptance matrix", "", matrix["evidence_boundary"], "", markdown_table(["Environment", *matrix["columns"]], matrix_rows), "", "## Evidence records", "", *evidence_lines, "", f"Historical development evidence source: `{matrix['development_source']}`. These records preserve completed rehearsals but are not current-HEAD acceptance after later lifecycle changes, and they do not establish isolated-recovery or production acceptance.", ""])
     backlog_md = "\n".join(["# Evidence-backed canonical backlog", "", "Active reconciliation is intentionally compact. Package source completion, original audit dispositions, approved decisions, and environment acceptance are the active authorities; the full per-claim ledger is frozen in Git history.", "", "- [Package source completion](../.hermes/reconciliation/package-completion.md)", "- [Original audit finding dispositions](../.hermes/reconciliation/audit-dispositions.md)", "- [Explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md)", "- [Environment-specific acceptance matrix](../.hermes/reconciliation/acceptance-matrix.md)", "", "Only external acceptance remains active; no incomplete source package or unresolved decision is reported as frontier work.", ""])
     return {
         RECON / "package-completion.json": json.dumps(completion, indent=2) + "\n",

@@ -25,7 +25,6 @@ values/
 .env
 .env.*
 !.env.example
-!scaffold/.env.example
 
 # Local Ansible inventories outside the private values repo
 ansible/inventory/local.yml

@@ -6,16 +6,8 @@ import io
 import json
 import sys
 import tempfile
-import types
 import unittest
 from pathlib import Path
-
-try:
-    import hcl2  # noqa: F401
-except ImportError:
-    hcl2_stub = types.ModuleType("hcl2")
-    hcl2_stub.load = lambda _file: {}
-    sys.modules.setdefault("hcl2", hcl2_stub)
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "service-runtime.py"
 spec = importlib.util.spec_from_file_location("service_runtime", SCRIPT)
@@ -70,6 +62,23 @@ class ServiceRuntimeTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         self.assertEqual(output.getvalue().strip(), "vm")
+
+    def test_main_rejects_missing_or_malformed_runtime_projection(self) -> None:
+        for payload in (
+            {},
+            {"enabled_services": ["forgejo"], "service_runtime": []},
+            {"enabled_services": ["forgejo"], "service_runtime": {"forgejo": []}},
+        ):
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temp:
+                projection = Path(temp) / "terraform.auto.tfvars.json"
+                projection.write_text(json.dumps(payload), encoding="utf-8")
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(
+                        service_runtime.main(
+                            ["forgejo", "--projection", str(projection)]
+                        ),
+                        1,
+                    )
 
 
 if __name__ == "__main__":

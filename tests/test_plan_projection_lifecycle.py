@@ -114,16 +114,22 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         content = (ROOT / "scripts" / "plan-infra.sh").read_text(encoding="utf-8")
         ordered_steps = (
             "python scripts/workspace-preflight.py --require-values --require-secrets",
-            'generated_verified=false',
-            'generated_tmp="$(mktemp -d',
+            'generated_dir="${INFRA_VALUES_DIR}/generated"',
+            'python scripts/canonical-render.py',
             'python scripts/verify-projections.py',
-            'generated_verified=true',
             'tofu -chdir=infra/opentofu init',
             'plan_tmp="$(mktemp',
             'mv -f "${plan_tmp}" "${INFRA_VALUES_DIR}/tfplan"',
         )
         positions = [content.index(step) for step in ordered_steps]
         self.assertEqual(positions, sorted(positions))
+        self.assertNotIn('mv "${generated_tmp}" "${generated_dir}"', content)
+        self.assertNotIn('mv "${generated_dir}" "${generated_backup}"', content)
+        renderer = (ROOT / "scripts" / "canonical-render.py").read_text(encoding="utf-8")
+        self.assertLess(
+            renderer.index("verify_manifest("),
+            renderer.index("atomic_output_directory(args.output_dir, populate)"),
+        )
         self.assertNotIn('rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"', content)
 
     def test_apply_requires_canonical_proxmox_identity_before_snapshot_or_provider_mutation(self) -> None:

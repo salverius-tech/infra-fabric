@@ -28,19 +28,9 @@ for plan_artifact in "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.me
   fi
 done
 
-generated_tmp=""
-generated_backup=""
-generated_verified=false
 plan_tmp=""
 metadata_tmp=""
 cleanup_generated_tmp() {
-  if [[ -n "${generated_tmp}" && -d "${generated_tmp}" ]]; then
-    rm -rf "${generated_tmp}"
-  fi
-  if [[ -n "${generated_backup}" && ! "${generated_verified}" == true && -e "${generated_backup}" ]]; then
-    rm -rf "${generated_dir}" 2>/dev/null || true
-    mv "${generated_backup}" "${generated_dir}" || printf "Unable to restore prior canonical projections.\\n" >&2
-  fi
   if [[ -n "${equivalence_after_json}" ]]; then
     rm -f "${equivalence_after_json}"
   fi
@@ -54,30 +44,14 @@ cleanup_generated_tmp() {
 trap cleanup_generated_tmp EXIT
 
 generated_dir="${INFRA_VALUES_DIR}/generated"
-generated_tmp="$(mktemp -d "${INFRA_VALUES_DIR}/.canonical-generated.XXXXXX")"
 source_commit="$(git rev-parse HEAD 2>/dev/null || printf "unknown")"
 python scripts/canonical-render.py \
   --site-file "${INFRA_VALUES_DIR}/site.yaml" \
-  --output-dir "${generated_tmp}" \
+  --output-dir "${generated_dir}" \
   --source-commit "${source_commit}"
-if [[ -e "${generated_dir}" ]]; then
-  generated_backup="$(mktemp -d "${INFRA_VALUES_DIR}/.canonical-generated-previous.XXXXXX")"
-  rmdir "${generated_backup}"
-  mv "${generated_dir}" "${generated_backup}"
-fi
-if ! mv "${generated_tmp}" "${generated_dir}"; then
-  printf "Unable to install refreshed canonical projections.\\n" >&2
-  exit 1
-fi
-generated_tmp=""
 python scripts/verify-projections.py \
   --site-file "${INFRA_VALUES_DIR}/site.yaml" \
   --generated-dir "${generated_dir}"
-generated_verified=true
-if [[ -n "${generated_backup}" ]]; then
-  rm -rf "${generated_backup}"
-  generated_backup=""
-fi
 printf "Canonical non-secret projections refreshed for %s.\\n" "${INFRA_VALUES_DIR}"
 
 ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
