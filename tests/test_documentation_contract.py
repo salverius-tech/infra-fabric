@@ -111,6 +111,47 @@ class DocumentationContractTests(unittest.TestCase):
         for retired in ("upstream", "repository-audit", "phase0", "mapping-v1"):
             self.assertNotIn(retired, text.lower())
 
+    def test_retired_implementation_trackers_are_not_active_backlog_authorities(self) -> None:
+        inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
+        historical_trackers = (
+            ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
+            ".hermes/plans/canonical-values-model-implementation.md",
+            ".hermes/plans/site-aware-values-migration.md",
+            ".hermes/plans/upstream-capability-adoption.md",
+        )
+        for relative in historical_trackers:
+            self.assertEqual(inventory["documents"][relative], "historical reference", relative)
+            opening = "\n".join((ROOT / relative).read_text(encoding="utf-8").splitlines()[:12])
+            self.assertIn("Historical", opening, relative)
+
+        matrix = json.loads((ROOT / ".hermes" / "reconciliation" / "acceptance-matrix.json").read_text(encoding="utf-8"))
+        development = matrix["rows"]["development"]
+        self.assertEqual(
+            {category for category, status in development.items() if status == "evidenced"},
+            {"plan", "apply", "health-idempotence", "service-restore", "infrastructure-recovery", "hermes-integration", "rollback"},
+        )
+        self.assertTrue(all(status == "not-evidenced" for status in matrix["rows"]["isolated-recovery"].values()))
+        self.assertTrue(all(status == "not-evidenced" for status in matrix["rows"]["production"].values()))
+
+        prd = (ROOT / "docs" / "hermes-operator-pilot-prd.md").read_text(encoding="utf-8")
+        for evidenced in (
+            "plan, apply, health/idempotence, service restore, infrastructure recovery",
+            "read-only Hermes integration",
+            "Hermes rollback evidence",
+        ):
+            self.assertIn(evidenced, prd)
+        for unevidenced in (
+            "Provider-equivalence",
+            "isolated-recovery",
+            "production",
+            "external audit durability",
+            "authenticated dashboard/API and WebSocket acceptance",
+            "mutation approval identity",
+            "live search smoke",
+        ):
+            self.assertIn(unevidenced, prd)
+        self.assertNotIn("not yet provider-equivalence, Hermes live-integration", prd)
+
     def test_installed_scaffold_readme_has_no_broken_relative_document_links(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             installed = Path(temporary) / "values"

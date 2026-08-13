@@ -1,6 +1,6 @@
 # Canonical Site Values Model — Implementation Plan
 
-**Status:** Canonical schema/catalog, semantic mapping, normalized non-secret importer admission, protected delivery boundary, canonical-first operational gating, and catalog dependency closure are implemented and focused-test verified on `feat/canonical-values-model`. The clean-rebuild host contract is now decided: global `infra` provisioning, global `systemboss` operator access, authenticated operator sudo, pinned full dotfiles, public-key rotation, and new-build-only recovery. Remaining work is selected-source candidate/migration acceptance, private-values setup, host-identity implementation, representative secret execution evidence, projection/consumer parity, semantic plan/apply equivalence, backup/restore rehearsal, operational cutover evidence, and compatibility removal.
+**Status:** Historical implementation tracker. Its phase text and unchecked boxes describe the migration as it was planned and are not current backlog authority. Source completion is governed by [`package-completion.md`](../reconciliation/package-completion.md); environment-specific evidence and remaining external gates are governed by [`acceptance-matrix.md`](../reconciliation/acceptance-matrix.md). The normal workflow is canonical-only and the retired compatibility surface must not be recreated from this record.
 **Branch:** `feat/canonical-values-model`
 **PRD:** [`canonical-values-model-prd.md`](./canonical-values-model-prd.md)
 **Repository:** `infra-fabric`
@@ -8,7 +8,7 @@
 
 ## Purpose
 
-This document is the implementation companion to the Canonical Site Values Model PRD. It decomposes the PRD into reviewable work packages and is the progress tracker for this branch. Checkboxes, phase status, decision records, and verification evidence must be updated as work lands; do not mark a phase complete from code inspection alone.
+This document preserves the implementation history of the Canonical Site Values Model PRD. It no longer drives current work. Checkboxes and phase statuses below are frozen historical records and must not be interpreted as outstanding source tasks.
 
 ## Approved architectural decision ledger — 2026-07-30
 

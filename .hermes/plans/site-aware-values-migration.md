@@ -1,7 +1,10 @@
 # Site-Aware Values and Service Selection Migration
 
-**Status:** Implemented — site-aware development validation completed; production
-was left untouched.
+**Status:** Historical migration record. The `site.json`, dotenv, tfvars, static
+inventory, and DNS layout below has been superseded by the canonical `site.yaml` plus
+encrypted `secrets.sops.yaml` contract. Current operator guidance starts at
+[`docs/canonical-quick-start.md`](../../docs/canonical-quick-start.md); do not use the
+historical target model below as an authoring surface.
 
 ## Objective
 

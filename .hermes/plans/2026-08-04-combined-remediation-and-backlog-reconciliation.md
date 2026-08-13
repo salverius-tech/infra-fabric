@@ -1,6 +1,6 @@
 # Combined Backlog Reconciliation and Audit Remediation Plan
 
-**Status:** Approved for source-level execution; infrastructure mutation remains prohibited without separate explicit approval
+**Status:** Historical execution record. Public-source completion is now governed by the concise [package completion](../reconciliation/package-completion.md) authority, and remaining environment-specific gates are governed by the [acceptance matrix](../reconciliation/acceptance-matrix.md). Unchecked boxes and older “remaining” prose below are not active backlog items.
 **Date:** 2026-08-04
 **Repository:** `infra-fabric`
 **Starting branch:** `feat/canonical-values-model`

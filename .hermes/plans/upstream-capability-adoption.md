@@ -1,6 +1,6 @@
 # Upstream Capability Adoption Plan
 
-**Status:** Implementation in progress — approved fork-native work; no live infrastructure mutation, plan, or apply has been performed.
+**Status:** Historical implementation tracker. Its ordered-task checkboxes are frozen planning records, not current backlog authority. Completed public-source packages are governed by [`package-completion.md`](../reconciliation/package-completion.md); remaining environment-specific guest, provider, recovery, and production evidence is governed by [`acceptance-matrix.md`](../reconciliation/acceptance-matrix.md).
 
 **Historical source decision record:** the retired upstream-gap review is succeeded by [canonical readiness](../../docs/canonical-readiness.md).
 
