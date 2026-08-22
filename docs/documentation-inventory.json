@@ -84,6 +84,7 @@
     "docs/canonical-values-secret-operations.md": "operator guidance",
     "docs/debian-baseline.md": "working design",
     "docs/design-implementation-backlog.md": "current authority",
+    "docs/development-acceptance-gate-runbook.md": "operator guidance",
     "docs/development-environment.md": "working design",
     "docs/hermes-control-operations.md": "operator guidance",
     "docs/hermes-independent-recovery.md": "operator guidance",
