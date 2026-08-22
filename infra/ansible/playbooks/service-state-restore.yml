@@ -179,15 +179,12 @@
         - name: Snapshot current managed service-state paths before restore
           tags: [restore]
           ansible.builtin.command:
-            argv:
-              - tar
-              - --numeric-owner
-              - --exclude=*/lost+found
-              - -C
-              - /
-              - -cf
-              - "{{ service_state_pre_restore_snapshot_dir.path }}/.snapshot-{{ service_state_path_index }}.tar"
-              - "{{ item | regex_replace('^/', '') }}"
+            argv: >-
+              {{ ['tar', '--numeric-owner', '--exclude=*/lost+found']
+                 + (service_state_definition.tar_exclude_args | default([]))
+                 + ['-C', '/', '-cf',
+                    service_state_pre_restore_snapshot_dir.path ~ '/.snapshot-' ~ service_state_path_index ~ '.tar',
+                    item | regex_replace('^/', '')] }}
           loop: "{{ service_state_existing_paths }}"
           loop_control:
             index_var: service_state_path_index

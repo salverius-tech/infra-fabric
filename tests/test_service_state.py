@@ -40,6 +40,17 @@ class ServiceStateTests(unittest.TestCase):
             ["hermes-gateway", "hermes-dashboard"],
         )
 
+    def test_sssf_backup_excludes_transient_managed_environment_links(self) -> None:
+        self.assertEqual(
+            self.catalog["sssf"]["tar_exclude_args"],
+            ["--exclude=*/.env", "--exclude=*/.uv-cache"],
+        )
+        for path in (BACKUP, RESTORE):
+            self.assertIn(
+                "service_state_definition.tar_exclude_args | default([])",
+                path.read_text(encoding="utf-8"),
+            )
+
     def test_onramp_user_units_are_not_declared_as_system_services(self) -> None:
         for service, unit in (
             ("infisical_onramp", "infisical-onramp.service"),
