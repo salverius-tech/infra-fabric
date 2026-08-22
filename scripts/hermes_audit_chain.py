@@ -22,6 +22,7 @@ class AuditChainError(RuntimeError):
 SUPPORTED_AUDIT_ACTIONS = frozenset({"validate", "plan", "apply"})
 AUDIT_PHASES = frozenset({"intent", "completed", "failed"})
 LIFECYCLE_FIELDS = frozenset({"correlation_id", "phase", "action", "returncode", "ok"})
+LEGACY_RESULT_FIELDS = frozenset({"action", "returncode", "ok"})
 
 
 def audit_record_hash(record: dict[str, object]) -> str:
@@ -70,9 +71,20 @@ def validate_audit_lifecycles(records: list[dict[str, object]]) -> list[str]:
     lifecycles: dict[str, dict[str, object]] = {}
     for record in records:
         if not LIFECYCLE_FIELDS.issubset(record):
-            raise AuditChainError(
-                "Hermes operator audit lifecycle record shape is invalid"
-            )
+            if any(field in record for field in ("correlation_id", "phase")) or not LEGACY_RESULT_FIELDS.issubset(record):
+                raise AuditChainError(
+                    "Hermes operator audit lifecycle record shape is invalid"
+                )
+            action = record["action"]
+            returncode = record["returncode"]
+            ok = record["ok"]
+            if not isinstance(action, str) or action not in SUPPORTED_AUDIT_ACTIONS:
+                raise AuditChainError("Hermes operator audit action is empty or unsupported")
+            if isinstance(returncode, bool) or not isinstance(returncode, int) or not isinstance(ok, bool):
+                raise AuditChainError("Hermes operator legacy result shape is invalid")
+            if ok != (returncode == 0):
+                raise AuditChainError("Hermes operator legacy result is inconsistent")
+            continue
 
         correlation_id = record["correlation_id"]
         phase = record["phase"]

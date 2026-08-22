@@ -653,6 +653,22 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertEqual(len(result["head_hash"]), 64)
             self.assertNotIn(str(root), json.dumps(result))
 
+    def test_audit_verify_accepts_hash_valid_legacy_terminal_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            audit = root / "private" / "audit.jsonl"
+            self.write_hash_valid_audit(
+                audit,
+                [
+                    {"_remove": ["correlation_id", "phase"], "action": "validate", "returncode": 0, "ok": True},
+                    {"_remove": ["correlation_id", "phase"], "action": "plan", "returncode": 0, "ok": True},
+                ],
+            )
+            with mock.patch.dict(os.environ, {"HERMES_OPERATOR_AUDIT_PATH": str(audit)}):
+                result = hermes_operator.verify_audit(root)
+            self.assertEqual(result["record_count"], 2)
+            self.assertEqual(result["unresolved_correlations"], [])
+
     def test_audit_verify_accepts_valid_interleaved_operations(self) -> None:
         first = "a" * 32
         second = "b" * 32
