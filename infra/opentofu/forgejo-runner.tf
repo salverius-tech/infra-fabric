@@ -54,6 +54,7 @@ module "forgejo_runner_vm" {
   tags          = ["forgejo", "runner", "actions", "opentofu"]
 
   cores     = var.forgejo_runner_cores
+  cpu_type  = local.vm_cpu_type["forgejo_runner"]
   memory_mb = var.forgejo_runner_memory_mb
 
   image = {

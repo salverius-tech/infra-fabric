@@ -31,7 +31,7 @@ resource "proxmox_virtual_environment_vm" "onramp_host" {
 
   cpu {
     cores = var.onramp_host_cores
-    type  = "x86-64-v2-AES"
+    type  = local.vm_cpu_type["onramp_host"]
   }
 
   memory {

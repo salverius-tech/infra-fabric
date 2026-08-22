@@ -395,6 +395,7 @@ class ResourceCompute(StrictModel):
     cores: StrictInt
     memory_mb: StrictInt
     swap_mb: StrictInt = 0
+    cpu_type: Literal["x86-64-v2-AES", "x86-64-v3"] | None = None
 
     @model_validator(mode="after")
     def validate_sizes(self) -> "ResourceCompute":
@@ -521,6 +522,10 @@ class Resource(StrictModel):
     @model_validator(mode="after")
     def validate_runtime_fields(self) -> "Resource":
         runtime = self.runtime
+        if self.type == "lxc" and self.compute.cpu_type is not None:
+            raise ValueError("VM-only compute.cpu_type is not valid on LXC resources")
+        if self.type == "vm" and self.compute.cpu_type is None:
+            self.compute.cpu_type = "x86-64-v2-AES"
         if self.type == "lxc" and any(value is not None for value in (runtime.firmware, runtime.machine, runtime.guest_agent, runtime.cloud_init)):
             raise ValueError("VM-only runtime fields are not valid on LXC resources")
         if self.type == "vm" and any(value is not None for value in (runtime.unprivileged, runtime.nesting)):
@@ -866,7 +871,6 @@ class SssfConfiguration(StrictModel):
     visualizer_enabled: StrictBool = False
     visualizer_host: StrictStr = "127.0.0.1"
     visualizer_port: StrictInt = 4600
-    max_concurrent_runs: StrictInt = 1
     allowed_repositories: list[StrictStr] = Field(default_factory=list)
     provider: Literal["openrouter", "openai", "fireworks"] = "openrouter"
 
@@ -909,12 +913,6 @@ class SssfConfiguration(StrictModel):
             raise ValueError("SSSF visualizer_port must be between 1 and 65535")
         return value
 
-    @field_validator("max_concurrent_runs")
-    @classmethod
-    def validate_concurrency(cls, value: int) -> int:
-        if not 1 <= value <= 4:
-            raise ValueError("SSSF max_concurrent_runs must be between 1 and 4")
-        return value
 
     @field_validator("allowed_repositories")
     @classmethod

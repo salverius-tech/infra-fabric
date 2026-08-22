@@ -14,26 +14,28 @@
       - sssf_visualizer_host in ['127.0.0.1', '::1', 'localhost']
       - sssf_visualizer_port | int >= 1
       - sssf_visualizer_port | int <= 65535
-      - sssf_max_concurrent_runs | int >= 1
-      - sssf_max_concurrent_runs | int <= 4
       - sssf_allowed_repositories is iterable
       - ansible_architecture == 'x86_64'
       - sssf_artifact_path is match('^/[^ ]+$')
       - sssf_uv_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
       - sssf_pi_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
       - sssf_bun_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
+      - sssf_just_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
       - sssf_uv_sha256 is match('^[0-9a-f]{64}$')
       - sssf_pi_sha256 is match('^[0-9a-f]{64}$')
       - sssf_bun_sha256 is match('^[0-9a-f]{64}$')
+      - sssf_just_sha256 is match('^[0-9a-f]{64}$')
+      - sssf_just_artifact_path is match('^/[^ ]+$')
       - sssf_nodesource_key_sha256 is match('^[0-9a-f]{64}$')
       - sssf_nodesource_key_fingerprint is match('^[0-9A-F]{40}$')
+      - sssf_provider in ['openrouter', 'openai', 'fireworks']
       - >-
         (sssf_provider == 'openrouter' and sssf_openrouter_api_key | length > 0) or
         (sssf_provider == 'openai' and sssf_openai_api_key | length > 0) or
         (sssf_provider == 'fireworks' and sssf_fireworks_api_key | length > 0)
     fail_msg: >-
       SSSF requires a pinned upstream commit, non-root runtime user, normalized paths,
-      loopback-only visualizer binding, x86_64 reviewed runtime pins, bounded concurrency,
+      loopback-only visualizer policy, x86_64 reviewed runtime pins,
       and at least one provider key.
 
 - name: Install SSSF operating-system dependencies
@@ -67,14 +69,69 @@
   ansible.builtin.file:
     path: "{{ sssf_data_dir }}"
     state: directory
-    owner: "{{ sssf_runtime_user }}"
-    group: "{{ sssf_runtime_user }}"
-    mode: '0750'
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Detect existing SSSF data mount source
+  tags: [config]
+  ansible.builtin.command:
+    argv: [findmnt, -no, SOURCE, --mountpoint, "{{ sssf_data_dir }}"]
+  register: sssf_existing_data_mount
+  changed_when: false
+  failed_when: false
+
+- name: Normalize existing SSSF data mount sources
+  tags: [validation]
+  ansible.builtin.set_fact:
+    sssf_existing_data_mount_sources: >-
+      {{ sssf_existing_data_mount.stdout_lines | default([])
+         | map('trim') | reject('equalto', '') | unique | list }}
+
+- name: Require at most one SSSF data mount source
+  tags: [validation]
+  ansible.builtin.assert:
+    that:
+      - sssf_existing_data_mount_sources | length <= 1
+    fail_msg: The SSSF data mountpoint resolves to more than one distinct source.
+
+- name: Select effective SSSF data device
+  tags: [config]
+  ansible.builtin.set_fact:
+    sssf_effective_data_device: >-
+      {{ sssf_existing_data_mount_sources[0]
+         if sssf_existing_data_mount_sources | length == 1
+         else sssf_data_device }}
+
+- name: Resolve effective SSSF data device
+  tags: [validation]
+  ansible.builtin.command:
+    argv: [readlink, -e, "{{ sssf_effective_data_device }}"]
+  register: sssf_effective_data_device_path
+  changed_when: false
+  failed_when: >-
+    sssf_effective_data_device_path.rc != 0 or
+    sssf_effective_data_device_path.stdout | trim == ''
+
+- name: Inspect effective SSSF data device mountpoints
+  tags: [validation]
+  ansible.builtin.command:
+    argv: [lsblk, -nrpo, MOUNTPOINTS, "{{ sssf_effective_data_device_path.stdout | trim }}"]
+  register: sssf_effective_data_mountpoints
+  changed_when: false
+  failed_when: sssf_effective_data_mountpoints.rc != 0
+
+- name: Reject the root filesystem as SSSF data storage
+  tags: [validation]
+  ansible.builtin.assert:
+    that:
+      - "'/' not in (sssf_effective_data_mountpoints.stdout_lines | map('trim') | list)"
+    fail_msg: The SSSF data device resolves to storage containing the guest root filesystem.
 
 - name: Detect SSSF data disk filesystem
   tags: [config]
   ansible.builtin.command:
-    argv: [blkid, -s, TYPE, -o, value, "{{ sssf_data_device }}"]
+    argv: [blkid, -s, TYPE, -o, value, "{{ sssf_effective_data_device_path.stdout | trim }}"]
   register: sssf_data_filesystem
   changed_when: false
   failed_when: false
@@ -82,27 +139,49 @@
 - name: Create SSSF data disk filesystem when absent
   tags: [config]
   ansible.builtin.command:
-    argv: [mkfs.ext4, -F, "{{ sssf_data_device }}"]
-  when: sssf_data_filesystem.stdout | trim == ''
+    argv: [mkfs.ext4, -F, "{{ sssf_effective_data_device_path.stdout | trim }}"]
+  when:
+    - sssf_existing_data_mount_sources | length == 0
+    - sssf_data_filesystem.stdout | trim == ''
   changed_when: true
+
+- name: Resolve SSSF data disk UUID
+  tags: [config]
+  ansible.builtin.command:
+    argv: [blkid, -s, UUID, -o, value, "{{ sssf_effective_data_device_path.stdout | trim }}"]
+  register: sssf_data_uuid
+  changed_when: false
+  failed_when: sssf_data_uuid.rc != 0 or sssf_data_uuid.stdout | trim == ''
+
+- name: Remove stale SSSF data mount entries
+  tags: [config]
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^\S+\s+{{ sssf_data_dir | regex_escape }}\s+'
+    state: absent
+    owner: root
+    group: root
+    mode: '0644'
+  when: sssf_existing_data_mount_sources | length == 0
 
 - name: Persist SSSF data disk mount
   tags: [config]
   ansible.builtin.lineinfile:
     path: /etc/fstab
-    regexp: "^{{ sssf_data_device | regex_escape }}\\s"
-    line: "{{ sssf_data_device }} {{ sssf_data_dir }} ext4 noatime 0 2"
+    line: "UUID={{ sssf_data_uuid.stdout | trim }} {{ sssf_data_dir }} ext4 noatime 0 2"
+    insertafter: EOF
     owner: root
     group: root
     mode: '0644'
+  when: sssf_existing_data_mount_sources | length == 0
 
 - name: Mount SSSF data disk
   tags: [config]
   ansible.builtin.command:
     argv: [mount, "{{ sssf_data_dir }}"]
   register: sssf_mount_result
+  when: sssf_existing_data_mount_sources | length == 0
   changed_when: sssf_mount_result.rc == 0
-  failed_when: false
 
 - name: Ensure SSSF directories exist
   tags: [config]
@@ -114,9 +193,9 @@
     mode: "{{ item.mode }}"
   loop:
     - { path: "{{ sssf_workspace_root }}", mode: '0750' }
-    - { path: "{{ sssf_data_dir }}", mode: '0750' }
-    - { path: "{{ sssf_data_dir }}/upstream", mode: '0750' }
-    - { path: "{{ sssf_data_dir }}/factory", mode: '0750' }
+    - { path: "{{ sssf_data_dir }}", owner: root, group: root, mode: '0755' }
+    - { path: "{{ sssf_data_dir }}/upstream", owner: root, group: root, mode: '0755' }
+    - { path: "{{ sssf_data_dir }}/factory", owner: "{{ sssf_runtime_user }}", group: "{{ sssf_runtime_user }}", mode: '0750' }
     - { path: /etc/sssf, owner: root, group: root, mode: '0755' }
 
 - name: Ensure Node.js 22 is available for the Pi coding agent
@@ -176,6 +255,7 @@
   ansible.builtin.assert:
     that:
       - item.stat.exists
+      - item.stat.isreg
       - item.stat.checksum == item.item.checksum
     fail_msg: "Missing or checksum-mismatched reviewed SSSF {{ item.item.tool }} artifact in {{ sssf_artifact_path }}."
   loop: "{{ sssf_cached_artifacts.results }}"
@@ -190,10 +270,85 @@
     group: root
     mode: '0600'
   loop:
-    - { tool: uv, version: "{{ sssf_uv_version }}", filename: uv-x86_64-unknown-linux-gnu.tar.gz }
-    - { tool: pi, version: "{{ sssf_pi_version }}", filename: pi-linux-x64.tar.gz }
-    - { tool: bun, version: "{{ sssf_bun_version }}", filename: bun-linux-x64.zip }
+    - { tool: uv, version: "{{ sssf_uv_version }}", filename: uv-x86_64-unknown-linux-gnu.tar.gz, checksum: "{{ sssf_uv_sha256 }}" }
+    - { tool: pi, version: "{{ sssf_pi_version }}", filename: pi-linux-x64.tar.gz, checksum: "{{ sssf_pi_sha256 }}" }
+    - { tool: bun, version: "{{ sssf_bun_version }}", filename: bun-linux-x64.zip, checksum: "{{ sssf_bun_sha256 }}" }
   when: item.tool != 'bun' or sssf_visualizer_enabled | bool
+
+- name: Verify staged SSSF runtime artifacts
+  tags: [validation]
+  ansible.builtin.stat:
+    path: "/var/tmp/sssf-{{ item.tool }}-{{ item.version }}.{{ item.filename.split('.')[-1] }}"
+    checksum_algorithm: sha256
+  register: sssf_staged_artifacts
+  loop:
+    - { tool: uv, version: "{{ sssf_uv_version }}", filename: uv-x86_64-unknown-linux-gnu.tar.gz, checksum: "{{ sssf_uv_sha256 }}" }
+    - { tool: pi, version: "{{ sssf_pi_version }}", filename: pi-linux-x64.tar.gz, checksum: "{{ sssf_pi_sha256 }}" }
+    - { tool: bun, version: "{{ sssf_bun_version }}", filename: bun-linux-x64.zip, checksum: "{{ sssf_bun_sha256 }}" }
+  when: item.tool != 'bun' or sssf_visualizer_enabled | bool
+
+- name: Require checksum-verified staged SSSF runtime artifacts
+  tags: [validation]
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+      - item.stat.checksum == item.item.checksum
+    fail_msg: Staged reviewed SSSF runtime artifact failed checksum verification.
+  loop: "{{ sssf_staged_artifacts.results }}"
+  when: not item.skipped | default(false)
+
+- name: Check reviewed Just artifact on the controller
+  tags: [validation]
+  ansible.builtin.stat:
+    path: "{{ sssf_just_artifact_path }}/{{ sssf_just_version }}/amd64/just-{{ sssf_just_version }}-amd64"
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  become: false
+  register: sssf_cached_just
+
+- name: Require reviewed Just artifact
+  tags: [validation]
+  ansible.builtin.assert:
+    that:
+      - sssf_cached_just.stat.exists
+      - sssf_cached_just.stat.isreg
+      - sssf_cached_just.stat.checksum == sssf_just_sha256
+    fail_msg: "Missing or checksum-mismatched reviewed Just artifact in {{ sssf_just_artifact_path }}."
+
+- name: Stage reviewed Just runtime
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "{{ sssf_just_artifact_path }}/{{ sssf_just_version }}/amd64/just-{{ sssf_just_version }}-amd64"
+    dest: "/var/tmp/sssf-just-{{ sssf_just_version }}"
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Verify staged Just runtime
+  tags: [validation]
+  ansible.builtin.stat:
+    path: "/var/tmp/sssf-just-{{ sssf_just_version }}"
+    checksum_algorithm: sha256
+  register: sssf_staged_just
+
+- name: Require checksum-verified staged Just runtime
+  tags: [validation]
+  ansible.builtin.assert:
+    that:
+      - sssf_staged_just.stat.exists
+      - sssf_staged_just.stat.isreg
+      - sssf_staged_just.stat.checksum == sssf_just_sha256
+
+- name: Install checksum-verified Just runtime
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/sssf-just-{{ sssf_just_version }}"
+    dest: /usr/local/bin/just
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
 
 - name: Install checksum-verified uv runtime
   tags: [packages]
@@ -258,7 +413,13 @@
     upstream={{ (sssf_data_dir ~ '/upstream') | quote }}
     git -c safe.directory="${upstream}" -C "${upstream}" fetch --depth=1 origin {{ sssf_upstream_commit | quote }}
     git -c safe.directory="${upstream}" -C "${upstream}" checkout --force {{ sssf_upstream_commit | quote }}
-    chown -R {{ sssf_runtime_user | quote }}:{{ sssf_runtime_user | quote }} {{ (sssf_data_dir ~ '/upstream') | quote }}
+    git -c safe.directory="${upstream}" -C "${upstream}" clean -ffdx
+    if [[ -n "$(git -c safe.directory="${upstream}" -C "${upstream}" status --porcelain)" ]]; then
+      printf 'Pinned SSSF checkout is not clean after reconciliation.\n' >&2
+      exit 1
+    fi
+    chown -R root:root {{ (sssf_data_dir ~ '/upstream') | quote }}
+    chmod -R u=rwX,go=rX {{ (sssf_data_dir ~ '/upstream') | quote }}
   args:
     executable: /bin/bash
   changed_when: true
@@ -279,10 +440,29 @@
     src: sssf.env.j2
     dest: /etc/sssf/env
     owner: root
-    group: root
-    mode: '0600'
+    group: "{{ sssf_runtime_user }}"
+    mode: '0640'
   no_log: true
   notify: Restart sssf visualizer
+
+- name: Ensure Pi agent configuration directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: "/home/{{ sssf_runtime_user }}/.pi/agent"
+    state: directory
+    owner: "{{ sssf_runtime_user }}"
+    group: "{{ sssf_runtime_user }}"
+    mode: '0700'
+
+- name: Install empty Pi custom model registry
+  tags: [config]
+  ansible.builtin.copy:
+    dest: "/home/{{ sssf_runtime_user }}/.pi/agent/models.json"
+    content: |
+      {"providers": {}}
+    owner: "{{ sssf_runtime_user }}"
+    group: "{{ sssf_runtime_user }}"
+    mode: '0600'
 
 - name: Install SSSF workspace initialization helper
   tags: [packages]
@@ -341,6 +521,28 @@
     force: true
   when: sssf_visualizer_enabled | bool
 
+- name: Ensure SSSF visualizer runtime directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ sssf_data_dir }}/factory/visualizer"
+    state: directory
+    owner: "{{ sssf_runtime_user }}"
+    group: "{{ sssf_runtime_user }}"
+    mode: '0750'
+  when: sssf_visualizer_enabled | bool
+
+- name: Copy pinned SSSF visualizer source to runtime directory
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "{{ sssf_data_dir }}/upstream/.claude/skills/sssf/apps/visualizer/"
+    dest: "{{ sssf_data_dir }}/factory/visualizer/"
+    remote_src: true
+    owner: "{{ sssf_runtime_user }}"
+    group: "{{ sssf_runtime_user }}"
+    mode: preserve
+    directory_mode: '0750'
+  when: sssf_visualizer_enabled | bool
+
 - name: Install SSSF visualizer dependencies from its lockfile
   tags: [packages]
   ansible.builtin.command:
@@ -349,7 +551,21 @@
       - install
       - --frozen-lockfile
       - --cwd
-      - "{{ sssf_data_dir }}/upstream/.claude/skills/sssf/apps/visualizer"
+      - "{{ sssf_data_dir }}/factory/visualizer"
+  become: true
+  become_user: "{{ sssf_runtime_user }}"
+  when: sssf_visualizer_enabled | bool
+  changed_when: true
+
+- name: Build SSSF visualizer UI
+  tags: [packages]
+  ansible.builtin.command:
+    argv:
+      - bun
+      - run
+      - build
+      - --cwd
+      - "{{ sssf_data_dir }}/factory/visualizer"
   become: true
   become_user: "{{ sssf_runtime_user }}"
   when: sssf_visualizer_enabled | bool
@@ -379,3 +595,11 @@
   register: sssf_revision
   changed_when: false
   failed_when: sssf_revision.stdout | trim != sssf_upstream_commit
+
+- name: Run SSSF health check
+  tags: [health, validation]
+  ansible.builtin.command:
+    argv: [/usr/local/bin/sssf-health]
+  register: sssf_health
+  changed_when: false
+  failed_when: sssf_health.rc != 0 or 'sssf healthy' not in sssf_health.stdout

@@ -54,6 +54,7 @@ module "hermes_vm" {
   tags          = ["hermes", "management", "opentofu"]
 
   cores     = var.hermes_container_cores
+  cpu_type  = local.vm_cpu_type["hermes"]
   memory_mb = var.hermes_container_memory_mb
 
   image = {

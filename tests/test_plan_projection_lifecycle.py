@@ -114,7 +114,7 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         content = (ROOT / "scripts" / "plan-infra.sh").read_text(encoding="utf-8")
         ordered_steps = (
             "python scripts/workspace-preflight.py --require-values --require-secrets",
-            'generated_dir="${INFRA_VALUES_DIR}/generated"',
+            'generated_dir="${INFRA_GENERATED_DIR:-${INFRA_VALUES_DIR}/generated}"',
             'python scripts/canonical-render.py',
             'python scripts/verify-projections.py',
             'tofu -chdir=infra/opentofu init',
@@ -131,6 +131,9 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
             renderer.index("atomic_output_directory(args.output_dir, populate)"),
         )
         self.assertNotIn('rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"', content)
+        self.assertIn('tofu_vars_file="${generated_dir}/terraform.auto.tfvars.json"', content)
+        self.assertIn('if [[ "${tofu_vars_file}" != /* ]]', content)
+        self.assertIn('tofu_vars_file="../../${tofu_vars_file}"', content)
 
     def test_apply_requires_canonical_proxmox_identity_before_snapshot_or_provider_mutation(self) -> None:
         # Safety category: pre-mutation ordering. The provider path is live, so

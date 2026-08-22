@@ -70,15 +70,18 @@ def _copy(source, destination: Path) -> None:
         raise ExecutionSnapshotError(str(error)) from error
 
 
-def _expected_sources(values_dir: Path, plan: Path, metadata: Path) -> dict[str, Path]:
+def _expected_sources(
+    values_dir: Path, plan: Path, metadata: Path, generated_dir: Path | None = None
+) -> dict[str, Path]:
     sources = {
         "tfplan": plan,
         "tfplan.meta.json": metadata,
     }
     for name in SITE_FILES:
         sources[f"values/{name}"] = values_dir / name
+    projections = generated_dir or values_dir / "generated"
     for name in GENERATED_FILES:
-        sources[f"values/generated/{name}"] = values_dir / "generated" / name
+        sources[f"values/generated/{name}"] = projections / name
     return sources
 
 
@@ -232,6 +235,7 @@ def create_snapshot(
     destination_root: Path,
     *,
     site: str,
+    generated_dir: Path | None = None,
     retain: int = DEFAULT_RETENTION,
 ) -> Path:
     """Copy verified execution inputs into one atomically installed read-only directory."""
@@ -246,7 +250,7 @@ def create_snapshot(
     try:
         with staging_directory(destination_root, prefix=".execution-next-") as staging:
             temporary = staging.path
-            sources = _expected_sources(values_dir, plan, metadata)
+            sources = _expected_sources(values_dir, plan, metadata, generated_dir)
             files: dict[str, str] = {}
             for relative, source in sources.items():
                 if relative.startswith("values/"):
@@ -294,6 +298,7 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--plan", type=Path, required=True)
     create.add_argument("--metadata", type=Path, required=True)
     create.add_argument("--destination-root", type=Path, required=True)
+    create.add_argument("--generated-dir", type=Path)
     create.add_argument("--site", required=True)
     create.add_argument("--retain", type=int, default=DEFAULT_RETENTION)
     verify = subparsers.add_parser("verify")
@@ -307,6 +312,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.metadata,
                 args.destination_root,
                 site=args.site,
+                generated_dir=args.generated_dir,
                 retain=args.retain,
             )
             print(snapshot)

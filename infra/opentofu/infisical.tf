@@ -54,6 +54,7 @@ module "infisical_vm" {
   tags          = ["infisical", "secrets", "opentofu"]
 
   cores     = var.infisical_container_cores
+  cpu_type  = local.vm_cpu_type["infisical"]
   memory_mb = var.infisical_container_memory_mb
 
   image = {

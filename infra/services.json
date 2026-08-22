@@ -715,7 +715,6 @@
           "sssf_visualizer_enabled": "configuration.visualizer_enabled",
           "sssf_visualizer_host": "configuration.visualizer_host",
           "sssf_visualizer_port": "configuration.visualizer_port",
-          "sssf_max_concurrent_runs": "configuration.max_concurrent_runs",
           "sssf_allowed_repositories": "configuration.allowed_repositories",
           "sssf_provider": "configuration.provider",
           "sssf_upstream_commit": "release.commit"

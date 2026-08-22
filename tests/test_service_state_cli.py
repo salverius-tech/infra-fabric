@@ -64,10 +64,15 @@ class ServiceStateCliTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            captured = capture.read_text(encoding="utf-8")
             self.assertIn(
                 "MSYS2_ENV_CONV_EXCL=KEEP;SERVICE_STATE_BACKUP_ROOT;SERVICE_STATE_RESTORE_FILE",
-                capture.read_text(encoding="utf-8"),
+                captured,
             )
+            self.assertIn('generated_dir="${INFRA_GENERATED_DIR:-/workspace/values/sites/dev/generated}"', captured)
+            self.assertIn('inventory="${generated_dir}/ansible-inventory.json"', captured)
+            self.assertIn('vars_file="${generated_dir}/ansible-vars.json"', captured)
+            self.assertIn('--generated-dir "${generated_dir}"', captured)
 
 
 if __name__ == "__main__":

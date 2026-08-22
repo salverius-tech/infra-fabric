@@ -126,15 +126,6 @@ PY
   done < <(scripts/python.sh scripts/settings.py services | tr ' ' '\n')
 }
 
-verify_canonical_service_state_inputs() {
-  if [[ -z "${VALUES_SITE:-}" ]]; then
-    return 0
-  fi
-  scripts/python.sh scripts/verify-projections.py \
-    --site-file "/workspace/${site_values_dir}/site.yaml" \
-    --generated-dir "/workspace/${site_values_dir}/generated"
-}
-
 require_canonical_service_enabled() {
   local requested="$1"
   if [[ -z "${VALUES_SITE:-}" ]]; then
@@ -151,8 +142,6 @@ run_playbook() {
   local service="$2"
   local group
   group="$(service_group "${service}")"
-  local inventory="/workspace/${site_values_dir}/generated/ansible-inventory.json"
-  local vars_file="/workspace/${site_values_dir}/generated/ansible-vars.json"
   local flat_vars_file="/tmp/.service-state-ansible-vars-${service}.json"
 
   local msys_env_conv_excl="${MSYS2_ENV_CONV_EXCL:-}"
@@ -166,16 +155,16 @@ run_playbook() {
       INFRA_SSH_IDENTITY_SOURCE=sops \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
-      scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; python /workspace/scripts/flatten-ansible-vars.py --input ${vars_file@Q} --output ${flat_vars_file@Q}; ansible-playbook -i ${inventory@Q} -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml; rc=\$?; rm -f ${flat_vars_file@Q}; exit \$rc"
+      scripts/run-infra.sh bash -euo pipefail -c \
+      "export PATH=/opt/ansible/bin:\$PATH; trap 'rm -f ${flat_vars_file}' EXIT; generated_dir=\"\${INFRA_GENERATED_DIR:-/workspace/${site_values_dir}/generated}\"; inventory=\"\${generated_dir}/ansible-inventory.json\"; vars_file=\"\${generated_dir}/ansible-vars.json\"; python /workspace/scripts/verify-projections.py --site-file /workspace/${site_values_dir}/site.yaml --generated-dir \"\${generated_dir}\"; python /workspace/scripts/flatten-ansible-vars.py --input \"\${vars_file}\" --output ${flat_vars_file@Q}; ansible-playbook -i \"\${inventory}\" -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml"
   else
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
       INFRA_SSH_IDENTITY_SOURCE=sops \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       SERVICE_STATE_RESTORE_FILE="${restore_file}" \
-      scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; python /workspace/scripts/flatten-ansible-vars.py --input ${vars_file@Q} --output ${flat_vars_file@Q}; ansible-playbook -i ${inventory@Q} -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml; rc=\$?; rm -f ${flat_vars_file@Q}; exit \$rc"
+      scripts/run-infra.sh bash -euo pipefail -c \
+      "export PATH=/opt/ansible/bin:\$PATH; trap 'rm -f ${flat_vars_file}' EXIT; generated_dir=\"\${INFRA_GENERATED_DIR:-/workspace/${site_values_dir}/generated}\"; inventory=\"\${generated_dir}/ansible-inventory.json\"; vars_file=\"\${generated_dir}/ansible-vars.json\"; python /workspace/scripts/verify-projections.py --site-file /workspace/${site_values_dir}/site.yaml --generated-dir \"\${generated_dir}\"; python /workspace/scripts/flatten-ansible-vars.py --input \"\${vars_file}\" --output ${flat_vars_file@Q}; ansible-playbook -i \"\${inventory}\" -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml"
   fi
 }
 
@@ -199,7 +188,6 @@ case "${command_name}" in
   backup)
     require_site_context
     require_canonical_authority
-    verify_canonical_service_state_inputs
     if [[ $# -ne 1 ]]; then
       usage
       exit 2
@@ -227,7 +215,6 @@ case "${command_name}" in
   restore)
     require_site_context
     require_canonical_authority
-    verify_canonical_service_state_inputs
     if [[ $# -ne 2 ]]; then
       usage
       exit 2
@@ -245,7 +232,6 @@ case "${command_name}" in
   restore-if-present)
     require_site_context
     require_canonical_authority
-    verify_canonical_service_state_inputs
     if [[ $# -lt 1 || $# -gt 2 ]]; then
       usage
       exit 2

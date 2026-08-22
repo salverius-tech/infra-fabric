@@ -1,4 +1,16 @@
 locals {
+  vm_cpu_type = {
+    for resource_id in [
+      "technitium",
+      "forgejo",
+      "forgejo_runner",
+      "infisical",
+      "hermes",
+      "sssf",
+      "tailscale_client",
+      "onramp_host",
+    ] : resource_id => lookup(var.vm_cpu_types, resource_id, "missing-canonical-vm-cpu-type")
+  }
   service_registry = jsondecode(file("${path.module}/../services.json"))
   service_names    = keys(local.service_registry.services)
   # Canonical selection and runtime are the only root-level service adapters.

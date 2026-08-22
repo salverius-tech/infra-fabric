@@ -5,6 +5,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "scripts"
@@ -128,6 +129,15 @@ class CanonicalSshIdentityTests(unittest.TestCase):
                     destination=directory / "materialized",
                     public_keys=[public],
                 )
+
+    def test_public_key_derivation_explicitly_uses_an_empty_passphrase(self) -> None:
+        completed = subprocess.CompletedProcess([], 1, "", "incorrect passphrase")
+        with mock.patch.object(module.subprocess, "run", return_value=completed) as run:
+            with self.assertRaisesRegex(module.CanonicalSshIdentityError, "invalid or passphrase-protected"):
+                module.derive_public_key(Path("/tmp/test-key"))
+        command = run.call_args.args[0]
+        self.assertEqual(command[:4], ["ssh-keygen", "-y", "-P", ""])
+        self.assertEqual(run.call_args.kwargs["stdin"], subprocess.DEVNULL)
 
 
 if __name__ == "__main__":

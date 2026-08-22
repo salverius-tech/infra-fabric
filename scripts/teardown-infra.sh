@@ -29,9 +29,10 @@ python scripts/settings.py policy --action destroy --canonical
 
 plan_path="${INFRA_VALUES_DIR}/destroy.tfplan"
 metadata_path="${INFRA_VALUES_DIR}/destroy.tfplan.meta.json"
+generated_dir="${INFRA_GENERATED_DIR:-${INFRA_VALUES_DIR}/generated}"
 if [[ "${1}" == "plan" ]]; then
-  require_canonical_projection_set "${INFRA_VALUES_DIR}/generated"
-  python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
+  require_canonical_projection_set "${generated_dir}"
+  python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${generated_dir}"
   tofu -chdir=infra/opentofu init
   plan_tmp="$(mktemp "${INFRA_VALUES_DIR}/.destroy-tfplan-next.XXXXXX")"
   metadata_tmp="$(mktemp "${INFRA_VALUES_DIR}/.destroy-tfplan-meta-next.XXXXXX")"
@@ -40,7 +41,7 @@ if [[ "${1}" == "plan" ]]; then
   rm -f "${plan_tmp}" "${metadata_tmp}"
   destroy_command=(tofu -chdir=infra/opentofu plan -destroy \
     -var="stateful_destroy_acknowledged=true" \
-    -var-file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json" \
+    -var-file="${generated_dir}/terraform.auto.tfvars.json" \
     -state="../../${INFRA_VALUES_DIR}/terraform.tfstate" \
     -out="../../${plan_tmp}")
   python scripts/canonical-provider-env.py -- "${destroy_command[@]}"
@@ -66,6 +67,7 @@ execution_snapshot_root="${INFRA_EXECUTION_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/ex
 state_snapshot_root="${INFRA_STATE_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/state-backups}"
 execution_snapshot="$(python scripts/execution-snapshot.py create \
   --values-dir "${INFRA_VALUES_DIR}" --plan "${plan_path}" --metadata "${metadata_path}" \
+  --generated-dir "${generated_dir}" \
   --destination-root "${execution_snapshot_root}" --site "${VALUES_SITE}")"
 cleanup_artifacts() { rm -f "${plan_path}" "${metadata_path}"; }
 trap cleanup_artifacts EXIT

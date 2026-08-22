@@ -24,14 +24,19 @@ def _key_identity(value: str) -> tuple[str, str]:
 def derive_public_key(private_key: Path) -> tuple[str, str]:
     try:
         result = subprocess.run(
-            ["ssh-keygen", "-y", "-f", str(private_key)],
+            ["ssh-keygen", "-y", "-P", "", "-f", str(private_key)],
             check=False,
             capture_output=True,
+            stdin=subprocess.DEVNULL,
             text=True,
             timeout=10,
         )
-    except (OSError, subprocess.TimeoutExpired) as error:
+    except OSError as error:
         raise CanonicalSshIdentityError("SSH public-key derivation is unavailable") from error
+    except subprocess.TimeoutExpired as error:
+        raise CanonicalSshIdentityError(
+            "bootstrap SSH private key is invalid or passphrase-protected"
+        ) from error
     if result.returncode != 0:
         raise CanonicalSshIdentityError("bootstrap SSH private key is invalid or passphrase-protected")
     try:

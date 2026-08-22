@@ -78,6 +78,7 @@ module "technitium_dns_vm" {
   tags        = ["dns", "technitium", "opentofu"]
 
   cores     = var.technitium_container_cores
+  cpu_type  = local.vm_cpu_type["technitium"]
   memory_mb = var.technitium_container_memory_mb
 
   image = {

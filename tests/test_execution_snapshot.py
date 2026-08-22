@@ -385,6 +385,7 @@ class ExecutionSnapshotTests(unittest.TestCase):
         storage = "python scripts/storage-vars.py --summary"
         apply = "apply_command=(tofu -chdir=infra/opentofu apply"
         self.assertIn(create, source)
+        self.assertIn('--generated-dir "${generated_dir}"', source)
         self.assertIn('export VALUES_DIR="${execution_snapshot}/values"', source)
         self.assertIn(
             "${execution_values_dir}/generated/terraform.auto.tfvars.json", source
@@ -406,7 +407,8 @@ class ExecutionSnapshotTests(unittest.TestCase):
         self.assertIn('--destination-root "${execution_snapshot_root}"', apply_source)
         self.assertIn('--destination-root "${execution_snapshot_root}"', teardown_source)
         self.assertIn('must be an absolute private host path', wrapper_source)
-        self.assertIn('must not be a symlink', wrapper_source)
+        self.assertIn("prepare_private_directory", wrapper_source)
+        self.assertIn("open_private_directory", wrapper_source)
         self.assertIn('INFRA_EXECUTION_SNAPSHOT_ROOT=/run/infra-fabric/execution-snapshots', wrapper_source)
 
 

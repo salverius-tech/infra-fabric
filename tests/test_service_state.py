@@ -73,17 +73,32 @@ class ServiceStateTests(unittest.TestCase):
         self.assertIn("state_capable_services()", cli)
         self.assertNotIn("supported_services=(", cli)
         self.assertIn('print(name)', cli)
-        self.assertIn("generated/ansible-vars.json", cli)
+        self.assertIn("ansible-vars.json", cli)
         self.assertIn("flatten-ansible-vars.py", cli)
         self.assertIn(".service-state-ansible-vars-", cli)
-        self.assertIn("rc=\\$?; rm -f", cli)
-        self.assertIn('"/workspace/${site_values_dir}/site.yaml"', cli)
+        self.assertEqual(cli.count("trap 'rm -f"), 2)
+        self.assertNotIn("rc=\\$?; rm -f", cli)
+        self.assertIn("--site-file /workspace/${site_values_dir}/site.yaml", cli)
         self.assertNotIn('"${repo_root}/${site_values_dir}/site.yaml"', cli)
         self.assertIn('grep -Fx "${requested}" >/dev/null', cli)
         self.assertNotIn('grep -Fxq "${requested}"', cli)
         self.assertIn("/home/anvil/.ssh/canonical-bootstrap", cli)
         self.assertIn("StrictHostKeyChecking=yes", cli)
         self.assertEqual(cli.count("INFRA_SSH_IDENTITY_SOURCE=sops"), 2)
+
+    def test_cli_uses_effective_controller_local_projection_directory(self) -> None:
+        cli = SERVICE_STATE_CLI.read_text(encoding="utf-8")
+        self.assertEqual(
+            cli.count('generated_dir=\\"\\${INFRA_GENERATED_DIR:-/workspace/${site_values_dir}/generated}\\"'),
+            2,
+        )
+        self.assertEqual(cli.count('inventory=\\"\\${generated_dir}/ansible-inventory.json\\"'), 2)
+        self.assertEqual(cli.count('vars_file=\\"\\${generated_dir}/ansible-vars.json\\"'), 2)
+        self.assertEqual(cli.count('--generated-dir \\"\\${generated_dir}\\"'), 2)
+        self.assertNotIn('inventory="/workspace/${site_values_dir}/generated/ansible-inventory.json"', cli)
+        self.assertNotIn('vars_file="/workspace/${site_values_dir}/generated/ansible-vars.json"', cli)
+        self.assertEqual(cli.count("scripts/run-infra.sh bash -euo pipefail -c"), 2)
+        self.assertNotIn("scripts/run-infra.sh bash -lc", cli)
 
     def test_hermes_compatibility_wrapper_requires_selected_site_paths(self) -> None:
         wrapper = HERMES_STATE_CLI.read_text(encoding="utf-8")

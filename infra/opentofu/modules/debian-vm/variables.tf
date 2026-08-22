@@ -105,6 +105,16 @@ variable "cores" {
   }
 }
 
+variable "cpu_type" {
+  description = "Portable Proxmox virtual CPU baseline."
+  type        = string
+
+  validation {
+    condition     = contains(["x86-64-v2-AES", "x86-64-v3"], var.cpu_type)
+    error_message = "cpu_type must be x86-64-v2-AES or x86-64-v3."
+  }
+}
+
 variable "memory_mb" {
   description = "Dedicated memory in MiB."
   type        = number

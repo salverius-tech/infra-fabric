@@ -168,6 +168,5 @@ services:
       visualizer_enabled: false
       visualizer_host: 127.0.0.1
       visualizer_port: 4600
-      max_concurrent_runs: 1
       allowed_repositories: []
       provider: openrouter

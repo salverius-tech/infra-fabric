@@ -21,6 +21,17 @@ variable "stateful_destroy_acknowledged" {
   default     = false
 }
 
+variable "vm_cpu_types" {
+  description = "Canonical effective Proxmox CPU type by VM resource ID. Generated from site.yaml; do not author directly."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for cpu_type in values(var.vm_cpu_types) : contains(["x86-64-v2-AES", "x86-64-v3"], cpu_type)])
+    error_message = "vm_cpu_types values must be x86-64-v2-AES or x86-64-v3."
+  }
+}
+
 
 variable "proxmox_endpoint" {
   description = "Proxmox VE API endpoint. Set in terraform.tfvars."

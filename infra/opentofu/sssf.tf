@@ -54,6 +54,7 @@ module "sssf_vm" {
   tags          = ["sssf", "software-factory", "opentofu"]
 
   cores     = var.sssf_cores
+  cpu_type  = local.vm_cpu_type["sssf"]
   memory_mb = var.sssf_memory_mb
 
   image = {

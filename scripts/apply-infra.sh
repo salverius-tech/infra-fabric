@@ -47,6 +47,7 @@ execution_values_dir="${INFRA_VALUES_DIR}"
 execution_snapshot=""
 execution_snapshot_root="${INFRA_EXECUTION_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/execution-snapshots}"
 state_snapshot_root="${INFRA_STATE_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/state-backups}"
+generated_dir="${INFRA_GENERATED_DIR:-${INFRA_VALUES_DIR}/generated}"
 
 target_service="${1:-}"
 replace_service="${2:-}"
@@ -67,10 +68,10 @@ verify_saved_plan() {
 }
 verify_saved_plan
 python scripts/tfplan-metadata.py summary --metadata "${INFRA_VALUES_DIR}/tfplan.meta.json"
-require_canonical_projection_set "${INFRA_VALUES_DIR}/generated"
+require_canonical_projection_set "${generated_dir}"
 # Apply consumes existing plan-bound projections and verifies them exactly once.
-python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${INFRA_VALUES_DIR}/generated"
-ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
+python scripts/verify-projections.py --site-file "${INFRA_VALUES_DIR}/site.yaml" --generated-dir "${generated_dir}"
+ansible_inventory="${generated_dir}/ansible-inventory.json"
 
 # The selected canonical site has a distinct SOPS-backed Proxmox-management
 # identity materialized before this lifecycle payload starts. Check it before snapshots or
@@ -84,6 +85,7 @@ execution_snapshot="$(python scripts/execution-snapshot.py create \
   --values-dir "${INFRA_VALUES_DIR}" \
   --plan "${execution_plan}" \
   --metadata "${execution_metadata}" \
+  --generated-dir "${generated_dir}" \
   --destination-root "${execution_snapshot_root}" \
   --site "${VALUES_SITE}")"
 python scripts/execution-snapshot.py verify --snapshot "${execution_snapshot}"

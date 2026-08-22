@@ -24,6 +24,13 @@ just plan
 just apply
 ```
 
+Lifecycle commands keep generated projections, execution snapshots, and state
+backups under the controller-local private state root
+`${XDG_STATE_HOME:-$HOME/.local/state}/infra-fabric/sites/<site>/` by default.
+This preserves atomic private-artifact publication when the selected values
+repository is on NFS. `INFRA_GENERATED_ROOT`, `INFRA_EXECUTION_SNAPSHOT_ROOT`,
+and `INFRA_STATE_SNAPSHOT_ROOT` remain explicit absolute-path overrides.
+
 Reset or rebuild the development site through a reviewed plan. Never reuse production values, state, backups, databases, or credentials.
 
 ## Implementing a service

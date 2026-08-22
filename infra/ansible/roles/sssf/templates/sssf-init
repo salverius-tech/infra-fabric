@@ -1,26 +1,241 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env python3
+"""Initialize one allow-listed SSSF workspace without pathname-race escape."""
+from __future__ import annotations
 
-repo_url=${1:?usage: sssf-init https://host/org/repo [workspace]}
-workspace=${2:-"{{ sssf_workspace_root }}/$(basename "${repo_url%.git}")"}
-case "${repo_url}" in
-{% for repo in sssf_allowed_repositories %}  {{ repo }}|{{ repo }}.git)
-    ;;
-{% endfor %}  *)
-    echo "repository is not in the canonical SSSF allow-list" >&2
-    exit 1
-    ;;
-esac
+import ctypes
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
 
-install -d -m 0750 -o {{ sssf_runtime_user }} -g {{ sssf_runtime_user }} "${workspace}"
-if [ ! -d "${workspace}/.git" ]; then
-  git clone "${repo_url}" "${workspace}"
-else
-  git -C "${workspace}" fetch --prune origin
-fi
-install -d -m 0750 "${workspace}/.claude/skills"
-rm -rf "${workspace}/.claude/skills/sssf"
-cp -a {{ sssf_data_dir }}/upstream/.claude/skills/sssf "${workspace}/.claude/skills/sssf"
-cp -n {{ sssf_config_path }} "${workspace}/sssf.config.yaml" || true
-chown -R {{ sssf_runtime_user }}:{{ sssf_runtime_user }} "${workspace}"
-printf 'initialized %s\n' "${workspace}"
+RUNTIME_USER = {{ sssf_runtime_user | tojson }}
+WORKSPACE_ROOT = {{ sssf_workspace_root | tojson }}
+REVIEWED_SKILL = {{ (sssf_data_dir ~ '/upstream/.claude/skills/sssf') | tojson }}
+INSTALLER = {{ (sssf_data_dir ~ '/upstream/.claude/skills/sssf/scripts/install.py') | tojson }}
+UV = {{ sssf_uv_path | tojson }}
+MANAGED_CONFIG = {{ sssf_config_path | tojson }}
+ALLOWED_REPOSITORIES = {
+{% for repo in sssf_allowed_repositories %}    {{ repo | tojson }},
+{% endfor %}}
+
+# Linux Landlock ABI and filesystem rights. Reads and execution remain unrestricted;
+# every mutating right is permitted only beneath the descriptor-pinned workspace.
+LANDLOCK_CREATE_RULESET_VERSION = 1
+LANDLOCK_RULE_PATH_BENEATH = 1
+PR_SET_NO_NEW_PRIVS = 38
+_MUTATING_RIGHTS = (
+    (1 << 1)   # WRITE_FILE
+    | (1 << 4) # REMOVE_DIR
+    | (1 << 5) # REMOVE_FILE
+    | (1 << 6) # MAKE_CHAR
+    | (1 << 7) # MAKE_DIR
+    | (1 << 8) # MAKE_REG
+    | (1 << 9) # MAKE_SOCK
+    | (1 << 10) # MAKE_FIFO
+    | (1 << 11) # MAKE_BLOCK
+    | (1 << 12) # MAKE_SYM
+)
+
+
+class RulesetAttr(ctypes.Structure):
+    _fields_ = [("handled_access_fs", ctypes.c_uint64)]
+
+
+class PathBeneathAttr(ctypes.Structure):
+    _fields_ = [("allowed_access", ctypes.c_uint64), ("parent_fd", ctypes.c_int32)]
+
+
+def fail(message: str) -> "None":
+    raise SystemExit(message)
+
+
+def syscall_numbers() -> tuple[int, int, int]:
+    machine = os.uname().machine
+    if machine == "x86_64":
+        return 444, 445, 446
+    if machine in {"aarch64", "arm64"}:
+        return 444, 445, 446
+    fail(f"unsupported architecture for SSSF Landlock confinement: {machine}")
+
+
+def landlock_restrict_self(workspace_fd: int) -> None:
+    create_ruleset, add_rule, restrict_self = syscall_numbers()
+    libc = ctypes.CDLL(None, use_errno=True)
+    abi = libc.syscall(create_ruleset, 0, 0, LANDLOCK_CREATE_RULESET_VERSION)
+    if abi < 1:
+        error = ctypes.get_errno()
+        fail(f"SSSF workspace confinement requires Landlock: {os.strerror(error)}")
+    handled = _MUTATING_RIGHTS
+    if abi >= 2:
+        handled |= 1 << 13  # REFER
+    if abi >= 3:
+        handled |= 1 << 14  # TRUNCATE
+    if abi >= 5:
+        handled |= 1 << 15  # IOCTL_DEV
+    ruleset_attr = RulesetAttr(handled)
+    ruleset_fd = libc.syscall(create_ruleset, ctypes.byref(ruleset_attr), ctypes.sizeof(ruleset_attr), 0)
+    if ruleset_fd < 0:
+        fail(f"cannot create SSSF Landlock ruleset: {os.strerror(ctypes.get_errno())}")
+    try:
+        path_rule = PathBeneathAttr(handled, workspace_fd)
+        if libc.syscall(add_rule, ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, ctypes.byref(path_rule), 0) != 0:
+            fail(f"cannot add SSSF Landlock path rule: {os.strerror(ctypes.get_errno())}")
+        null_fd = os.open("/dev/null", os.O_RDWR | os.O_NOFOLLOW)
+        try:
+            null_rule = PathBeneathAttr(1 << 1, null_fd)
+            if libc.syscall(add_rule, ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, ctypes.byref(null_rule), 0) != 0:
+                fail(f"cannot add SSSF /dev/null Landlock rule: {os.strerror(ctypes.get_errno())}")
+        finally:
+            os.close(null_fd)
+        if libc.prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0:
+            fail(f"cannot enable no-new-privileges for SSSF initializer: {os.strerror(ctypes.get_errno())}")
+        if libc.syscall(restrict_self, ruleset_fd, 0) != 0:
+            fail(f"cannot enforce SSSF Landlock ruleset: {os.strerror(ctypes.get_errno())}")
+    finally:
+        os.close(ruleset_fd)
+
+
+def run(command: list[str], workspace_fd: int, *, capture: bool = False) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        cwd=f"/proc/self/fd/{workspace_fd}",
+        pass_fds=(workspace_fd,),
+        check=True,
+        text=True,
+        capture_output=capture,
+    )
+
+
+def reject_managed_symlinks(workspace: Path) -> None:
+    managed = (".claude", ".claude/skills", ".claude/skills/sssf", "adws", ".gitignore", ".env.sample", "justfile")
+    for relative in managed:
+        if (workspace / relative).is_symlink():
+            fail("installer-managed workspace paths must not contain symlinks")
+    adws = workspace / "adws"
+    if adws.is_dir():
+        for root, directories, files in os.walk(adws, followlinks=False):
+            for name in (*directories, *files):
+                if (Path(root) / name).is_symlink():
+                    fail("installer-managed workspace paths must not contain symlinks")
+
+
+def open_absolute_directory_nofollow(path: str) -> int:
+    candidate = Path(path)
+    if not candidate.is_absolute():
+        fail("SSSF workspace root must be absolute")
+    descriptor = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for component in candidate.parts[1:]:
+            if component in {"", ".", ".."}:
+                fail("SSSF workspace root contains an unsafe component")
+            next_descriptor = os.open(
+                component,
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                dir_fd=descriptor,
+            )
+            os.close(descriptor)
+            descriptor = next_descriptor
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def main() -> int:
+    if os.geteuid() == 0 or os.environ.get("USER") == "root":
+        fail(f"sssf-init must be run as {RUNTIME_USER}")
+    import pwd
+    if pwd.getpwuid(os.geteuid()).pw_name != RUNTIME_USER:
+        fail(f"sssf-init must be run as {RUNTIME_USER}")
+    if len(sys.argv) not in {2, 3}:
+        fail("usage: sssf-init https://host/org/repo [workspace-name]")
+    repo_url = sys.argv[1]
+    normalized = repo_url[:-4] if repo_url.endswith(".git") else repo_url
+    if normalized not in {value[:-4] if value.endswith(".git") else value for value in ALLOWED_REPOSITORIES}:
+        fail("repository is not in the canonical SSSF allow-list")
+    workspace_name = sys.argv[2] if len(sys.argv) == 3 else normalized.rsplit("/", 1)[-1]
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", workspace_name) or workspace_name in {".", ".."}:
+        fail("workspace name must be a single safe name")
+
+    workspace_root_fd = open_absolute_directory_nofollow(WORKSPACE_ROOT)
+    try:
+        try:
+            workspace_fd = os.open(
+                workspace_name,
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                dir_fd=workspace_root_fd,
+            )
+            existing = True
+        except FileNotFoundError:
+            os.mkdir(workspace_name, 0o750, dir_fd=workspace_root_fd)
+            workspace_fd = os.open(
+                workspace_name,
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY,
+                dir_fd=workspace_root_fd,
+            )
+            existing = False
+    finally:
+        os.close(workspace_root_fd)
+
+    try:
+        workspace = Path(f"/proc/self/fd/{workspace_fd}")
+        landlock_restrict_self(workspace_fd)
+        environment = os.environ.copy()
+        environment["TMPDIR"] = str(workspace)
+        environment["UV_CACHE_DIR"] = str(workspace / ".uv-cache")
+        os.environ.update(environment)
+
+        if existing:
+            if not (workspace / ".git").is_dir() or (workspace / ".git").is_symlink():
+                fail("workspace exists but is not a Git checkout")
+            origin = run(["git", "remote", "get-url", "origin"], workspace_fd, capture=True).stdout.strip()
+            origin_normalized = origin[:-4] if origin.endswith(".git") else origin
+            if origin_normalized != normalized:
+                fail("existing workspace origin does not match the allow-listed repository")
+            run(["git", "fetch", "--prune", "origin"], workspace_fd)
+        else:
+            run(["git", "clone", repo_url, "."], workspace_fd)
+
+        reject_managed_symlinks(workspace)
+        skill = workspace / ".claude/skills/sssf"
+        if skill.exists():
+            if not skill.is_dir() or skill.is_symlink():
+                fail("existing SSSF skill differs from the reviewed pin")
+            difference = subprocess.run(
+                ["diff", "-qr", REVIEWED_SKILL, str(skill)],
+                pass_fds=(workspace_fd,),
+                check=False,
+            ).returncode
+            if difference != 0:
+                fail("existing SSSF skill differs from the reviewed pin")
+        else:
+            skill.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+            shutil.copytree(REVIEWED_SKILL, skill, symlinks=True)
+
+        run([UV, "run", INSTALLER], workspace_fd)
+        reject_managed_symlinks(workspace)
+        config_destination = workspace / "adws/adw_sssf_config/sssf.config.yaml"
+        if config_destination.parent.is_symlink():
+            fail("installer-managed workspace paths must not contain symlinks")
+        with open(MANAGED_CONFIG, "rb") as source, open(config_destination, "wb") as destination:
+            shutil.copyfileobj(source, destination)
+        os.chmod(config_destination, 0o640)
+
+        environment_link = workspace / ".env"
+        if environment_link.exists() or environment_link.is_symlink():
+            if not environment_link.is_symlink() or os.readlink(environment_link) != "/etc/sssf/env":
+                fail("workspace .env exists and is not the managed SSSF environment link")
+            environment_link.unlink()
+        environment_link.symlink_to("/etc/sssf/env")
+        print(f"initialized {WORKSPACE_ROOT}/{workspace_name}")
+        return 0
+    except subprocess.CalledProcessError as error:
+        fail(f"SSSF initializer command failed with exit code {error.returncode}")
+    finally:
+        os.close(workspace_fd)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

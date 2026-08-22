@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
+import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -100,12 +101,62 @@ services:
 
 
 class CanonicalValuesTests(unittest.TestCase):
+    def test_vm_cpu_type_defaults_and_projects_as_a_typed_resource_map(self) -> None:
+        resource_data = {
+            "type": "vm",
+            "identity": {"vmid": 113, "hostname": "sssf"},
+            "network": {"address": "dhcp", "expected_address": "192.0.2.73"},
+            "compute": {"cores": 4, "memory_mb": 8192},
+            "storage": {
+                "root": {
+                    "type": "proxmox_volume",
+                    "storage_id": "local-lvm",
+                    "size_gb": 32,
+                    "target": "/",
+                }
+            },
+            "runtime": {},
+        }
+        defaulted = canonical_values.Resource.model_validate(resource_data)
+        self.assertEqual(defaulted.compute.cpu_type, "x86-64-v2-AES")
+
+        selected_data = dict(resource_data)
+        selected_data["compute"] = {**resource_data["compute"], "cpu_type": "x86-64-v3"}
+        selected = canonical_values.Resource.model_validate(selected_data)
+        self.assertEqual(selected.compute.cpu_type, "x86-64-v3")
+        site_data = yaml.safe_load(VALID_SITE)
+        site_data["resources"]["guests"]["forgejo"]["type"] = "vm"
+        site_data["resources"]["guests"]["forgejo"]["runtime"].pop("unprivileged")
+        site_model = canonical_values.CanonicalSite.model_validate(site_data)
+        self.assertEqual(
+            render_opentofu_variables(site_model).get("vm_cpu_types", {}).get("forgejo"),
+            "x86-64-v2-AES",
+        )
+        template_path = Path(__file__).resolve().parents[1] / "scaffold/sites/_template/site.yaml"
+        template = canonical_values.CanonicalSite.model_validate(yaml.safe_load(template_path.read_text(encoding="utf-8")))
+        self.assertEqual(render_opentofu_variables(template)["vm_cpu_types"]["sssf"], "x86-64-v3")
+
+    def test_lxc_rejects_explicit_vm_cpu_type(self) -> None:
+        data = yaml.safe_load(VALID_SITE)
+        data["resources"]["guests"]["forgejo"]["compute"]["cpu_type"] = "x86-64-v3"
+        with self.assertRaisesRegex(ValidationError, "VM-only compute.cpu_type"):
+            canonical_values.CanonicalSite.model_validate(data)
+
+    def test_vm_cpu_type_rejects_unsupported_proxmox_models(self) -> None:
+        data = yaml.safe_load(VALID_SITE)
+        data["resources"]["guests"]["forgejo"]["type"] = "vm"
+        data["resources"]["guests"]["forgejo"]["runtime"].pop("unprivileged")
+        data["resources"]["guests"]["forgejo"]["compute"]["cpu_type"] = "host"
+        with self.assertRaises(ValidationError):
+            canonical_values.CanonicalSite.model_validate(data)
+
     def test_sssf_configuration_is_strict_and_loopback_visualizer_is_default(self) -> None:
         configuration = SssfConfiguration.model_validate({})
         self.assertEqual(configuration.runtime_user, "sssf")
         self.assertFalse(configuration.visualizer_enabled)
         self.assertEqual(configuration.visualizer_host, "127.0.0.1")
         self.assertEqual(configuration.provider, "openrouter")
+        self.assertNotIn("max_concurrent_runs", type(configuration).model_fields)
         with self.assertRaises(ValueError):
             SssfConfiguration.model_validate({"runtime_user": "root"})
         with self.assertRaises(ValueError):

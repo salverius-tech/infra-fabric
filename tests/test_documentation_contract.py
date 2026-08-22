@@ -335,6 +335,25 @@ class DocumentationContractTests(unittest.TestCase):
         shared = (ROOT / "docs/service-state-backup.md").read_text(encoding="utf-8")
         self.assertIn("values/sites/<site>/service-backups/", shared)
 
+    def test_sssf_maintained_doc_preserves_upstream_and_runtime_boundaries(self) -> None:
+        sssf = (ROOT / "docs" / "sssf.md").read_text(encoding="utf-8")
+        required = (
+            "Pinned upstream artifacts remain unmodified",
+            "`install.py`",
+            "`adws/`",
+            "`.claude/skills/sssf/`",
+            "`sssf.config.yaml`",
+            "single provider",
+            "`bun run server/index.ts`",
+            "non-`--force` upstream install",
+            "future pin-update compatibility workflow",
+            "must not be treated as live acceptance evidence",
+        )
+        for marker in required:
+            self.assertIn(marker, sssf, marker)
+        self.assertIn("/usr/local/bin/sssf-init https://host/org/repo", sssf)
+        self.assertIn("must not supply the optional workspace argument", sssf)
+
     def test_maintained_docs_do_not_present_legacy_or_ambient_authority_as_normal(self) -> None:
         prd = (ROOT / "docs/hermes-operator-pilot-prd.md").read_text(encoding="utf-8")
         self.assertIn("Private selected-site inputs", prd)

@@ -66,6 +66,7 @@ module "tailscale_client_vm" {
   tags          = ["tailscale", "vpn", "opentofu"]
 
   cores     = var.tailscale_client_cores
+  cpu_type  = local.vm_cpu_type["tailscale_client"]
   memory_mb = var.tailscale_client_memory_mb
 
   image = {

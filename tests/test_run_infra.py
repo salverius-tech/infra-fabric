@@ -44,10 +44,16 @@ class RunInfraTests(unittest.TestCase):
         env.update(
             {
                 "PATH": f"{fakebin}{os.pathsep}{env['PATH']}",
+                "HOME": str(root / "home"),
                 "VALUES_DIR": str(values),
                 "TMPDIR": str(root),
             }
         )
+        (root / "home").mkdir()
+        age_key = root / "site.age"
+        age_key.write_text("synthetic-test-age-identity\n", encoding="utf-8")
+        age_key.chmod(0o600)
+        env["SOPS_AGE_KEY_FILE"] = str(age_key)
         env["VALUES_SITE"] = selected_site
         result = subprocess.run(
             ["bash", "scripts/run-infra.sh", "true"],
@@ -73,6 +79,28 @@ class RunInfraTests(unittest.TestCase):
         result, root = self.run_with_fake_docker(7)
         self.assertEqual(result.returncode, 7)
         self.assertFalse(list(root.glob("run-infra.*")))
+
+    def test_generated_root_override_uses_a_private_fixed_site_mount(self) -> None:
+        source = (REPO / "scripts/run-infra.sh").read_text(encoding="utf-8")
+        self.assertIn("INFRA_GENERATED_ROOT must be an absolute private host path", source)
+        self.assertIn("prepare_private_directory", source)
+        self.assertIn("open_private_directory", source)
+        self.assertIn("ensure_private_directory", source)
+        self.assertIn("st_uid != os.getuid()", source)
+        self.assertIn('${generated_host_root}:/run/infra-fabric/generated', source)
+        self.assertIn('INFRA_GENERATED_DIR=/run/infra-fabric/generated/generated', source)
+        self.assertNotIn("INFRA_ACCEPT_CHANGED_HOST_KEYS", source)
+
+    def test_default_private_artifact_roots_make_plain_lifecycle_commands_nfs_safe(self) -> None:
+        result, root = self.run_with_fake_docker(0, site="dev")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        invocation = (root / "record").read_text(encoding="utf-8")
+        state_root = root / "home/.local/state/infra-fabric/sites/dev"
+        self.assertIn(f"{state_root}/generated:/run/infra-fabric/generated", invocation)
+        self.assertIn(f"{state_root}/execution-snapshots:/run/infra-fabric/execution-snapshots", invocation)
+        self.assertIn(f"{state_root}/state-backups:/run/infra-fabric/state-backups", invocation)
+        for name in ("generated", "execution-snapshots", "state-backups"):
+            self.assertEqual(stat.S_IMODE((state_root / name).stat().st_mode), 0o700)
 
 
 if __name__ == "__main__":

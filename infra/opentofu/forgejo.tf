@@ -142,6 +142,7 @@ module "forgejo_vm" {
   tags        = ["forgejo", "git", "opentofu"]
 
   cores     = var.forgejo_container_cores
+  cpu_type  = local.vm_cpu_type["forgejo"]
   memory_mb = var.forgejo_container_memory_mb
 
   image = {

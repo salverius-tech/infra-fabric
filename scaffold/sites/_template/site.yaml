@@ -126,6 +126,7 @@ resources:
         cores: 4
         memory_mb: 8192
         swap_mb: 0
+        cpu_type: x86-64-v3
       storage:
         root:
           type: proxmox_volume
@@ -210,7 +211,6 @@ services:
       visualizer_enabled: false
       visualizer_host: 127.0.0.1
       visualizer_port: 4600
-      max_concurrent_runs: 1
       allowed_repositories: []
       provider: openrouter
     endpoints:

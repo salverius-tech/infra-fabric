@@ -2,7 +2,7 @@
 sssf_runtime_user: sssf
 sssf_workspace_root: /srv/sssf/workspaces
 sssf_data_dir: /var/lib/sssf
-sssf_data_device: /dev/sdb
+sssf_data_device: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1
 sssf_config_path: /etc/sssf/sssf.config.yaml
 sssf_upstream_repository: https://github.com/disler/super-simple-software-factory
 sssf_upstream_commit: de31374882e7a4e3e5b7bb9bd09e69dc2f779356
@@ -15,13 +15,14 @@ sssf_pi_version: 0.83.0
 sssf_pi_sha256: b0625eb623197b0afe20c870d21ef2f34481f1504e5777df3f698a66c7636f5f
 sssf_bun_version: 1.3.14
 sssf_bun_sha256: 951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f
+sssf_just_artifact_path: /var/lib/infra-fabric/artifacts/just
+sssf_just_version: 1.58.0
+sssf_just_sha256: 3ad66571feae522db2cad31b9613bf21035b8a06d2738d6fc8fe6089856f2042
 sssf_visualizer_enabled: false
 sssf_visualizer_host: 127.0.0.1
 sssf_visualizer_port: 4600
-sssf_max_concurrent_runs: 1
 sssf_allowed_repositories: []
 sssf_provider: openrouter
-sssf_visualizer_command: bun run --cwd .claude/skills/sssf/apps/visualizer dev --host {{ sssf_visualizer_host }} --port {{ sssf_visualizer_port }}
 sssf_openrouter_api_key: ""
 sssf_openai_api_key: ""
 sssf_fireworks_api_key: ""

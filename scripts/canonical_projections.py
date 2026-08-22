@@ -226,6 +226,11 @@ def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | No
             for name, service in sorted(model.services.items())
             if service.state.capable
         },
+        "vm_cpu_types": {
+            resource_id: resource.compute.cpu_type
+            for resource_id, resource in sorted((*model.resources.guests.items(), *model.resources.shared_hosts.items()))
+            if resource.type == "vm"
+        },
         "proxmox_endpoint": model.platform.proxmox.endpoint,
         "proxmox_node_name": model.platform.proxmox.node,
         "proxmox_insecure": model.platform.proxmox.insecure,

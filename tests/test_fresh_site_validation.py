@@ -53,7 +53,7 @@ class FreshSiteValidationTests(unittest.TestCase):
         script = (ROOT / "scripts" / "validate-values.sh").read_text(encoding="utf-8")
         render = 'python scripts/canonical-render.py'
         verify = 'python scripts/verify-projections.py'
-        inventory = 'ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"'
+        inventory = 'ansible_inventory="${generated_dir}/ansible-inventory.json"'
         self.assertIn(render, script)
         self.assertIn(verify, script)
         self.assertLess(script.index(render), script.index(verify))

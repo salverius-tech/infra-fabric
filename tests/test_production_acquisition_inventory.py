@@ -19,6 +19,7 @@ CANONICAL_VALUES = ROOT / "scripts/canonical_values.py"
 ACQUISITION_PATTERNS = (
     re.compile(r"\bansible\.builtin\.(?:get_url|git|apt_repository)\b"),
     re.compile(r"\bgit clone\b"),
+    re.compile(r"\[\s*[\"']git[\"']\s*,\s*[\"']clone[\"']"),
     re.compile(r"\bcurl\s+-[^\n]*\b(?:https?://|\$\{(?:[A-Za-z_][A-Za-z0-9_]*|[^}]+)\})"),
     re.compile(r"^FROM\s+", re.MULTILINE),
     re.compile(r"^\s*image:\s+", re.MULTILINE),

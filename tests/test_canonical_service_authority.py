@@ -182,6 +182,7 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
     def test_hcl_rejects_unsupported_runtime_choices_and_retired_aliases(self) -> None:
         cases = (
             ('-var=service_runtime={forgejo={type="baremetal"}}', "service_runtime entries must use type lxc or vm."),
+            ('-var=vm_cpu_types={sssf="host"}', "vm_cpu_types values must be x86-64-v2-AES or x86-64-v3."),
             ('-var=service_runtime={onramp_host={type="lxc"}}', "onramp_host is VM-only"),
             ('-var=forgejo_runtime={type="vm"}', "forgejo_runtime is a retired OpenTofu alias"),
             ('-var=tailscale_client_enabled=true', "tailscale_client_enabled is a retired OpenTofu alias"),
@@ -211,6 +212,33 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
         plan_script = PLAN_SCRIPT.read_text(encoding="utf-8")
         self.assertIn('INFRA_ALLOW_DESTROY:-0', plan_script)
         self.assertIn('-var="stateful_destroy_acknowledged=${stateful_destroy_acknowledged}"', plan_script)
+
+    def test_every_vm_consumer_uses_the_canonical_cpu_type_map(self) -> None:
+        variables = VARIABLES_TF.read_text(encoding="utf-8")
+        services = SERVICES_TF.read_text(encoding="utf-8")
+        module_variables = (ROOT / "infra/opentofu/modules/debian-vm/variables.tf").read_text(encoding="utf-8")
+        module_main = (ROOT / "infra/opentofu/modules/debian-vm/main.tf").read_text(encoding="utf-8")
+        self.assertIn('variable "vm_cpu_types"', variables)
+        self.assertIn('"x86-64-v2-AES", "x86-64-v3"', variables)
+        self.assertNotIn("default_vm_cpu_type", services)
+        self.assertIn('lookup(var.vm_cpu_types, resource_id, "missing-canonical-vm-cpu-type")', services)
+        self.assertIn('variable "cpu_type"', module_variables)
+        self.assertIn("type  = var.cpu_type", module_main)
+
+        consumers = {
+            "main.tf": ("cpu_type", "technitium"),
+            "forgejo.tf": ("cpu_type", "forgejo"),
+            "forgejo-runner.tf": ("cpu_type", "forgejo_runner"),
+            "infisical.tf": ("cpu_type", "infisical"),
+            "hermes.tf": ("cpu_type", "hermes"),
+            "sssf.tf": ("cpu_type", "sssf"),
+            "tailscale.tf": ("cpu_type", "tailscale_client"),
+            "onramp-host.tf": ("type", "onramp_host"),
+        }
+        for filename, (attribute, resource_id) in consumers.items():
+            with self.subTest(filename=filename):
+                source = (ROOT / "infra/opentofu" / filename).read_text(encoding="utf-8")
+                self.assertRegex(source, rf'{attribute}\s+=\s+local\.vm_cpu_type\["{resource_id}"\]')
 
     def test_conditional_service_root_inputs_are_optional_until_canonical_enablement_requires_them(self) -> None:
         model = load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH)

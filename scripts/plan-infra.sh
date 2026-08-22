@@ -43,7 +43,7 @@ cleanup_generated_tmp() {
 }
 trap cleanup_generated_tmp EXIT
 
-generated_dir="${INFRA_VALUES_DIR}/generated"
+generated_dir="${INFRA_GENERATED_DIR:-${INFRA_VALUES_DIR}/generated}"
 source_commit="$(git rev-parse HEAD 2>/dev/null || printf "unknown")"
 python scripts/canonical-render.py \
   --site-file "${INFRA_VALUES_DIR}/site.yaml" \
@@ -54,8 +54,11 @@ python scripts/verify-projections.py \
   --generated-dir "${generated_dir}"
 printf "Canonical non-secret projections refreshed for %s.\\n" "${INFRA_VALUES_DIR}"
 
-ansible_inventory="${INFRA_VALUES_DIR}/generated/ansible-inventory.json"
-tofu_vars_file="../../${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json"
+ansible_inventory="${generated_dir}/ansible-inventory.json"
+tofu_vars_file="${generated_dir}/terraform.auto.tfvars.json"
+if [[ "${tofu_vars_file}" != /* ]]; then
+  tofu_vars_file="../../${tofu_vars_file}"
+fi
 
 if [[ "${equivalence_required}" == true && -z "${INFRA_EQUIVALENCE_BEFORE_JSON:-}" ]]; then
   printf "%s\\n" "Canonical planning requires INFRA_EQUIVALENCE_BEFORE_JSON when INFRA_REQUIRE_EQUIVALENCE=true." >&2
@@ -68,7 +71,7 @@ storage_vars_args=()
 if [[ -n "${1:-}" ]]; then
   storage_vars_args+=(--service "${1}")
 fi
-projection_args=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+projection_args=(--projection "${generated_dir}/terraform.auto.tfvars.json")
 python scripts/storage-vars.py --summary "${storage_vars_args[@]}" "${projection_args[@]}"
 python scripts/guest-mount-feature-vars.py --summary "${projection_args[@]}"
 
@@ -84,16 +87,16 @@ enabled_services_args=()
 target_args=()
 replace_args=()
 if [[ -n "${1:-}" ]]; then
-  target_projection_args=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+  target_projection_args=(--projection "${generated_dir}/terraform.auto.tfvars.json")
   while IFS= read -r target; do
     [[ -n "${target}" ]] && target_args+=("-target=${target}")
   done < <(python scripts/settings.py tofu-targets "${1}" "${target_projection_args[@]}")
   printf "Creating one-service canary plan for %s. A full plan is required after this rollout.\n" "${1}"
 fi
 if [[ -n "${2:-}" ]]; then
-  replace_runtime_args=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+  replace_runtime_args=(--projection "${generated_dir}/terraform.auto.tfvars.json")
   replace_runtime="$(python scripts/service-runtime.py "${2}" "${replace_runtime_args[@]}")"
-  replace_projection_args=(--projection "${INFRA_VALUES_DIR}/generated/terraform.auto.tfvars.json")
+  replace_projection_args=(--projection "${generated_dir}/terraform.auto.tfvars.json")
   while IFS= read -r target; do
     [[ -n "${target}" ]] && replace_args+=("-replace=${target}")
   done < <(python scripts/settings.py tofu-replace-targets "${2}" --runtime "${replace_runtime}" "${replace_projection_args[@]}")

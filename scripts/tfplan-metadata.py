@@ -299,7 +299,8 @@ def canonical_identity(repo: Path) -> dict[str, Any] | None:
     catalog_path = repo / "infra" / "services.json"
     try:
         model = load_site(site_file, expected_site=context.site, catalog_path=catalog_path)
-        manifest_path = context.projection_manifest_path
+        generated_dir = Path(os.environ.get("INFRA_GENERATED_DIR", context.generated_dir))
+        manifest_path = generated_dir / "manifest.json"
         verify_projection_permissions(manifest_path.parent)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         entries = manifest.get("projections")
@@ -307,7 +308,7 @@ def canonical_identity(repo: Path) -> dict[str, Any] | None:
             raise MetadataError("Saved tfplan canonical projection manifest is invalid. Run `just plan` again.")
         projections: dict[str, Any] = {}
         for name in entries:
-            projection_path = context.generated_path(name)
+            projection_path = generated_dir / name
             projections[name] = json.loads(projection_path.read_text(encoding="utf-8"))
         verify_manifest(
             manifest,

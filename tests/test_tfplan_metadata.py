@@ -108,6 +108,25 @@ class TfplanMetadataTests(unittest.TestCase):
             self.assertTrue(data["canonical"]["projection_digest"])
             tfplan_metadata.verify_metadata(plan, metadata, repo)
 
+    def test_canonical_identity_accepts_explicit_generated_directory(self) -> None:
+        temp_dir, repo, _, _ = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        source = repo / "values/sites/dev/generated"
+        explicit = repo / "controller-local/generated"
+        explicit.parent.mkdir(parents=True)
+        source.rename(explicit)
+        with temp_dir, patch.dict(
+            os.environ,
+            {
+                "VALUES_SITE": "dev",
+                "VALUES_DIR": str(repo / "values"),
+                "INFRA_GENERATED_DIR": str(explicit),
+            },
+            clear=True,
+        ):
+            identity = tfplan_metadata.canonical_identity(repo)
+        self.assertEqual(identity["site"], "dev")
+
     def test_canonical_stateful_selection_ignores_stale_site_json(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         self.add_canonical_projection_set(repo, "_template")

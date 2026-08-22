@@ -65,11 +65,9 @@ class AnsibleConvergenceContractTests(unittest.TestCase):
             "onramp_host": {"onramp_host_allow_passwordless_sudo"},
             "sssf": {
                 "sssf_data_device",
-                "sssf_max_concurrent_runs",
                 "sssf_pi_path",
                 "sssf_provider",
                 "sssf_uv_path",
-                "sssf_visualizer_command",
             },
         }
         for role, keys in expected.items():

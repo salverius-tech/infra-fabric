@@ -168,7 +168,16 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=catalog_path)
     catalog = load_catalog(catalog_path)
     expected_projections = render_projection_set(model, catalog)
-    generated_path = getattr(context, "generated_path")
+    configured_generated = os.environ.get("INFRA_GENERATED_DIR", "").strip()
+    if configured_generated:
+        generated_dir = Path(configured_generated).expanduser()
+        if not generated_dir.is_absolute():
+            generated_dir = (REPO / generated_dir).resolve()
+
+        def generated_path(name: str) -> Path:
+            return generated_dir / name
+    else:
+        generated_path = getattr(context, "generated_path")
     projections: dict[str, object] = {}
     try:
         for name in expected_projections:
@@ -184,7 +193,7 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
         inventory=projections["ansible-inventory.json"],
         ansible_vars=projections["ansible-vars.json"],
     )
-    manifest_path = getattr(context, "projection_manifest_path")
+    manifest_path = generated_path("manifest.json")
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -318,7 +327,10 @@ def run_canonical_host_identity(
             consumer="ansible-host-identity",
             requirements=(operator_requirement,),
         )
-        skip_root = os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "").strip().lower() == "true"
+        # Root SSH is a first-boot/recovery exception. Normal steady-state
+        # convergence defaults to the canonical infra account; callers must
+        # explicitly opt into the root phase with the literal value false.
+        skip_root = os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "true").strip().lower() != "false"
         if resource.type == "lxc" and skip_root:
             phases = (("infra", True),)
         else:
@@ -391,8 +403,6 @@ def run_canonical_direct_access_ready(
         "-e",
         f"direct_access_ready_known_hosts_file={known_hosts}",
     ]
-    if os.environ.get("INFRA_ACCEPT_CHANGED_HOST_KEYS", "").lower() == "true":
-        command.extend(("-e", "direct_access_ready_accept_host_key_change=true"))
     if enroll_only:
         command.extend(("-e", "direct_access_ready_enroll_only=true"))
     command.append("infra/ansible/playbooks/direct-access-ready.yml")
@@ -404,7 +414,16 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
     if getattr(context, "canonical_site_path", None) is None:
         raise RuntimeError("canonical Ansible execution requires a selected canonical site")
     environment = canonical_dns_environment(context)
-    generated_path = getattr(context, "generated_path")
+    configured_generated = os.environ.get("INFRA_GENERATED_DIR", "").strip()
+    if configured_generated:
+        generated_dir = Path(configured_generated).expanduser()
+        if not generated_dir.is_absolute():
+            generated_dir = (REPO / generated_dir).resolve()
+
+        def generated_path(name: str) -> Path:
+            return generated_dir / name
+    else:
+        generated_path = getattr(context, "generated_path")
     inventory_path = generated_path("ansible-inventory.json")
     vars_projection_path = generated_path("ansible-vars.json")
     try:

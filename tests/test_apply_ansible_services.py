@@ -135,6 +135,10 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "generated projection"):
                 apply_ansible_services.canonical_dns_environment(CanonicalContext())
 
+    def test_canonical_dns_environment_uses_explicit_generated_directory(self) -> None:
+        source = (apply_ansible_services.REPO / "scripts/apply-ansible-services.py").read_text(encoding="utf-8")
+        self.assertIn('os.environ.get("INFRA_GENERATED_DIR"', source)
+
     def test_normal_entrypoint_rejects_legacy_inventory_arguments(self) -> None:
         with self.assertRaises(SystemExit) as raised:
             apply_ansible_services.main(["--inventory", "legacy-inventory.yml", "--service", "forgejo"])
@@ -220,6 +224,47 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertNotIn("ssh_public_key", runtime_inventory)
         self.assertEqual(flattened["canonical_enabled_services"], ["forgejo", "hermes"])
         self.assertNotIn("services", flattened)
+
+    def test_canonical_transport_uses_explicit_generated_directory_for_ansible_vars(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            stale = root / "stale"
+            current = root / "current"
+            stale.mkdir()
+            current.mkdir()
+            (stale / "ansible-vars.json").write_text(
+                '{"services": {"sssf": {"legacy_vars": {"sssf_allowed_repositories": []}}}}\n',
+                encoding="utf-8",
+            )
+            (current / "ansible-vars.json").write_text(
+                '{"services": {"sssf": {"legacy_vars": {"sssf_allowed_repositories": ["https://example.invalid/org/repo"]}}}}\n',
+                encoding="utf-8",
+            )
+            (current / "ansible-inventory.json").write_text("{}\n", encoding="utf-8")
+
+            class Context:
+                canonical_site_path = root / "site.yaml"
+
+                @staticmethod
+                def generated_path(name: str) -> Path:
+                    return stale / name
+
+                @staticmethod
+                def path(name: str) -> Path:
+                    return root / name
+
+            with (
+                mock.patch.object(apply_ansible_services, "canonical_dns_environment", return_value={}),
+                mock.patch.dict(os.environ, {"INFRA_GENERATED_DIR": str(current)}, clear=False),
+            ):
+                transport = apply_ansible_services.canonical_ansible_transport(Context(), root)
+            flattened = json.loads(transport.vars_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            flattened["sssf_allowed_repositories"],
+            ["https://example.invalid/org/repo"],
+        )
+        self.assertEqual(transport.inventories[0], str(current / "ansible-inventory.json"))
 
 
     def test_runtime_known_hosts_path_uses_live_values_dir_during_snapshot_execution(self) -> None:
@@ -360,7 +405,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
         self.assertEqual(delivered_hosts[0][1]["INFRA_BOOTSTRAP_ROOT_PASSWORD"], "secret-for-forgejo")
         self.assertEqual(delivered_hosts[1][1]["INFRA_BOOTSTRAP_ROOT_PASSWORD"], "secret-for-bootstrap")
 
-    def test_canonical_host_identity_uses_root_only_for_lxc_and_delivers_both_passwords(self) -> None:
+    def test_canonical_host_identity_uses_root_only_when_explicitly_requested(self) -> None:
         commands: list[list[str]] = []
         environments: list[dict[str, str]] = []
         delivered_paths: list[str] = []
@@ -411,7 +456,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 mock.patch.object(apply_ansible_services, "canonical_bootstrap_targets", return_value=(("technitium", "technitium"),)),
                 mock.patch.object(apply_ansible_services, "SopsAgeProvider", return_value=object()),
                 mock.patch.object(apply_ansible_services, "deliver", side_effect=fake_deliver),
-                mock.patch.dict(os.environ, {}, clear=True),
+                mock.patch.dict(os.environ, {"INFRA_HOST_IDENTITY_SKIP_ROOT": "false"}, clear=True),
             ):
                 result = apply_ansible_services.run_canonical_host_identity(Context(), ("inventory.json",), root, {}, runner=fake_run)
 
@@ -432,7 +477,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             ],
         )
 
-    def test_canonical_host_identity_skips_lxc_root_only_when_explicitly_requested(self) -> None:
+    def test_canonical_host_identity_skips_lxc_root_by_default(self) -> None:
         commands: list[list[str]] = []
         model = SimpleNamespace(
             resources=SimpleNamespace(guests={"technitium": SimpleNamespace(type="lxc")}, shared_hosts={}),
@@ -463,7 +508,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
                 mock.patch.object(apply_ansible_services, "canonical_bootstrap_targets", return_value=(("technitium", "technitium"),)),
                 mock.patch.object(apply_ansible_services, "SopsAgeProvider", return_value=object()),
                 mock.patch.object(apply_ansible_services, "deliver", side_effect=fake_deliver),
-                mock.patch.dict(os.environ, {"INFRA_HOST_IDENTITY_SKIP_ROOT": "true"}, clear=True),
+                mock.patch.dict(os.environ, {}, clear=True),
             ):
                 result = apply_ansible_services.run_canonical_host_identity(Context(), ("inventory.json",), root, {}, runner=fake_run)
 

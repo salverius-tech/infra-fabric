@@ -55,6 +55,16 @@ argument_specs:
       sssf_bun_sha256:
         type: str
         required: false
+      sssf_just_artifact_path:
+        type: str
+        required: false
+        description: "Controller-side reviewed artifact cache root for the Just binary."
+      sssf_just_version:
+        type: str
+        required: false
+      sssf_just_sha256:
+        type: str
+        required: false
       sssf_allowed_repositories:
         type: list
         elements: str
@@ -80,13 +90,7 @@ argument_specs:
       sssf_visualizer_port:
         type: int
         required: false
-      sssf_max_concurrent_runs:
-        type: int
-        required: false
       sssf_provider:
-        type: str
-        required: false
-      sssf_visualizer_command:
         type: str
         required: false
       sssf_nodesource_key_sha256:
