@@ -80,16 +80,16 @@ MATRIX_COLUMNS = (
 )
 MATRIX_ROWS = {
     "development": {
-        "plan": "historical-evidence", "apply": "historical-evidence",
-        "health-idempotence": "historical-evidence",
-        "service-restore": "historical-evidence",
-        "infrastructure-recovery": "historical-evidence",
-        "hermes-integration": "historical-evidence", "rollback": "historical-evidence",
+        "plan": "evidenced", "apply": "evidenced",
+        "health-idempotence": "evidenced",
+        "service-restore": "evidenced",
+        "infrastructure-recovery": "evidenced",
+        "hermes-integration": "evidenced", "rollback": "evidenced",
     },
     "isolated-recovery": {column: "not-evidenced" for column in MATRIX_COLUMNS},
     "production": {column: "not-evidenced" for column in MATRIX_COLUMNS},
 }
-DEVELOPMENT_ACCEPTANCE_COMMIT = "d88a66a65675a920f4930d0cbb6c470a9a49a9a1"
+DEVELOPMENT_ACCEPTANCE_COMMIT = "9c568a3f03c7a125a3c398e3f6bf5ab860259033"
 MATRIX_EVIDENCE = {
     f"development/{category}": {
         "environment": "development",
@@ -98,7 +98,7 @@ MATRIX_EVIDENCE = {
         "citation": {"path": PLAN_PATH, "lines": lines},
         "procedure_id": procedure,
         "result": "passed",
-        "date": "2026-08-09",
+        "date": "2026-08-22",
         "boundary": boundary,
     }
     for category, lines, procedure, boundary in (
@@ -141,17 +141,19 @@ MATRIX_EVIDENCE = {
     )
 }
 MATRIX_EVIDENCE["development/hermes-integration"]["audited_commit"] = (
-    "e142d4490765fd0d2a20000e9deb326fa9694ba1"
+    "9c568a3f03c7a125a3c398e3f6bf5ab860259033"
 )
-MATRIX_EVIDENCE["development/hermes-integration"]["date"] = "2026-08-12"
+MATRIX_EVIDENCE["development/hermes-integration"]["date"] = "2026-08-22"
+MATRIX_EVIDENCE["development/plan"]["audited_commit"] = "b25d0037ef510bc848786e18582fab95bf9661fc"
+MATRIX_EVIDENCE["development/infrastructure-recovery"]["audited_commit"] = "b25d0037ef510bc848786e18582fab95bf9661fc"
 MATRIX_EVIDENCE["development/rollback"] = {
     "environment": "development",
     "category": "rollback",
-    "audited_commit": "1ec7f520e4cf6b29d29a1c50a99fb8b089c92228",
+    "audited_commit": "2249405d2c4a45c3c14cfcff74f2bb6a610c103f",
     "citation": {"path": PLAN_PATH, "lines": "676-687"},
     "procedure_id": "phase-9-gate-7-development-hermes-rollback",
     "result": "passed",
-    "date": "2026-08-12",
+    "date": "2026-08-22",
     "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance.",
 }
 RETIRED_ARTIFACTS = (
@@ -238,7 +240,7 @@ def build() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
         "evidence": MATRIX_EVIDENCE,
         "evidence_boundary": (
             "Active authority for environment-specific external acceptance only. "
-            "A historical-evidence cell records a rehearsal at its exact environment, audited commit, "
+            "An evidenced or historical-evidence cell records a rehearsal at its exact environment, audited commit, "
             "procedure, result, citation, date, and stated boundary; source completion "
             "does not populate this matrix, and later lifecycle changes require revalidation."
         ),
@@ -311,13 +313,13 @@ def validate(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any
         errors.append("acceptance matrix columns are incomplete")
     for environment in matrix.get("environments", []):
         row = matrix.get("rows", {}).get(environment, {})
-        if set(row) != set(MATRIX_COLUMNS) or not set(row.values()) <= {"historical-evidence", "not-evidenced"}:
+        if set(row) != set(MATRIX_COLUMNS) or not set(row.values()) <= {"evidenced", "historical-evidence", "not-evidenced"}:
             errors.append(f"invalid acceptance matrix row: {environment}")
     expected_evidence_cells = {
         f"{environment}/{category}"
         for environment in matrix.get("environments", [])
         for category, status in matrix.get("rows", {}).get(environment, {}).items()
-        if status == "historical-evidence"
+        if status in {"evidenced", "historical-evidence"}
     }
     evidence = matrix.get("evidence", {})
     if not isinstance(evidence, dict) or set(evidence) != expected_evidence_cells:
@@ -383,7 +385,7 @@ def artifacts(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, An
             f"`{record['date']}`; evidence `{citation['path']}:{citation['lines']}`; "
             f"boundary: {record['boundary']}"
         )
-    matrix_md = "\n".join(["# Environment-specific acceptance matrix", "", matrix["evidence_boundary"], "", markdown_table(["Environment", *matrix["columns"]], matrix_rows), "", "## Evidence records", "", *evidence_lines, "", f"Historical development evidence source: `{matrix['development_source']}`. These records preserve completed rehearsals but are not current-HEAD acceptance after later lifecycle changes, and they do not establish isolated-recovery or production acceptance.", ""])
+    matrix_md = "\n".join(["# Environment-specific acceptance matrix", "", matrix["evidence_boundary"], "", markdown_table(["Environment", *matrix["columns"]], matrix_rows), "", "## Evidence records", "", *evidence_lines, "", f"Development evidence source: `{matrix['development_source']}`. Current evidenced cells apply only to disposable development and do not establish isolated-recovery or production acceptance.", ""])
     backlog_md = "\n".join(["# Evidence-backed canonical backlog", "", "Active reconciliation is intentionally compact. Package source completion, original audit dispositions, approved decisions, and environment acceptance are the active authorities; the full per-claim ledger is frozen in Git history.", "", "- [Package source completion](../.hermes/reconciliation/package-completion.md)", "- [Original audit finding dispositions](../.hermes/reconciliation/audit-dispositions.md)", "- [Explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md)", "- [Environment-specific acceptance matrix](../.hermes/reconciliation/acceptance-matrix.md)", "", "Only external acceptance remains active; no incomplete source package or unresolved decision is reported as frontier work.", ""])
     return {
         RECON / "package-completion.json": json.dumps(completion, indent=2) + "\n",

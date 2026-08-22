@@ -415,13 +415,13 @@
     ],
     "rows": {
       "development": {
-        "plan": "historical-evidence",
-        "apply": "historical-evidence",
-        "health-idempotence": "historical-evidence",
-        "service-restore": "historical-evidence",
-        "infrastructure-recovery": "historical-evidence",
-        "hermes-integration": "historical-evidence",
-        "rollback": "historical-evidence"
+        "plan": "evidenced",
+        "apply": "evidenced",
+        "health-idempotence": "evidenced",
+        "service-restore": "evidenced",
+        "infrastructure-recovery": "evidenced",
+        "hermes-integration": "evidenced",
+        "rollback": "evidenced"
       },
       "isolated-recovery": {
         "plan": "not-evidenced",
@@ -446,96 +446,96 @@
       "development/plan": {
         "environment": "development",
         "category": "plan",
-        "audited_commit": "d88a66a65675a920f4930d0cbb6c470a9a49a9a1",
+        "audited_commit": "b25d0037ef510bc848786e18582fab95bf9661fc",
         "citation": {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "635-648"
         },
         "procedure_id": "phase-9-gate-1",
         "result": "passed",
-        "date": "2026-08-09",
+        "date": "2026-08-22",
         "boundary": "Disposable development plan only; no prior normalized baseline established semantic equivalence."
       },
       "development/apply": {
         "environment": "development",
         "category": "apply",
-        "audited_commit": "d88a66a65675a920f4930d0cbb6c470a9a49a9a1",
+        "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
         "citation": {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "635-648"
         },
         "procedure_id": "phase-9-gate-2",
         "result": "passed",
-        "date": "2026-08-09",
+        "date": "2026-08-22",
         "boundary": "Reviewed disposable development apply only; no isolated-recovery or production acceptance."
       },
       "development/health-idempotence": {
         "environment": "development",
         "category": "health-idempotence",
-        "audited_commit": "d88a66a65675a920f4930d0cbb6c470a9a49a9a1",
+        "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
         "citation": {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "635-648"
         },
         "procedure_id": "phase-9-gate-3",
         "result": "passed",
-        "date": "2026-08-09",
+        "date": "2026-08-22",
         "boundary": "Direct development health and second-run idempotence only."
       },
       "development/service-restore": {
         "environment": "development",
         "category": "service-restore",
-        "audited_commit": "d88a66a65675a920f4930d0cbb6c470a9a49a9a1",
+        "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
         "citation": {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "635-648"
         },
         "procedure_id": "phase-9-gate-4",
         "result": "passed",
-        "date": "2026-08-09",
+        "date": "2026-08-22",
         "boundary": "Enabled disposable development stateful services only; not controller or infrastructure recovery."
       },
       "development/infrastructure-recovery": {
         "environment": "development",
         "category": "infrastructure-recovery",
-        "audited_commit": "d88a66a65675a920f4930d0cbb6c470a9a49a9a1",
+        "audited_commit": "b25d0037ef510bc848786e18582fab95bf9661fc",
         "citation": {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "635-658"
         },
         "procedure_id": "phase-9-gate-5",
         "result": "passed",
-        "date": "2026-08-09",
+        "date": "2026-08-22",
         "boundary": "Disposable development controller/infrastructure recovery rehearsal: private audit and state snapshots were verified and restored through guarded paths, post-recovery canonical convergence and redacted connectivity passed, and fresh provider plans were zero-change. It does not establish independent external audit durability, rollback, or production acceptance."
       },
       "development/hermes-integration": {
         "environment": "development",
         "category": "hermes-integration",
-        "audited_commit": "e142d4490765fd0d2a20000e9deb326fa9694ba1",
+        "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
         "citation": {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "661-674"
         },
         "procedure_id": "phase-9-gate-6-read-only-bridge",
         "result": "passed",
-        "date": "2026-08-12",
+        "date": "2026-08-22",
         "boundary": "Disposable development deployed-plugin read-only status and audit verification only; uses a non-secret service-ID context and guest-local private empty audit baseline. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance."
       },
       "development/rollback": {
         "environment": "development",
         "category": "rollback",
-        "audited_commit": "1ec7f520e4cf6b29d29a1c50a99fb8b089c92228",
+        "audited_commit": "2249405d2c4a45c3c14cfcff74f2bb6a610c103f",
         "citation": {
           "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
           "lines": "676-687"
         },
         "procedure_id": "phase-9-gate-7-development-hermes-rollback",
         "result": "passed",
-        "date": "2026-08-12",
+        "date": "2026-08-22",
         "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance."
       }
     },
-    "evidence_boundary": "Active authority for environment-specific external acceptance only. A historical-evidence cell records a rehearsal at its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix, and later lifecycle changes require revalidation.",
+    "evidence_boundary": "Active authority for environment-specific external acceptance only. An evidenced or historical-evidence cell records a rehearsal at its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix, and later lifecycle changes require revalidation.",
     "development_source": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-648"
   }
 }

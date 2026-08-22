@@ -130,7 +130,7 @@ class DocumentationContractTests(unittest.TestCase):
             {
                 category
                 for category, status in development.items()
-                if status == "historical-evidence"
+                if status == "evidenced"
             },
             {"plan", "apply", "health-idempotence", "service-restore", "infrastructure-recovery", "hermes-integration", "rollback"},
         )

@@ -98,19 +98,17 @@ class DesignReconciliationTests(unittest.TestCase):
         self.assertEqual(set(matrix["columns"]), set(self.module.MATRIX_COLUMNS))
         self.assertEqual(
             matrix["rows"]["development"]["service-restore"],
-            "historical-evidence",
+            "evidenced",
         )
         self.assertEqual(
             matrix["rows"]["development"]["infrastructure-recovery"],
-            "historical-evidence",
+            "evidenced",
         )
         self.assertEqual(
             matrix["rows"]["development"]["hermes-integration"],
-            "historical-evidence",
+            "evidenced",
         )
-        self.assertEqual(
-            matrix["rows"]["development"]["rollback"], "historical-evidence"
-        )
+        self.assertEqual(matrix["rows"]["development"]["rollback"], "evidenced")
         self.assertEqual(
             matrix["rows"]["isolated-recovery"]["service-restore"],
             "not-evidenced",
