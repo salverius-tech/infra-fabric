@@ -67,6 +67,10 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertIn('"${VALUES_SITE}" != "dev"', script)
         self.assertIn("StrictHostKeyChecking=yes", script)
         self.assertIn("hermes_rollback_rehearsal_approved", script)
+        self.assertIn('generated_dir=\\"\\${INFRA_GENERATED_DIR:-/workspace/${values_dir}/generated}\\"', script)
+        self.assertIn("verify-projections.py", script)
+        self.assertIn('--generated-dir \\"\\${generated_dir}\\"', script)
+        self.assertNotIn('inventory="/workspace/${values_dir}/generated/', script)
         self.assertIn("rehearse-development-rollback approval=\"\":", justfile)
 
     def test_no_legacy_recovery_entrypoint_remains(self) -> None:

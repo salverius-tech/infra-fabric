@@ -15,13 +15,11 @@ if [[ "${VALUES_SITE}" != "dev" ]]; then
 fi
 
 values_dir="$(site_values_dir)"
-inventory="/workspace/${values_dir}/generated/ansible-inventory.json"
-vars_file="/workspace/${values_dir}/generated/ansible-vars.json"
 flat_vars_file="/tmp/.development-rollback-ansible-vars.json"
 
 set +e
 INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh bash -euo pipefail -c \
-  "export PATH=/opt/ansible/bin:\$PATH; python /workspace/scripts/flatten-ansible-vars.py --input ${vars_file@Q} --output ${flat_vars_file@Q}; trap 'rm -f ${flat_vars_file@Q}' EXIT; ansible-playbook -i ${inventory@Q} -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\",\"hermes_rollback_rehearsal_approved\":true}' infra/ansible/playbooks/hermes-rollback-rehearsal.yml"
+  "export PATH=/opt/ansible/bin:\$PATH; generated_dir=\"\${INFRA_GENERATED_DIR:-/workspace/${values_dir}/generated}\"; inventory=\"\${generated_dir}/ansible-inventory.json\"; vars_file=\"\${generated_dir}/ansible-vars.json\"; trap 'rm -f ${flat_vars_file}' EXIT; python /workspace/scripts/verify-projections.py --site-file /workspace/${values_dir}/site.yaml --generated-dir \"\${generated_dir}\"; python /workspace/scripts/flatten-ansible-vars.py --input \"\${vars_file}\" --output ${flat_vars_file@Q}; ansible-playbook -i \"\${inventory}\" -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\",\"hermes_rollback_rehearsal_approved\":true}' infra/ansible/playbooks/hermes-rollback-rehearsal.yml"
 status=$?
 set -e
 
