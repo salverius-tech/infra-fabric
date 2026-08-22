@@ -72,6 +72,9 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertIn('--generated-dir \\"\\${generated_dir}\\"', script)
         self.assertNotIn('inventory="/workspace/${values_dir}/generated/', script)
         self.assertIn("rehearse-development-rollback approval=\"\":", justfile)
+        rollback = (ROOT / "infra/ansible/playbooks/hermes-rollback-rehearsal.yml").read_text(encoding="utf-8")
+        self.assertIn("hermes_rollback_dashboard_ready", rollback)
+        self.assertIn("until: hermes_rollback_dashboard_ready.status | default(0) == 200", rollback)
 
     def test_no_legacy_recovery_entrypoint_remains(self) -> None:
         justfile = (ROOT / "justfile").read_text(encoding="utf-8")

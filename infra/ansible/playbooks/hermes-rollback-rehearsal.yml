@@ -153,6 +153,10 @@
             url: "http://127.0.0.1:{{ hermes_dashboard_port | default(9119) }}/login"
             status_code: 200
             return_content: false
+          register: hermes_rollback_dashboard_ready
+          retries: 30
+          delay: 2
+          until: hermes_rollback_dashboard_ready.status | default(0) == 200
 
         - name: Record completed Hermes rollback rehearsal
           tags: [restore]
