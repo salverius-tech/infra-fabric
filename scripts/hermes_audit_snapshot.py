@@ -153,7 +153,9 @@ def create_snapshot(journal: Path, backup_dir: Path) -> Path:
             raise AuditSnapshotError(
                 "audit journal changed while snapshotting"
             ) from error
-        raise AuditSnapshotError("audit snapshot directory is unsafe") from error
+        raise AuditSnapshotError(
+            f"audit snapshot directory is unsafe: {error}"
+        ) from error
 
 
 def restore_snapshot(

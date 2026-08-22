@@ -52,6 +52,14 @@ VALUES_SITE=<site> just update
 
 Checks or updates managed public tool/service pins through the repository update workflow. Review the resulting public and selected private-site diffs, then run validation and a reviewed plan. It does not apply infrastructure.
 
+## `test`
+
+```bash
+just test
+```
+
+Runs the full Python test suite in the pinned tooling container. It does not require `values/` and does not touch infrastructure.
+
 ## `validate`
 
 ```bash

@@ -39,11 +39,15 @@ def _renameat2(parent_fd: int, source: str, destination: str, flags: int) -> Non
     if result == 0:
         return
     error = ctypes.get_errno()
+    detail = errno.errorcode.get(error, str(error))
     if error == errno.EEXIST:
         raise AtomicOutputError(
             "output directory already exists; explicit replacement acknowledgement is required"
         )
-    raise AtomicOutputError("atomic directory replacement is unavailable")
+    raise AtomicOutputError(
+        f"atomic directory replacement is unavailable: renameat2 failed with {detail} ({error}); "
+        "the filesystem may not support atomic exchange operations"
+    )
 
 
 def _identity(metadata: os.stat_result) -> tuple[int, int]:

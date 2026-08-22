@@ -88,13 +88,6 @@
   changed_when: false
   failed_when: false
 
-- name: Stop Technitium before changing its service account
-  tags: [config]
-  ansible.builtin.systemd:
-    name: dns
-    state: stopped
-  when: technitium_service_active.rc == 0
-
 - name: Ensure Technitium service account exists
   tags: [config]
   ansible.builtin.user:
@@ -103,13 +96,23 @@
     shell: /usr/sbin/nologin
     home: /var/lib/dns-server
     create_home: false
+  register: technitium_service_user
+
+- name: Stop Technitium before changing its service account
+  tags: [config]
+  ansible.builtin.systemd:
+    name: dns
+    state: stopped
+  when: >-
+    technitium_service_active.rc == 0 and (technitium_service_user is defined)
+    and (technitium_service_user is changed)
 
 - name: Restart Technitium after changing its service account
   tags: [service]
   ansible.builtin.systemd:
     name: dns
     state: started
-  when: technitium_service_active.rc == 0
+  when: technitium_service_active.rc == 0 and technitium_service_user is changed
 
 - name: Ensure Technitium persistent and release directories exist
   tags: [config]

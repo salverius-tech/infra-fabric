@@ -92,7 +92,9 @@ def _private_directory(path: Path) -> None:
     try:
         ensure_private_directory(path)
     except PrivateFileError as error:
-        raise StateSnapshotError("state snapshot directory is unsafe") from error
+        raise StateSnapshotError(
+            f"state snapshot directory is unsafe: {error}"
+        ) from error
 
 
 @contextlib.contextmanager
@@ -197,7 +199,9 @@ def create_snapshot(
             raise StateSnapshotError(
                 "local state changed while snapshotting"
             ) from error
-        raise StateSnapshotError("state snapshot directory is unsafe") from error
+        raise StateSnapshotError(
+            f"state snapshot directory is unsafe: {error}"
+        ) from error
 
 
 def restore_snapshot(

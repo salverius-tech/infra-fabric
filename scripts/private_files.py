@@ -347,7 +347,10 @@ def _rename_noreplace(parent_fd: int, source: str, destination: str) -> None:
         raise PrivateFileError(
             "private directory already exists; explicit replacement acknowledgement is required"
         )
-    raise PrivateFileError("atomic no-replace directory installation is unavailable")
+    raise PrivateFileError(
+        f"atomic no-replace directory installation is unavailable: renameat2 failed with "
+        f"{errno.errorcode.get(error, str(error))} ({error}); the filesystem may not support atomic operations"
+    )
 
 
 @contextlib.contextmanager
