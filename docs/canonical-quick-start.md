@@ -23,7 +23,7 @@ Outside tracked public source, provide the selected site’s:
 
 - `.sops.yaml` policy;
 - encrypted `secrets.sops.yaml` bundle;
-- external age identity file with restrictive permissions.
+- external age identity file with restrictive permissions, backed up in a separate protected location such as an approved password-manager vault (see [canonical secret operations](canonical-values-secret-operations.md)); recovery of the identity from that vault is part of the documented disaster-recovery procedure in [canonical troubleshooting](canonical-troubleshooting.md).
 
 The private site files are:
 

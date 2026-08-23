@@ -14,6 +14,24 @@ Confirm `VALUES_SITE=<site>` is set and that `values/sites/<site>/site.yaml` exi
 
 Check the selected site’s `.sops.yaml`, encrypted bundle, and external age identity. Confirm required logical paths rather than values. `just edit-secrets SITE=<site>` needs a working editor and readable identity; it mutates encrypted ciphertext.
 
+### Identity and secret recovery after controller loss
+
+If the controller host is lost or unrecoverable, reconstruct the secret prerequisites before any plan, apply, or restore step:
+
+1. Clone the public repository and the private values repository from their remotes; confirm the private checkout contains the selected site’s `.sops.yaml` and encrypted bundle.
+2. Recover the site age identity from its external copy — for example the 1Password vault item created via `just VAULT=<vault> site-identity store` (search for `infra-fabric-site-age-identity-<site>`). Either fetch it directly:
+
+   ```bash
+   op signin
+   just VAULT=<vault> site-identity fetch SITE=<site>
+   ```
+
+   or manually paste the note contents into `~/.config/infra-fabric/keys/<site>/site.age` with `0600` permissions. The note must contain an `AGE-SECRET-KEY-...` line plus its public-key comment; a value that is only a file path is not an identity.
+3. Verify before trusting: `just site-identity verify SITE=<site>` decrypts the real site bundle and fails closed on a wrong or truncated key. No consumer should touch secret material until this passes.
+4. Then resume the standard workflow: `just validate`, a reviewed plan, apply, convergence, and guarded state restores per [storage and state](#storage-and-state-errors) below.
+
+Without a recoverable identity copy, every encrypted value for the site is permanently unreadable regardless of backup availability — which is why the external copy is a mandatory prerequisite (`just VAULT=<vault> site-identity store`) rather than an optional convenience.
+
 ## Projection errors
 
 Remove stale generated artifacts only through the supported site workflow, then rerun validation. Compare value-free projection metadata and check that the canonical file—not a generated file—contains the intended change.

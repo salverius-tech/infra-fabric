@@ -19,7 +19,10 @@ Each mutating step requires its own reviewed plan and explicit approval.
    generated projections, plans, state, credentials, or host trust from public source.
 3. **Restore private site inputs.** Obtain the selected site's `site.yaml`, `.sops.yaml`,
    and `secrets.sops.yaml` from the protected private repository. Obtain the site and
-   recovery age identities through the approved protected key-management path. Inspect
+   recovery age identities through the approved protected key-management path (for
+   example the 1Password vault copy; retrieve with `just VAULT=<vault> site-identity
+   fetch SITE=<site>` and verify with `just site-identity verify SITE=<site>` per
+   [canonical secret operations](canonical-values-secret-operations.md)). Inspect
    only metadata and logical paths until the policy, recipient set, and permissions are
    verified.
 4. **Restore audit continuity.** Recover the private Hermes operator journal and its
