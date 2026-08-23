@@ -74,6 +74,36 @@ class ServiceStateCliTests(unittest.TestCase):
             self.assertIn('vars_file="${generated_dir}/ansible-vars.json"', captured)
             self.assertIn('--generated-dir "${generated_dir}"', captured)
 
+    def test_latest_local_archive_skips_pre_restore_safety_archives(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            script = self.make_fixture(root)
+            site_values = root / "values" / "sites" / "dev"
+            backup_dir = site_values / "service-backups" / "hermes"
+            backup_dir.mkdir(parents=True)
+            (backup_dir / "hermes-state-20260101T000000Z.tar.gz").write_text("old")
+            (backup_dir / "hermes-state-pre-restore-20260201T000000Z.tar.gz").write_text("safety")
+            probe = root / "probe.sh"
+            probe.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                f"repo_root={root}\n"
+                'site_values_dir="values/sites/dev"\n'
+                f"source <(sed -n '/^latest_local_archive()/,/^}}/p' {script})\n"
+                "latest_local_archive hermes\n",
+                encoding="utf-8",
+            )
+            probe.chmod(0o755)
+            result = subprocess.run(
+                [str(probe)],
+                cwd=root,
+                env=os.environ | {"VALUES_SITE": "dev"},
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(backup_dir / "hermes-state-20260101T000000Z.tar.gz"))
 
 if __name__ == "__main__":
     unittest.main()

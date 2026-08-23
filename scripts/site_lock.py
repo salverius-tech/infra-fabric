@@ -17,10 +17,38 @@ class SiteLockError(RuntimeError):
     """Raised when the selected site operation lock cannot be acquired safely."""
 
 
+HELD_LOCK_ENV = "INFRA_SITE_LOCK_PATH"
+
+_process_locks: dict[str, list[int]] = {}
+
+
 @contextmanager
 def acquire_site_lock(lock_path: Path) -> Iterator[None]:
-    """Hold one persistent, private, non-symlink lock file until context exit."""
+    """Hold one persistent, private, non-symlink lock file until context exit.
+
+    Acquisition is reentrant within one process for the same resolved lock
+    file, and commands launched by an outer ``site_lock`` holder inherit that
+    held lock through the session environment: nested operations (for example
+    a state snapshot restore inside a wrapped tooling session) share the outer
+    holder instead of self-blocking on flock. The descriptor is released only
+    by the outermost context.
+    """
     path = lock_path.expanduser()
+    cache_key = os.path.realpath(path)
+    inherited = os.environ.get(HELD_LOCK_ENV, "")
+    if inherited and os.path.realpath(inherited) == cache_key:
+        yield
+        return
+    holders = _process_locks.get(cache_key)
+    if holders is not None:
+        holders.append(1)
+        try:
+            yield
+        finally:
+            holders.pop()
+            if not holders:
+                del _process_locks[cache_key]
+        return
     if not path.parent.is_dir():
         raise SiteLockError("site lock parent directory is unavailable")
     flags = os.O_CREAT | os.O_RDWR
@@ -39,8 +67,14 @@ def acquire_site_lock(lock_path: Path) -> Iterator[None]:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise SiteLockError("another operation already holds the selected site lock") from error
+    except BaseException:
+        os.close(descriptor)
+        raise
+    _process_locks[cache_key] = []
+    try:
         yield
     finally:
+        _process_locks.pop(cache_key, None)
         os.close(descriptor)
 
 
@@ -49,7 +83,9 @@ def run_locked(lock_path: Path, command: Sequence[str]) -> int:
     if not command:
         raise SiteLockError("site lock command is required")
     with acquire_site_lock(lock_path):
-        return subprocess.run(list(command), check=False).returncode
+        environment = dict(os.environ)
+        environment[HELD_LOCK_ENV] = str(lock_path)
+        return subprocess.run(list(command), check=False, env=environment).returncode
 
 
 def main(argv: list[str] | None = None) -> int:

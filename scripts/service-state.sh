@@ -64,6 +64,7 @@ latest_local_archive() {
     return 1
   fi
   find "${backup_dir}" -maxdepth 1 -type f -name "${service}-state-*.tar.gz" \
+    ! -name "${service}-state-pre-restore-*.tar.gz" \
     -printf '%T@ %p\n' | sort -nr | awk 'NR == 1 { $1=""; sub(/^ /, ""); print }'
 }
 
