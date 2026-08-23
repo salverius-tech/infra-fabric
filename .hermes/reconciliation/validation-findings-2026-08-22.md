@@ -41,3 +41,40 @@ are re-run clean.
 - Commit strategy for the private values repo executed: source-of-truth files
   committed; transient operational artifacts remain untracked under the
   documented backup procedure.
+
+## Destructive-rebuild rehearsal addendum — 2026-08-23
+
+A model-driven catastrophic-recovery exercise was executed on disposable
+development after the initial gate re-run, with operator approval: one
+stateless guest (forgejo_runner) and one stateful guest (technitium) were each
+fully destroyed through a reviewed plan and recreated from the committed
+canonical model alone, with the technitium DNS zones restored from a guarded
+pre-destruction backup and verified record-for-record against canonical
+configuration. Both guests converged to idempotence afterward and provider
+plans returned to zero-change. This demonstrates guest-level recovery from
+model plus backups; it does not establish full-site teardown/rebuild,
+off-controller reconstruction, or isolated-recovery acceptance.
+
+The rehearsal surfaced four wrapper-contract defects, fixed and verified:
+
+1. Site-lock acquisition was not reentrant within a process and did not
+   recognize an outer holder across the wrapped tooling session boundary, so
+   guarded state-snapshot restores self-deadlocked (fixed in `6628142`).
+2. `restore-if-present` selected manifestless pre-restore safety archives as
+   restore candidates, failing archive validation on every post-restore
+   invocation (fixed in `6628142`).
+3. The Technitium DNS sync never matched existing records because record
+   values are nested under the API's `rData` shape, re-upserting every pass
+   (fixed in `6628142`).
+4. `INFRA_ALLOW_DESTROY` was not forwarded into the tooling container, making
+   retained-stateful disables unplannable through the supported workflow
+   (fixed in `ae916c5`).
+
+Two service-model findings were also recorded: forgejo bootstrap consumed a
+compatibility variable owned by forgejo_runner, silently coupling their
+lifecycles — fixed by binding the bootstrap repository scope to forgejo's own
+canonical configuration with a fail-closed divergence check (`fc752da`) — and
+the ACME health-check budget was widened after first certificate issuance on
+a fresh guest exceeded the previous window (`57d2b2f`). The sanctioned host-
+trust procedure after intentional guest replacement is now documented in
+[canonical troubleshooting](../../docs/canonical-troubleshooting.md).
