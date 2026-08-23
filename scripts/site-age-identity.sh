@@ -52,7 +52,7 @@ cmd_store() {
   [[ -f "${identity_file}" ]] || die "no identity at ${identity_file}; run generate first"
   require_op
   local force=""
-  [[ "${2:-}" == "--force" ]] && force=1
+  [[ "${1:-}" == "--force" ]] && force=1
   if op item get "${op_item_title}" --vault "${op_vault}" >/dev/null 2>&1; then
     [[ -n "${force}" ]] || die "1Password item already exists: ${op_item_title}; pass --force to replace it"
     op item delete "${op_item_title}" --vault "${op_vault}"
@@ -90,7 +90,7 @@ PYEOF
 cmd_fetch() {
   require_op
   local force=""
-  [[ "${2:-}" == "--force" ]] && force=1
+  [[ "${1:-}" == "--force" ]] && force=1
   if [[ -f "${identity_file}" ]]; then
     [[ -n "${force}" ]] || die "identity already exists at ${identity_file}; pass --force to replace it"
     rm -f "${identity_file}"

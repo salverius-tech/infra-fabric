@@ -51,7 +51,14 @@ The explicit site age-identity lifecycle. `generate` creates the identity at the
 just VAULT=<vault-name> site-identity store SITE=<site>
 ``` `fetch` recovers from the vault onto a fresh machine. `verify` performs a decryption round-trip against the selected site bundle and is mandatory after any recovery or before trusting any recovered key.
 
-Key material is never printed; every overwrite requires an explicit `--force` passed after the action (`just site-identity store --force`). Manual recovery without the CLI remains fully supported: paste the vault contents into the documented path with `0600` permissions, then run `verify`. Re-store the identity in the vault as a mandatory step of any identity rotation. See [canonical secret operations](canonical-values-secret-operations.md).
+Key material is never printed; every overwrite requires an explicit `--force`. Place flags after the site assignment, or set the site in the environment for any flag order:
+
+```bash
+just VAULT=<vault> site-identity store SITE=dev --force   # supported
+VALUES_SITE=dev just VAULT=<vault> site-identity store --force   # supported
+```
+
+Manual recovery without the CLI remains fully supported: paste the vault contents into the documented path with `0600` permissions, then run `verify`. Re-store the identity in the vault as a mandatory step of any identity rotation. See [canonical secret operations](canonical-values-secret-operations.md).
 
 ## `ssh-initialize`
 

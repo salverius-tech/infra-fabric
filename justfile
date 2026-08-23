@@ -83,12 +83,19 @@ site-identity action="" SITE="dev" *extra="":
     if [[ -z "${site}" || "${site}" == -* ]]; then
       site="${VALUES_SITE:-}"
     fi
+    rest=()
+    for arg in "$@"; do
+      case "${arg}" in
+        SITE=*) candidate="${arg#SITE=}"; [[ -n "${candidate}" && "${candidate}" != -* ]] && site="${candidate}" ;;
+        *) rest+=("${arg}") ;;
+      esac
+    done
     if [[ -z "${action}" ]]; then
-      printf 'Usage: just site-identity {generate|store|fetch|verify} [SITE=<site>] [--force]\n' >&2
+      printf 'Usage: just site-identity {generate|store|fetch|verify} [SITE=<site>] [--force]\n       Flags must follow the site (e.g.: store SITE=dev --force); or set VALUES_SITE=<site> in the environment for any flag order.\n' >&2
       exit 2
     fi
     export VALUES_SITE="${site}"
-    exec scripts/site-age-identity.sh "${action}" "$@"
+    exec scripts/site-age-identity.sh "${action}" "${rest[@]}"
 
 # Check upstream releases and update eligible pinned versions after the safety hold period; pass --dry-run to report without writes
 update *args:
