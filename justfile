@@ -77,14 +77,15 @@ site-identity action="" SITE="dev" *extra="":
     set -euo pipefail
     site_arg="{{SITE}}"; site="${site_arg#SITE=}"
     action_arg="{{action}}"; action="${action_arg#action=}"
-    # Argument-order resilience: a flag placed before the SITE assignment
-    # fills the SITE slot positionally. Fall back to the ambient VALUES_SITE
-    # so `VALUES_SITE=dev just site-identity store --force` keeps working.
+    # Flags and assignments may arrive via {{extra}} rather than positional
+    # arguments (shebang recipes do not forward variadic positionals), so the
+    # extra string is scanned for a SITE= override before passthrough.
     if [[ -z "${site}" || "${site}" == -* ]]; then
       site="${VALUES_SITE:-}"
     fi
+    extra_args="{{extra}}"
     rest=()
-    for arg in "$@"; do
+    for arg in ${extra_args}; do
       case "${arg}" in
         SITE=*) candidate="${arg#SITE=}"; [[ -n "${candidate}" && "${candidate}" != -* ]] && site="${candidate}" ;;
         *) rest+=("${arg}") ;;
@@ -95,7 +96,8 @@ site-identity action="" SITE="dev" *extra="":
       exit 2
     fi
     export VALUES_SITE="${site}"
-    exec scripts/site-age-identity.sh "${action}" "${rest[@]}"
+    exec scripts/site-age-identity.sh "${action}" ${rest[@]+"${rest[@]}"}
+
 
 # Check upstream releases and update eligible pinned versions after the safety hold period; pass --dry-run to report without writes
 update *args:
