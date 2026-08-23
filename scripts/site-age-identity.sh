@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Site age identity lifecycle helper: generate, store in 1Password, recover,
+# and verify. Key material is never echoed to stdout or logs.
+#
+# Usage:
+#   VALUES_SITE=<site> scripts/site-age-identity.sh generate
+#   VALUES_SITE=<site> scripts/site-age-identity.sh store [--force]
+#   VALUES_SITE=<site> scripts/site-age-identity.sh fetch [--force]
+#   VALUES_SITE=<site> scripts/site-age-identity.sh verify
+#
+# 1Password integration is optional and interactive: `op` must be installed
+# and signed in (`op signin`). The toolchain never requires it; recovery from
+# a manual 1Password paste is always available. See
+# docs/canonical-values-secret-operations.md.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+source "${repo_root}/scripts/site-context.sh"
+
+require_site_context
+identity_dir="${INFRA_IDENTITY_DIR:-${HOME}/.config/infra-fabric/keys/${VALUES_SITE}}"
+identity_file="${identity_dir}/site.age"
+op_item_title="infra-fabric-site-age-identity-${VALUES_SITE}"
+op_vault="${OP_VAULT:-}"
+
+die() { printf '%s\n' "$*" >&2; exit 2; }
+
+require_key_tools() {
+  command -v age-keygen >/dev/null || die "age-keygen is required"
+}
+
+require_op() {
+  command -v op >/dev/null || die "1Password CLI (op) is required for this operation; install it or recover manually per docs/canonical-values-secret-operations.md"
+  [[ -n "${op_vault}" ]] || die "set OP_VAULT to the target 1Password vault name"
+  op whoami >/dev/null 2>&1 || die "op is not signed in; run 'op signin' first"
+}
+
+cmd_generate() {
+  [[ -f "${identity_file}" ]] && die "identity already exists: ${identity_file}; refusing to overwrite"
+  require_key_tools
+  mkdir -p "${identity_dir}"
+  chmod 700 "${identity_dir}"
+  age-keygen -o "${identity_file}" 2>/dev/null >/dev/null
+  chmod 600 "${identity_file}"
+  local public_key
+  public_key="$(grep -oE '^# public key: .*' "${identity_file}" | head -1 | sed 's/^# public key: //')"
+  printf 'generated site identity for %s\npublic key: %s\nstore a copy with: %s store\n' \
+    "${VALUES_SITE}" "${public_key}" "$0"
+}
+
+cmd_store() {
+  [[ -f "${identity_file}" ]] || die "no identity at ${identity_file}; run generate first"
+  require_op
+  local force=""
+  [[ "${2:-}" == "--force" ]] && force=1
+  if op item get "${op_item_title}" --vault "${op_vault}" >/dev/null 2>&1; then
+    [[ -n "${force}" ]] || die "1Password item already exists: ${op_item_title}; pass --force to replace it"
+    op item delete "${op_item_title}" --vault "${op_vault}"
+  fi
+  # Field value is passed by the CLI from the file on disk; the secret never
+  # appears in this script's output.
+  op item create \
+    --category "Secure Note" \
+    --title "${op_item_title}" \
+    --vault "${op_vault}" \
+    "notes.note_text=${identity_file}" >/dev/null
+  printf 'stored identity for %s as 1Password item %s in vault %s\n' \
+    "${VALUES_SITE}" "${op_item_title}" "${op_vault}"
+}
+
+cmd_fetch() {
+  require_op
+  local force=""
+  [[ "${2:-}" == "--force" ]] && force=1
+  if [[ -f "${identity_file}" ]]; then
+    [[ -n "${force}" ]] || die "identity already exists at ${identity_file}; pass --force to replace it"
+    rm -f "${identity_file}"
+  fi
+  mkdir -p "${identity_dir}"
+  chmod 700 "${identity_dir}"
+  umask 177
+  op read "op://${op_vault}/${op_item_title}/notes.note_text" > "${identity_file}"
+  chmod 600 "${identity_file}"
+  local public_key
+  public_key="$(grep -oE '^# public key: .*' "${identity_file}" | head -1 | sed 's/^# public key: //')"
+  [[ -n "${public_key}" ]] || die "recovered file does not look like an age identity; refusing"
+  printf 'recovered identity for %s\npublic key: %s\nnext: verify against the site bundle with: %s verify\n' \
+    "${VALUES_SITE}" "${public_key}" "$0"
+}
+
+cmd_verify() {
+  [[ -f "${identity_file}" ]] || die "no identity at ${identity_file}"
+  [[ -f "${identity_file}.backup" ]] && cp "${identity_file}" "${identity_file}.backup.pre-verify"
+  local values_dir
+  values_dir="$(site_values_dir)"
+  SOPS_AGE_KEY_FILE="${identity_file}" sops \
+    --config "${repo_root}/${values_dir}/.sops.yaml" \
+    -d "${repo_root}/${values_dir}/secrets.sops.yaml" >/dev/null
+  printf 'identity verified: decrypted the %s site bundle successfully\n' "${VALUES_SITE}"
+}
+
+case "${1:-}" in
+  generate) shift; cmd_generate "$@" ;;
+  store) shift; cmd_store "$@" ;;
+  fetch) shift; cmd_fetch "$@" ;;
+  verify) shift; cmd_verify "$@" ;;
+  *) usage_die() { printf 'Usage: %s {generate|store [--force]|fetch [--force]|verify}\n' "$0" >&2; }; usage_die; exit 2 ;;
+esac

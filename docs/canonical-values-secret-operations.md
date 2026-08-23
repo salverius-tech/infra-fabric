@@ -58,6 +58,19 @@ Back up ciphertext and value-free manifests, not decrypted secret material. A ma
 
 Private age identities require separate protected offline backup and access control. Recovery must use a disposable restricted workspace, verify site identity, ciphertext identity, recipient policy, required paths, key permissions, cleanup, and redaction before any approved consumer sees the restored bundle.
 
+### 1Password-backed identity backup
+
+A password manager vault (for example 1Password) is an approved location for the separate offline identity copy: it is client-side encrypted, access-controlled, and independent of the controller host. The identity file is small plain text (a comment header with the public key plus one `AGE-SECRET-KEY-...` line) and stores verbatim as a secure note.
+
+`scripts/site-age-identity.sh` wraps the lifecycle; it never prints key material and refuses to overwrite without `--force`. 1Password integration is optional: the toolchain always works from the identity file alone, and manual recovery (paste contents into place, then run the same verification) remains fully supported.
+
+- **Create**: `VALUES_SITE=<site> scripts/site-age-identity.sh generate`
+- **Store external copy**: sign in with `op signin`, set `OP_VAULT`, then `VALUES_SITE=<site> scripts/site-age-identity.sh store`. Store the full file contents including the public-key comment.
+- **Recover on a fresh machine**: install the age/sops toolchain and optionally `op`; then either `VALUES_SITE=<site> scripts/site-age-identity.sh fetch` or manually recreate the file at the documented path with `0600` permissions from the vault item.
+- **Verify before trusting** (mandatory after any recovery): `VALUES_SITE=<site> scripts/site-age-identity.sh verify` performs a decryption round-trip against the real site bundle. A wrong or truncated key fails closed here before any consumer touches secret material.
+
+Do not use a 1Password service-account token stored on the controller to automate these steps; that would reintroduce a host-local single point of failure with vault-wide reach. Interactive `op signin` by the operator keeps the vault outside the machine's failure domain. Re-store the identity in the vault as a mandatory step of any rotation.
+
 ## Restore rehearsal
 
 A disposable rehearsal with synthetic values must prove:
