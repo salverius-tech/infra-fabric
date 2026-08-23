@@ -57,14 +57,33 @@ cmd_store() {
     [[ -n "${force}" ]] || die "1Password item already exists: ${op_item_title}; pass --force to replace it"
     op item delete "${op_item_title}" --vault "${op_vault}"
   fi
-  # Field value is passed by the CLI from the file on disk; the secret never
-  # appears in this script's output.
-  op item create \
-    --category "Secure Note" \
-    --title "${op_item_title}" \
-    --vault "${op_vault}" \
-    "notes.note_text=${identity_file}" >/dev/null
-  printf 'stored identity for %s as 1Password item %s in vault %s\n' \
+  # Build a private item template so the vault stores the full identity file
+  # contents (never a path or other literal). The template is created with
+  # 0600 in a private directory and removed immediately.
+  local template_dir template
+  template_dir="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/site-identity.XXXXXX")"
+  chmod 700 "${template_dir}"
+  template="${template_dir}/item-template.json"
+  trap 'rm -rf "${template_dir}"' RETURN
+  python3 - "$identity_file" "$op_item_title" > "${template}" <<'PYEOF'
+import json, sys
+contents = open(sys.argv[1], encoding="utf-8").read()
+print(json.dumps({
+    "title": sys.argv[2],
+    "category": "SECURE_NOTE",
+    "fields": [
+        {"id": "notesPlain", "type": "STRING", "purpose": "NOTES", "value": contents, "label": "notes"}
+    ],
+}))
+PYEOF
+  op item create --template "${template}" --vault "${op_vault}" >/dev/null
+  rm -rf "${template_dir}"
+  # Fail closed unless the stored note round-trips byte-for-byte.
+  if ! op read "op://${op_vault}/${op_item_title}/notes.note_text" 2>/dev/null \
+      | cmp -s - "${identity_file}"; then
+    die "stored item does not match the identity file; the vault copy is INVALID. Delete item ${op_item_title} and re-run store."
+  fi
+  printf 'stored and verified identity for %s as 1Password item %s in vault %s\n' \
     "${VALUES_SITE}" "${op_item_title}" "${op_vault}"
 }
 
@@ -81,11 +100,9 @@ cmd_fetch() {
   umask 177
   op read "op://${op_vault}/${op_item_title}/notes.note_text" > "${identity_file}"
   chmod 600 "${identity_file}"
-  local public_key
-  public_key="$(grep -oE '^# public key: .*' "${identity_file}" | head -1 | sed 's/^# public key: //')"
-  [[ -n "${public_key}" ]] || die "recovered file does not look like an age identity; refusing"
-  printf 'recovered identity for %s\npublic key: %s\nnext: verify against the site bundle with: %s verify\n' \
-    "${VALUES_SITE}" "${public_key}" "$0"
+  grep -qE '^AGE-SECRET-KEY-' "${identity_file}" || die "recovered file does not contain an age secret key; refusing"
+  printf 'recovered identity for %s\npublic key comment: %s\nnext: verify against the site bundle with: %s verify\n' \
+    "${VALUES_SITE}" "$(grep -oE '^# public key: .*' "${identity_file}" | head -1)" "$0"
 }
 
 cmd_verify() {
