@@ -78,3 +78,41 @@ the ACME health-check budget was widened after first certificate issuance on
 a fresh guest exceeded the previous window (`57d2b2f`). The sanctioned host-
 trust procedure after intentional guest replacement is now documented in
 [canonical troubleshooting](../../docs/canonical-troubleshooting.md).
+
+## Full-site teardown and rebuild rehearsal — 2026-08-23
+
+With operator approval, the entire disposable development site was destroyed
+through the guarded teardown path (`teardown-plan`, reviewed destroy plan of
+11 resources including all stateful guests, `teardown-apply --approve` with
+the stateful batch acknowledgement) after fresh guarded backups of all seven
+service states, the audit journal, and the OpenTofu state. The site was then
+rebuilt from the committed canonical model alone through the supported apply
+workflow.
+
+Recovery sequence exercised and verified:
+
+1. All eleven resources recreated from model-pinned identity (same VMIDs,
+   hostnames, addresses); provider plan converged to zero-change afterward.
+2. Controller trust re-enrollment for all recreated guests followed the
+   documented attribution-and-replacement procedure.
+3. First-boot identity recovery ran per resource class: root phase then infra
+   phase for LXC guests, infra phase via cloud-init for VMs; all converged.
+4. Full service convergence configured all eight enabled services.
+5. Stateful data was restored into the rebuilt guests from pre-teardown
+   guarded archives with automatic safety archives; Technitium DNS zones
+   verified record-for-record against canonical configuration.
+6. Final verification battery passed: convergence idempotence limited to the
+   accepted exceptions, direct-service connectivity pass, Hermes read-only
+   bridge healthy, zero-change provider plan.
+
+One recovery-sequence finding emerged: restoring a service-state archive
+reverts the guest's credential store to the archive era, invalidating any API
+token bootstrapped between rebuild and restore. The pipeline already handles
+this — re-running the apply rotates the token against the restored service —
+but operators must know that a stateful restore requires one more apply
+afterward. This is documented here as rehearsal evidence rather than a code
+defect.
+
+Boundary: same-host full-site rebuild only. It does not establish
+off-controller reconstruction, independent external durability of retained
+recovery artifacts, isolated-recovery acceptance, or production acceptance.
