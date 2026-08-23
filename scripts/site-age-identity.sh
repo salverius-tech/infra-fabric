@@ -78,10 +78,24 @@ print(json.dumps({
 PYEOF
   op item create --template "${template}" --vault "${op_vault}" >/dev/null
   rm -rf "${template_dir}"
-  # Fail closed unless the stored note round-trips byte-for-byte.
-  if ! op read "op://${op_vault}/${op_item_title}/notes.note_text" 2>/dev/null \
-      | cmp -s - "${identity_file}"; then
-    die "stored item does not match the identity file; the vault copy is INVALID. Delete item ${op_item_title} and re-run store."
+  verify_stored_identity() {
+    # Read back through the item JSON (field-reference URIs are ambiguous for
+    # template-created items) and byte-compare against the identity file.
+    op item get "${op_item_title}" --vault "${op_vault}" --format json 2>/dev/null \
+      | python3 -c '
+import json, sys
+item = json.load(sys.stdin)
+for field in item.get("fields", []):
+    if field.get("id") == "notesPlain" or field.get("label") == "notes":
+        sys.stdout.write(field.get("value") or "")
+        break
+' 
+  }
+  local stored_bytes local_bytes
+  stored_bytes="$(verify_stored_identity | wc -c)"
+  local_bytes="$(wc -c < "${identity_file}")"
+  if ! verify_stored_identity | cmp -s - "${identity_file}"; then
+    die "stored item does not match the identity file (stored ${stored_bytes} bytes, local ${local_bytes} bytes; empty stored count means the notes field could not be read back). The vault copy is unreliable - delete item ${op_item_title} and re-run store."
   fi
   printf 'stored and verified identity for %s as 1Password item %s in vault %s\n' \
     "${VALUES_SITE}" "${op_item_title}" "${op_vault}"
