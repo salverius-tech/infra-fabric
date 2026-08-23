@@ -89,7 +89,7 @@ for field in item.get("fields", []):
     if field.get("id") == "notesPlain" or field.get("label") == "notes":
         sys.stdout.write(field.get("value") or "")
         break
-' 
+'
   }
   local stored_bytes local_bytes
   stored_bytes="$(verify_stored_identity | wc -c)"
