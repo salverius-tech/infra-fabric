@@ -446,14 +446,14 @@
       "development/plan": {
         "environment": "development",
         "category": "plan",
-        "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
+        "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
         "citation": {
           "path": "docs/development-acceptance-gate-runbook.md",
           "lines": "40-50"
         },
         "procedure_id": "dev-gate-runbook-gate-3",
         "result": "passed",
-        "date": "2026-08-22",
+        "date": "2026-08-23",
         "boundary": "Disposable development plan review only; no apply performed. Fresh plans before convergence and after recovery were zero-change with no destructive changes."
       },
       "development/apply": {
@@ -472,53 +472,53 @@
       "development/health-idempotence": {
         "environment": "development",
         "category": "health-idempotence",
-        "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
+        "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
         "citation": {
           "path": "docs/development-acceptance-gate-runbook.md",
           "lines": "51-68"
         },
         "procedure_id": "dev-gate-runbook-gate-4",
         "result": "passed",
-        "date": "2026-08-22",
+        "date": "2026-08-23",
         "boundary": "Development guests only across two full convergence passes plus direct-service connectivity; nonzero changes limited to the accepted imperative-bootstrap exceptions recorded in .hermes/reconciliation/validation-findings-2026-08-22.md, including the sssf pinned-checkout changed_when declaration; Technitium DNS sync verified zero-change after the rData matching fix."
       },
       "development/service-restore": {
         "environment": "development",
         "category": "service-restore",
-        "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
+        "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
         "citation": {
           "path": "docs/development-acceptance-gate-runbook.md",
           "lines": "69-80"
         },
         "procedure_id": "dev-gate-runbook-gate-5",
         "result": "passed",
-        "date": "2026-08-22",
+        "date": "2026-08-23",
         "boundary": "Enabled development stateful services only; not controller or infrastructure recovery. All enabled services backed up and restored with automatic pre-restore safety archives and zero failures; post-restore connectivity and reconvergence passed."
       },
       "development/infrastructure-recovery": {
         "environment": "development",
         "category": "infrastructure-recovery",
-        "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
+        "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
         "citation": {
           "path": "docs/development-acceptance-gate-runbook.md",
           "lines": "81-120"
         },
         "procedure_id": "dev-gate-runbook-gate-6",
         "result": "passed",
-        "date": "2026-08-22",
+        "date": "2026-08-23",
         "boundary": "Disposable development controller/infrastructure recovery rehearsal on a local-filesystem host: guarded audit-journal and state snapshots were created, verified, and restored through the site lock inside one wrapped tooling session; canonical projections verified afterward followed by a fresh zero-change plan and connectivity pass. No external durability claim."
       },
       "development/hermes-integration": {
         "environment": "development",
         "category": "hermes-integration",
-        "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
+        "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
         "citation": {
           "path": "docs/development-acceptance-gate-runbook.md",
           "lines": "121-137"
         },
         "procedure_id": "dev-gate-runbook-gate-7",
         "result": "passed",
-        "date": "2026-08-22",
+        "date": "2026-08-23",
         "boundary": "Deployed-plugin read-only status and audit verification only: zero-change non-destructive saved plan reported and audit chain verified with no unresolved correlations. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance."
       },
       "development/rollback": {
