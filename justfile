@@ -77,6 +77,12 @@ site-identity action="" SITE="dev" *extra="":
     set -euo pipefail
     site_arg="{{SITE}}"; site="${site_arg#SITE=}"
     action_arg="{{action}}"; action="${action_arg#action=}"
+    # Argument-order resilience: a flag placed before the SITE assignment
+    # fills the SITE slot positionally. Fall back to the ambient VALUES_SITE
+    # so `VALUES_SITE=dev just site-identity store --force` keeps working.
+    if [[ -z "${site}" || "${site}" == -* ]]; then
+      site="${VALUES_SITE:-}"
+    fi
     if [[ -z "${action}" ]]; then
       printf 'Usage: just site-identity {generate|store|fetch|verify} [SITE=<site>] [--force]\n' >&2
       exit 2
