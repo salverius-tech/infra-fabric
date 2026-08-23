@@ -46,15 +46,15 @@
     "development/plan": {
       "environment": "development",
       "category": "plan",
-      "audited_commit": "b25d0037ef510bc848786e18582fab95bf9661fc",
+      "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
       "citation": {
-        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-        "lines": "635-648"
+        "path": "docs/development-acceptance-gate-runbook.md",
+        "lines": "40-50"
       },
-      "procedure_id": "phase-9-gate-1",
+      "procedure_id": "dev-gate-runbook-gate-3",
       "result": "passed",
       "date": "2026-08-22",
-      "boundary": "Disposable development plan only; no prior normalized baseline established semantic equivalence."
+      "boundary": "Disposable development plan review only; no apply performed. Fresh plans before convergence and after recovery were zero-change with no destructive changes."
     },
     "development/apply": {
       "environment": "development",
@@ -72,54 +72,54 @@
     "development/health-idempotence": {
       "environment": "development",
       "category": "health-idempotence",
-      "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
+      "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
       "citation": {
-        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-        "lines": "635-648"
+        "path": "docs/development-acceptance-gate-runbook.md",
+        "lines": "51-68"
       },
-      "procedure_id": "phase-9-gate-3",
+      "procedure_id": "dev-gate-runbook-gate-4",
       "result": "passed",
       "date": "2026-08-22",
-      "boundary": "Direct development health and second-run idempotence only."
+      "boundary": "Development guests only across two full convergence passes plus direct-service connectivity; nonzero changes limited to the accepted imperative-bootstrap exceptions recorded in .hermes/reconciliation/validation-findings-2026-08-22.md, including the sssf pinned-checkout changed_when declaration; Technitium DNS sync verified zero-change after the rData matching fix."
     },
     "development/service-restore": {
       "environment": "development",
       "category": "service-restore",
-      "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
+      "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
       "citation": {
-        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-        "lines": "635-648"
+        "path": "docs/development-acceptance-gate-runbook.md",
+        "lines": "69-80"
       },
-      "procedure_id": "phase-9-gate-4",
+      "procedure_id": "dev-gate-runbook-gate-5",
       "result": "passed",
       "date": "2026-08-22",
-      "boundary": "Enabled disposable development stateful services only; not controller or infrastructure recovery."
+      "boundary": "Enabled development stateful services only; not controller or infrastructure recovery. All enabled services backed up and restored with automatic pre-restore safety archives and zero failures; post-restore connectivity and reconvergence passed."
     },
     "development/infrastructure-recovery": {
       "environment": "development",
       "category": "infrastructure-recovery",
-      "audited_commit": "b25d0037ef510bc848786e18582fab95bf9661fc",
+      "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
       "citation": {
-        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-        "lines": "635-658"
+        "path": "docs/development-acceptance-gate-runbook.md",
+        "lines": "81-120"
       },
-      "procedure_id": "phase-9-gate-5",
+      "procedure_id": "dev-gate-runbook-gate-6",
       "result": "passed",
       "date": "2026-08-22",
-      "boundary": "Disposable development controller/infrastructure recovery rehearsal: private audit and state snapshots were verified and restored through guarded paths, post-recovery canonical convergence and redacted connectivity passed, and fresh provider plans were zero-change. It does not establish independent external audit durability, rollback, or production acceptance."
+      "boundary": "Disposable development controller/infrastructure recovery rehearsal on a local-filesystem host: guarded audit-journal and state snapshots were created, verified, and restored through the site lock inside one wrapped tooling session; canonical projections verified afterward followed by a fresh zero-change plan and connectivity pass. No external durability claim."
     },
     "development/hermes-integration": {
       "environment": "development",
       "category": "hermes-integration",
-      "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
+      "audited_commit": "66281423a5baddceacf1ea9216d54743cb4b1b11",
       "citation": {
-        "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-        "lines": "661-674"
+        "path": "docs/development-acceptance-gate-runbook.md",
+        "lines": "121-137"
       },
-      "procedure_id": "phase-9-gate-6-read-only-bridge",
+      "procedure_id": "dev-gate-runbook-gate-7",
       "result": "passed",
       "date": "2026-08-22",
-      "boundary": "Disposable development deployed-plugin read-only status and audit verification only; uses a non-secret service-ID context and guest-local private empty audit baseline. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance."
+      "boundary": "Deployed-plugin read-only status and audit verification only: zero-change non-destructive saved plan reported and audit chain verified with no unresolved correlations. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance."
     },
     "development/rollback": {
       "environment": "development",

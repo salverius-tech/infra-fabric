@@ -156,6 +156,51 @@ MATRIX_EVIDENCE["development/rollback"] = {
     "date": "2026-08-22",
     "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance.",
 }
+RUNBOOK_PATH = "docs/development-acceptance-gate-runbook.md"
+GATE_RERUN_COMMIT = "66281423a5baddceacf1ea9216d54743cb4b1b11"
+# 2026-08-22 local-filesystem host re-execution of docs/development-acceptance-gate-runbook.md
+# gates 1-7 after fixes in GATE_RERUN_COMMIT; apply and rollback were not exercised and retain
+# their historical evidence.
+MATRIX_EVIDENCE["development/plan"].update(
+    {
+        "audited_commit": GATE_RERUN_COMMIT,
+        "citation": {"path": RUNBOOK_PATH, "lines": "40-50"},
+        "procedure_id": "dev-gate-runbook-gate-3",
+        "boundary": "Disposable development plan review only; no apply performed. Fresh plans before convergence and after recovery were zero-change with no destructive changes.",
+    }
+)
+MATRIX_EVIDENCE["development/health-idempotence"].update(
+    {
+        "audited_commit": GATE_RERUN_COMMIT,
+        "citation": {"path": RUNBOOK_PATH, "lines": "51-68"},
+        "procedure_id": "dev-gate-runbook-gate-4",
+        "boundary": "Development guests only across two full convergence passes plus direct-service connectivity; nonzero changes limited to the accepted imperative-bootstrap exceptions recorded in .hermes/reconciliation/validation-findings-2026-08-22.md, including the sssf pinned-checkout changed_when declaration; Technitium DNS sync verified zero-change after the rData matching fix.",
+    }
+)
+MATRIX_EVIDENCE["development/service-restore"].update(
+    {
+        "audited_commit": GATE_RERUN_COMMIT,
+        "citation": {"path": RUNBOOK_PATH, "lines": "69-80"},
+        "procedure_id": "dev-gate-runbook-gate-5",
+        "boundary": "Enabled development stateful services only; not controller or infrastructure recovery. All enabled services backed up and restored with automatic pre-restore safety archives and zero failures; post-restore connectivity and reconvergence passed.",
+    }
+)
+MATRIX_EVIDENCE["development/infrastructure-recovery"].update(
+    {
+        "audited_commit": GATE_RERUN_COMMIT,
+        "citation": {"path": RUNBOOK_PATH, "lines": "81-120"},
+        "procedure_id": "dev-gate-runbook-gate-6",
+        "boundary": "Disposable development controller/infrastructure recovery rehearsal on a local-filesystem host: guarded audit-journal and state snapshots were created, verified, and restored through the site lock inside one wrapped tooling session; canonical projections verified afterward followed by a fresh zero-change plan and connectivity pass. No external durability claim.",
+    }
+)
+MATRIX_EVIDENCE["development/hermes-integration"].update(
+    {
+        "audited_commit": GATE_RERUN_COMMIT,
+        "citation": {"path": RUNBOOK_PATH, "lines": "121-137"},
+        "procedure_id": "dev-gate-runbook-gate-7",
+        "boundary": "Deployed-plugin read-only status and audit verification only: zero-change non-destructive saved plan reported and audit chain verified with no unresolved correlations. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance.",
+    }
+)
 RETIRED_ARTIFACTS = (
     "audit-package-evidence-registry.json", "audit-package-evidence-registry.md",
     "backlog.json", "contradiction-register.md", "decision-register.md",
