@@ -670,6 +670,20 @@ def verify_cross_projection_identity(
         if len(matching_hosts) != 1 or matching_hosts[0].get("canonical_resource") != resource:
             raise ProjectionError(f"resource identity disagrees across projections: {name}")
         identities[name] = {"resource": resource, "resource_type": resource_type}
+    forgejo_scope = (
+        services.get("forgejo", {}).get("legacy_vars", {}).get("forgejo_bootstrap_repo_scope")
+        if isinstance(services.get("forgejo"), Mapping)
+        else None
+    )
+    runner_scope = (
+        services.get("forgejo_runner", {}).get("legacy_vars", {}).get("forgejo_runner_scope")
+        if isinstance(services.get("forgejo_runner"), Mapping)
+        else None
+    )
+    if forgejo_scope is not None and runner_scope is not None and forgejo_scope != runner_scope:
+        raise ProjectionError(
+            "forgejo bootstrap repository and forgejo_runner registration scope disagree"
+        )
     return {"site": site, "services": identities, "status": "verified"}
 
 

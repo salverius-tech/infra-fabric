@@ -77,6 +77,42 @@ class CrossProjectionIdentityTests(unittest.TestCase):
             "verified",
         )
 
+    def test_forgejo_runner_scope_divergence_is_rejected(self) -> None:
+        opentofu, inventory, ansible_vars = self.projections()
+        opentofu["service_runtime"]["forgejo_runner"] = {"type": "lxc"}
+        ansible_vars["services"]["forgejo_runner"] = {
+            "resource": "forgejo_runner",
+            "resource_type": "lxc",
+        }
+        inventory["_meta"]["hostvars"]["forgejo_runner_lxc"] = {
+            "canonical_service": "forgejo_runner",
+            "canonical_resource": "forgejo_runner",
+        }
+        ansible_vars["services"]["forgejo"]["legacy_vars"] = {"forgejo_bootstrap_repo_scope": "owner/repo"}
+        ansible_vars["services"]["forgejo_runner"]["legacy_vars"] = {"forgejo_runner_scope": "owner/other"}
+        with self.assertRaisesRegex(ProjectionError, "registration scope disagree"):
+            verify_cross_projection_identity(
+                site="dev", opentofu=opentofu, inventory=inventory, ansible_vars=ansible_vars
+            )
+
+    def test_matching_forgejo_scopes_are_verified(self) -> None:
+        opentofu, inventory, ansible_vars = self.projections()
+        opentofu["service_runtime"]["forgejo_runner"] = {"type": "lxc"}
+        ansible_vars["services"]["forgejo_runner"] = {
+            "resource": "forgejo_runner",
+            "resource_type": "lxc",
+        }
+        inventory["_meta"]["hostvars"]["forgejo_runner_lxc"] = {
+            "canonical_service": "forgejo_runner",
+            "canonical_resource": "forgejo_runner",
+        }
+        ansible_vars["services"]["forgejo"]["legacy_vars"] = {"forgejo_bootstrap_repo_scope": "owner/repo"}
+        ansible_vars["services"]["forgejo_runner"]["legacy_vars"] = {"forgejo_runner_scope": "owner/repo"}
+        result = verify_cross_projection_identity(
+            site="dev", opentofu=opentofu, inventory=inventory, ansible_vars=ansible_vars
+        )
+        self.assertEqual(result["status"], "verified")
+
 
 if __name__ == "__main__":
     unittest.main()

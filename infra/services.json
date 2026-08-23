@@ -183,6 +183,7 @@
           "forgejo_bootstrap_admin_username": "configuration.bootstrap_admin_username",
           "forgejo_bootstrap_admin_email": "configuration.bootstrap_admin_email",
           "forgejo_bootstrap_owner_email": "configuration.bootstrap_owner_email",
+          "forgejo_bootstrap_repo_scope": "configuration.bootstrap_repo",
           "forgejo_actions_enabled": "configuration.actions_enabled",
           "forgejo_actions_default_url": "configuration.actions_default_url",
           "forgejo_caddy_cloudflare_version": "configuration.caddy_artifact.version",

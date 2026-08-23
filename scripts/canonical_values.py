@@ -838,9 +838,17 @@ class ForgejoConfiguration(StrictModel):
     bootstrap_admin_username: StrictStr | None = None
     bootstrap_admin_email: StrictStr | None = None
     bootstrap_owner_email: StrictStr | None = None
+    bootstrap_repo: StrictStr | None = None
     actions_enabled: StrictBool | None = None
     actions_default_url: StrictStr | None = None
     caddy_artifact: ReviewedArtifactPin | None = None
+
+    @field_validator("bootstrap_repo")
+    @classmethod
+    def validate_bootstrap_repo(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*", value):
+            raise ValueError("Forgejo bootstrap_repo must be in owner/repository form")
+        return value
 
     @field_validator("actions_default_url")
     @classmethod

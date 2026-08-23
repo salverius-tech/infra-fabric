@@ -14,7 +14,7 @@
       - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_admin_password is defined
       - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_owner_email is defined
       - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_owner_password is defined
-      - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_runner_scope is defined
+      - not (forgejo_bootstrap_enabled | default(false) | bool) or forgejo_bootstrap_repo_scope is defined
       - forgejo_database is not defined or forgejo_database.type | default('sqlite') in ['sqlite', 'postgres']
       - forgejo_database is not defined or forgejo_database.type | default('sqlite') != 'postgres' or forgejo_database.managed | default(true) | bool
     fail_msg: >-
@@ -239,18 +239,18 @@
 - name: Derive Forgejo bootstrap repository scope
   tags: [config]
   ansible.builtin.set_fact:
-    forgejo_bootstrap_repo_owner: "{{ forgejo_runner_scope.split('/')[0] }}"
-    forgejo_bootstrap_repo_name: "{{ forgejo_runner_scope.split('/')[1] }}"
+    forgejo_bootstrap_repo_owner: "{{ forgejo_bootstrap_repo_scope.split('/')[0] }}"
+    forgejo_bootstrap_repo_name: "{{ forgejo_bootstrap_repo_scope.split('/')[1] }}"
   when: forgejo_bootstrap_enabled | default(false) | bool
 
 - name: Validate Forgejo bootstrap repository scope
   tags: [validation]
   ansible.builtin.assert:
     that:
-      - forgejo_runner_scope.split('/') | length == 2
+      - forgejo_bootstrap_repo_scope.split('/') | length == 2
       - forgejo_bootstrap_repo_owner | length > 0
       - forgejo_bootstrap_repo_name | length > 0
-    fail_msg: Forgejo bootstrap requires forgejo_runner_scope in owner/repository form.
+    fail_msg: Forgejo bootstrap requires forgejo_bootstrap_repo_scope in owner/repository form.
   when: forgejo_bootstrap_enabled | default(false) | bool
 
 - name: Check Forgejo bootstrap admin user in SQLite
