@@ -173,6 +173,9 @@
       - "https://{{ (caddy_server_names if caddy_server_names is defined else [caddy_server_name]) | first }}/"
   changed_when: false
   register: caddy_proxy_https_check
-  retries: 12
-  delay: 5
+  # A freshly provisioned guest must obtain its certificate before this route
+  # answers; ACME issuance can legitimately take longer than a minute. Allow a
+  # five-minute budget before declaring the route unhealthy.
+  retries: 30
+  delay: 10
   until: caddy_proxy_https_check.rc == 0
