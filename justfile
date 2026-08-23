@@ -3,6 +3,10 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 export INFRA_HOST_UID := `scripts/host-id.sh uid`
 export INFRA_HOST_GID := `scripts/host-id.sh gid`
 
+# Target 1Password vault for site age-identity operations; override with: just VAULT=<name> ...
+VAULT := ""
+export OP_VAULT := VAULT
+
 # Show available commands
 default:
     @just --list
