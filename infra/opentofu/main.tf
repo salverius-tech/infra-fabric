@@ -51,8 +51,7 @@ module "technitium_dns" {
   ipv4_address  = var.technitium_container_ipv4_address
   ipv4_gateway  = var.technitium_container_ipv4_gateway
 
-  root_password   = var.lxc_root_password
-  ssh_public_keys = var.lxc_ssh_public_keys
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "technitium", [])
 
   network = {
     bridge  = var.technitium_container_bridge
@@ -79,6 +78,7 @@ module "technitium_dns_vm" {
   tags        = ["dns", "technitium", "opentofu"]
 
   cores     = var.technitium_container_cores
+  cpu_type  = local.vm_cpu_type["technitium"]
   memory_mb = var.technitium_container_memory_mb
 
   image = {
@@ -99,8 +99,8 @@ module "technitium_dns_vm" {
   ipv4_address  = var.technitium_container_ipv4_address
   ipv4_gateway  = var.technitium_container_ipv4_gateway
 
-  cloud_init_user = coalesce(try(local.technitium_runtime.cloud_init_user, null), var.guest_vm_cloud_init_user)
-  ssh_public_keys = var.lxc_ssh_public_keys
+  cloud_init_user = var.bootstrap_ssh_user
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "technitium", [])
 
   network = {
     bridge  = var.technitium_container_bridge

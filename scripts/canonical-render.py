@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""Render disposable non-secret canonical consumer projections."""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+from atomic_output import atomic_output_directory
+from canonical_projections import (
+    render_projection_set,
+    verify_cross_projection_identity,
+    verify_onramp_handoff_identity,
+)
+from canonical_values import CanonicalValuesError, load_site, model_digest
+from projection_manifest import (
+    ManifestError,
+    build_manifest,
+    verify_manifest,
+    verify_projection_permissions,
+)
+from service_catalog import ServiceCatalogError, load_catalog
+
+
+PROJECTION_FILES = {
+    "terraform.auto.tfvars.json": "terraform",
+    "ansible-inventory.json": "ansible",
+    "ansible-vars.json": "ansible-vars",
+    "dns-records.json": "dns",
+    "onramp-handoff.json": "onramp-handoff",
+}
+
+
+def _write_json(path: Path, value: object) -> None:
+    handle = tempfile.NamedTemporaryFile("w", dir=path.parent, prefix=f".{path.name}.", delete=False, encoding="utf-8")
+    temporary = Path(handle.name)
+    try:
+        with handle:
+            json.dump(value, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        temporary.chmod(0o600)
+        temporary.replace(path)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--site-file", type=Path, required=True)
+    parser.add_argument("--catalog", type=Path, default=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--source-commit", default=os.environ.get("INFRA_GIT_COMMIT", "unknown"))
+    parser.add_argument("--renderer-version", default="canonical-renderer/0.1")
+    args = parser.parse_args(argv)
+    try:
+        model = load_site(args.site_file, catalog_path=args.catalog)
+        catalog = load_catalog(args.catalog)
+        projections = render_projection_set(model, catalog)
+        manifest = build_manifest(
+            site=model.site.name,
+            schema_version=model.schema_version,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+            renderer_version=args.renderer_version,
+            source_commit=args.source_commit,
+        )
+        def populate(directory: Path) -> None:
+            for name, value in projections.items():
+                _write_json(directory / name, value)
+            _write_json(directory / "manifest.json", manifest)
+            verify_projection_permissions(directory)
+            verify_cross_projection_identity(
+                site=model.site.name,
+                opentofu=projections["terraform.auto.tfvars.json"],
+                inventory=projections["ansible-inventory.json"],
+                ansible_vars=projections["ansible-vars.json"],
+            )
+            verify_onramp_handoff_identity(
+                model, catalog, projections["onramp-handoff.json"]
+            )
+            verify_manifest(
+                manifest,
+                site=model.site.name,
+                model_digest=model_digest(model),
+                secret_digest=None,
+                projections=projections,
+            )
+
+        atomic_output_directory(args.output_dir, populate)
+        print(f"rendered {len(projections)} non-secret projections for {model.site.name} into {args.output_dir}")
+    except (CanonicalValuesError, ServiceCatalogError, ManifestError, OSError, ValueError) as error:
+        print(f"canonical projection error: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

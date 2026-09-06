@@ -1,0 +1,113 @@
+# Canonical site quick start
+
+This is the supported operator path for a new or existing canonical site.
+
+## Prerequisites
+
+Use a Linux `amd64` host with Git, GNU Make-compatible shell utilities, `just`, and Docker Engine with the Compose plugin. The tooling image currently installs checksum-pinned Linux `amd64` OpenTofu, TFLint, and SOPS binaries; non-`amd64` hosts are not supported by this workflow. Docker must be available to the invoking user before running `just setup` or any validation recipe.
+
+## 1. Create site scaffolding
+
+From the repository root:
+
+```bash
+just setup "" <site>
+export VALUES_SITE=<site>
+```
+
+This creates or preserves the selected site directory and public-safe `site.yaml` scaffold. If no site-specific fixture exists, setup renders `scaffold/sites/_template/site.yaml` and replaces its example site name. It does not create credentials or a private SOPS policy.
+
+## 2. Establish private secret prerequisites
+
+Outside tracked public source, provide the selected site’s:
+
+- `.sops.yaml` policy;
+- encrypted `secrets.sops.yaml` bundle;
+- external age identity file with restrictive permissions, backed up in a separate protected location such as an approved password-manager vault (see [canonical secret operations](canonical-values-secret-operations.md)); recovery of the identity from that vault is part of the documented disaster-recovery procedure in [canonical troubleshooting](canonical-troubleshooting.md).
+
+The private site files are:
+
+```text
+values/sites/<site>/.sops.yaml
+values/sites/<site>/secrets.sops.yaml
+```
+
+The bundle must use canonical paths such as `secrets.providers.<provider>.<key>`, `secrets.bootstrap.ssh_private_key`, `secrets.operator.password`, and `services.<service>.secrets.<key>` as required by the catalog. Never place plaintext credentials in `site.yaml`, generated projections, plans, state, or documentation.
+
+## 3. Edit canonical inputs
+
+Edit non-secret configuration in:
+
+```text
+values/sites/<site>/site.yaml
+```
+
+Use the encrypted editor for protected values:
+
+```bash
+just edit-secrets SITE=<site>
+```
+
+This changes encrypted ciphertext and requires the selected policy and external age identity.
+
+## 4. Initialize the canonical bootstrap identity
+
+After the site model, SOPS policy, encrypted bundle, and external age identity are ready:
+
+```bash
+just ssh-initialize SITE=<site>
+```
+
+This is an explicit secret-dependent operation. It validates or creates the distinct bootstrap and Proxmox-management key pairs, updates their encrypted private logical values and public pins, and refreshes derived projections. Setup, validation, planning, and apply do not invoke it automatically.
+
+## 5. Validate
+
+```bash
+VALUES_SITE=<site> just validate
+```
+
+Validation checks the public repository, canonical model and catalog, then atomically renders and identity-verifies the non-secret generated projections before DNS and Ansible structural checks. It does not contact the provider, decrypt secrets, require a SOPS policy/bundle, or prove provider-backed plan equivalence, live host readiness, service health, or restore acceptance. The refreshed `generated/` directory is private and derived; never edit it.
+
+## 6. Plan
+
+```bash
+VALUES_SITE=<site> just plan
+```
+
+Planning is non-mutating to infrastructure but may contact the configured provider and refresh private derived projections. Review the saved plan and metadata under the selected site directory. Treat generated files and plan artifacts as private and derived.
+
+Review at minimum:
+
+- creates, updates, replacements, and destroys;
+- service and resource identity;
+- addresses, hostnames, VLANs, storage, and image pins;
+- bootstrap/operator identity changes;
+- secret delivery requirements;
+- provider and host-readiness failures;
+- stateful-service and backup implications.
+
+## 7. Apply only after approval
+
+```bash
+VALUES_SITE=<site> just apply
+```
+
+Apply requires a fresh verified plan and explicit operator approval. It mutates infrastructure and runs the approved service orchestration chain. Afterward, verify service health, direct endpoints, DNS/HTTPS, and a repeat plan for drift.
+
+Before a service-converging apply, configure the selected site's distinct Proxmox-management identity. Keep the public half at `platform.proxmox.management.ssh_public_key` and its encrypted private half at `secrets.providers.proxmox.ssh_private_key`; it is separate from the guest bootstrap identity:
+
+```bash
+VALUES_SITE=<site> just apply
+```
+
+The wrapper materializes both identities only inside the protected tooling boundary and retains strict host-key checking. Do not use an ambient controller-key selector, reuse the guest bootstrap key, or place private material in `site.yaml`, projections, plans, or state.
+
+## Source ownership
+
+```text
+Operator-edited: site.yaml, .sops.yaml, secrets.sops.yaml
+Derived: generated projections, plan metadata, plan artifacts
+External/private: age identities, recipient policy, credentials, state backups
+```
+
+For recipe details and controlled rollout flags, see [Public Just recipes](just-recipes.md). For failures, start with the failing gate named by the command; do not bypass it by editing generated files or passing unreviewed provider values.

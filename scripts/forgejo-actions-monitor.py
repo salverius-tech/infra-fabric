@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Read-only Forgejo Actions monitor for the private values repository."""
+
 from __future__ import annotations
 
 import argparse
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -14,7 +14,14 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from values_context import from_environment
+from values_context import ValuesContextError, from_environment
+from canonical_projections import (
+    render_projection_set,
+    verify_cross_projection_identity,
+)
+from canonical_values import load_site, model_digest
+from projection_manifest import verify_manifest
+from service_catalog import load_catalog
 
 REPO = Path(__file__).resolve().parents[1]
 INVENTORY = "values/ansible/inventory/local.yml"
@@ -33,16 +40,29 @@ STATUS = {
 TERMINAL_OK = {"success", "skipped"}
 TERMINAL_BAD = {"failure", "cancelled", "blocked", "unknown"}
 TERMINAL = TERMINAL_OK | TERMINAL_BAD
-
-REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"(?i)(authorization:\s*)(?:basic|bearer)?\s*[^\s]+"), r"\1<redacted>"),
-    (re.compile(r"(?i)\b([A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|PASS|API_KEY)[A-Z0-9_]*)=([^\s]+)"), r"\1=<redacted>"),
-    (re.compile(r"\b[0-9a-fA-F]{40,}\b"), "<token>"),
-    (re.compile(r"(?<![0-9.])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9.])"), "<ip>"),
-    (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "<email>"),
-    (re.compile(r"https?://[^\s]+"), "<url>"),
-    (re.compile(r"git@[^\s:]+:[^\s]+"), "<ssh-url>"),
-)
+OUTPUT_SCHEMA_VERSION = 1
+MAX_STATUS_ROWS = 50
+MAX_RUNNERS = 100
+MAX_SAFE_ID = (1 << 63) - 1
+MAX_TIMESTAMP = 4_102_444_800  # 2100-01-01; bounds derived display text.
+SAFE_EVENTS = {
+    "push",
+    "pull_request",
+    "pull_request_target",
+    "workflow_dispatch",
+    "repository_dispatch",
+    "schedule",
+    "release",
+}
+SAFE_SERVICE_STATES = {
+    "active",
+    "inactive",
+    "failed",
+    "activating",
+    "deactivating",
+    "reloading",
+    "maintenance",
+}
 
 
 class MonitorError(RuntimeError):
@@ -56,12 +76,40 @@ def status_name(value: int | str | None) -> str:
         return "unknown"
 
 
-def age(timestamp: int | str | None) -> str:
+def safe_int(value: object, *, maximum: int = MAX_SAFE_ID) -> int | None:
+    """Return a bounded non-negative integer, never attacker-controlled text."""
+    if isinstance(value, bool):
+        return None
     try:
-        value = int(timestamp)
-    except (TypeError, ValueError):
-        return "-"
-    if value <= 0:
+        result = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if 0 <= result <= maximum else None
+
+
+def bounded_limit(value: object, maximum: int) -> int:
+    parsed = safe_int(value)
+    return min(parsed, maximum) if parsed and parsed > 0 else 1
+
+
+def safe_event(value: object) -> str:
+    return value if isinstance(value, str) and value in SAFE_EVENTS else "unknown"
+
+
+def safe_service_state(value: object) -> str:
+    if not isinstance(value, str):
+        return "unknown"
+    normalized = value.strip().lower()
+    return normalized if normalized in SAFE_SERVICE_STATES else "unknown"
+
+
+def safe_timestamp(value: object) -> int | None:
+    return safe_int(value, maximum=MAX_TIMESTAMP)
+
+
+def age(timestamp: int | str | None) -> str:
+    value = safe_timestamp(timestamp)
+    if not value:
         return "-"
     seconds = max(0, int(datetime.now(timezone.utc).timestamp()) - value)
     if seconds < 60:
@@ -76,14 +124,11 @@ def age(timestamp: int | str | None) -> str:
 
 
 def duration(started: int | str | None, stopped: int | str | None) -> str:
-    try:
-        start = int(started or 0)
-        stop = int(stopped or 0)
-    except (TypeError, ValueError):
+    start = safe_timestamp(started)
+    stop = safe_timestamp(stopped)
+    if not start:
         return "-"
-    if start <= 0:
-        return "-"
-    if stop <= 0:
+    if not stop:
         stop = int(datetime.now(timezone.utc).timestamp())
     seconds = max(0, stop - start)
     if seconds < 60:
@@ -95,15 +140,69 @@ def duration(started: int | str | None, stopped: int | str | None) -> str:
     return f"{hours}h{minute:02d}m"
 
 
-def redact(text: str) -> str:
-    redacted = text
-    for pattern, replacement in REDACTIONS:
-        redacted = pattern.sub(replacement, redacted)
-    return redacted
-
-
 def shell_quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
+
+
+def verify_canonical_monitor_inputs(context: object) -> Path:
+    site_file = getattr(context, "canonical_site_path", None)
+    if site_file is None:
+        raise MonitorError("canonical site.yaml is required")
+    catalog_path = REPO / "infra" / "services.json"
+    try:
+        model = load_site(
+            site_file,
+            expected_site=getattr(context, "site", None),
+            catalog_path=catalog_path,
+        )
+        catalog = load_catalog(catalog_path)
+    except Exception as error:
+        raise MonitorError("canonical monitor site or catalog is invalid") from error
+    expected = render_projection_set(model, catalog)
+    names = tuple(expected)
+    projections: dict[str, dict[str, Any]] = {}
+    try:
+        for name in names:
+            projection = json.loads(
+                getattr(context, "generated_path")(name).read_text(encoding="utf-8")
+            )
+            if not isinstance(projection, dict):
+                raise MonitorError(
+                    f"canonical monitor projection is not an object: {name}"
+                )
+            projections[name] = projection
+        manifest = json.loads(
+            getattr(context, "projection_manifest_path").read_text(encoding="utf-8")
+        )
+        if not isinstance(manifest, dict):
+            raise MonitorError("canonical monitor manifest is not an object")
+    except (OSError, json.JSONDecodeError) as error:
+        raise MonitorError(
+            "canonical monitor projections or manifest are unavailable"
+        ) from error
+    if projections != expected:
+        raise MonitorError(
+            "canonical monitor projections do not match the selected model"
+        )
+    try:
+        verify_cross_projection_identity(
+            site=model.site.name,
+            opentofu=projections["terraform.auto.tfvars.json"],
+            inventory=projections["ansible-inventory.json"],
+            ansible_vars=projections["ansible-vars.json"],
+        )
+        verify_manifest(
+            manifest,
+            site=model.site.name,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+        )
+    except Exception as error:
+        raise MonitorError(
+            "canonical monitor projection identity verification failed"
+        ) from error
+    return getattr(context, "generated_path")("ansible-inventory.json")
 
 
 def run_ansible_shell(command: str) -> str:
@@ -129,13 +228,18 @@ def run_ansible_shell(command: str) -> str:
         capture_output=True,
         check=False,
     )
-    output = result.stdout + result.stderr
     if result.returncode != 0:
-        raise MonitorError(redact(output.strip()))
+        # Remote output is an untrusted private-data boundary. Never put it in
+        # an exception that can be returned to Hermes.
+        raise MonitorError("Forgejo monitor command failed")
     marker = ">>\n"
     if marker in result.stdout:
         return result.stdout.split(marker, 1)[1].strip()
-    lines = [line for line in result.stdout.splitlines() if not line.startswith(" Container ")]
+    lines = [
+        line
+        for line in result.stdout.splitlines()
+        if not line.startswith(" Container ")
+    ]
     if lines and " | " in lines[0]:
         return "\n".join(lines[1:]).strip()
     return "\n".join(lines).strip()
@@ -151,46 +255,114 @@ def forgejo_sql(query: str) -> list[dict[str, Any]]:
     if not raw:
         return []
     try:
-        return json.loads(raw)
+        parsed = json.loads(raw)
     except json.JSONDecodeError as error:
-        raise MonitorError(f"failed to parse Forgejo SQLite JSON: {error}\n{redact(raw)}") from error
+        raise MonitorError("Forgejo monitor returned invalid data") from error
+    if not isinstance(parsed, list) or not all(isinstance(row, dict) for row in parsed):
+        raise MonitorError("Forgejo monitor returned invalid data")
+    return parsed
+
+
+def safe_status_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Project a database row into a fixed, public-safe status schema."""
+    return {
+        "run_id": safe_int(row.get("id")),
+        "status": status_name(row.get("status")),
+        "event": safe_event(row.get("event")),
+        "age": age(row.get("created")),
+        "duration": duration(row.get("started"), row.get("stopped")),
+        "job_status": status_name(row.get("job_status")),
+    }
+
+
+def status_payload(rows: list[dict[str, Any]], limit: int) -> dict[str, Any]:
+    selected_limit = bounded_limit(limit, MAX_STATUS_ROWS)
+    return {
+        "schema_version": OUTPUT_SCHEMA_VERSION,
+        "kind": "forgejo_actions_status",
+        "runs": [safe_status_row(row) for row in rows[:selected_limit]],
+        "truncated": len(rows) > selected_limit,
+    }
+
+
+def safe_label_count(value: object) -> int:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return 0
+    if not isinstance(value, list):
+        return 0
+    return min(len(value), 999)
+
+
+def safe_runner_row(row: dict[str, Any]) -> dict[str, Any]:
+    scope = "global"
+    if safe_int(row.get("repo_id")):
+        scope = "repo"
+    elif safe_int(row.get("owner_id")):
+        scope = "owner"
+    return {
+        "runner_id": safe_int(row.get("id")),
+        "scope": scope,
+        "last_seen": age(row.get("last_online")),
+        "label_count": safe_label_count(row.get("agent_labels")),
+    }
+
+
+def runners_payload(rows: list[dict[str, Any]], service: object) -> dict[str, Any]:
+    return {
+        "schema_version": OUTPUT_SCHEMA_VERSION,
+        "kind": "forgejo_actions_runners",
+        "service": safe_service_state(service),
+        "runners": [safe_runner_row(row) for row in rows[:MAX_RUNNERS]],
+        "truncated": len(rows) > MAX_RUNNERS,
+    }
 
 
 def latest_runs(limit: int) -> list[dict[str, Any]]:
+    selected_limit = bounded_limit(limit, MAX_STATUS_ROWS)
     return forgejo_sql(
         "select r.id, r.status, r.event, r.workflow_id, r.created, r.updated, "
         "coalesce(j.name, '-') as job_name, coalesce(j.status, 0) as job_status, "
         "coalesce(j.task_id, 0) as task_id, coalesce(j.started, 0) as started, "
         "coalesce(j.stopped, 0) as stopped "
         "from action_run r left join action_run_job j on j.run_id = r.id "
-        f"order by r.id desc limit {int(limit)}"
+        f"order by r.id desc limit {selected_limit + 1}"
     )
 
 
 def print_status(limit: int, as_json: bool) -> None:
-    rows = latest_runs(limit)
+    payload = status_payload(latest_runs(limit), limit)
     if as_json:
-        print(json.dumps(rows, indent=2))
+        print(json.dumps(payload, indent=2, sort_keys=True))
         return
-    print(f"{'RUN':>5}  {'STATUS':<9}  {'WORKFLOW':<16}  {'EVENT':<8}  {'AGE':>6}  {'DURATION':>9}  JOB")
-    for row in rows:
-        run_status = status_name(row.get("status"))
-        job_status = status_name(row.get("job_status"))
+    print(
+        f"{'RUN':>19}  {'STATUS':<9}  {'EVENT':<20}  {'AGE':>6}  {'DURATION':>9}  JOB"
+    )
+    for row in payload["runs"]:
+        run_id = row["run_id"] if row["run_id"] is not None else "-"
         print(
-            f"{row.get('id', '-'):>5}  {run_status:<9}  "
-            f"{str(row.get('workflow_id', '-')):<16}  {str(row.get('event', '-')):<8}  "
-            f"{age(row.get('created')):>6}  {duration(row.get('started'), row.get('stopped')):>9}  "
-            f"{row.get('job_name', '-')}:{job_status}"
+            f"{run_id:>19}  {row['status']:<9}  {row['event']:<20}  "
+            f"{row['age']:>6}  {row['duration']:>9}  {row['job_status']}"
         )
+    if payload["truncated"]:
+        print("additional runs omitted")
 
 
 def run_id_or_latest(value: str) -> int:
     if value != "latest":
-        return int(value)
+        run_id = safe_int(value)
+        if not run_id:
+            raise MonitorError("run identifier is invalid")
+        return run_id
     rows = forgejo_sql("select id from action_run order by id desc limit 1")
     if not rows:
         raise MonitorError("no Forgejo Actions runs found")
-    return int(rows[0]["id"])
+    run_id = safe_int(rows[0].get("id"))
+    if not run_id:
+        raise MonitorError("Forgejo monitor returned invalid data")
+    return run_id
 
 
 def run_state(run_id: int) -> dict[str, Any]:
@@ -212,9 +384,10 @@ def watch(run: str, interval: int, timeout: int) -> int:
     last = ""
     while True:
         row = run_state(run_id)
-        current = status_name(row.get("status"))
-        job = status_name(row.get("job_status"))
-        line = f"run {run_id}: {current} job {row.get('job_name', '-')}:{job} duration {duration(row.get('started'), row.get('stopped'))}"
+        safe_row = safe_status_row(row)
+        current = safe_row["status"]
+        job = safe_row["job_status"]
+        line = f"run {run_id}: {current} job {job} duration {safe_row['duration']}"
         if line != last:
             print(line, flush=True)
             last = line
@@ -229,41 +402,47 @@ def watch(run: str, interval: int, timeout: int) -> int:
 def print_runners(as_json: bool) -> None:
     rows = forgejo_sql(
         "select id, name, owner_id, repo_id, last_online, last_active, agent_labels "
-        "from action_runner order by id"
+        f"from action_runner order by id limit {MAX_RUNNERS + 1}"
     )
-    service = run_ansible_shell(
+    service_output = run_ansible_shell(
         "pct exec {{ forgejo_runner_vmid | string }} -- systemctl is-active forgejo-runner || true"
-    ).splitlines()[-1].strip()
+    )
+    service_lines = service_output.splitlines()
+    service = service_lines[-1].strip() if service_lines else "unknown"
+    payload = runners_payload(rows, service)
     if as_json:
-        print(json.dumps({"service": service, "runners": rows}, indent=2))
+        print(json.dumps(payload, indent=2, sort_keys=True))
         return
-    print(f"runner service: {service}")
-    print(f"{'ID':>3}  {'NAME':<20}  {'SCOPE':<8}  {'LAST_SEEN':>9}  LABELS")
-    for row in rows:
-        scope = "global"
-        if int(row.get("repo_id") or 0):
-            scope = "repo"
-        elif int(row.get("owner_id") or 0):
-            scope = "owner"
-        labels = row.get("agent_labels") or "[]"
-        print(f"{row.get('id', '-'):>3}  {str(row.get('name', '-')):<20}  {scope:<8}  {age(row.get('last_online')):>9}  {labels}")
+    print(f"runner service: {payload['service']}")
+    print(f"{'ID':>19}  {'SCOPE':<8}  {'LAST_SEEN':>9}  LABEL_COUNT")
+    for row in payload["runners"]:
+        runner_id = row["runner_id"] if row["runner_id"] is not None else "-"
+        print(
+            f"{runner_id:>19}  {row['scope']:<8}  "
+            f"{row['last_seen']:>9}  {row['label_count']}"
+        )
+    if payload["truncated"]:
+        print("additional runners omitted")
 
 
 def print_logs(run: str, tail: int, unsafe: bool) -> None:
     run_id = run_id_or_latest(run)
-    command = (
-        "pct exec {{ forgejo_vmid | string }} -- bash -lc "
-        + shell_quote(
-            "path=$(find /var/lib/forgejo/data/actions_log -type f -name '"
-            + str(run_id)
-            + ".log.zst' | sort | tail -n1); "
-            "if [ -z \"$path\" ]; then echo 'log not found'; exit 1; fi; "
-            "zstdcat \"$path\" | tail -n "
-            + str(int(tail))
-        )
+    command = "pct exec {{ forgejo_vmid | string }} -- bash -lc " + shell_quote(
+        "path=$(find /var/lib/forgejo/data/actions_log -type f -name '"
+        + str(run_id)
+        + ".log.zst' | sort | tail -n1); "
+        "if [ -z \"$path\" ]; then echo 'log not found'; exit 1; fi; "
+        'zstdcat "$path" | tail -n ' + str(int(tail))
     )
     text = run_ansible_shell(command)
-    print(text if unsafe else redact(text))
+    if unsafe:
+        # Deliberately available only on this direct monitor CLI. The Hermes
+        # operator adapter has a fixed status/validate/plan action allowlist
+        # and cannot dispatch this command or this flag.
+        print(text)
+        return
+    line_count = min(len(text.splitlines()), bounded_limit(tail, 10_000))
+    print(f"Forgejo log content redacted ({line_count} lines)")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -285,12 +464,24 @@ def main(argv: list[str] | None = None) -> int:
     logs = sub.add_parser("logs")
     logs.add_argument("run", nargs="?", default="latest")
     logs.add_argument("--tail", type=int, default=200)
-    logs.add_argument("--unsafe-no-redact", action="store_true")
+    logs.add_argument(
+        "--unsafe-no-redact",
+        action="store_true",
+        help="direct terminal use only; unavailable through the Hermes operator adapter",
+    )
 
     args = parser.parse_args(argv)
     global INVENTORY
-    INVENTORY = str(from_environment(REPO).path("ansible/inventory/local.yml"))
     try:
+        context = from_environment(REPO)
+        if context.site is None:
+            raise MonitorError("VALUES_SITE is required for Forgejo Actions monitoring")
+        if context.canonical_site_path is None:
+            raise MonitorError("canonical site.yaml is required")
+        inventory = verify_canonical_monitor_inputs(context)
+        if not inventory.is_file():
+            raise MonitorError("canonical generated inventory is missing")
+        INVENTORY = str(inventory)
         if args.command == "status":
             print_status(args.limit, args.json)
         elif args.command == "runners":
@@ -299,6 +490,9 @@ def main(argv: list[str] | None = None) -> int:
             return watch(args.run, args.interval, args.timeout)
         elif args.command == "logs":
             print_logs(args.run, args.tail, args.unsafe_no_redact)
+    except ValuesContextError:
+        print("Forgejo monitor context is invalid", file=sys.stderr)
+        return 2
     except MonitorError as error:
         print(error, file=sys.stderr)
         return 2

@@ -210,6 +210,38 @@ class DnsApplyTests(unittest.TestCase):
         self.assertNotIn("upserted A", buffer.getvalue())
         self.assertNotIn("upserted CNAME", buffer.getvalue())
 
+    def test_rdata_shaped_records_are_not_upserted(self) -> None:
+        """Technitium nests record values under ``rData``; convergence must hold."""
+        client = FakeClient(
+            {
+                ("example.internal", "dns.example.internal", "A"): {
+                    "type": "A",
+                    "name": "dns.example.internal",
+                    "rData": {"ipAddress": "192.0.2.53"},
+                },
+                ("apps.example.net", "app.apps.example.net", "A"): {
+                    "type": "A",
+                    "name": "app.apps.example.net",
+                    "rData": {"ipAddress": "192.0.2.20"},
+                },
+                ("example.internal", "www.example.internal", "CNAME"): {
+                    "type": "CNAME",
+                    "name": "www.example.internal",
+                    "rData": {"cname": "dns.example.internal"},
+                },
+            }
+        )
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            apply_dns.apply_config(apply_dns.validate_config(VALID_CONFIG), client)
+
+        changed_records = [
+            params
+            for path, params in client.calls
+            if path == "/zones/records/add" and params["type"] in {"A", "CNAME"}
+        ]
+        self.assertEqual(changed_records, [])
+
     def test_changed_a_record_is_upserted(self) -> None:
         client = FakeClient(
             {

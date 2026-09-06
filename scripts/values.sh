@@ -2,6 +2,7 @@
 set -euo pipefail
 
 command_name="${1:-}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 values_root="${VALUES_DIR:-values}"
 template_dir="${VALUES_TEMPLATE_DIR:-scaffold}"
 site="${VALUES_SITE:-}"
@@ -56,6 +57,10 @@ copy_if_missing() {
 
 case "${command_name}" in
   init)
+    if [[ -z "${site}" ]]; then
+      printf 'VALUES_SITE is required for canonical setup. Set VALUES_SITE=<site> and run just setup "" <site>; use explicit migration or recovery tools for legacy forensics.\n' >&2
+      exit 2
+    fi
     remote="${2:-}"
     require_template
     if [[ -e "${values_root}" && ! -d "${values_root}/.git" ]]; then
@@ -67,17 +72,18 @@ case "${command_name}" in
     fi
     install -d -m 0755 "${values_dir}"
     copy_if_missing "${template_dir}/README.md" "${values_root}/README.md"
-    copy_if_missing "${template_dir}/.env.example" "${values_dir}/.env"
-    copy_if_missing "${template_dir}/terraform.tfvars" "${values_dir}/terraform.tfvars"
-    copy_if_missing "${template_dir}/dns-records.local.json" "${values_dir}/dns-records.local.json"
-    copy_if_missing "${template_dir}/ansible/inventory/local.yml" "${values_dir}/ansible/inventory/local.yml"
-    if [[ -n "${site}" ]]; then
-      site_template="${template_dir}/sites/${site}/site.json"
-      if [[ ! -f "${site_template}" ]]; then
-        printf 'Missing site scaffold: %s\n' "${site_template}" >&2
+    site_yaml_template="${template_dir}/sites/${site}/site.yaml"
+    if [[ ! -f "${site_yaml_template}" ]]; then
+      site_yaml_template="${template_dir}/sites/_template/site.yaml"
+      if [[ ! -f "${site_yaml_template}" ]]; then
+        printf 'Missing canonical site scaffold: %s\n' "${site_yaml_template}" >&2
         exit 1
       fi
-      copy_if_missing "${site_template}" "${values_dir}/site.json"
+      if [[ ! -e "${values_dir}/site.yaml" ]]; then
+        python3 "${repo_root}/scripts/render-site-template.py" "${site_yaml_template}" "${values_dir}/site.yaml" "${site}"
+      fi
+    else
+      copy_if_missing "${site_yaml_template}" "${values_dir}/site.yaml"
     fi
     if [[ ! -d "${values_root}/.git" ]]; then
       git -C "${values_root}" init
@@ -105,12 +111,16 @@ case "${command_name}" in
     git -C "${values_root}" status --short --branch
     ;;
   check)
+    if [[ -z "${site}" ]]; then
+      printf 'VALUES_SITE is required for canonical values checks. Set VALUES_SITE=<site>, ensure values/sites/<site>/site.yaml exists, then rerun; use explicit migration or recovery tools for legacy forensics.\n' >&2
+      exit 2
+    fi
     require_values
     missing=0
-    required_paths=(.env terraform.tfvars dns-records.local.json ansible/inventory/local.yml)
-  if [[ -n "${site}" ]]; then
-    required_paths+=(site.json)
-  fi
+    # Static canonical validation is deliberately non-secret and can run
+    # immediately after `just setup "" <site>`. Protected-input commands
+    # validate the SOPS policy and encrypted bundle at their own boundary.
+    required_paths=(site.yaml)
   for path in "${required_paths[@]}"; do
       if [[ ! -f "${values_dir}/${path}" ]]; then
         printf 'Missing %s/%s\n' "${values_dir}" "${path}" >&2

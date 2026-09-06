@@ -30,6 +30,30 @@ class ValuesContext:
         return candidate
 
     @property
+    def generated_dir(self) -> Path:
+        """Return the ignored generated-artifact directory for the selected site."""
+        return self.path("generated")
+
+    def generated_path(self, name: str | Path) -> Path:
+        """Return a traversal-safe path inside the selected site's generated dir."""
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValuesContextError(f"generated path escapes selected site: {name}")
+        return self.generated_dir / relative
+
+    @property
+    def projection_manifest_path(self) -> Path:
+        return self.generated_path("manifest.json")
+
+    @property
+    def canonical_site_path(self) -> Path | None:
+        """Return the canonical site.yaml path when the selected site has one."""
+        if self.site is None:
+            return None
+        candidate = self.values_dir / "site.yaml"
+        return candidate if candidate.is_file() else None
+
+    @property
     def metadata_path(self) -> Path | None:
         if self.site is None:
             return None

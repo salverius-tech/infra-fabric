@@ -1,0 +1,5 @@
+# Public policy contract only. Replace the placeholder recipient in the private
+# values workflow before encrypting canonical site secret bundles.
+creation_rules:
+  - path_regex: '^values/sites/[^/]+/secrets\.sops\.yaml$'
+    age: age1REPLACE_WITH_SITE_RECIPIENT

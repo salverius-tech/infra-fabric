@@ -3,10 +3,16 @@
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: onramp_host
+- name: Converge canonical host identities for Onramp host
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: onramp_host
 
 - name: Prepare Debian Podman onramp host for Onramp
   hosts: onramp_host
   gather_facts: true
   become: true
+  vars:
+    caddy_cloudflare_api_token: "{{ lookup('env', 'CF_DNS_API_TOKEN') }}"
   roles:
     - onramp_host

@@ -1,6 +1,6 @@
 # PRD: Hermes Operator Pilot for Homelab Infrastructure
 
-**Status:** Active design document; onramp-host and temporary SearXNG infrastructure are implemented. The remaining scope is Hermes operator integration and approval workflow.
+**Status:** Working design — source implementation and bounded disposable-development plan, apply, health/idempotence, service restore, infrastructure recovery, read-only Hermes integration, and Hermes rollback evidence are recorded in the [acceptance matrix](../.hermes/reconciliation/acceptance-matrix.md). Provider-equivalence, isolated-recovery, production, external audit durability, authenticated dashboard/API and WebSocket acceptance, mutation approval identity, and live search smoke remain unevidenced. The [explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md) are closed; the acceptance matrix is the active environment-status authority.
 
 ## Summary
 
@@ -16,11 +16,11 @@ The homelab infrastructure workflow is repo-driven and intentionally cautious: s
 
 Hermes is now available as a managed LXC with a browser-facing dashboard. The next product question is how to use Hermes as an operator cockpit for this repository without bypassing the audited runbook workflow, leaking private values, or turning the infra repo into a general application catalog.
 
-The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `validate`, and `plan` actions. `apply` requires `--approve`, refuses missing or destructive plans without additional explicit gates, and delegates to the existing `just apply` verification path. The dashboard/gateway loads this plugin and records sanitized local action metadata under `.tmp/hermes-operator-audit.jsonl`; durable centralized audit persistence remains outstanding. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding.
+The first repository-side operator interface is `scripts/hermes-operator.py`. It provides sanitized machine-readable `status`, `audit-verify`, `validate`, and `plan` actions. The future `apply` design retains its approval, saved-plan, destructive-change, and audit-durability requirements, but every tracked canonical, deployment, CLI, plugin, and dashboard surface now rejects activation unconditionally. Environment or private configuration cannot override this hard read-only pilot gate. Reactivation requires a later reviewed source change after a trustworthy sender/principal boundary, external audit durability, and the acceptance matrix's remaining mutation-specific gates are evidenced. The dashboard/gateway loads the read-only plugin and records sanitized operator metadata in a mode-restricted, fsynced, hash-chained JSONL journal; set `HERMES_OPERATOR_AUDIT_PATH` to place that journal in private controller storage instead of the default local `.tmp/` path. The Hermes package's bundled SearXNG provider is selected when `HERMES_WEB_SEARXNG_URL` is configured; live search smoke testing remains outstanding.
 
 ## Goals
 
-- Provide a safe operator surface for the standard homelab workflow: inspect status, validate, plan, apply after approval, and summarize outcomes.
+- Provide a safe operator surface for the standard homelab workflow: inspect status, verify the audit journal, validate, plan, apply after approval, and summarize outcomes.
 - Keep `homelab-infra` as the source of truth for durable infrastructure and first-class services.
 - Keep `onramp-vNext` as the owner for general Docker app services and app catalog behavior.
 - Keep private site data in `values/` and prevent secrets, real domains, real IPs, and state from entering tracked public files or operator summaries.
@@ -60,6 +60,9 @@ Repo automation may run validation, planning, deployment, and status checks, but
 
 ### Scenario: apply a reviewed plan
 
+This is a future post-pilot scenario and is not activatable by deployment values or
+environment variables in the hard read-only pilot.
+
 1. Operator explicitly approves applying the current plan.
 2. Hermes runs the repo-native apply workflow.
 3. Apply verifies saved plan metadata before mutation.
@@ -95,8 +98,8 @@ Repo automation may run validation, planning, deployment, and status checks, but
 - OpenTofu owns Proxmox LXC shape, VMIDs, networking, storage attachments, and service enablement resources.
 - Ansible owns in-LXC service installation and configuration.
 - Technitium DNS record sync remains in Ansible, after Technitium is installed and reachable.
-- `values/terraform.tfvars` remains the source of truth for infrastructure-derived service shape.
-- Inventory should derive service hosts, VMIDs, and addresses from tfvars instead of duplicating them manually.
+- The selected canonical site model remains the source of truth for infrastructure-derived service shape.
+- Inventory should derive service hosts, VMIDs, and addresses from verified canonical projections instead of duplicating them manually.
 
 ### App-platform boundary requirements
 
@@ -121,6 +124,7 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 ## Observability and audit requirements
 
 - Hermes should capture command, repo, status, and sanitized summaries for operator actions.
+- The operator journal must be private, append-only, fsynced, hash-chained, and fail closed on malformed or tampered prior records; journal backup and independent controller durability are separate acceptance requirements.
 - Live mutation summaries must include what changed, validation run, known gaps, and next steps.
 - Failed workflows must report root cause and next safe command without dumping sensitive logs.
 - Future workflow telemetry should make plan, review, and execution quality auditable without reconstructing full transcripts.
@@ -138,7 +142,9 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 ## Dependencies
 
 - Hermes management LXC and dashboard deployment.
-- Private `values/` repo with current tfvars, inventory, DNS records, environment values, and OpenTofu state.
+- Private selected-site inputs: `site.yaml`, `secrets.sops.yaml`, private SOPS
+  policy/age identity, and required derived operational artifacts such as state,
+  plans, and trust material. Legacy files are recovery/migration-only.
 - Working local tooling container for `just validate`, `just plan`, and `just apply`.
 - Forgejo and private values repo workflow if remote deployment or monitoring is in scope.
 - `onramp-vNext` direction if plugin backends are treated as app-platform services, plus a handoff path for retiring the temporary `searxng_onramp` exception.
@@ -151,11 +157,30 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 - Private values could leak through summaries, logs, dashboard output, or copied command output.
 - Disabled services that still exist in state could confuse operators unless the UI distinguishes configured, enabled, deployed, reachable, and maintained states.
 
-## Open questions
+## Resolved pilot decisions
 
-- Which Hermes actions are in scope for the first pilot: status only, validate, plan, apply, private values commits, or Forgejo workflow monitoring?
-- Should Hermes trigger `just apply` locally, trigger Forgejo Actions, or support both with different approval paths?
-- What is the minimum audit trail required for an operator-approved apply?
-- Which onramp-host provisioning shape should a future infrastructure plan expose to `onramp-vNext`?
-- How should Hermes safely support edits to `values/` without exposing private values in transcripts or summaries?
-- What recovery path should be documented when Hermes is unavailable but infrastructure needs maintenance?
+The ten approved decisions and their implementation boundaries are recorded in the
+[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record-2026-08-06).
+For this pilot specifically:
+
+- The initial Hermes surface is read-only: status, validate, plan, sanitized
+  summaries, and read-only Forgejo monitoring.
+- A future `/infra-apply` extension may use only the designated controller's local
+  guarded apply path. Forgejo does not become a second apply authority while state is
+  local.
+- Mutation activation requires durable private append-only audit persistence,
+  trustworthy approval identity, development acceptance, and recovery verification.
+  The current stable Hermes slash-command API passes only raw argument text to plugin
+  handlers and does not expose a trusted sender identity; the dashboard bridge also
+  has no accepted principal-propagation contract. Until those gates are evidenced,
+  tracked source hard-disables mutation at canonical validation, role/runtime, CLI,
+  plugin, and dashboard boundaries. Reactivation is a separate reviewed source change,
+  not a values or environment toggle.
+- The Onramp handoff is a versioned non-secret Debian 13 VM shared-host substrate;
+  Onramp owns applications but receives no Proxmox lifecycle authority.
+- Private-values editing is excluded from the pilot. Any future feature uses typed,
+  expiring proposals and a protected input channel outside transcripts, with separate
+  apply, commit, and push approvals.
+- Hermes is not a recovery dependency. Trusted operators retain the same canonical
+  controller workflow, audit continuity, and dependency-ordered recovery path when
+  Hermes is unavailable.

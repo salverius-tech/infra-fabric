@@ -33,7 +33,6 @@ locals {
     backup           = false
     read_only        = false
   }
-  forgejo_runtime        = lookup(var.service_runtime, "forgejo", { type = var.forgejo_runtime.type, cloud_init_user = null })
   forgejo_runtime_type   = local.forgejo_runtime.type
   forgejo_storage        = lookup(var.service_storage, "forgejo", {})
   forgejo_data_storage   = lookup(local.forgejo_storage, "data", local.forgejo_default_data_storage)
@@ -113,8 +112,7 @@ module "forgejo" {
   ipv4_address  = var.forgejo_container_ipv4_address
   ipv4_gateway  = var.forgejo_container_ipv4_gateway
 
-  root_password   = var.lxc_root_password
-  ssh_public_keys = var.lxc_ssh_public_keys
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "forgejo", [])
 
   network = {
     bridge      = var.forgejo_container_bridge
@@ -144,14 +142,15 @@ module "forgejo_vm" {
   tags        = ["forgejo", "git", "opentofu"]
 
   cores     = var.forgejo_container_cores
+  cpu_type  = local.vm_cpu_type["forgejo"]
   memory_mb = var.forgejo_container_memory_mb
 
   image = {
-    datastore_id = var.forgejo_vm_image_datastore_id
-    url          = var.forgejo_vm_image_url
-    file_name    = var.forgejo_vm_image_file_name
-    file_id      = local.onramp_host_enabled ? proxmox_download_file.debian_13_onramp_host_image[0].id : null
-    create       = !local.onramp_host_enabled
+    datastore_id = var.guest_vm_image_datastore_id
+    url          = var.guest_vm_image_url
+    file_name    = var.guest_vm_image_file_name
+    file_id      = local.onramp_host_enabled ? proxmox_download_file.debian_13_onramp_host_image[0].id : proxmox_download_file.debian_13_service_vm_image[0].id
+    create       = false
   }
 
   disk = {
@@ -164,8 +163,8 @@ module "forgejo_vm" {
   ipv4_address  = var.forgejo_container_ipv4_address
   ipv4_gateway  = var.forgejo_container_ipv4_gateway
 
-  cloud_init_user = var.forgejo_vm_cloud_init_user
-  ssh_public_keys = var.lxc_ssh_public_keys
+  cloud_init_user = var.bootstrap_ssh_user
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "forgejo", [])
 
   network = {
     bridge      = var.forgejo_container_bridge

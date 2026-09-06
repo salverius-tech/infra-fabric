@@ -1,0 +1,1670 @@
+#!/usr/bin/env python3
+"""Strict loader and identity helpers for canonical site values.
+
+This module intentionally owns only the public, non-secret site model. Secret
+loading and consumer projections are separate phases of the migration.
+"""
+from __future__ import annotations
+
+import hashlib
+import ipaddress
+import json
+import re
+from pathlib import Path
+from pathlib import PurePosixPath
+from typing import Any, Literal, Mapping
+from urllib.parse import urlsplit
+
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, ValidationError, field_validator, model_validator
+from ruamel.yaml import YAML
+from ruamel.yaml.constructor import DuplicateKeyError
+from ruamel.yaml.parser import ParserError
+from ruamel.yaml.tokens import AliasToken, AnchorToken
+
+from service_catalog import ServiceCatalogError, load_catalog
+
+
+class CanonicalValuesError(ValueError):
+    """Raised when a canonical site document cannot be safely loaded."""
+
+
+_IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
+_IMAGE_IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
+_HOSTNAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,253}[a-z0-9])?$")
+_PORT_NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
+_CIDR_RE = re.compile(r"^(?:dhcp|(?:[0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2})$")
+_MAC_RE = re.compile(r"^[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}$")
+_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_CHECKSUM_RE = re.compile(r"^[0-9a-fA-F]{64}|[0-9a-fA-F]{128}$")
+_HERMES_TAG_RE = re.compile(r"^v[0-9]{4}\.[0-9]+\.[0-9]+(?:\.[0-9]+)?$")
+_HERMES_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_HERMES_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+_HERMES_USER_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
+_SSH_PUBLIC_KEY_RE = re.compile(r"^(?:ssh-(?:ed25519|rsa)|ecdsa-sha2-nistp(?:256|384|521))\s+\S+(?:\s+.*)?$")
+_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$")
+_ARTIFACT_VERSION_RE = re.compile(r"^v?[0-9]+(?:\.[0-9]+){1,3}(?:[-+][0-9a-z][0-9a-z.-]*)?$")
+
+
+def normalize_container_image_reference(reference: str) -> tuple[str, str]:
+    """Split an immutable lowercase container reference into image and digest."""
+    if not isinstance(reference, str) or reference != reference.strip() or reference.count("@") != 1:
+        raise CanonicalValuesError("container image must use repository@sha256:digest")
+    image, digest = reference.split("@", 1)
+    if not image or image != image.lower() or any(char.isspace() for char in image):
+        raise CanonicalValuesError("container image repository must be lowercase and non-empty")
+    if not _DIGEST_RE.fullmatch(digest):
+        raise CanonicalValuesError("container image digest must be lowercase sha256")
+    return image, digest
+
+
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+
+class SiteMetadata(StrictModel):
+    name: StrictStr
+    class_: StrictStr = Field(alias="class")
+    lifecycle: Literal["disposable", "persistent", "protected"]
+    allow_apply: StrictBool
+    allow_destroy: StrictBool
+
+    model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        if not _IDENTIFIER_RE.fullmatch(value):
+            raise ValueError("site.name must be a lowercase DNS-safe identifier")
+        return value
+
+    @model_validator(mode="after")
+    def validate_policy(self) -> "SiteMetadata":
+        if self.class_ == "production" and self.lifecycle == "disposable":
+            raise ValueError("production sites cannot use disposable lifecycle")
+        if self.class_ == "production" and self.allow_destroy:
+            raise ValueError("production sites cannot allow destroy")
+        if self.lifecycle == "protected" and (self.allow_apply or self.allow_destroy):
+            raise ValueError("protected sites cannot allow apply or destroy")
+        return self
+
+
+class DNSSettings(StrictModel):
+    forwarders: list[StrictStr]
+    forwarder_protocol: Literal["Udp", "Tcp", "Tls", "Https"]
+    concurrent_forwarding: StrictBool
+    dnssec_validation: StrictBool
+    prefer_ipv6: StrictBool
+
+    @field_validator("forwarders")
+    @classmethod
+    def validate_forwarders(cls, value: list[str]) -> list[str]:
+        if not value or any(not item.strip() or any(ord(char) < 32 for char in item) for item in value):
+            raise ValueError("platform.dns.settings.forwarders must be non-empty printable strings")
+        return value
+
+
+class PlatformDNS(StrictModel):
+    enabled: StrictBool = False
+    provider: Literal["technitium"] = "technitium"
+    default_ttl: StrictInt = 300
+    settings: DNSSettings | None = None
+    zones: dict[StrictStr, list[StrictStr]] = Field(default_factory=dict)
+    a_records: dict[StrictStr, StrictStr] = Field(default_factory=dict)
+    cname_records: dict[StrictStr, StrictStr] = Field(default_factory=dict)
+
+    @field_validator("default_ttl")
+    @classmethod
+    def validate_ttl(cls, value: int) -> int:
+        if not 0 <= value <= 86400:
+            raise ValueError("platform.dns.default_ttl must be between 0 and 86400")
+        return value
+
+    @model_validator(mode="after")
+    def validate_records(self) -> "PlatformDNS":
+        def hostname(value: str, field: str) -> str:
+            normalized = value.lower().rstrip(".")
+            if not _HOSTNAME_RE.fullmatch(normalized):
+                raise ValueError(f"{field} must be a valid hostname")
+            return normalized
+
+        def normalize_map(values: dict[str, Any], field: str) -> dict[str, Any]:
+            normalized: dict[str, Any] = {}
+            for key, value in values.items():
+                name = hostname(key, f"{field} key")
+                if name in normalized:
+                    raise ValueError(f"{field} contains duplicate normalized name: {name}")
+                normalized[name] = value
+            return normalized
+
+        zones = normalize_map(self.zones, "platform.dns.zones")
+        if any(not forwarders for forwarders in zones.values()):
+            raise ValueError("platform.dns.zones entries must contain at least one forwarder")
+        a_records = normalize_map(self.a_records, "platform.dns.a_records")
+        cname_records = normalize_map(self.cname_records, "platform.dns.cname_records")
+        if set(a_records) & set(cname_records):
+            raise ValueError("platform.dns.a_records and cname_records must not overlap")
+        for domain, address in a_records.items():
+            try:
+                a_records[domain] = str(ipaddress.IPv4Address(address))
+            except ipaddress.AddressValueError as error:
+                raise ValueError(f"platform.dns.a_records.{domain} must be an IPv4 address") from error
+        for domain, target in cname_records.items():
+            cname_records[domain] = hostname(target, f"platform.dns.cname_records.{domain}")
+        for domain in (*a_records, *cname_records):
+            if zones and not any(domain == zone or domain.endswith(f".{zone}") for zone in zones):
+                raise ValueError(f"platform.dns record has no configured zone: {domain}")
+        if self.enabled and (not zones or self.settings is None):
+            raise ValueError("enabled platform.dns requires settings and at least one zone")
+        if not self.enabled and (zones or a_records or cname_records or self.settings is not None):
+            raise ValueError("platform.dns records/settings require enabled: true")
+        self.zones = zones
+        self.a_records = a_records
+        self.cname_records = cname_records
+        return self
+
+
+class PlatformIngress(StrictModel):
+    class Acme(StrictModel):
+        email: StrictStr | None = None
+
+    class Cloudflare(StrictModel):
+        account_email: StrictStr | None = None
+        secret_ref: StrictStr = "secrets.providers.cloudflare.api_token"
+
+    acme: Acme = Field(default_factory=Acme)
+    dns_providers: dict[Literal["cloudflare"], Cloudflare] = Field(default_factory=dict)
+
+
+class ProxmoxManagement(StrictModel):
+    host: StrictStr
+    user: StrictStr = "root"
+    ssh_public_key: StrictStr
+    ssh_private_key_secret_ref: Literal["secrets.providers.proxmox.ssh_private_key"] = "secrets.providers.proxmox.ssh_private_key"
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str) -> str:
+        normalized = value.lower().rstrip(".")
+        if not _HOSTNAME_RE.fullmatch(normalized):
+            raise ValueError("platform.proxmox.management.host must be a valid hostname")
+        return normalized
+
+    @field_validator("ssh_public_key")
+    @classmethod
+    def validate_ssh_public_key(cls, value: str | None) -> str | None:
+        if value is not None and not _SSH_PUBLIC_KEY_RE.fullmatch(value):
+            raise ValueError("platform.proxmox.management.ssh_public_key must be a valid SSH public key")
+        return value
+
+class ProxmoxPlatform(StrictModel):
+    endpoint: StrictStr
+    node: StrictStr
+    insecure: StrictBool = False
+    management: ProxmoxManagement | None = None
+
+
+class NetworkDefaults(StrictModel):
+    default_bridge: StrictStr | None = None
+    default_gateway: StrictStr | None = None
+    default_dns_servers: list[StrictStr] = Field(default_factory=list)
+    default_search_domain: StrictStr | None = None
+    default_vlan_id: StrictInt | None = None
+
+
+class StorageDefaults(StrictModel):
+    rootfs_datastore: StrictStr
+    template_datastore: StrictStr
+    backup_datastore: StrictStr | None = None
+
+
+class ImageChecksum(StrictModel):
+    algorithm: Literal["sha256", "sha512"]
+    value: StrictStr
+
+    @field_validator("value")
+    @classmethod
+    def validate_checksum(cls, value: str) -> str:
+        if not _CHECKSUM_RE.fullmatch(value):
+            raise ValueError("checksum must be a SHA-256 or SHA-512 hexadecimal digest")
+        return value.lower()
+
+    @model_validator(mode="after")
+    def validate_algorithm_length(self) -> "ImageChecksum":
+        expected = 64 if self.algorithm == "sha256" else 128
+        if len(self.value) != expected:
+            raise ValueError(f"{self.algorithm} checksum must contain {expected} hex characters")
+        return self
+
+
+class ImageDefinition(StrictModel):
+    type: Literal["lxc_template", "vm_image"]
+    datastore_id: StrictStr | None = None
+    url: StrictStr
+    file_name: StrictStr
+    checksum: ImageChecksum
+
+    @model_validator(mode="after")
+    def validate_datastore_ownership(self) -> "ImageDefinition":
+        if self.type == "vm_image" and not self.datastore_id:
+            raise ValueError("vm images require datastore_id ownership")
+        if self.type == "lxc_template" and self.datastore_id is not None:
+            raise ValueError("lxc templates use platform storage template_datastore")
+        return self
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("image url must be an HTTP(S) URL without credentials or fragments")
+        return value
+
+    @field_validator("file_name")
+    @classmethod
+    def validate_file_name(cls, value: str) -> str:
+        if value in {".", ".."} or "/" in value or "\\\\" in value or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,254}", value):
+            raise ValueError("image file_name must be a safe pathless filename")
+        return value
+
+
+class PlatformImages(StrictModel):
+    lxc: dict[str, ImageDefinition] = Field(default_factory=dict)
+    vm: dict[str, ImageDefinition] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_image_keys(self) -> "PlatformImages":
+        for family, definitions, expected_type in (
+            ("lxc", self.lxc, "lxc_template"),
+            ("vm", self.vm, "vm_image"),
+        ):
+            for name, definition in definitions.items():
+                if not _IMAGE_IDENTIFIER_RE.fullmatch(name):
+                    raise ValueError(f"platform.images.{family} keys must be lowercase identifiers")
+                if definition.type != expected_type:
+                    raise ValueError(f"platform.images.{family}.{name} type does not match its image family")
+        return self
+
+
+class Platform(StrictModel):
+    proxmox: ProxmoxPlatform
+    network: NetworkDefaults
+    storage: StorageDefaults
+    dns: PlatformDNS = Field(default_factory=PlatformDNS)
+    ingress: PlatformIngress = Field(default_factory=PlatformIngress)
+    vm_cloud_init_user: StrictStr | None = None
+    lxc_template_download_timeout_seconds: StrictInt | None = None
+    images: PlatformImages = Field(default_factory=PlatformImages)
+
+    @field_validator("vm_cloud_init_user")
+    @classmethod
+    def validate_vm_cloud_init_user(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("platform.vm_cloud_init_user must be a valid Linux user identifier")
+        return value
+
+    @field_validator("lxc_template_download_timeout_seconds")
+    @classmethod
+    def validate_lxc_template_download_timeout(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("platform.lxc_template_download_timeout_seconds must be positive")
+        return value
+
+
+class ResourceIdentity(StrictModel):
+    vmid: StrictInt
+    hostname: StrictStr
+    description: StrictStr | None = None
+
+    @field_validator("vmid")
+    @classmethod
+    def validate_vmid(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("resource identity.vmid must be positive")
+        return value
+
+    @field_validator("hostname")
+    @classmethod
+    def validate_hostname(cls, value: str) -> str:
+        normalized = value.lower().rstrip(".")
+        if not _HOSTNAME_RE.fullmatch(normalized):
+            raise ValueError("resource identity.hostname must be a valid hostname")
+        return normalized
+
+
+class ResourceNetwork(StrictModel):
+    address: StrictStr
+    expected_address: StrictStr | None = None
+    gateway: StrictStr | None = None
+    mac_address: StrictStr | None = None
+    bridge: StrictStr | None = None
+    vlan_id: StrictInt | None = None
+    dns_servers: list[StrictStr] = Field(default_factory=list)
+    search_domain: StrictStr | None = None
+
+    @field_validator("address")
+    @classmethod
+    def validate_address(cls, value: str) -> str:
+        if not _CIDR_RE.fullmatch(value):
+            raise ValueError("network.address must be dhcp or an IPv4 CIDR")
+        return value
+
+    @field_validator("expected_address")
+    @classmethod
+    def validate_expected_address(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError as error:
+                raise ValueError("network.expected_address must be an IPv4 address") from error
+            if address.version != 4:
+                raise ValueError("network.expected_address must be an IPv4 address")
+        return value
+
+    @field_validator("gateway")
+    @classmethod
+    def validate_gateway(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError as error:
+                raise ValueError("network.gateway must be an IPv4 address") from error
+            if address.version != 4:
+                raise ValueError("network.gateway must be an IPv4 address")
+        return value
+
+    @field_validator("mac_address")
+    @classmethod
+    def validate_mac_address(cls, value: str | None) -> str | None:
+        if value is not None:
+            if not _MAC_RE.fullmatch(value):
+                raise ValueError("network.mac_address must be six colon-separated hexadecimal octets")
+            return value.lower()
+        return value
+
+    @model_validator(mode="after")
+    def validate_dhcp_policy(self) -> "ResourceNetwork":
+        if self.address == "dhcp" and self.gateway is not None:
+            raise ValueError("DHCP resources cannot declare a static gateway")
+        if self.address != "dhcp" and self.expected_address is not None:
+            raise ValueError("static resources cannot declare expected_address")
+        return self
+
+
+class ResourceCompute(StrictModel):
+    cores: StrictInt
+    memory_mb: StrictInt
+    swap_mb: StrictInt = 0
+    cpu_type: Literal["x86-64-v2-AES", "x86-64-v3"] | None = None
+
+    @model_validator(mode="after")
+    def validate_sizes(self) -> "ResourceCompute":
+        if self.cores <= 0 or self.memory_mb <= 0 or self.swap_mb < 0:
+            raise ValueError("resource compute values must be positive, with non-negative swap")
+        return self
+
+
+class ResourceVolume(StrictModel):
+    type: Literal["proxmox_volume", "directory", "bind"]
+    storage_id: StrictStr | None = None
+    size_gb: StrictInt | None = None
+    target: StrictStr
+    backup: StrictBool = True
+    read_only: StrictBool = False
+
+    @field_validator("size_gb")
+    @classmethod
+    def validate_size(cls, value: int | None) -> int | None:
+        if value is not None and value <= 0:
+            raise ValueError("storage volume size_gb must be positive")
+        return value
+
+
+class ResourceStorage(StrictModel):
+    root: ResourceVolume
+    volumes: dict[str, ResourceVolume] = Field(default_factory=dict)
+
+
+class ResourceRuntime(StrictModel):
+    started: StrictBool = True
+    start_on_boot: StrictBool = True
+    cloud_init_user: StrictStr | None = None
+
+    @field_validator("cloud_init_user")
+    @classmethod
+    def validate_cloud_init_user(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("resource runtime.cloud_init_user must be a valid Linux user identifier")
+        return value
+    unprivileged: StrictBool | None = None
+    nesting: StrictBool | None = None
+    features: dict[str, StrictBool] = Field(default_factory=dict)
+    template: dict[str, StrictStr] | None = None
+    firmware: Literal["uefi", "seabios"] | None = None
+    machine: StrictStr | None = None
+    guest_agent: StrictBool | None = None
+    cloud_init: dict[str, Any] | None = None
+    users: dict[str, dict[str, Any]] = Field(default_factory=dict)
+
+
+class ResourceSecurity(StrictModel):
+    password_authentication: StrictBool | None = None
+    permit_root_login: StrictBool | None = None
+    deploy_user: StrictStr | None = None
+    deploy_dir: StrictStr | None = None
+    allow_passwordless_sudo: StrictBool | None = None
+    allowed_ssh_cidrs: list[StrictStr] = Field(default_factory=list)
+    ssh_public_keys: list[StrictStr] = Field(default_factory=list)
+
+    @field_validator("deploy_user")
+    @classmethod
+    def validate_deploy_user(cls, value: str | None) -> str | None:
+        if value is not None and (
+            value == "root" or not _HERMES_USER_RE.fullmatch(value)
+        ):
+            raise ValueError(
+                "resource security.deploy_user must be a non-root Linux user identifier"
+            )
+        return value
+
+    @field_validator("deploy_dir")
+    @classmethod
+    def validate_deploy_dir(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        path = PurePosixPath(value)
+        if (
+            not re.fullmatch(r"/[A-Za-z0-9_./:-]+", value)
+            or value != str(path)
+            or ".." in path.parts
+        ):
+            raise ValueError(
+                "resource security.deploy_dir must be a normalized absolute POSIX path"
+            )
+        return value
+
+
+class ReviewedArtifactPin(StrictModel):
+    """A reviewed, architecture-specific executable cache identity."""
+
+    version: StrictStr
+    checksums: dict[Literal["amd64", "arm64"], StrictStr]
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str) -> str:
+        if not _ARTIFACT_VERSION_RE.fullmatch(value):
+            raise ValueError("reviewed artifact version must be a lowercase semantic version")
+        return value
+
+    @field_validator("checksums")
+    @classmethod
+    def validate_checksums(cls, value: dict[str, str]) -> dict[str, str]:
+        if set(value) != {"amd64", "arm64"} or any(not _SHA256_HEX_RE.fullmatch(digest) for digest in value.values()):
+            raise ValueError("reviewed artifact pins require lowercase amd64 and arm64 SHA-256 checksums")
+        return value
+
+
+class SharedHostArtifacts(StrictModel):
+    caddy_cloudflare: ReviewedArtifactPin | None = None
+
+
+class Resource(StrictModel):
+    type: Literal["lxc", "vm"]
+    identity: ResourceIdentity
+    network: ResourceNetwork
+    compute: ResourceCompute
+    storage: ResourceStorage
+    runtime: ResourceRuntime
+    security: ResourceSecurity = Field(default_factory=ResourceSecurity)
+    artifacts: SharedHostArtifacts = Field(default_factory=SharedHostArtifacts)
+
+    @model_validator(mode="after")
+    def validate_runtime_fields(self) -> "Resource":
+        runtime = self.runtime
+        if self.type == "lxc" and self.compute.cpu_type is not None:
+            raise ValueError("VM-only compute.cpu_type is not valid on LXC resources")
+        if self.type == "vm" and self.compute.cpu_type is None:
+            self.compute.cpu_type = "x86-64-v2-AES"
+        if self.type == "lxc" and any(value is not None for value in (runtime.firmware, runtime.machine, runtime.guest_agent, runtime.cloud_init)):
+            raise ValueError("VM-only runtime fields are not valid on LXC resources")
+        if self.type == "vm" and any(value is not None for value in (runtime.unprivileged, runtime.nesting)):
+            raise ValueError("LXC-only runtime fields are not valid on VM resources")
+        return self
+
+
+class Resources(StrictModel):
+    guests: dict[str, Resource] = Field(default_factory=dict)
+    shared_hosts: dict[str, Resource] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_ids(self) -> "Resources":
+        all_items = [*self.guests.items(), *self.shared_hosts.items()]
+        names = [name for name, _ in all_items]
+        if len(names) != len(set(names)):
+            raise ValueError("resource identifiers must be unique across guests and shared_hosts")
+        vmids = [resource.identity.vmid for _, resource in all_items]
+        if len(vmids) != len(set(vmids)):
+            raise ValueError("resource VMIDs must be unique")
+        hostnames = [resource.identity.hostname for _, resource in all_items]
+        if len(hostnames) != len(set(hostnames)):
+            raise ValueError("resource hostnames must be unique")
+        addresses: list[tuple[str, ipaddress.IPv4Address]] = []
+        for name, resource in all_items:
+            if resource.network.address == "dhcp":
+                continue
+            try:
+                interface = ipaddress.ip_interface(resource.network.address)
+            except ValueError as error:
+                raise ValueError(f"resources.{name}.network.address must be a valid IPv4 CIDR") from error
+            if interface.version != 4:
+                raise ValueError(f"resources.{name}.network.address must be an IPv4 CIDR")
+            for other_name, other_address in addresses:
+                if interface.ip == other_address:
+                    raise ValueError(f"resource network addresses duplicate: {name} ({interface.ip}) and {other_name} ({other_address})")
+            addresses.append((name, interface.ip))
+        return self
+
+
+class ForgejoDatabaseConfiguration(StrictModel):
+    """Non-secret Forgejo database selection and connection metadata."""
+
+    type: Literal["sqlite", "postgres"] = "sqlite"
+    managed: StrictBool = True
+    host: StrictStr = "127.0.0.1"
+    port: StrictInt = 5432
+    name: StrictStr = "forgejo"
+    user: StrictStr = "forgejo"
+    ssl_mode: StrictStr = "disable"
+
+    @field_validator("port")
+    @classmethod
+    def validate_port(cls, value: int) -> int:
+        if not 1 <= value <= 65535:
+            raise ValueError("Forgejo database port must be between 1 and 65535")
+        return value
+
+    @model_validator(mode="after")
+    def validate_postgres_identifiers(self) -> "ForgejoDatabaseConfiguration":
+        if self.type == "postgres":
+            identifier = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+            if not identifier.fullmatch(self.name) or not identifier.fullmatch(self.user):
+                raise ValueError("PostgreSQL Forgejo database name and user must be SQL identifiers")
+        return self
+
+
+class CaddyUpstream(StrictModel):
+    host: StrictStr
+    port: StrictInt
+
+    @field_validator("port")
+    @classmethod
+    def validate_port(cls, value: int) -> int:
+        if not 1 <= value <= 65535:
+            raise ValueError("Caddy upstream port must be between 1 and 65535")
+        return value
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str) -> str:
+        try:
+            ipaddress.ip_address(value)
+            return value
+        except ValueError:
+            normalized = value.lower().rstrip(".")
+            if not _HOSTNAME_RE.fullmatch(normalized):
+                raise ValueError("Caddy upstream host must be an IP address or hostname")
+            return normalized
+
+
+class CaddyVHost(StrictModel):
+    server_names: list[StrictStr]
+    upstream: CaddyUpstream
+
+    @field_validator("server_names")
+    @classmethod
+    def validate_server_names(cls, value: list[str]) -> list[str]:
+        normalized = [name.lower().rstrip(".") for name in value]
+        if not normalized or any(not _HOSTNAME_RE.fullmatch(name) for name in normalized):
+            raise ValueError("Caddy vhost server_names must contain valid hostnames")
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("Caddy vhost server_names must be unique")
+        return normalized
+
+
+class CaddyTLS(StrictModel):
+    dns_provider: Literal["cloudflare"]
+    resolvers: list[StrictStr] = Field(default_factory=lambda: ["1.1.1.1"])
+
+
+class CaddyConfiguration(StrictModel):
+    enabled: StrictBool = True
+    server_names: list[StrictStr]
+    upstream: CaddyUpstream
+    extra_vhosts: list[CaddyVHost] = Field(default_factory=list)
+    tls: CaddyTLS
+    artifact: ReviewedArtifactPin | None = None
+
+    @field_validator("server_names")
+    @classmethod
+    def validate_server_names(cls, value: list[str]) -> list[str]:
+        normalized = [name.lower().rstrip(".") for name in value]
+        if not normalized or any(not _HOSTNAME_RE.fullmatch(name) for name in normalized):
+            raise ValueError("Caddy server_names must contain valid hostnames")
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("Caddy server_names must be unique")
+        return normalized
+
+    @model_validator(mode="after")
+    def require_reviewed_artifact_when_enabled(self) -> "CaddyConfiguration":
+        if self.enabled and self.artifact is None:
+            raise ValueError("enabled Caddy configuration requires a reviewed artifact pin")
+        return self
+
+
+class TechnitiumConfiguration(StrictModel):
+    """Typed non-secret Technitium API and Caddy configuration."""
+
+    api_url: StrictStr | None = None
+    admin_user: StrictStr | None = None
+    caddy: CaddyConfiguration | None = None
+
+    @field_validator("api_url")
+    @classmethod
+    def validate_api_url(cls, value: str | None) -> str | None:
+        if value is not None:
+            parsed = urlsplit(value)
+            if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.username or parsed.password:
+                raise ValueError("Technitium API URL must be an HTTP(S) URL without credentials")
+        return value
+
+
+class SearxngConfiguration(StrictModel):
+    """Typed non-secret SearXNG host publication and instance settings."""
+
+    container_port: StrictInt | None = None
+    bind_address: StrictStr | None = None
+    instance_name: StrictStr | None = None
+    enable_public_url: StrictBool | None = None
+
+    @field_validator("container_port")
+    @classmethod
+    def validate_container_port(cls, value: int | None) -> int | None:
+        if value is not None and not 1 <= value <= 65535:
+            raise ValueError("SearXNG container port must be between 1 and 65535")
+        return value
+
+    @field_validator("bind_address")
+    @classmethod
+    def validate_bind_address(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError as error:
+                raise ValueError("SearXNG bind address must be an IP address") from error
+            if address.is_unspecified or not address.is_loopback:
+                raise ValueError("SearXNG bind address must be loopback-only")
+        return value
+
+
+class ForgejoRunnerHost(StrictModel):
+    name: StrictStr
+    address: StrictStr
+
+
+class ForgejoRunnerConfiguration(StrictModel):
+    """Typed non-secret Forgejo Runner registration metadata."""
+
+    url: StrictStr | None = None
+    name: StrictStr | None = None
+    scope: StrictStr | None = None
+    label: StrictStr | None = None
+    labels: list[StrictStr] | None = None
+    hosts: list[ForgejoRunnerHost] | None = None
+    compose_artifact: ReviewedArtifactPin | None = None
+    just_artifact: ReviewedArtifactPin | None = None
+    runner_artifact: ReviewedArtifactPin | None = None
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str | None) -> str | None:
+        if value is not None:
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise ValueError("Forgejo Runner URL must be HTTPS without credentials")
+        return value
+
+
+class TailscaleConfiguration(StrictModel):
+    """Typed non-secret Tailscale restore and networking behavior."""
+
+    restore_backup: StrictBool | None = None
+    backup_archive: StrictStr | None = None
+    enable_ip_forwarding: StrictBool | None = None
+    up_args: list[StrictStr] | None = None
+
+
+class ResourceOwnedConfiguration(StrictModel):
+    """Explicit empty service configuration for resource-owned boundaries."""
+
+
+class InfisicalConfiguration(StrictModel):
+    """Typed non-secret Infisical storage and database identity settings."""
+
+    data_dir: StrictStr | None = None
+    postgres_user: StrictStr | None = None
+    postgres_db: StrictStr | None = None
+    caddy_artifact: ReviewedArtifactPin | None = None
+    compose_artifact: ReviewedArtifactPin | None = None
+
+
+class InfisicalOnrampConfiguration(StrictModel):
+    """Typed non-secret Infisical onramp deployment settings."""
+
+    base_dir: StrictStr | None = None
+    container_port: StrictInt | None = None
+    bind_address: StrictStr | None = None
+    compose_provider_command: StrictStr | None = None
+    version: StrictStr | None = None
+    postgres_user: StrictStr | None = None
+    postgres_db: StrictStr | None = None
+    required_packages: list[StrictStr] = Field(default_factory=list)
+
+    @field_validator("container_port")
+    @classmethod
+    def validate_container_port(cls, value: int | None) -> int | None:
+        if value is not None and not 1 <= value <= 65535:
+            raise ValueError("Infisical onramp container_port must be between 1 and 65535")
+        return value
+
+    @field_validator("bind_address")
+    @classmethod
+    def validate_bind_address(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                address = ipaddress.ip_address(value)
+            except ValueError as error:
+                raise ValueError("Infisical onramp bind_address must be an IP address") from error
+            if not address.is_loopback:
+                raise ValueError("Infisical onramp bind_address must be loopback-only")
+        return value
+
+    @field_validator("base_dir")
+    @classmethod
+    def validate_base_dir(cls, value: str | None) -> str | None:
+        if value is not None:
+            path = PurePosixPath(value)
+            if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+                raise ValueError("Infisical onramp base_dir must be a normalized absolute POSIX path")
+        return value
+
+    @field_validator("compose_provider_command")
+    @classmethod
+    def validate_compose_command(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"[A-Za-z0-9_.-]+", value):
+            raise ValueError("Infisical onramp compose_provider_command must be a simple executable name")
+        return value
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str | None) -> str | None:
+        if value is not None and (not value.strip() or any(char.isspace() for char in value)):
+            raise ValueError("Infisical onramp version must be a non-whitespace image tag or digest")
+        return value
+
+    @field_validator("postgres_user", "postgres_db")
+    @classmethod
+    def validate_postgres_identifier(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+            raise ValueError("Infisical onramp PostgreSQL identifiers must be SQL identifiers")
+        return value
+
+    @field_validator("required_packages")
+    @classmethod
+    def validate_required_packages(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)) or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9+_.-]*", item) for item in value):
+            raise ValueError("Infisical onramp required_packages must be unique package identifiers")
+        return value
+
+
+class ForgejoConfiguration(StrictModel):
+    """Typed non-secret Forgejo role configuration."""
+
+    database: ForgejoDatabaseConfiguration = Field(default_factory=ForgejoDatabaseConfiguration)
+    enable_caddy: StrictBool | None = None
+    configure_system_ssh: StrictBool | None = None
+    write_initial_config: StrictBool | None = None
+    bootstrap_enabled: StrictBool | None = None
+    bootstrap_admin_username: StrictStr | None = None
+    bootstrap_admin_email: StrictStr | None = None
+    bootstrap_owner_email: StrictStr | None = None
+    bootstrap_repo: StrictStr | None = None
+    actions_enabled: StrictBool | None = None
+    actions_default_url: StrictStr | None = None
+    caddy_artifact: ReviewedArtifactPin | None = None
+
+    @field_validator("bootstrap_repo")
+    @classmethod
+    def validate_bootstrap_repo(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*", value):
+            raise ValueError("Forgejo bootstrap_repo must be in owner/repository form")
+        return value
+
+    @field_validator("actions_default_url")
+    @classmethod
+    def validate_actions_url(cls, value: str | None) -> str | None:
+        if value is not None:
+            parsed = urlsplit(value)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+                raise ValueError("Forgejo Actions default URL must be an HTTPS URL without credentials")
+        return value
+
+    @model_validator(mode="after")
+    def require_reviewed_caddy_artifact(self) -> "ForgejoConfiguration":
+        if self.enable_caddy and self.caddy_artifact is None:
+            raise ValueError("Forgejo Caddy requires a reviewed artifact pin")
+        return self
+
+
+class SssfConfiguration(StrictModel):
+    """Typed non-secret configuration for the Super Simple Software Factory VM."""
+
+    runtime_user: StrictStr = "sssf"
+    workspace_root: StrictStr = "/srv/sssf/workspaces"
+    data_dir: StrictStr = "/var/lib/sssf"
+    config_path: StrictStr = "/etc/sssf/sssf.config.yaml"
+    upstream_repository: StrictStr = "https://github.com/disler/super-simple-software-factory"
+    pi_path: StrictStr = "/usr/local/bin/pi"
+    uv_path: StrictStr = "/usr/local/bin/uv"
+    visualizer_enabled: StrictBool = False
+    visualizer_host: StrictStr = "127.0.0.1"
+    visualizer_port: StrictInt = 4600
+    allowed_repositories: list[StrictStr] = Field(default_factory=list)
+    provider: Literal["openrouter", "openai", "fireworks"] = "openrouter"
+
+    @field_validator("runtime_user")
+    @classmethod
+    def validate_runtime_user(cls, value: str) -> str:
+        if value == "root" or not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("SSSF runtime_user must be a non-root Linux user identifier")
+        return value
+
+    @field_validator("workspace_root", "data_dir", "config_path", "pi_path", "uv_path")
+    @classmethod
+    def validate_absolute_paths(cls, value: str) -> str:
+        path = PurePosixPath(value)
+        if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("SSSF paths must be normalized absolute POSIX paths")
+        return value
+
+    @field_validator("upstream_repository", "allowed_repositories")
+    @classmethod
+    def validate_https_repositories(cls, value: str | list[str]) -> str | list[str]:
+        values = [value] if isinstance(value, str) else value
+        for repository in values:
+            parsed = urlsplit(repository)
+            if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+                raise ValueError("SSSF repositories must be HTTPS URLs without credentials or fragments")
+        return value
+
+    @field_validator("visualizer_host")
+    @classmethod
+    def validate_visualizer_host(cls, value: str) -> str:
+        if value not in {"127.0.0.1", "::1", "localhost"}:
+            raise ValueError("SSSF visualizer_host must be loopback-only")
+        return value
+
+    @field_validator("visualizer_port")
+    @classmethod
+    def validate_port(cls, value: int) -> int:
+        if not 1 <= value <= 65535:
+            raise ValueError("SSSF visualizer_port must be between 1 and 65535")
+        return value
+
+
+    @field_validator("allowed_repositories")
+    @classmethod
+    def validate_repository_list(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("SSSF allowed_repositories must not contain duplicates")
+        return value
+
+
+class ServiceState(StrictModel):
+    capable: StrictBool = False
+    backup: dict[str, Any] = Field(default_factory=dict)
+    disable_policy: Literal["retain", "archive", "destroy"] | None = None
+
+    @model_validator(mode="after")
+    def validate_policy(self) -> "ServiceState":
+        if self.capable and self.disable_policy is None:
+            raise ValueError("state-capable services require a disable_policy")
+        if not self.capable and self.disable_policy is not None:
+            raise ValueError("stateless services cannot declare a disable_policy")
+        if not self.capable and self.backup:
+            raise ValueError("stateless services cannot declare backup metadata")
+        return self
+
+
+class ServiceEndpointDNS(StrictModel):
+    enabled: StrictBool = False
+    record_type: Literal["A"] = "A"
+
+
+class ServiceEndpoints(StrictModel):
+    public_names: list[StrictStr] = Field(default_factory=list)
+    public_url: StrictStr | None = None
+    protocols: list[StrictStr] = Field(default_factory=list)
+    ports: dict[str, StrictInt] = Field(default_factory=dict)
+    visibility: Literal["internal", "public", "none"] = "internal"
+    dns: ServiceEndpointDNS = Field(default_factory=ServiceEndpointDNS)
+
+    @field_validator("public_names")
+    @classmethod
+    def validate_names(cls, value: list[str]) -> list[str]:
+        normalized = [name.lower().rstrip(".") for name in value]
+        if any(not _HOSTNAME_RE.fullmatch(name) for name in normalized):
+            raise ValueError("service endpoint public_names must contain valid hostnames")
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("service endpoint public_names must be unique")
+        return normalized
+
+    @field_validator("protocols")
+    @classmethod
+    def validate_protocols(cls, value: list[str]) -> list[str]:
+        normalized = [protocol.lower() for protocol in value]
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("service endpoint protocols must be unique")
+        return normalized
+
+    @field_validator("ports")
+    @classmethod
+    def validate_ports(cls, value: dict[str, int]) -> dict[str, int]:
+        if any(not _PORT_NAME_RE.fullmatch(name) for name in value):
+            raise ValueError("service endpoint port names must be lowercase identifiers")
+        if any(port < 1 or port > 65535 for port in value.values()):
+            raise ValueError("service endpoint ports must be between 1 and 65535")
+        return value
+
+    @model_validator(mode="after")
+    def validate_protocol_ports(self) -> "ServiceEndpoints":
+        if "ssh" in self.protocols:
+            self.ports.setdefault("ssh", 22)
+        elif "ssh" in self.ports:
+            raise ValueError("service endpoint ssh port requires ssh protocol")
+        return self
+
+
+class ServiceRelease(StrictModel):
+    version: StrictStr | None = None
+    tag: StrictStr | None = None
+    commit: StrictStr | None = None
+    image: StrictStr | None = None
+    digest: StrictStr | None = None
+    checksum: StrictStr | None = None
+    source: Literal["package", "container", "binary", "image"] | None = None
+
+    @model_validator(mode="after")
+    def validate_release(self) -> "ServiceRelease":
+        if self.tag is not None and not _HERMES_TAG_RE.fullmatch(self.tag):
+            raise ValueError("release tag must use the managed Hermes release-tag form")
+        if self.commit is not None and not _HERMES_COMMIT_RE.fullmatch(self.commit):
+            raise ValueError("release commit must be a lowercase 40-character commit")
+        if self.source == "container":
+            if not self.image or not self.digest:
+                raise ValueError("container releases require image and immutable digest")
+            if "@" in self.image or not _DIGEST_RE.fullmatch(self.digest):
+                raise ValueError("container releases require a separate lowercase sha256 digest")
+        if self.source in {"package", "binary"} and not self.version:
+            raise ValueError(f"{self.source} releases require version")
+        if self.source == "package" and self.digest:
+            raise ValueError("package releases cannot declare digest")
+        return self
+
+
+class HermesRuntimeNode(StrictModel):
+    version: StrictStr | None = None
+    checksums: dict[Literal["amd64", "arm64"], StrictStr] = Field(default_factory=dict)
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_VERSION_RE.fullmatch(value):
+            raise ValueError("Hermes Node version must be a strict semantic version")
+        return value
+
+    @field_validator("checksums")
+    @classmethod
+    def validate_checksums(cls, value: dict[str, str]) -> dict[str, str]:
+        for architecture, checksum in value.items():
+            if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+                raise ValueError(f"Hermes Node {architecture} checksum must be lowercase SHA-256")
+        return value
+
+
+class HermesTuning(StrictModel):
+    compression_threshold: float | None = None
+    max_concurrent_children: StrictInt | None = None
+    max_spawn_depth: StrictInt | None = None
+
+    @field_validator("compression_threshold")
+    @classmethod
+    def validate_threshold(cls, value: float | None) -> float | None:
+        if value is not None and not 0.5 <= value <= 0.95:
+            raise ValueError("Hermes compression threshold must be between 0.5 and 0.95")
+        return value
+
+    @field_validator("max_concurrent_children")
+    @classmethod
+    def validate_concurrency(cls, value: int | None) -> int | None:
+        if value is not None and not 1 <= value <= 10:
+            raise ValueError("Hermes max_concurrent_children must be between 1 and 10")
+        return value
+
+    @field_validator("max_spawn_depth")
+    @classmethod
+    def validate_spawn_depth(cls, value: int | None) -> int | None:
+        if value is not None and not 1 <= value <= 3:
+            raise ValueError("Hermes max_spawn_depth must be between 1 and 3")
+        return value
+
+
+class HermesDashboard(StrictModel):
+    enabled: StrictBool | None = None
+    host: StrictStr | None = None
+    auth_username: StrictStr | None = None
+
+    @field_validator("host")
+    @classmethod
+    def validate_host(cls, value: str | None) -> str | None:
+        if value is not None and value not in {"127.0.0.1", "::1", "localhost"}:
+            raise ValueError("Hermes dashboard host must be loopback-only")
+        return value
+
+
+class HermesWebConfiguration(StrictModel):
+    searxng_url: StrictStr | None = None
+
+
+class HermesControlConfiguration(StrictModel):
+    enabled: StrictBool = False
+    domain: StrictStr | None = None
+    source_url: StrictStr | None = None
+    source_ref: StrictStr | None = None
+    api_host: StrictStr = "127.0.0.1"
+    api_port: StrictInt = 8787
+    require_task_approval: StrictBool = True
+    plugin_socket: StrictStr = "/run/hermes/control-extension.sock"
+    workspace_root: StrictStr = "/srv"
+    project_roots: list[StrictStr] = Field(default_factory=list)
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.lower().rstrip(".")
+        if not _HOSTNAME_RE.fullmatch(normalized):
+            raise ValueError("Hermes Control domain must be a hostname")
+        return normalized
+
+    @field_validator("source_url")
+    @classmethod
+    def validate_source_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("Hermes Control source_url must be HTTPS without credentials or fragments")
+        return value
+
+    @field_validator("source_ref")
+    @classmethod
+    def validate_source_ref(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_COMMIT_RE.fullmatch(value):
+            raise ValueError("Hermes Control source_ref must be a lowercase 40-character commit")
+        return value
+
+    @field_validator("api_host")
+    @classmethod
+    def validate_api_host(cls, value: str) -> str:
+        if value != "127.0.0.1":
+            raise ValueError("Hermes Control api_host must be 127.0.0.1")
+        return value
+
+    @field_validator("api_port")
+    @classmethod
+    def validate_api_port(cls, value: int) -> int:
+        if not 1 <= value <= 65535:
+            raise ValueError("Hermes Control api_port must be between 1 and 65535")
+        return value
+
+    @field_validator("require_task_approval")
+    @classmethod
+    def validate_task_approval(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Hermes Control requires task approval")
+        return value
+
+    @field_validator("plugin_socket")
+    @classmethod
+    def validate_plugin_socket(cls, value: str) -> str:
+        path = PurePosixPath(value)
+        if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("Hermes Control plugin_socket must be a normalized absolute POSIX path")
+        return value
+
+    @field_validator("workspace_root")
+    @classmethod
+    def validate_workspace_root(cls, value: str) -> str:
+        path = PurePosixPath(value)
+        if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("Hermes Control workspace_root must be a normalized absolute POSIX path")
+        return value
+
+    @field_validator("project_roots")
+    @classmethod
+    def validate_project_roots(cls, values: list[str]) -> list[str]:
+        for value in values:
+            path = PurePosixPath(value)
+            if not value.startswith("/") or value != str(path) or any(part in {"", ".", ".."} for part in path.parts):
+                raise ValueError("Hermes Control project_roots must contain normalized absolute POSIX paths")
+        if len(set(values)) != len(values):
+            raise ValueError("Hermes Control project_roots must not contain duplicates")
+        return values
+
+    @model_validator(mode="after")
+    def validate_enabled_requirements(self) -> "HermesControlConfiguration":
+        if self.enabled:
+            missing = [name for name, value in (("domain", self.domain), ("source_url", self.source_url), ("source_ref", self.source_ref)) if not value]
+            if missing:
+                raise ValueError(f"enabled Hermes Control requires: {', '.join(missing)}")
+        return self
+
+
+class HermesConfiguration(StrictModel):
+    runtime_user: StrictStr | None = None
+    repository_path: StrictStr | None = None
+    operator_mutation_enabled: StrictBool = False
+    operator_audit_path: StrictStr = ""
+    operator_audit_backup_dir: StrictStr = ""
+    allow_legacy_runtime: StrictBool | None = None
+    compose_version: StrictStr | None = None
+    caddy_artifact: ReviewedArtifactPin | None = None
+    compose_artifact: ReviewedArtifactPin | None = None
+    just_artifact: ReviewedArtifactPin | None = None
+    tuning: HermesTuning = Field(default_factory=HermesTuning)
+    node: HermesRuntimeNode = Field(default_factory=HermesRuntimeNode)
+    dashboard: HermesDashboard = Field(default_factory=HermesDashboard)
+    web: HermesWebConfiguration = Field(default_factory=HermesWebConfiguration)
+    control: HermesControlConfiguration = Field(default_factory=HermesControlConfiguration)
+
+    @field_validator("runtime_user")
+    @classmethod
+    def validate_runtime_user(cls, value: str | None) -> str | None:
+        if value is not None and (value == "root" or not _HERMES_USER_RE.fullmatch(value)):
+            raise ValueError("Hermes runtime_user must be a non-root Linux user identifier")
+        return value
+
+    @field_validator("repository_path")
+    @classmethod
+    def validate_repository_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        path = PurePosixPath(value)
+        if (
+            any(ord(char) < 32 or ord(char) == 127 for char in value)
+            or not value.startswith("/")
+            or value != str(path)
+            or any(part in {"", ".", ".."} for part in path.parts)
+        ):
+            raise ValueError("Hermes repository_path must be a normalized absolute POSIX path")
+        return value
+
+    @field_validator("operator_audit_path", "operator_audit_backup_dir")
+    @classmethod
+    def validate_operator_audit_path(cls, value: str) -> str:
+        if value == "":
+            return value
+        path = PurePosixPath(value)
+        if (
+            any(ord(char) < 32 or ord(char) == 127 for char in value)
+            or not value.startswith("/")
+            or value != str(path)
+            or any(part in {"", ".", ".."} for part in path.parts)
+        ):
+            raise ValueError("Hermes operator audit paths must be normalized absolute POSIX paths")
+        return value
+
+    @model_validator(mode="after")
+    def validate_mutation_activation(self) -> "HermesConfiguration":
+        if self.operator_mutation_enabled:
+            raise ValueError(
+                "Hermes operator mutation is unavailable during the hard read-only pilot; "
+                "reactivation requires a reviewed source change after trusted principal acceptance"
+            )
+        return self
+
+    @field_validator("compose_version")
+    @classmethod
+    def validate_compose_version(cls, value: str | None) -> str | None:
+        if value is not None and not _HERMES_VERSION_RE.fullmatch(value):
+            raise ValueError("Hermes compose_version must be a strict semantic version")
+        return value
+
+
+SERVICE_CONFIGURATION_MODELS: dict[str, type[StrictModel]] = {
+    "forgejo": ForgejoConfiguration,
+    "forgejo_runner": ForgejoRunnerConfiguration,
+    "hermes": HermesConfiguration,
+    "infisical": InfisicalConfiguration,
+    "infisical_onramp": InfisicalOnrampConfiguration,
+    "searxng_onramp": SearxngConfiguration,
+    "sssf": SssfConfiguration,
+    "tailscale_client": TailscaleConfiguration,
+    "technitium": TechnitiumConfiguration,
+}
+SERVICE_CONFIGURATION_EXEMPTIONS = {
+    "onramp_host": {
+        "schema": "ResourceOwnedConfiguration",
+        "owner": "resources.shared_hosts.onramp_host",
+        "reason": "shared-host resource owns security and runtime configuration",
+    },
+}
+
+
+def service_configuration_contract(
+    catalog_services: set[str],
+    catalog_schemas: Mapping[str, str | None] | None = None,
+) -> dict[str, dict[str, str]]:
+    """Return typed or explicitly resource-owned configuration contracts."""
+    known = set(SERVICE_CONFIGURATION_MODELS) | set(SERVICE_CONFIGURATION_EXEMPTIONS)
+    missing = sorted(catalog_services - known)
+    unexpected = sorted(known - catalog_services)
+    if missing or unexpected:
+        details = []
+        if missing:
+            details.append(f"missing services: {', '.join(missing)}")
+        if unexpected:
+            details.append(f"unknown services: {', '.join(unexpected)}")
+        raise CanonicalValuesError("service configuration contract mismatch: " + "; ".join(details))
+    contract = {
+        **{
+            name: {"kind": "typed-model", "model": model.__name__}
+            for name, model in sorted(SERVICE_CONFIGURATION_MODELS.items())
+        },
+        **{
+            name: {"kind": "resource-owned", **contract}
+            for name, contract in sorted(SERVICE_CONFIGURATION_EXEMPTIONS.items())
+        },
+    }
+    if catalog_schemas is not None:
+        mismatches = sorted(
+            name
+            for name, expected in ((name, entry.get("model") or entry.get("schema")) for name, entry in contract.items())
+            if catalog_schemas.get(name) != expected
+        )
+        if mismatches:
+            raise CanonicalValuesError(
+                "service configuration schema metadata mismatch: " + ", ".join(mismatches)
+            )
+    return contract
+
+
+class Service(StrictModel):
+    enabled: StrictBool
+    resource: StrictStr | None = None
+    dependencies: list[StrictStr] = Field(default_factory=list)
+    state: ServiceState = Field(default_factory=ServiceState)
+    endpoints: ServiceEndpoints = Field(default_factory=ServiceEndpoints)
+    release: ServiceRelease = Field(default_factory=ServiceRelease)
+    configuration: dict[str, Any] = Field(default_factory=dict)
+
+
+class RootPasswordBootstrapPolicy(StrictModel):
+    inheritance: Literal["automatic"] = "automatic"
+    default_secret: StrictStr = "secrets.bootstrap.root_password"
+    host_overrides: dict[StrictStr, StrictStr] = Field(default_factory=dict)
+
+    @field_validator("default_secret")
+    @classmethod
+    def validate_default_secret(cls, value: str) -> str:
+        if not value.startswith("secrets.") or value.endswith("."):
+            raise ValueError("bootstrap.root_password.default_secret must be a logical secret path")
+        return value
+
+    @field_validator("host_overrides")
+    @classmethod
+    def validate_host_overrides(cls, value: dict[str, str]) -> dict[str, str]:
+        for host, secret in value.items():
+            if not _IDENTIFIER_RE.fullmatch(host):
+                raise ValueError("bootstrap.root_password.host_overrides keys must be canonical resource IDs")
+            if not secret.startswith("secrets.") or secret.endswith("."):
+                raise ValueError(f"bootstrap.root_password.host_overrides.{host} must be a logical secret path")
+        return value
+
+
+class BootstrapSshPolicy(StrictModel):
+    user: StrictStr = "infra"
+    public_keys: list[StrictStr] = Field(default_factory=list)
+    host_additional_keys: dict[StrictStr, list[StrictStr]] = Field(default_factory=dict)
+
+    @field_validator("user")
+    @classmethod
+    def validate_user(cls, value: str) -> str:
+        if value == "root" or not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("bootstrap.ssh.user must be a non-root Linux user identifier")
+        return value
+
+    @field_validator("public_keys")
+    @classmethod
+    def validate_public_keys(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("bootstrap.ssh.public_keys must not contain duplicates")
+        for key in value:
+            if not _SSH_PUBLIC_KEY_RE.fullmatch(key):
+                raise ValueError("bootstrap.ssh.public_keys must contain valid SSH public keys")
+        return value
+
+    @field_validator("host_additional_keys")
+    @classmethod
+    def validate_host_keys(cls, value: dict[str, list[str]]) -> dict[str, list[str]]:
+        for host, keys in value.items():
+            if not _IDENTIFIER_RE.fullmatch(host):
+                raise ValueError("bootstrap.ssh.host_additional_keys keys must be canonical resource IDs")
+            if len(keys) != len(set(keys)):
+                raise ValueError(f"bootstrap.ssh.host_additional_keys.{host} must not contain duplicates")
+            for key in keys:
+                if not _SSH_PUBLIC_KEY_RE.fullmatch(key):
+                    raise ValueError(f"bootstrap.ssh.host_additional_keys.{host} must contain valid SSH public keys")
+        return value
+
+
+class OperatorSshPolicy(BootstrapSshPolicy):
+    """SSH access policy for the human operator account."""
+
+
+class ChezmoiPolicy(StrictModel):
+    version: StrictStr = "v2.71.1"
+    sha256: StrictStr = "e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed"
+
+    @field_validator("version")
+    @classmethod
+    def validate_version(cls, value: str) -> str:
+        if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", value):
+            raise ValueError("operator.dotfiles.chezmoi.version must be a pinned semantic release")
+        return value
+
+    @field_validator("sha256")
+    @classmethod
+    def validate_sha256(cls, value: str) -> str:
+        if not _SHA256_HEX_RE.fullmatch(value):
+            raise ValueError("operator.dotfiles.chezmoi.sha256 must be a lowercase SHA-256 digest")
+        return value
+
+
+class OperatorDotfilesPolicy(StrictModel):
+    repository: StrictStr = "https://github.com/salverius-tech/dotfiles"
+    revision: StrictStr = "4aeeadd928b0d03090e5aa973d10d989e846cf15"
+    chezmoi: ChezmoiPolicy = Field(default_factory=ChezmoiPolicy)
+
+    @field_validator("repository")
+    @classmethod
+    def validate_repository(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("operator.dotfiles.repository must be an HTTPS URL without credentials or fragments")
+        return value.rstrip("/")
+
+    @field_validator("revision")
+    @classmethod
+    def validate_revision(cls, value: str) -> str:
+        if not _GIT_COMMIT_RE.fullmatch(value):
+            raise ValueError("operator.dotfiles.revision must be a 40-character lowercase Git commit")
+        return value
+
+
+class OperatorPolicy(StrictModel):
+    user: StrictStr = "systemboss"
+    ssh: OperatorSshPolicy = Field(default_factory=OperatorSshPolicy)
+    dotfiles: OperatorDotfilesPolicy = Field(default_factory=OperatorDotfilesPolicy)
+
+    @field_validator("user")
+    @classmethod
+    def validate_user(cls, value: str) -> str:
+        if value == "root" or not _HERMES_USER_RE.fullmatch(value):
+            raise ValueError("operator.user must be a non-root Linux user identifier")
+        return value
+
+
+class BootstrapPolicy(StrictModel):
+    root_password: RootPasswordBootstrapPolicy = Field(default_factory=RootPasswordBootstrapPolicy)
+    ssh: BootstrapSshPolicy = Field(default_factory=BootstrapSshPolicy)
+
+
+class CanonicalSite(StrictModel):
+    schema_version: Literal[1]
+    site: SiteMetadata
+    platform: Platform
+    resources: Resources
+    services: dict[str, Service]
+    bootstrap: BootstrapPolicy = Field(default_factory=BootstrapPolicy)
+    operator: OperatorPolicy = Field(default_factory=OperatorPolicy)
+
+    @model_validator(mode="after")
+    def validate_service_ownership(self) -> "CanonicalSite":
+        if self.bootstrap.ssh.user == self.operator.user:
+            raise ValueError("bootstrap.ssh.user and operator.user must be distinct")
+        management = self.platform.proxmox.management
+        if management is not None and management.ssh_public_key is not None:
+            management_identity = " ".join(management.ssh_public_key.split()[:2])
+            bootstrap_identities = {
+                " ".join(public_key.split()[:2])
+                for public_key in self.bootstrap.ssh.public_keys
+            }
+            for public_keys in self.bootstrap.ssh.host_additional_keys.values():
+                bootstrap_identities.update(
+                    " ".join(public_key.split()[:2]) for public_key in public_keys
+                )
+            if management_identity in bootstrap_identities:
+                raise ValueError(
+                    "platform.proxmox.management.ssh_public_key must be distinct from bootstrap SSH public keys"
+                )
+        resource_ids = set(self.resources.guests) | set(self.resources.shared_hosts)
+        unknown_overrides = sorted(set(self.bootstrap.root_password.host_overrides) - resource_ids)
+        if unknown_overrides:
+            raise ValueError(
+                "bootstrap.root_password.host_overrides reference unknown resources: "
+                + ", ".join(unknown_overrides)
+            )
+        unknown_ssh_hosts = sorted(set(self.bootstrap.ssh.host_additional_keys) - resource_ids)
+        if unknown_ssh_hosts:
+            raise ValueError(
+                "bootstrap.ssh.host_additional_keys reference unknown resources: "
+                + ", ".join(unknown_ssh_hosts)
+            )
+        unknown_operator_ssh_hosts = sorted(set(self.operator.ssh.host_additional_keys) - resource_ids)
+        if unknown_operator_ssh_hosts:
+            raise ValueError(
+                "operator.ssh.host_additional_keys reference unknown resources: "
+                + ", ".join(unknown_operator_ssh_hosts)
+            )
+        hermes = self.services.get("hermes")
+        if hermes is not None:
+            try:
+                validated_hermes = HermesConfiguration.model_validate(hermes.configuration)
+                hermes.configuration = validated_hermes.model_dump(mode="json", exclude_none=True)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.hermes.configuration: {details}") from error
+        technitium = self.services.get("technitium")
+        if technitium is not None:
+            try:
+                configuration = TechnitiumConfiguration.model_validate(technitium.configuration)
+                if configuration.caddy and configuration.caddy.enabled:
+                    if not self.platform.ingress.acme.email:
+                        raise ValueError("platform.ingress.acme.email is required when Technitium Caddy is enabled")
+                    provider = self.platform.ingress.dns_providers.get(configuration.caddy.tls.dns_provider)
+                    if provider is None:
+                        raise ValueError(f"platform.ingress.dns_providers.{configuration.caddy.tls.dns_provider} is required")
+                technitium.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.technitium.configuration: {details}") from error
+        searxng = self.services.get("searxng_onramp")
+        if searxng is not None:
+            try:
+                configuration = SearxngConfiguration.model_validate(searxng.configuration)
+                searxng.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.searxng_onramp.configuration: {details}") from error
+        runner = self.services.get("forgejo_runner")
+        if runner is not None:
+            try:
+                configuration = ForgejoRunnerConfiguration.model_validate(runner.configuration)
+                runner.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.forgejo_runner.configuration: {details}") from error
+        tailscale = self.services.get("tailscale_client")
+        if tailscale is not None:
+            try:
+                configuration = TailscaleConfiguration.model_validate(tailscale.configuration)
+                tailscale.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.tailscale_client.configuration: {details}") from error
+        infisical = self.services.get("infisical")
+        if infisical is not None:
+            try:
+                configuration = InfisicalConfiguration.model_validate(infisical.configuration)
+                infisical.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.infisical.configuration: {details}") from error
+        infisical_onramp = self.services.get("infisical_onramp")
+        if infisical_onramp is not None:
+            try:
+                configuration = InfisicalOnrampConfiguration.model_validate(infisical_onramp.configuration)
+                infisical_onramp.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.infisical_onramp.configuration: {details}") from error
+        forgejo = self.services.get("forgejo")
+        if forgejo is not None:
+            try:
+                configuration = ForgejoConfiguration.model_validate(forgejo.configuration)
+                forgejo.configuration = configuration.model_dump(mode="json", exclude_none=False)
+            except ValidationError as error:
+                details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+                raise ValueError(f"services.forgejo.configuration: {details}") from error
+        for name, contract in SERVICE_CONFIGURATION_EXEMPTIONS.items():
+            service = self.services.get(name)
+            if service is not None and service.configuration:
+                raise ValueError(
+                    f"services.{name}.configuration is resource-owned by {contract['owner']}"
+                )
+        for _, resource in (*self.resources.guests.items(), *self.resources.shared_hosts.items()):
+            network = resource.network
+            if network.bridge is None:
+                network.bridge = self.platform.network.default_bridge
+            if network.dns_servers == []:
+                network.dns_servers = list(self.platform.network.default_dns_servers)
+            if network.search_domain is None:
+                network.search_domain = self.platform.network.default_search_domain
+            if network.vlan_id is None:
+                network.vlan_id = self.platform.network.default_vlan_id
+            if network.address != "dhcp" and network.gateway is None:
+                network.gateway = self.platform.network.default_gateway
+            if resource.storage.root.storage_id is None:
+                resource.storage.root.storage_id = self.platform.storage.rootfs_datastore
+        resource_names = set(self.resources.guests) | set(self.resources.shared_hosts)
+        for name, service in self.services.items():
+            if service.enabled and service.resource is None:
+                raise ValueError(f"services.{name}.resource is required when enabled")
+            if service.resource is not None and service.resource not in resource_names:
+                raise ValueError(f"services.{name}.resource does not resolve to a resource")
+            if service.state.capable and service.state.disable_policy is None:
+                raise ValueError(f"services.{name}.state.disable_policy is required when state-capable")
+        return self
+
+
+def _yaml_data(path: Path) -> dict[str, Any]:
+    yaml = YAML(typ="safe")
+    yaml.allow_duplicate_keys = False
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for token in yaml.scan(handle):
+                if isinstance(token, (AliasToken, AnchorToken)):
+                    raise CanonicalValuesError(f"YAML anchors and aliases are not permitted: {path}")
+        with path.open("r", encoding="utf-8") as handle:
+            data = yaml.load(handle)
+    except (DuplicateKeyError, ParserError, ValueError) as error:
+        raise CanonicalValuesError(f"invalid canonical YAML: {path}: {error}") from error
+    if not isinstance(data, dict):
+        raise CanonicalValuesError(f"canonical site document must be a mapping: {path}")
+    return data
+
+
+def load_site(
+    path: Path,
+    *,
+    expected_site: str | None = None,
+    catalog_path: Path | None = None,
+) -> CanonicalSite:
+    """Load and strictly validate a canonical site YAML document."""
+    try:
+        model = CanonicalSite.model_validate(_yaml_data(path))
+    except ValidationError as error:
+        details = "; ".join(f"{'.'.join(str(part) for part in item['loc'])}: {item['msg']}" for item in error.errors())
+        raise CanonicalValuesError(f"invalid canonical site model {path}: {details}") from error
+    directory_site = path.parent.name
+    if model.site.name != directory_site:
+        raise CanonicalValuesError(f"site.name {model.site.name!r} does not match directory {directory_site!r}")
+    if expected_site is not None and model.site.name != expected_site:
+        raise CanonicalValuesError(f"site.name {model.site.name!r} does not match selected site {expected_site!r}")
+    if catalog_path is not None:
+        try:
+            catalog = load_catalog(catalog_path)
+            catalog.validate_registry_completeness()
+            service_configuration_contract(
+                set(catalog.names),
+                {name: catalog.get(name).configuration_schema for name in catalog.names},
+            )
+            catalog.validate_model_services(model.services, model.resources)
+            catalog.validate_selection({name for name, service in model.services.items() if service.enabled})
+        except ServiceCatalogError as error:
+            raise CanonicalValuesError(str(error)) from error
+    return model
+
+
+def normalized_model(model: CanonicalSite) -> dict[str, Any]:
+    """Return a stable, JSON-compatible representation for identity hashing."""
+    return model.model_dump(mode="json", by_alias=True, exclude_none=False)
+
+
+def model_digest(model: CanonicalSite) -> str:
+    payload = json.dumps(normalized_model(model), sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def redacted_summary(model: CanonicalSite) -> dict[str, Any]:
+    return {
+        "schema_version": model.schema_version,
+        "site": model.site.model_dump(mode="json", by_alias=True),
+        "resource_count": len(model.resources.guests) + len(model.resources.shared_hosts),
+        "resources": [*model.resources.guests, *model.resources.shared_hosts],
+        "enabled_services": sorted(name for name, service in model.services.items() if service.enabled),
+        "model_digest": model_digest(model),
+    }
+
+
+__all__ = [
+    "CanonicalSite",
+    "CanonicalValuesError",
+    "load_site",
+    "model_digest",
+    "normalized_model",
+    "redacted_summary",
+]

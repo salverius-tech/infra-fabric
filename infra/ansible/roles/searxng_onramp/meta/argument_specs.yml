@@ -22,6 +22,7 @@ argument_specs:
       searxng_secret_key:
         type: str
         required: true
+        no_log: true
         description: "Required secret value for SearXNG runtime configuration."
       searxng_onramp_bind_address:
         type: str

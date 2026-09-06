@@ -1,0 +1,498 @@
+#!/usr/bin/env python3
+"""Compatibility view of the logical service capability registry."""
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Literal, Mapping
+
+
+class ServiceCatalogError(ValueError):
+    """Raised when a service catalog or selected service set is invalid."""
+
+
+_LOGICAL_PART_RE = re.compile(r"^[a-z][a-z0-9_-]{0,62}$")
+SecretClassification = Literal["bootstrap", "runtime", "provider", "recovery", "generated"]
+RuntimeOwner = Literal["guest", "shared_host", "none"]
+UpdatePolicyStatus = Literal["managed", "manual", "unmanaged"]
+_SECRET_CLASSIFICATIONS = frozenset(("bootstrap", "runtime", "provider", "recovery", "generated"))  # public-safety: allow-secret
+_RUNTIME_OWNERS = frozenset(("guest", "shared_host", "none"))
+_UPDATE_POLICY_STATUSES = frozenset(("managed", "manual", "unmanaged"))
+_SCHEMA_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,127}$")
+_RELEASE_SOURCES = frozenset(("package", "container", "binary", "image"))
+_RUNTIME_TYPES = frozenset(("lxc", "vm"))
+_ONRAMP_HANDOFF = {
+    "api_version": "infra-fabric.onramp-handoff/v1",
+    "consumer": "onramp-vNext",
+    "operating_system": {
+        "family": "debian",
+        "major_version": 13,
+    },
+    "container_runtime": {
+        "engine": "podman",
+        "rootless": True,
+        "compose_command": "podman-compose",
+    },
+    "proxy": {
+        "implementation": "caddy",
+        "configuration_owner": "infra-fabric",
+        "consumer_writable": False,
+        "ingress_tcp_ports": [80, 443],
+    },
+}
+
+
+def _path_value(value: Any, path: str) -> Any:
+    for part in path.split(".") if path else ():
+        if isinstance(value, Mapping):
+            value = value.get(part)
+        else:
+            value = getattr(value, part, None)
+    return value
+
+
+def _condition_matches(value: Any, condition: str) -> bool:
+    if "=" in condition:
+        path, expected = condition.split("=", 1)
+        return str(_path_value(value, path.removeprefix("configuration."))) == expected
+    return _path_value(value, condition.removeprefix("configuration.")) is True
+
+
+def _service_required_field_value(service: object, field: str, resources: Any | None) -> object:
+    if not field.startswith("resource."):
+        return _path_value(service, field)
+    if resources is None:
+        return None
+    resource_name = getattr(service, "resource", None)
+    resource_map = {
+        **getattr(resources, "guests", {}),
+        **getattr(resources, "shared_hosts", {}),
+    }
+    resource = resource_map.get(resource_name)
+    if resource is None:
+        return None
+    return _path_value(resource, field.removeprefix("resource."))
+
+
+def _required_field_missing(field: str, value: object) -> bool:
+    if field == "state.capable":
+        return value is not True
+    return value in (None, "", [])
+
+
+@dataclass(frozen=True)
+class ServiceCapability:
+    name: str
+    state_capable: bool
+    runtime_owner: RuntimeOwner
+    runtime: "RuntimeMetadata | None"
+    handoff: dict[str, object] | None
+    configuration_schema: str | None
+    release_sources: tuple[str, ...]
+    required_fields: tuple[str, ...]
+    dependencies: tuple[str, ...]
+    required_secrets: tuple[str, ...]
+    secret_classifications: dict[str, SecretClassification]
+    secret_environment: dict[str, str]
+    conditional_required_secrets: dict[str, tuple[str, ...]]
+    update_policy: tuple[UpdatePolicyStatus, str] | None
+    inventory: dict[str, object]
+    raw: dict[str, object]
+
+
+@dataclass(frozen=True)
+class RuntimeMetadata:
+    """Catalog-owned OpenTofu runtime defaults and accepted runtime types."""
+
+    default_type: str
+    supported_types: tuple[str, ...]
+
+
+class ServiceCatalog:
+    def __init__(self, capabilities: dict[str, ServiceCapability]) -> None:
+        self._capabilities = capabilities
+
+    @property
+    def names(self) -> frozenset[str]:
+        return frozenset(self._capabilities)
+
+    def get(self, name: str) -> ServiceCapability:
+        try:
+            return self._capabilities[name]
+        except KeyError as error:
+            raise ServiceCatalogError(f"unknown service catalog entry: {name}") from error
+
+    def validate_registry_completeness(self) -> None:
+        required_keys = {
+            "configuration_schema",
+            "release_sources",
+            "required_fields",
+            "runtime_owner",
+            "runtime",
+        }
+        for name, capability in self._capabilities.items():
+            missing = sorted(required_keys - capability.raw.keys())
+            if missing:
+                raise ServiceCatalogError(
+                    f"service {name} is missing registry metadata: {', '.join(missing)}"
+                )
+            if not capability.required_fields:
+                raise ServiceCatalogError(f"service {name} must declare at least one required canonical field")
+            if capability.update_policy is None:
+                raise ServiceCatalogError(f"service {name} is missing registry metadata: update_policy")
+
+    def update_policy_report(self) -> tuple[dict[str, str], ...]:
+        """Return a deterministic, value-free service update-policy report."""
+        return tuple(
+            {
+                "service": name,
+                "status": capability.update_policy[0],
+                "detail": capability.update_policy[1],
+            }
+            for name, capability in sorted(self._capabilities.items())
+            if capability.update_policy is not None
+        )
+
+    def validate_selection(self, enabled: set[str]) -> None:
+        unknown = sorted(enabled - self.names)
+        if unknown:
+            raise ServiceCatalogError(f"enabled services are not in catalog: {', '.join(unknown)}")
+        for name in sorted(enabled):
+            capability = self.get(name)
+            missing = sorted(set(capability.dependencies) - enabled)
+            if missing:
+                raise ServiceCatalogError(
+                    f"enabled service {name} requires disabled services: {', '.join(missing)}"
+                )
+        self._validate_acyclic()
+
+    def required_secret_paths(self, enabled: set[str]) -> frozenset[str]:
+        """Return catalog-declared logical secrets for an enabled service set."""
+        self.validate_selection(enabled)
+        conditional = {
+            path
+            for name in enabled
+            for paths in self.get(name).conditional_required_secrets.values()
+            for path in paths
+        }
+        return frozenset(
+            path
+            for name in sorted(enabled)
+            for path in self.get(name).required_secrets
+            if path not in conditional
+        )
+
+    def required_secret_paths_for_model(self, services: dict[str, object]) -> frozenset[str]:
+        """Derive required logical secrets from canonical service enablement."""
+        self.validate_model_services(services)
+        enabled = {name for name, service in services.items() if getattr(service, "enabled", False)}
+        paths = set(self.required_secret_paths(enabled))
+        for name in sorted(enabled):
+            service = services[name]
+            configuration = getattr(service, "configuration", {})
+            for condition, conditional_paths in self.get(name).conditional_required_secrets.items():
+                if _condition_matches(configuration, condition):
+                    paths.update(conditional_paths)
+        return frozenset(paths)
+
+    def required_secret_report_for_model(self, services: Mapping[str, object]) -> tuple[dict[str, object], ...]:
+        """Return value-free secret metadata including configuration conditions."""
+        paths = self.required_secret_paths_for_model(dict(services))
+        report: list[dict[str, object]] = []
+        for path in sorted(paths):
+            owner = next(
+                (
+                    capability
+                    for capability in self._capabilities.values()
+                    if path in capability.required_secrets
+                    or any(path in values for values in capability.conditional_required_secrets.values())
+                ),
+                None,
+            )
+            entry: dict[str, object] = {"path": path, "required": True}
+            if owner is not None:
+                entry["service"] = owner.name
+                classification = owner.secret_classifications.get(path)
+                if classification is not None:
+                    entry["classification"] = classification
+            report.append(entry)
+        return tuple(report)
+
+    def required_secret_report(self, enabled: set[str]) -> tuple[dict[str, object], ...]:
+        """Return a deterministic, value-free report of catalog requirements."""
+        self.validate_selection(enabled)
+        conditional_services = sorted(name for name in enabled if self.get(name).conditional_required_secrets)
+        if conditional_services:
+            raise ServiceCatalogError(
+                "required_secret_report(enabled) cannot evaluate conditional secrets; use required_secret_report_for_model(): "
+                + ", ".join(conditional_services)
+            )
+        report: list[dict[str, object]] = []
+        for name in sorted(enabled):
+            capability = self.get(name)
+            for path in sorted(set(capability.required_secrets)):
+                entry: dict[str, object] = {"service": name, "path": path, "required": True}
+                classification = capability.secret_classifications.get(path)
+                if classification is not None:
+                    entry["classification"] = classification
+                report.append(entry)
+        return tuple(report)
+
+    def required_field_report_for_model(
+        self,
+        services: Mapping[str, object],
+        resources: Any | None = None,
+    ) -> tuple[dict[str, object], ...]:
+        """Return value-free required-field evidence for enabled catalog services."""
+        self.validate_selection(set(services))
+        report: list[dict[str, object]] = []
+        for name in sorted(services):
+            service = services[name]
+            if not getattr(service, "enabled", False):
+                continue
+            capability = self.get(name)
+            for field in capability.required_fields:
+                value = _service_required_field_value(service, field, resources)
+                report.append(
+                    {
+                        "service": name,
+                        "field": field,
+                        "required": True,
+                        "present": not _required_field_missing(field, value),
+                    }
+                )
+        return tuple(report)
+
+    def validate_model_services(self, services: Mapping[str, object], resources: Any | None = None) -> None:
+        """Validate canonical service ownership and catalog-derived resource compatibility."""
+        unknown = sorted(set(services) - self.names)
+        if unknown:
+            raise ServiceCatalogError(f"canonical services are not in catalog: {', '.join(unknown)}")
+        enabled = {name for name, service in services.items() if getattr(service, "enabled", False)}
+        self.validate_selection(enabled)
+        required_report = self.required_field_report_for_model(services, resources)
+        for name, service in services.items():
+            declared = tuple(getattr(service, "dependencies", ()))
+            expected = self.get(name).dependencies
+            if declared and declared != expected:
+                raise ServiceCatalogError(
+                    f"service {name} declares dependencies {list(declared)!r}; catalog requires {list(expected)!r}"
+                )
+            state = getattr(service, "state", None)
+            if state is not None and getattr(state, "capable", False) and not self.get(name).state_capable:
+                raise ServiceCatalogError(f"service {name} declares state capability not present in catalog")
+            release_source = getattr(getattr(service, "release", None), "source", None)
+            if release_source is not None and release_source not in self.get(name).release_sources:
+                raise ServiceCatalogError(
+                    f"service {name} release source {release_source!r} is not supported by catalog"
+                )
+            if resources is not None and getattr(service, "enabled", False):
+                missing_fields = [
+                    str(entry["field"])
+                    for entry in required_report
+                    if entry["service"] == name and not entry["present"]
+                ]
+                if missing_fields:
+                    raise ServiceCatalogError(
+                        f"enabled service {name} is missing required fields: {', '.join(missing_fields)}"
+                    )
+            if resources is not None and getattr(service, "enabled", False):
+                resource_name = getattr(service, "resource", None)
+                resource_map = {
+                    **getattr(resources, "guests", {}),
+                    **getattr(resources, "shared_hosts", {}),
+                }
+                resource = resource_map.get(resource_name)
+                runtime = self.get(name).runtime
+                supported = set(runtime.supported_types) if runtime is not None else set()
+                if (
+                    resource is not None
+                    and supported
+                    and getattr(resource, "type", None) not in supported
+                ):
+                    raise ServiceCatalogError(
+                        f"service {name} resource type {getattr(resource, 'type', None)!r} is not supported by catalog"
+                    )
+
+    def _validate_acyclic(self) -> None:
+        visiting: set[str] = set()
+        visited: set[str] = set()
+
+        def visit(name: str) -> None:
+            if name in visiting:
+                raise ServiceCatalogError(f"service dependency cycle includes {name}")
+            if name in visited:
+                return
+            visiting.add(name)
+            for dependency in self.get(name).dependencies:
+                if dependency not in self.names:
+                    raise ServiceCatalogError(f"service {name} depends on unknown service {dependency}")
+                visit(dependency)
+            visiting.remove(name)
+            visited.add(name)
+
+        for name in sorted(self.names):
+            visit(name)
+
+
+def load_catalog(path: Path) -> ServiceCatalog:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ServiceCatalogError(f"cannot load service catalog {path}") from error
+    if not isinstance(data, dict) or not isinstance(data.get("services"), dict):
+        raise ServiceCatalogError(f"service catalog must contain a services object: {path}")
+
+    capabilities: dict[str, ServiceCapability] = {}
+    for name, raw in data["services"].items():
+        if not isinstance(name, str) or not isinstance(raw, dict):
+            raise ServiceCatalogError(f"invalid service catalog entry: {name!r}")
+        dependencies = raw.get("dependencies", [])
+        if not isinstance(dependencies, list) or not all(isinstance(item, str) for item in dependencies):
+            raise ServiceCatalogError(f"service {name} dependencies must be a list of strings")
+        required_secrets = raw.get("required_secrets", [])
+        if not isinstance(required_secrets, list) or not all(
+            isinstance(item, str) and item and all(_LOGICAL_PART_RE.fullmatch(part) for part in item.split("."))
+            for item in required_secrets
+        ):
+            raise ServiceCatalogError(f"service {name} required_secrets must be logical paths")
+        secret_classifications = raw.get("secret_classifications", {})
+        if not isinstance(secret_classifications, dict) or any(
+            not isinstance(secret_path, str)
+            or not isinstance(classification, str)
+            or secret_path not in required_secrets
+            or classification not in _SECRET_CLASSIFICATIONS
+            for secret_path, classification in secret_classifications.items()
+        ):
+            raise ServiceCatalogError(
+                f"service {name} secret_classifications must map required paths to supported classifications"
+            )
+        secret_environment = raw.get("secret_environment", {})
+        if not isinstance(secret_environment, dict) or any(
+            not isinstance(secret_path, str)
+            or secret_path not in required_secrets
+            or not isinstance(environment_name, str)
+            or not re.fullmatch(r"[A-Z][A-Z0-9_]*", environment_name)
+            for secret_path, environment_name in secret_environment.items()
+        ):
+            raise ServiceCatalogError(
+                f"service {name} secret_environment must map required paths to environment names"
+            )
+
+        conditional_required_secrets = raw.get("conditional_required_secrets", {})
+        if not isinstance(conditional_required_secrets, dict) or any(
+            not isinstance(condition, str)
+            or not condition
+            or not all(_LOGICAL_PART_RE.fullmatch(part) for part in condition.split("=", 1)[0].split("."))
+            or not isinstance(paths, list)
+            or not all(
+                isinstance(secret_path, str)
+                and secret_path
+                and all(_LOGICAL_PART_RE.fullmatch(part) for part in secret_path.split("."))
+                for secret_path in paths
+            )
+            for condition, paths in conditional_required_secrets.items()
+        ):
+            raise ServiceCatalogError(f"service {name} conditional_required_secrets must map paths to logical secret lists")
+        conditional_paths = {condition: tuple(paths) for condition, paths in conditional_required_secrets.items()}
+        conditional_secret_paths = {secret_path for paths in conditional_paths.values() for secret_path in paths}
+        undeclared = sorted(conditional_secret_paths - set(required_secrets) - set(secret_classifications))
+        if undeclared:
+            raise ServiceCatalogError(
+                f"service {name} conditional secret paths must be declared: {', '.join(undeclared)}"
+            )
+        inventory = raw.get("inventory", {})
+        if not isinstance(inventory, dict):
+            raise ServiceCatalogError(f"service {name} inventory metadata must be an object")
+        configuration_schema = raw.get("configuration_schema")
+        if configuration_schema is not None and (not isinstance(configuration_schema, str) or not _SCHEMA_RE.fullmatch(configuration_schema)):
+            raise ServiceCatalogError(f"service {name} configuration_schema must be a model identifier or null")
+        release_sources = raw.get("release_sources", [])
+        if not isinstance(release_sources, list) or any(
+            not isinstance(source, str) or source not in _RELEASE_SOURCES for source in release_sources
+        ) or len(release_sources) != len(set(release_sources)):
+            raise ServiceCatalogError(f"service {name} release_sources must contain unique supported release forms")
+        required_fields = raw.get("required_fields", [])
+        if not isinstance(required_fields, list) or any(
+            not isinstance(field, str)
+            or not field
+            or not all(_LOGICAL_PART_RE.fullmatch(part) for part in field.split("."))
+            for field in required_fields
+        ) or len(required_fields) != len(set(required_fields)):
+            raise ServiceCatalogError(f"service {name} required_fields must contain unique logical field paths")
+        runtime_owner = raw.get("runtime_owner", "guest")
+        if runtime_owner not in _RUNTIME_OWNERS:
+            raise ServiceCatalogError(f"service {name} runtime_owner must be one of: {', '.join(sorted(_RUNTIME_OWNERS))}")
+        runtime_raw = raw.get("runtime")
+        runtime: RuntimeMetadata | None = None
+        if runtime_owner == "none":
+            if runtime_raw is not None:
+                raise ServiceCatalogError(f"service {name} runtime must be null or omitted when runtime_owner is none")
+        elif runtime_raw is None:
+            raise ServiceCatalogError(f"service {name} runtime is required when runtime_owner is {runtime_owner}")
+        elif (
+            not isinstance(runtime_raw, dict)
+            or set(runtime_raw) != {"default_type", "supported_types"}
+            or runtime_raw.get("default_type") not in _RUNTIME_TYPES
+            or not isinstance(runtime_raw.get("supported_types"), list)
+            or not runtime_raw["supported_types"]
+            or any(item not in _RUNTIME_TYPES for item in runtime_raw["supported_types"])
+            or len(runtime_raw["supported_types"]) != len(set(runtime_raw["supported_types"]))
+            or runtime_raw["default_type"] not in runtime_raw["supported_types"]
+        ):
+            raise ServiceCatalogError(
+                f"service {name} runtime must declare a supported default_type and unique supported_types"
+            )
+        else:
+            runtime = RuntimeMetadata(
+                default_type=runtime_raw["default_type"],
+                supported_types=tuple(runtime_raw["supported_types"]),
+            )
+        handoff_raw = raw.get("handoff")
+        if name == "onramp_host":
+            if handoff_raw != _ONRAMP_HANDOFF:
+                raise ServiceCatalogError(
+                    "service onramp_host handoff metadata must match the reviewed v1 contract"
+                )
+        elif handoff_raw is not None:
+            raise ServiceCatalogError(
+                f"service {name} may not declare Onramp handoff metadata"
+            )
+        handoff = dict(handoff_raw) if isinstance(handoff_raw, dict) else None
+        update_policy = raw.get("update_policy")
+        if update_policy is not None and (
+            not isinstance(update_policy, dict)
+            or set(update_policy) != {"status", "detail"}
+            or update_policy.get("status") not in _UPDATE_POLICY_STATUSES
+            or not isinstance(update_policy.get("detail"), str)
+            or not update_policy["detail"].strip()
+        ):
+            raise ServiceCatalogError(
+                f"service {name} update_policy must declare a supported status and non-empty detail"
+            )
+        capabilities[name] = ServiceCapability(
+            name=name,
+            state_capable=raw.get("state_capable") is True,
+            runtime_owner=runtime_owner,
+            runtime=runtime,
+            handoff=handoff,
+            configuration_schema=configuration_schema,
+            release_sources=tuple(release_sources),
+            required_fields=tuple(required_fields),
+            dependencies=tuple(dependencies),
+            required_secrets=tuple(required_secrets),
+            secret_classifications=dict(secret_classifications),
+            secret_environment=dict(secret_environment),
+            conditional_required_secrets=conditional_paths,
+            update_policy=(update_policy["status"], update_policy["detail"]) if update_policy is not None else None,
+            inventory=inventory,
+            raw=raw,
+        )
+    catalog = ServiceCatalog(capabilities)
+    catalog._validate_acyclic()
+    return catalog
+
+
+__all__ = ["RuntimeMetadata", "SecretClassification", "ServiceCapability", "ServiceCatalog", "ServiceCatalogError", "UpdatePolicyStatus", "load_catalog"]

@@ -1,0 +1,9 @@
+---
+argument_specs:
+  main:
+    short_description: Rotate one canonical host root password from private environment input.
+    options:
+      root_credentials_root_password_hash_salt:
+        type: str
+        required: true
+        description: Stable non-secret salt used for a deterministic protected hash.

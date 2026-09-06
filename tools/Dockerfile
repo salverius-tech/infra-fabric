@@ -1,22 +1,31 @@
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42ebe6441b7ea838a042bbd5acbfca6ec875818
 
+ARG TARGETARCH
 ARG OPENTOFU_VERSION=1.12.3
 ARG OPENTOFU_LINUX_AMD64_SHA256=46b48c3438c65cf479fc076c9281422ffa2f493548d1e813d154c835c5986a08
 ARG TFLINT_VERSION=0.63.1
 ARG TFLINT_LINUX_AMD64_SHA256=8441a7d97df20431f19c9b9d27ff4c63e308c964e86660bc7cc0cf7bbe0725e8
-ARG PIP_VERSION=26.1.2
+ARG SOPS_VERSION=3.13.3
+ARG SOPS_LINUX_AMD64_SHA256=e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
+ARG JUST_VERSION=1.46.0
+ARG JUST_LINUX_AMD64_MUSL_SHA256=79966e6e353f535ee7d1c6221641bcc8e3381c55b0d0a6dc6e54b34f9db36eaa
 
-COPY tools/requirements.txt /tmp/requirements.txt
+COPY tools/pip-bootstrap.lock tools/requirements.lock /tmp/
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/ansible/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     TF_PLUGIN_CACHE_DIR=/root/.terraform.d/plugin-cache
+
+RUN test "${TARGETARCH}" = "amd64" \
+    || (printf '%s\n' "The tooling image supports only TARGETARCH=amd64; see docs/tooling-reproducibility.md." >&2; exit 64)
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bash \
         ca-certificates \
         curl \
+        git \
+        age \
         gosu \
         jq \
         openssh-client \
@@ -37,9 +46,19 @@ RUN apt-get update \
     && unzip /tmp/tflint.zip -d /usr/local/bin tflint \
     && chmod 0755 /usr/local/bin/tflint \
     && rm -f /tmp/tflint.zip \
+    && curl -fsSL -o /usr/local/bin/sops \
+        "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64" \
+    && printf '%s  %s\n' "${SOPS_LINUX_AMD64_SHA256}" /usr/local/bin/sops | sha256sum -c - \
+    && chmod 0755 /usr/local/bin/sops \
+    && curl -fsSL -o /tmp/just.tar.gz \
+        "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+    && printf '%s  %s\n' "${JUST_LINUX_AMD64_MUSL_SHA256}" /tmp/just.tar.gz | sha256sum -c - \
+    && tar -xzf /tmp/just.tar.gz -C /usr/local/bin just \
+    && chmod 0755 /usr/local/bin/just \
+    && rm -f /tmp/just.tar.gz \
     && python3 -m venv /opt/ansible \
-    && /opt/ansible/bin/pip install --no-cache-dir --upgrade "pip==${PIP_VERSION}" \
-    && /opt/ansible/bin/pip install --no-cache-dir -r /tmp/requirements.txt \
+    && /opt/ansible/bin/pip install --no-cache-dir --require-hashes --upgrade -r /tmp/pip-bootstrap.lock \
+    && /opt/ansible/bin/pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \
     && useradd --create-home --shell /bin/bash --uid 1000 anvil \
     && mkdir -p /home/anvil/.terraform.d/plugin-cache /home/anvil/.ansible /workspace \
     && chown -R anvil:anvil /home/anvil /workspace \

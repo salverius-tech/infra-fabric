@@ -1,5 +1,6 @@
 ---
 - name: Validate LXC readiness inputs
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - lxc_ready_vmid is defined
@@ -7,6 +8,7 @@
     fail_msg: lxc_ready_vmid is required
 
 - name: Wait for LXC to report running {{ lxc_ready_name | default(lxc_ready_vmid) }}
+  tags: [config]
   ansible.builtin.command:
     argv:
       - pct
@@ -22,6 +24,7 @@
     - "'status: running' in lxc_ready_status.stdout"
 
 - name: Wait for systemd in LXC {{ lxc_ready_name | default(lxc_ready_vmid) }}
+  tags: [config]
   ansible.builtin.command:
     argv:
       - pct

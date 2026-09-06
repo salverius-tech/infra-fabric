@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+id {{ sssf_runtime_user }} >/dev/null
+[ -x {{ sssf_pi_path | quote }} ]
+[ -x {{ sssf_uv_path | quote }} ]
+[ -x /usr/local/bin/just ]
+[ -r {{ sssf_config_path | quote }} ]
+[ -d {{ sssf_workspace_root | quote }} ]
+[ -d {{ sssf_data_dir | quote }} ]
+if [ -f {{ (sssf_data_dir ~ '/factory/adw_data/sssf.db') | quote }} ]; then
+  sqlite3 {{ (sssf_data_dir ~ '/factory/adw_data/sssf.db') | quote }} 'PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;' >/dev/null
+fi
+if {{ sssf_visualizer_enabled | bool | ternary('true', 'false') }}; then
+  systemctl is-active --quiet sssf-visualizer
+  python3 - <<'PY'
+import json
+from urllib.request import urlopen
+
+with urlopen("http://127.0.0.1:{{ sssf_visualizer_port }}/api/health", timeout=5) as response:
+    payload = json.load(response)
+if response.status != 200 or payload.get("ok") is not True:
+    raise SystemExit("SSSF visualizer API health check failed")
+PY
+fi
+printf 'sssf healthy\n'

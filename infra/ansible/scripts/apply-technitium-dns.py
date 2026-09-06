@@ -214,7 +214,9 @@ def record_matches(
             continue
         if str(record.get("name", record.get("domain", domain))).rstrip(".") != domain:
             continue
-        if str(record.get(value_field, "")).rstrip(".") == desired_value.rstrip("."):
+        r_data = record.get("rData") if isinstance(record.get("rData"), Mapping) else {}
+        current_value = record.get(value_field, r_data.get(value_field, ""))
+        if str(current_value).rstrip(".") == desired_value.rstrip("."):
             return True
     return False
 

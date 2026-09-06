@@ -37,6 +37,7 @@ class FetchServiceStateTests(unittest.TestCase):
     def args(self, root: Path, output: str = "state.tar.gz") -> object:
         return fetch_service_state.parse_args([
             "--host", "192.0.2.71", "--user", "operator", "--remote-archive", "/tmp/hermes-state.tar.gz",
+            "--identity-file", "/home/anvil/.ssh/canonical-bootstrap",
             "--output", str(root / output), "--backup-root", str(root),
         ])
 
@@ -76,6 +77,8 @@ class FetchServiceStateTests(unittest.TestCase):
                 "ssh",
                 "-p",
                 "22",
+                "-i",
+                "/home/anvil/.ssh/canonical-bootstrap",
                 "-o",
                 "BatchMode=yes",
                 "-o",
@@ -101,7 +104,11 @@ class FetchServiceStateTests(unittest.TestCase):
         backup = (SCRIPT.parents[1] / "playbooks" / "service-state-backup.yml").read_text(encoding="utf-8")
         self.assertIn("service_state_stream.stdout | from_json", backup)
         self.assertIn("service_state_checksum.sha256", backup)
+        restore = (SCRIPT.parents[1] / "playbooks" / "service-state-restore.yml").read_text(encoding="utf-8")
+        self.assertIn("--identity-file", restore)
+        self.assertIn("/home/anvil/.ssh/canonical-bootstrap", restore)
         self.assertIn("- name: Create and stream service-state backup transaction\n      block:", backup)
+        self.assertNotIn("- name: Create and stream service-state backup transaction\n      tags:", backup)
         self.assertIn("      always:\n", backup)
         self.assertLess(backup.index("      always:"), backup.index("Record streamed service-state archive checksum"))
         self.assertNotIn("sha256sum", backup)

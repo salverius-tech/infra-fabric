@@ -1,5 +1,6 @@
 ---
 - name: Validate Infisical required variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - infisical_vmid is defined
@@ -13,21 +14,93 @@
       - caddy_email is defined
       - caddy_cloudflare_api_token is defined
     fail_msg: infisical_vmid, infisical_domain, infisical_encryption_key, infisical_auth_secret, infisical_postgres_password, caddy_email, and caddy_cloudflare_api_token are required.  # yamllint disable-line rule:line-length
+- name: Check whether Infisical Caddy has Cloudflare DNS module
+  tags: [validation]
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
+  register: infisical_caddy_cloudflare_module
+  changed_when: false
+  failed_when: false
+
+- name: Require reviewed Infisical Caddy artifact before guest mutation
+  tags: [always]
+  ansible.builtin.include_tasks: ../../../tasks/reviewed-artifact-cache.yml
+  vars:
+    reviewed_artifact_cache_root: "{{ infisical_artifact_cache_root | default('/var/lib/infra-fabric/artifacts') }}"
+    reviewed_artifact_stage_root: /var/tmp/infra-fabric-artifacts
+    reviewed_artifacts:
+      - name: caddy-cloudflare
+        version: "{{ infisical_caddy_cloudflare_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "caddy-cloudflare-{{ infisical_caddy_cloudflare_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ infisical_caddy_cloudflare_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else infisical_caddy_cloudflare_sha256_arm64 }}
+      - name: docker-compose
+        version: "{{ infisical_compose_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "docker-compose-{{ infisical_compose_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ infisical_compose_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else infisical_compose_sha256_arm64 }}
+
+
+- name: Install Caddy package and service prerequisites
+  tags: [packages]
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+    update_cache: true
+
+- name: Ensure Caddy service account exists
+  tags: [config]
+  ansible.builtin.user:
+    name: caddy
+    system: true
+    state: present
+
+- name: Install reviewed Infisical Caddy with Cloudflare DNS module
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/caddy-cloudflare/{{ infisical_caddy_cloudflare_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/caddy-cloudflare-{{ infisical_caddy_cloudflare_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/bin/caddy
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
+  notify: Restart caddy
 - name: Install Infisical OS dependencies in LXC
+  tags: [packages]
   ansible.builtin.command:
     argv:
       - bash
       - -lc
-      - "set -euo pipefail; packages=\"ca-certificates caddy curl docker.io git gnupg openssh-client\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
+      - "set -euo pipefail; packages=\"ca-certificates curl docker.io git gnupg openssh-client\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
   changed_when: false
-- name: Install Docker Compose CLI plugin in Infisical LXC
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - "set -euo pipefail; version=\"{{ infisical_compose_version | default('5.3.0') }}\"; current=\"$(docker compose version --short 2>/dev/null || true)\"; if [[ \"${current}\" != \"${version}\" ]]; then\n  arch=\"$(uname -m | sed 's/x86_64/x86_64/;s/aarch64/aarch64/')\";\n  install -d -m 0755 /usr/local/lib/docker/cli-plugins;\n  compose_url=\"https://github.com/docker/compose/releases/download/v${version}/docker-compose-linux-${arch}\";\n  curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-compose \"${compose_url}\";\n  chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose;\nfi"  # yamllint disable-line rule:line-length
-  changed_when: false
+- name: Ensure Infisical Compose plugin parent exists
+  tags: [config]
+  ansible.builtin.file:
+    path: /usr/local/lib/docker/cli-plugins
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install reviewed Infisical Docker Compose plugin
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/docker-compose/{{ infisical_compose_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/docker-compose-{{ infisical_compose_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/local/lib/docker/cli-plugins/docker-compose
+    remote_src: true
+    mode: '0755'
+
 - name: Ensure Infisical directories exist
+  tags: [config]
   ansible.builtin.command:
     argv:
       - bash
@@ -35,6 +108,7 @@
       - install -d -m 0750 /etc/infisical /opt/infisical {{ infisical_data_dir | default('/var/lib/infisical') }} {{ infisical_data_dir | default('/var/lib/infisical') }}/postgres {{ infisical_data_dir | default('/var/lib/infisical') }}/redis  # yamllint disable-line rule:line-length
   changed_when: false
 - name: Install Infisical env
+  tags: [packages]
   ansible.builtin.template:
     src: infisical.env.j2
     dest: /etc/infisical/infisical.env
@@ -44,6 +118,7 @@
   no_log: true
   notify: Restart infisical
 - name: Install Infisical Compose file
+  tags: [packages]
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: /opt/infisical/docker-compose.yml
@@ -52,6 +127,7 @@
     group: root
   notify: Restart infisical
 - name: Start Infisical Compose stack
+  tags: [service]
   ansible.builtin.command:
     argv:
       - bash
@@ -59,25 +135,9 @@
       - cd /opt/infisical && set -a && . /etc/infisical/infisical.env && set +a && docker compose -f docker-compose.yml up -d
   changed_when: false
   no_log: true
-- name: Check whether Infisical Caddy has Cloudflare DNS module
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
-  register: infisical_caddy_cloudflare_module
-  changed_when: false
-  failed_when: false
-- name: Build Infisical Caddy with Cloudflare DNS module
-  ansible.builtin.command:
-    argv:
-      - bash
-      - -lc
-      - curl -fsSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz && rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz && PATH=/usr/local/go/bin:${PATH} GOBIN=/usr/local/bin /usr/local/go/bin/go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.6 && PATH=/usr/local/go/bin:${PATH} /usr/local/bin/xcaddy build --with github.com/caddy-dns/cloudflare@v0.2.4 --output /tmp/caddy-cloudflare && install -m 0755 /tmp/caddy-cloudflare /usr/bin/caddy  # yamllint disable-line rule:line-length
-  when: infisical_caddy_cloudflare_module.rc != 0
-  changed_when: true
-  notify: Restart caddy
+
 - name: Install Infisical Caddy env
+  tags: [packages]
   ansible.builtin.template:
     src: caddy.env.j2
     dest: /etc/caddy/env
@@ -87,6 +147,7 @@
   no_log: true
   notify: Restart caddy
 - name: Install Infisical Caddyfile
+  tags: [packages]
   ansible.builtin.template:
     src: Caddyfile.j2
     dest: /etc/caddy/Caddyfile
@@ -95,6 +156,7 @@
     group: root
   notify: Restart caddy
 - name: Ensure Infisical Caddy systemd override directory exists
+  tags: [config]
   ansible.builtin.file:
     path: /etc/systemd/system/caddy.service.d
     state: directory
@@ -102,6 +164,7 @@
     owner: root
     group: root
 - name: Install Infisical Caddy systemd override
+  tags: [packages]
   ansible.builtin.template:
     src: caddy-override.conf.j2
     dest: /etc/systemd/system/caddy.service.d/override.conf
@@ -110,6 +173,7 @@
     group: root
   notify: Restart caddy
 - name: Validate Infisical Caddy config
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - bash
@@ -117,6 +181,7 @@
       - set -a && . /etc/caddy/env && set +a && caddy validate --config /etc/caddy/Caddyfile
   changed_when: false
 - name: Enable Infisical Caddy service
+  tags: [service]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -125,8 +190,10 @@
       - caddy
   changed_when: false
 - name: Flush Infisical service restarts before endpoint checks
+  tags: [health]
   ansible.builtin.meta: flush_handlers
 - name: Verify Infisical Docker service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -138,6 +205,7 @@
   delay: 5
   until: infisical_docker_active.rc == 0
 - name: Verify Infisical Caddy service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -149,6 +217,7 @@
   delay: 5
   until: infisical_caddy_active.rc == 0
 - name: Verify Infisical Compose services are running
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - bash
@@ -165,6 +234,7 @@
   delay: 5
   until: infisical_compose_running_check.rc == 0
 - name: Verify Infisical HTTPS route locally
+  tags: [health]
   ansible.builtin.command:
     argv:
       - curl

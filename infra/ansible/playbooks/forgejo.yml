@@ -9,16 +9,29 @@
       vars:
         lxc_ready_vmid: '{{ forgejo_vmid }}'
         lxc_ready_name: forgejo
-      when: forgejo_runtime.type | default('lxc') == 'lxc'
+      when:
+        - forgejo_runtime.type | default('lxc') == 'lxc'
+        - not (infra_host_identity_skip_root | default(false) | bool)
 - name: Run direct access handoff for Forgejo
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: forgejo
-- name: Configure Forgejo service directly
+- name: Converge canonical host identities for Forgejo
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: forgejo
+- name: Configure Forgejo directly
   hosts: forgejo
   gather_facts: false
   become: true
+  vars:
+    caddy_cloudflare_api_token: "{{ lookup('env', 'CF_DNS_API_TOKEN') }}"
+    forgejo_bootstrap_admin_password: "{{ lookup('env', 'FORGEJO_ADMIN_PASSWORD') }}"
+    forgejo_bootstrap_owner_password: "{{ lookup('env', 'FORGEJO_REPO_OWNER_PASSWORD') }}"
+    forgejo_internal_token: "{{ lookup('env', 'FORGEJO_INTERNAL_TOKEN') }}"
+    forgejo_lfs_jwt_secret: "{{ lookup('env', 'FORGEJO_LFS_JWT_SECRET') }}"
+    forgejo_oauth2_jwt_secret: "{{ lookup('env', 'FORGEJO_OAUTH2_JWT_SECRET') }}"
+    forgejo_postgres_password: "{{ lookup('env', 'FORGEJO_POSTGRES_PASSWORD') }}"
+    forgejo_secret_key: "{{ lookup('env', 'FORGEJO_SECRET_KEY') }}"
   roles:
-    - role: lxc_credentials
-      when: forgejo_runtime.type | default('lxc') == 'lxc'
     - forgejo

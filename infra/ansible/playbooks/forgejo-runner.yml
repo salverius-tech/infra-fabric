@@ -9,14 +9,22 @@
       vars:
         lxc_ready_vmid: '{{ forgejo_runner_vmid }}'
         lxc_ready_name: forgejo_runner
-      when: forgejo_runner_runtime.type | default('lxc') == 'lxc'
-- name: Run direct access handoff for Forgejo Actions runner and delegated Forgejo tasks
+      when:
+        - forgejo_runner_runtime.type | default('lxc') == 'lxc'
+        - not (infra_host_identity_skip_root | default(false) | bool)
+- name: Run direct access handoff for Forgejo Runner
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: forgejo_runner:forgejo
-- name: Configure Forgejo Actions runner directly
+- name: Converge canonical host identities for Forgejo Runner
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: forgejo_runner
+- name: Configure Forgejo Runner directly
   hosts: forgejo_runner
   gather_facts: false
   become: true
+  vars:
+    forgejo_runner_registration_secret: "{{ lookup('env', 'FORGEJO_RUNNER_REGISTRATION_SECRET') }}"
   roles:
     - forgejo_runner

@@ -18,14 +18,17 @@ argument_specs:
       infisical_encryption_key:
         type: str
         required: true
+        no_log: true
         description: "Infisical encryption key from private values."
       infisical_auth_secret:
         type: str
         required: true
+        no_log: true
         description: "Infisical auth secret from private values."
       infisical_postgres_password:
         type: str
         required: true
+        no_log: true
         description: "Infisical PostgreSQL password from private values."
       infisical_onramp_base_dir:
         type: str

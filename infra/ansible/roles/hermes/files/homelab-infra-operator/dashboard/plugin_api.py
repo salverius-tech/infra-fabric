@@ -13,6 +13,12 @@ from fastapi import APIRouter, HTTPException, Request
 router = APIRouter()
 
 
+def _mutation_enabled() -> bool:
+    # No trusted sender/principal boundary exists yet. Environment configuration
+    # cannot reactivate mutation; that requires a later reviewed source change.
+    return False
+
+
 def _bridge(action: str, *extra: str) -> dict[str, Any]:
     repo_value = os.environ.get("HERMES_OPERATOR_REPO_PATH", "").strip()
     if not repo_value:
@@ -53,8 +59,17 @@ def plan() -> dict[str, Any]:
     return _bridge("plan")
 
 
+@router.get("/audit-verify")
+def audit_verify() -> dict[str, Any]:
+    return _bridge("audit-verify")
+
+
 @router.post("/apply")
 async def apply(request: Request) -> dict[str, Any]:
+    if not _mutation_enabled():
+        raise HTTPException(
+            status_code=404, detail="infrastructure mutation is not activated"
+        )
     try:
         body = await request.json()
     except Exception as error:

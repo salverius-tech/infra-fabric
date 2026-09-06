@@ -1,5 +1,6 @@
 ---
 - name: Restart infisical
+  tags: [service]
   ansible.builtin.command:
     argv:
       - bash
@@ -8,6 +9,7 @@
   changed_when: true
   no_log: true
 - name: Restart caddy
+  tags: [service]
   ansible.builtin.systemd:
     name: caddy
     state: restarted

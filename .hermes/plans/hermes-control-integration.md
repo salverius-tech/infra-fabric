@@ -1,6 +1,6 @@
 # Hermes Control Integration Plan
 
-**Status:** Implementation in progress — authority model approved; no live guest deployment, plan, or apply has been performed.
+**Status:** Working design — the `infra-fabric` source contract is complete and HC-01 is complete in `hermes-control`; disposable guest lifecycle/plugin/Caddy/DNS/WebSocket smoke checks, upstream compatibility, deployed five-state/update behavior, rollback, and live acceptance remain external gates. The [package completion](../reconciliation/package-completion.md) and [acceptance matrix](../reconciliation/acceptance-matrix.md) are the active status authorities. No live or production acceptance is implied here.
 
 ## Decision
 
@@ -37,13 +37,15 @@ The operator approved implementation on the active working branches. The Control
 
 ## Ordered tasks
 
+The checkboxes below record completion of the public source contract only. They do not claim the guest, provider, production, rollback, or other external evidence listed in the evidence log. Use the environment-specific acceptance matrix for those gates.
+
 ### HC-01 — Enforce the infrastructure authority model in Hermes Control
 
-- [ ] Add an explicit deployment policy setting such as `CONTROL_API_REQUIRE_TASK_APPROVAL=1`.
-- [ ] Enforce the policy at the shared task-submission boundary, not only in mobile defaults: newly created tasks and all recovery/continuation/new-session paths must remain awaiting approval when the setting is enabled.
-- [ ] Keep health, diagnostics, project/session reads, task reads, and approval/rejection audit reads available to authenticated callers.
-- [ ] Preserve durable approval audit metadata; reject invalid state transitions.
-- [ ] Document that API approval is a task-execution gate, while infrastructure mutation must still pass the existing homelab operator’s plan/approval/destructive-stateful controls.
+- [x] Add an explicit deployment policy setting such as `CONTROL_API_REQUIRE_TASK_APPROVAL=1`.
+- [x] Enforce the policy at the shared task-submission boundary, not only in mobile defaults: newly created tasks and all recovery/continuation/new-session paths must remain awaiting approval when the setting is enabled.
+- [x] Keep health, diagnostics, project/session reads, task reads, and approval/rejection audit reads available to authenticated callers.
+- [x] Preserve durable approval audit metadata; reject invalid state transitions.
+- [x] Document that API approval is a task-execution gate, while infrastructure mutation must still pass the existing infrastructure operator’s plan/approval/destructive-stateful controls.
 
 **Repository:** `hermes-control`.
 
@@ -51,11 +53,11 @@ The operator approved implementation on the active working branches. The Control
 
 ### HC-02 — Add a dedicated `hermes_control` Ansible role
 
-- [ ] Create `infra/ansible/roles/hermes_control/` with defaults, tasks, templates, handlers, and public-safe tests.
-- [ ] Invoke it from the existing Hermes service configuration flow only when `hermes_control_enabled` is true.
-- [ ] Use `hermes_runtime_user` and its existing home/Hermes state; do not create or hard-code a second `hermes` account.
-- [ ] Install required OS dependencies declaratively and create an isolated venv under the managed checkout.
-- [ ] Keep role variables free of real URLs, hostnames, tokens, paths unique to a site, and source credentials.
+- [x] Create `infra/ansible/roles/hermes_control/` with defaults, tasks, templates, handlers, and public-safe tests.
+- [x] Invoke it from the existing Hermes service configuration flow only when `hermes_control_enabled` is true.
+- [x] Use `hermes_runtime_user` and its existing home/Hermes state; do not create or hard-code a second `hermes` account.
+- [x] Install required OS dependencies declaratively and create an isolated venv under the managed checkout.
+- [x] Keep role variables free of real URLs, hostnames, tokens, paths unique to a site, and source credentials.
 
 **Likely paths:** `infra/ansible/playbooks/hermes.yml`, `infra/ansible/roles/hermes/tasks/main.yml`, new `infra/ansible/roles/hermes_control/`, dynamic inventory/scaffold tests as needed.
 
@@ -63,36 +65,36 @@ The operator approved implementation on the active working branches. The Control
 
 ### HC-03 — Add pinned source acquisition and local plugin installation
 
-- [ ] Declare private source inputs for repository URL, immutable reviewed commit/ref, and optional read-only source credential mechanism.
-- [ ] Check out the exact approved revision into a fixed managed guest path; verify the checked-out commit before venv installation.
-- [ ] Install/enable `hermes-control-extension` from the local managed checkout using the Hermes plugin manager, under `hermes_runtime_user`.
-- [ ] Restart the gateway only through Ansible handlers after plugin installation/update.
-- [ ] Do not use floating `git pull`, an unpinned remote plugin install, or a second uncontrolled plugin checkout.
+- [x] Declare private source inputs for repository URL, immutable reviewed commit/ref, and optional read-only source credential mechanism.
+- [x] Check out the exact approved revision into a fixed managed guest path; verify the checked-out commit before venv installation.
+- [x] Install/enable `hermes-control-extension` from the local managed checkout using the Hermes plugin manager, under `hermes_runtime_user`.
+- [x] Restart the gateway only through Ansible handlers after plugin installation/update.
+- [x] Do not use floating `git pull`, an unpinned remote plugin install, or a second uncontrolled plugin checkout.
 
-**Likely paths:** new role tasks/templates; `scaffold/.env.example`; `scaffold/ansible/inventory/local.yml`; values migration/default generation; public documentation.
+**Implemented paths:** role tasks/templates, canonical catalog/schema/projections, generated inventory/vars, and public documentation.
 
 **Evidence:** Idempotence tests/mocks for checkout revision and plugin install invocation; plugin manifest/source verification; `HERMES_PLUGINS_DEBUG=1 hermes tools list` in disposable guest validation.
 
 ### HC-04 — Render least-privilege configuration and persistent state
 
-- [ ] Generate and persist separately an API bearer token and bridge token in private `values/.env`; generation must be idempotent and never logged.
-- [ ] Render three root-owned, runtime-user-readable environment views:
+- [x] Deliver separate API bearer and bridge tokens from the selected site's encrypted canonical bundle; delivery is transient and never logged.
+- [x] Render three root-owned, runtime-user-readable environment views:
   - API: API bearer token, bridge token/socket, task DB, Hermes home, managed workspace and approved project roots, mandatory-approval policy.
   - bridge: bridge token/socket, managed Hermes command, Hermes home, runtime PATH/node environment.
   - gateway plugin: localhost API URL and API bearer token only.
-- [ ] Create persistent Control API state with restrictive ownership/mode.
-- [ ] Ensure the bridge command uses the managed Hermes runtime and prevents recursive plugin loading; do not rely on disabled child rules for infrastructure safety.
+- [x] Create persistent Control API state with restrictive ownership/mode.
+- [x] Ensure the bridge command uses the managed Hermes runtime and prevents recursive plugin loading; do not rely on disabled child rules for infrastructure safety.
 
-**Likely paths:** new role templates; `scripts/migrate-values.py`; scaffold private-value examples; related tests.
+**Implemented paths:** role templates, catalog-declared canonical secret bindings, canonical projections, and related tests.
 
 **Evidence:** No-secret output tests; mode/ownership/template contract tests; successful Control API diagnostics in a disposable guest; public-safety check.
 
 ### HC-05 — Install separately supervised bridge and API services
 
-- [ ] Template the bridge and API units with the configured `hermes_runtime_user`, managed checkout path, environment files, runtime directory, loopback binding, restart policy, and least necessary write paths.
-- [ ] Keep the bridge outside the gateway process so gateway reload/restart does not own or orphan mobile task IPC.
-- [ ] Configure ordering and handlers so bridge/API restart after a source, environment, or unit change; gateway restart remains independent.
-- [ ] Verify real Unix-socket connection readiness, not merely the socket pathname.
+- [x] Template the bridge and API units with the configured `hermes_runtime_user`, managed checkout path, environment files, runtime directory, loopback binding, restart policy, and least necessary write paths.
+- [x] Keep the bridge outside the gateway process so gateway reload/restart does not own or orphan mobile task IPC.
+- [x] Configure ordering and handlers so bridge/API restart after a source, environment, or unit change; gateway restart remains independent.
+- [x] Verify real Unix-socket connection readiness, not merely the socket pathname.
 
 **Likely paths:** new role systemd templates/handlers and test coverage.
 
@@ -100,10 +102,10 @@ The operator approved implementation on the active working branches. The Control
 
 ### HC-06 — Expose the API privately through Hermes-local Caddy and DNS
 
-- [ ] Extend the existing Hermes Caddy configuration using a dedicated private Control API hostname, not an exposed port and not a public default route.
-- [ ] Preserve dashboard routing and WebSocket behavior; Caddy `reverse_proxy` must carry `/ws/events` upgrades.
-- [ ] Add the corresponding DNS record through existing service/DNS orchestration, using public-safe scaffold placeholders and private values for the actual name.
-- [ ] Validate Caddy before reload and test both local loopback and private HTTPS access.
+- [x] Extend the existing Hermes Caddy configuration using a dedicated private Control API hostname, not an exposed port and not a public default route.
+- [x] Preserve dashboard routing and WebSocket behavior; Caddy `reverse_proxy` must carry `/ws/events` upgrades.
+- [x] Add the corresponding DNS record through existing service/DNS orchestration, using public-safe scaffold placeholders and private values for the actual name.
+- [x] Validate Caddy before reload and define both local-loopback and private-HTTPS health checks; live endpoint evidence remains external.
 
 **Likely paths:** Hermes Caddy templates, inventory/scaffold settings, DNS record generation/orchestration, documentation, Caddy tests.
 
@@ -111,10 +113,10 @@ The operator approved implementation on the active working branches. The Control
 
 ### HC-07 — Add deployment and upgrade verification
 
-- [ ] Add a redacted status/verification procedure that reports separately: gateway running, plugin installed/enabled, plugin loaded/registered, bridge ready, and API ready.
-- [ ] Add source-revision, API process-start/PID freshness, and authenticated diagnostics checks after an update.
-- [ ] Document API-token rotation, bridge-token rotation, rollback to the previous source ref, plugin refresh, and safe failure recovery.
-- [ ] Verify the existing `homelab-infra-operator` plugin remains loaded and its constrained plan/apply behavior is unchanged.
+- [x] Add a redacted status/verification procedure that reports separately: gateway running, plugin installed/enabled, plugin loaded/registered, bridge ready, and API ready.
+- [x] Add source-revision, API process-start/PID freshness, and authenticated diagnostics checks after an update.
+- [x] Document API-token rotation, bridge-token rotation, rollback to the previous source ref, plugin refresh, and safe failure recovery.
+- [x] Preserve the existing infrastructure operator plugin's hard read-only behavior; deployed coexistence remains an external acceptance gate.
 
 **Likely paths:** Hermes runbook/PRD, role verification tasks where appropriate, test fixtures, and documentation index.
 
@@ -138,14 +140,15 @@ The private values repository will need only deployment-specific values such as 
 | Task | Required evidence | Status |
 |---|---|---|
 | HC-01 | Mandatory-approval API regression coverage | Complete — backend approval-path coverage and docs in `hermes-control` |
-| HC-02 | Role contract and LXC/VM inventory coverage | Partial — dedicated role and focused contracts; disposable LXC/VM smoke pending |
-| HC-03 | Pinned checkout and local plugin-install checks | Partial — immutable checkout/local install contract; disposable plugin-manager smoke pending |
-| HC-04 | Secret/mode/template contract tests | Partial — split environment rendering and migration contract; guest diagnostics pending |
-| HC-05 | Bridge/API unit and real socket/API smoke evidence | Partial — units, local socket-connect/API checks; protocol/lifecycle guest smoke pending |
-| HC-06 | Caddy/DNS/HTTPS/WebSocket evidence | Partial — Caddy/DNS/HTTPS role checks; WebSocket and deployed DNS smoke pending |
-| HC-07 | Five-state verification and rollback documentation | Partial — operations guide and focused contracts; deployed five-state/update verification pending |
+| HC-02 | Role contract and LXC/VM inventory coverage | Source complete; external disposable LXC/VM smoke pending |
+| HC-03 | Pinned checkout and local plugin-install checks | Source complete; external disposable plugin-manager smoke pending |
+| HC-04 | Secret/mode/template contract tests | Source complete; external guest diagnostics pending |
+| HC-05 | Bridge/API unit and real socket/API smoke evidence | Source complete; external protocol/lifecycle guest smoke pending |
+| HC-06 | Caddy/DNS/HTTPS/WebSocket evidence | Source complete; external WebSocket and deployed DNS smoke pending |
+| HC-07 | Five-state verification and rollback documentation | Source complete; external deployed five-state/update verification pending |
 
 ## Decision log
 
 - 2026-07-22: Operator approved mandatory server-enforced task approval for Hermes Control in this infrastructure deployment.
-- 2026-07-22: Operator approved the dedicated Ansible-role approach in principle; implementation remains separately gated.
+- 2026-07-22: Operator approved the dedicated Ansible-role approach in principle.
+- 2026-08-13: Public source tasks are complete. Unchecked live claims were removed from the source checklist; the evidence log and acceptance matrix retain all external gates.

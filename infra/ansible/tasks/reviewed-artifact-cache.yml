@@ -1,0 +1,62 @@
+---
+# yamllint disable rule:line-length
+# Controller-side reviewed-artifact contract.  Callers provide only public pins and
+# filenames; cache ingestion is deliberately out of band and is never attempted here.
+- name: Validate reviewed artifact pins
+  tags: [validation]
+  ansible.builtin.assert:
+    that:
+      - reviewed_artifact_cache_root is match('^/[^ ]+$')
+      - reviewed_artifacts | length > 0
+      - item.name is match('^[a-z0-9][a-z0-9._-]*$')
+      - item.version is match('^v?[0-9]+[.][0-9]+(?:[.][0-9]+){0,2}(?:[-+][0-9a-z][0-9a-z.-]*)?$')
+      - item.architecture in ['amd64', 'arm64']
+      - item.filename is match('^[A-Za-z0-9][A-Za-z0-9._+-]*$')
+      - item.sha256 is match('^[0-9a-f]{64}$')
+    fail_msg: >-
+      Every reviewed artifact requires a cache root, version, supported architecture,
+      filename, and lowercase SHA-256 before any guest mutation.
+  loop: "{{ reviewed_artifacts }}"
+
+- name: Check reviewed artifacts on controller
+  tags: [validation]
+  ansible.builtin.stat:
+    path: "{{ reviewed_artifact_cache_root }}/{{ item.name }}/{{ item.version }}/{{ item.architecture }}/{{ item.filename }}"
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  become: false
+  register: reviewed_artifact_cache_stats
+  loop: "{{ reviewed_artifacts }}"
+
+- name: Require reviewed artifacts before guest mutation
+  tags: [validation]
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+      - item.stat.checksum == item.item.sha256
+    fail_msg: >-
+      Missing or checksum-mismatched reviewed artifact {{ item.item.name }} {{ item.item.version }}
+      for {{ item.item.architecture }} under {{ reviewed_artifact_cache_root }}. Review and place the
+      artifact out of band; deployment never fetches or populates this cache.
+  loop: "{{ reviewed_artifact_cache_stats.results }}"
+
+- name: Create reviewed artifact stage directories
+  tags: [packages]
+  ansible.builtin.file:
+    path: "{{ reviewed_artifact_stage_root }}/{{ item.name }}/{{ item.version }}/{{ item.architecture }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  loop: "{{ reviewed_artifacts }}"
+
+- name: Stage checksum-verified reviewed artifacts
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "{{ reviewed_artifact_cache_root }}/{{ item.name }}/{{ item.version }}/{{ item.architecture }}/{{ item.filename }}"
+    dest: "{{ reviewed_artifact_stage_root }}/{{ item.name }}/{{ item.version }}/{{ item.architecture }}/{{ item.filename }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop: "{{ reviewed_artifacts }}"

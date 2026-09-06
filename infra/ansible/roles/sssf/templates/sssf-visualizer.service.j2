@@ -1,0 +1,26 @@
+[Unit]
+Description=SSSF visualizer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ sssf_runtime_user }}
+Group={{ sssf_runtime_user }}
+WorkingDirectory={{ sssf_data_dir }}/factory/visualizer
+EnvironmentFile=/etc/sssf/env
+Environment=SSSF_DB={{ sssf_data_dir }}/factory/adw_data/sssf.db
+Environment=PORT={{ sssf_visualizer_port }}
+ExecStart=/usr/local/bin/bun run server/index.ts
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths={{ sssf_data_dir }}
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

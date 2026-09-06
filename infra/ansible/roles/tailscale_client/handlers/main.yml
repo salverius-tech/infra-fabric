@@ -1,5 +1,6 @@
 ---
 - name: Restart tailscaled
+  tags: [service]
   ansible.builtin.systemd:
     name: tailscaled
     state: restarted

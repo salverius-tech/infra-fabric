@@ -18,6 +18,7 @@ argument_specs:
       caddy_cloudflare_api_token:
         type: str
         required: true
+        no_log: true
         description: "Cloudflare DNS API token for Caddy DNS-01 challenge."
       hermes_dashboard_enabled:
         type: bool
@@ -63,6 +64,27 @@ argument_specs:
         type: str
         required: false
         description: "Repository path written into the landing page helper (default: /srv/homelab-infra)."
+      hermes_operator_mutation_enabled:
+        type: bool
+        required: false
+        default: false
+        description: "Reserved future activation gate; true is rejected by the hard read-only pilot role until a reviewed source change."
+      hermes_operator_audit_path:
+        type: str
+        required: false
+        description: "Private append-only operator journal path; required when mutation is activated."
+      hermes_operator_audit_backup_dir:
+        type: str
+        required: false
+        description: "Private externally backed audit snapshot directory; required when mutation is activated."
+      hermes_operator_runtime_path:
+        type: str
+        required: false
+        description: "Root-owned public read-only Hermes operator runtime bundle path."
+      hermes_operator_context_path:
+        type: str
+        required: false
+        description: "Root-owned generated non-secret Hermes operator context path."
       hermes_runtime_user:
         type: str
         required: false
@@ -79,6 +101,11 @@ argument_specs:
         type: list
         required: false
         description: "Authorized key entries installed for the Hermes runtime user (default: [])."
+      hermes_default_soul_sha256:
+        type: list
+        elements: str
+        required: false
+        description: "Accepted SHA-256 digests for the default managed Hermes soul artifact."
       hermes_compression_threshold:
         type: float
         required: false
@@ -106,12 +133,113 @@ argument_specs:
       hermes_dashboard_basic_auth_password_hash:
         type: str
         required: false
+        no_log: true
         description: "Required when hermes_dashboard_enabled is true; argon/scrypt hash for dashboard basic-auth."
       hermes_dashboard_basic_auth_secret:
         type: str
         required: false
+        no_log: true
         description: "Required when hermes_dashboard_enabled is true; Hermes dashboard auth secret."
       hermes_web_searxng_url:
         type: str
         required: false
         description: "Optional public/searxng URL injected for web search integration if set."
+      hermes_control_enabled:
+        type: bool
+        required: false
+        description: "Enable the private Hermes Control companion stack (default: false)."
+      hermes_control_source_checkout_path:
+        type: str
+        required: false
+        description: "Managed checkout path for the reviewed Hermes Control source."
+      hermes_control_install_dir:
+        type: str
+        required: false
+        description: "Managed Hermes Control install path."
+      hermes_control_config_dir:
+        type: str
+        required: false
+        description: "Root-owned Hermes Control configuration directory."
+      hermes_control_state_dir:
+        type: str
+        required: false
+        description: "Persistent Hermes Control state directory."
+      hermes_control_api_host:
+        type: str
+        required: false
+        description: "Loopback-only Control API bind host."
+      hermes_control_api_port:
+        type: int
+        required: false
+        description: "Local Control API bind port."
+      hermes_control_domain:
+        type: str
+        required: false
+        description: "Private HTTPS hostname for Hermes Control."
+      hermes_control_require_task_approval:
+        type: bool
+        required: false
+        description: "Require approval before Hermes Control executes submitted tasks."
+      hermes_control_source_url:
+        type: str
+        required: false
+        description: "Private source repository URL for the reviewed Hermes Control checkout."
+      hermes_control_source_ref:
+        type: str
+        required: false
+        description: "Immutable reviewed Git commit for Hermes Control."
+      hermes_control_api_token:
+        type: str
+        required: false
+        no_log: true
+        description: "Private Hermes Control API bearer token."
+      hermes_control_bridge_token:
+        type: str
+        required: false
+        no_log: true
+        description: "Private Hermes Control bridge authentication token."
+      hermes_control_plugin_socket:
+        type: str
+        required: false
+        description: "Local Unix socket for the Hermes Control bridge."
+      hermes_control_workspace_root:
+        type: str
+        required: false
+        description: "Normalized absolute workspace root available to the Control API."
+      hermes_control_project_roots:
+        type: list
+        elements: str
+        required: false
+        description: "Approved normalized absolute project roots available to the Control API."
+      hermes_compose_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed Docker Compose SHA-256 for amd64."
+      hermes_compose_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed Docker Compose SHA-256 for arm64."
+      hermes_just_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed just SHA-256 for amd64."
+      hermes_just_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed just SHA-256 for arm64."
+      hermes_caddy_cloudflare_version:
+        type: str
+        required: false
+        description: "Reviewed artifact pin supplied by the canonical projection."
+      hermes_caddy_cloudflare_sha256_amd64:
+        type: str
+        required: false
+        description: "Reviewed Caddy SHA-256 for amd64."
+      hermes_caddy_cloudflare_sha256_arm64:
+        type: str
+        required: false
+        description: "Reviewed Caddy SHA-256 for arm64."
+      hermes_artifact_cache_root:
+        type: str
+        required: false
+        description: "Reviewed artifact pin supplied by the canonical projection."

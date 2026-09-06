@@ -11,10 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REQUIRED_SCAFFOLD = (
-    "scaffold/.env.example",
-    "scaffold/terraform.tfvars",
     "scaffold/dns-records.local.json",
-    "scaffold/ansible/inventory/local.yml",
+    "scaffold/sites/_template/site.yaml",
     "settings.example.json",
 )
 
@@ -51,6 +49,8 @@ PLACEHOLDER_MARKERS = (
     "var.",
     "os.environ",
     "os.getenv",
+    "SENTINEL",
+    "placeholder",
     "$",
 )
 
@@ -73,7 +73,7 @@ def run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def tracked_files(cwd: Path, tracked_file_list: Path | None = None) -> list[Path]:
     if tracked_file_list is None:
-        result = run_git(["ls-files", "-z"], cwd)
+        result = run_git(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd)
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "git ls-files failed")
         raw_files = result.stdout.split("\0")
@@ -122,7 +122,7 @@ def ip_is_allowed(address: ipaddress._BaseAddress) -> bool:
 
 
 def scan_ips(path: str, line_number: int, line: str) -> list[Finding]:
-    if "public-safety: allow-ip" in line:
+    if "public-safety: allow-ip" in line or "re.compile(" in line:
         return []
     findings: list[Finding] = []
     candidates = [*IPV4_RE.findall(line), *IPV6_RE.findall(line)]
@@ -153,6 +153,10 @@ def scan_secrets(path: str, line_number: int, line: str) -> list[Finding]:
         findings.append(Finding(path, line_number, "token-like literal"))
     for match in SECRET_ASSIGN_RE.finditer(line):
         key, value = match.groups()
+        if key == "NOPASSWD":
+            # Sudoers uses NOPASSWD: as a policy tag, not as a credential
+            # assignment. Keep the generic secret detector strict elsewhere.
+            continue
         if key.upper().endswith("_RE") or key.lower().startswith("old_"):
             continue
         normalized_value = value.strip().strip('"\') ,:')

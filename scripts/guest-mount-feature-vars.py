@@ -10,15 +10,6 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import settings
-from values_context import from_environment
-
-try:
-    import hcl2
-except ImportError as error:  # pragma: no cover - exercised in tooling container
-    print(f"missing python-hcl2 dependency: {error}", file=sys.stderr)
-    raise SystemExit(1) from error
-
-DEFAULT_TFVARS = from_environment().path("terraform.tfvars")
 REQUIRED_FEATURES = {"guest_nfs": "nfs", "guest_cifs": "cifs"}
 SERVICE_HOSTS = settings.SERVICE_REGISTRY_DATA["services"]
 
@@ -27,16 +18,13 @@ class GuestMountFeatureError(ValueError):
     pass
 
 
-def load_tfvars(path: Path) -> dict[str, Any]:
+def load_projection(path: Path) -> dict[str, Any]:
     try:
-        with path.open("r", encoding="utf-8") as file:
-            data = hcl2.load(file)
-    except OSError as error:
-        raise GuestMountFeatureError(f"cannot read {path}: {error}") from error
-    except Exception as error:
-        raise GuestMountFeatureError(f"cannot parse {path}: {error}") from error
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise GuestMountFeatureError(f"cannot read canonical projection {path}: {error}") from error
     if not isinstance(data, dict):
-        raise GuestMountFeatureError(f"{path} must contain an object")
+        raise GuestMountFeatureError(f"canonical projection {path} must contain an object")
     return data
 
 
@@ -52,8 +40,6 @@ def build_feature_checks(enabled_services: list[str], tfvars: dict[str, Any]) ->
         vmid = tfvars.get(vmid_key) if vmid_key else None
         runtimes = tfvars.get("service_runtime", {})
         runtime = runtimes.get(service, {}) if isinstance(runtimes, dict) else {}
-        if not isinstance(runtime, dict) or not runtime:
-            runtime = tfvars.get(f"{service}_runtime", {})
         runtime_type = runtime.get("type", "lxc") if isinstance(runtime, dict) else "lxc"
         if runtime_type != "lxc":
             continue
@@ -96,15 +82,28 @@ def format_summary(checks: list[dict[str, Any]]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--tfvars", type=Path, default=DEFAULT_TFVARS)
-    parser.add_argument("--settings", type=Path, default=None)
+    parser.add_argument("--projection", type=Path, required=True, help="generated canonical OpenTofu JSON projection")
     parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
 
     try:
-        loaded_settings = settings.load_settings(args.settings)
-        checks = build_feature_checks(loaded_settings["services"], load_tfvars(args.tfvars))
-    except (settings.SettingsError, GuestMountFeatureError) as error:
+        projection = load_projection(args.projection)
+        enabled_services = projection.get("enabled_services")
+        if not isinstance(enabled_services, list) or not all(isinstance(service, str) for service in enabled_services):
+            raise GuestMountFeatureError("canonical projection enabled_services must be a string list")
+        runtimes = projection.get("service_runtime")
+        storage = projection.get("service_storage")
+        if not isinstance(runtimes, dict):
+            raise GuestMountFeatureError("canonical projection service_runtime must be an object")
+        if not isinstance(storage, dict):
+            raise GuestMountFeatureError("canonical projection service_storage must be an object")
+        if any(service in runtimes and not isinstance(runtimes[service], dict) for service in enabled_services):
+            raise GuestMountFeatureError("canonical projection service_runtime entries must be objects")
+        if any(service in storage and not isinstance(storage[service], dict) for service in enabled_services):
+            raise GuestMountFeatureError("canonical projection service_storage entries must be objects")
+        tfvars = projection
+        checks = build_feature_checks(enabled_services, tfvars)
+    except GuestMountFeatureError as error:
         print(f"guest mount feature vars failed: {error}", file=sys.stderr)
         return 1
 

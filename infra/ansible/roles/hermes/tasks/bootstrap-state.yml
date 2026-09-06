@@ -1,5 +1,6 @@
 ---
 - name: Discover private Hermes state backups on the controller
+  tags: [backup]
   ansible.builtin.set_fact:
     hermes_state_backup_candidates: >-
       {{ query('ansible.builtin.fileglob', '/workspace/values/service-backups/hermes/hermes-state-*.tar.gz')
@@ -8,16 +9,19 @@
          | list }}
 
 - name: Select newest private Hermes state backup
+  tags: [backup]
   ansible.builtin.set_fact:
     hermes_state_bootstrap_archive: >-
       {{ (hermes_state_backup_candidates | last) if hermes_state_backup_candidates | length > 0 else '' }}
 
 - name: Inspect existing Hermes runtime state
+  tags: [config]
   ansible.builtin.stat:
     path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
   register: hermes_state_directory_before_bootstrap
 
 - name: Inspect existing Hermes runtime state entries
+  tags: [config]
   ansible.builtin.find:
     paths: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
     recurse: false
@@ -27,12 +31,14 @@
   when: hermes_state_directory_before_bootstrap.stat.exists
 
 - name: Decide whether Hermes state is safe to bootstrap
+  tags: [config]
   ansible.builtin.set_fact:
     hermes_state_bootstrap_safe: >-
       {{ not hermes_state_directory_before_bootstrap.stat.exists or
          (hermes_state_entries_before_bootstrap.matched | default(0) | int == 0) }}
 
 - name: Validate selected Hermes bootstrap archive checksum when present
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - sha256sum
@@ -48,6 +54,7 @@
     - lookup('ansible.builtin.fileglob', hermes_state_bootstrap_archive ~ '.sha256', wantlist=True) | length > 0
 
 - name: Validate selected Hermes bootstrap archive structure
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - python
@@ -65,6 +72,7 @@
   when: hermes_state_bootstrap_archive | length > 0
 
 - name: Read archived Hermes soul checksum
+  tags: [validation]
   ansible.builtin.shell:
     cmd: >-
       set -euo pipefail;
@@ -81,6 +89,7 @@
     - hermes_state_bootstrap_safe | bool
 
 - name: Require customized soul state before automatic full restore
+  tags: [restore]
   ansible.builtin.assert:
     that:
       - hermes_archived_soul_checksum.stdout | trim not in hermes_default_soul_sha256
@@ -97,6 +106,7 @@
     - hermes_state_bootstrap_safe | bool
   block:
     - name: Stop Hermes services before bootstrap restore when present
+      tags: [restore]
       ansible.builtin.command:
         argv:
           - systemctl
@@ -107,23 +117,27 @@
       failed_when: false
 
     - name: Copy private Hermes bootstrap archive to service host
+      tags: [config]
       ansible.builtin.copy:
         src: "{{ hermes_state_bootstrap_archive }}"
         dest: /tmp/hermes-state-bootstrap.tar.gz
         mode: '0600'
 
     - name: Remove pristine Hermes runtime state before bootstrap restore
+      tags: [restore]
       ansible.builtin.file:
         path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
         state: absent
 
     - name: Restore complete Hermes runtime state
+      tags: [restore]
       ansible.builtin.unarchive:
         src: /tmp/hermes-state-bootstrap.tar.gz
         dest: /
         remote_src: true
 
     - name: Repair restored Hermes runtime state ownership
+      tags: [restore]
       ansible.builtin.file:
         path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
         state: directory
@@ -132,11 +146,13 @@
         recurse: true
 
     - name: Remove remote Hermes bootstrap archive
+      tags: [config]
       ansible.builtin.file:
         path: /tmp/hermes-state-bootstrap.tar.gz
         state: absent
 
     - name: Record restored Hermes bootstrap archive checksum
+      tags: [restore]
       ansible.builtin.copy:
         dest: /home/{{ hermes_runtime_user | default('anvil') }}/.hermes/.infra-state-bootstrap
         owner: "{{ hermes_runtime_user | default('anvil') }}"

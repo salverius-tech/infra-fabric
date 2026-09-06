@@ -31,7 +31,7 @@ resource "proxmox_virtual_environment_vm" "onramp_host" {
 
   cpu {
     cores = var.onramp_host_cores
-    type  = "x86-64-v2-AES"
+    type  = local.vm_cpu_type["onramp_host"]
   }
 
   memory {
@@ -61,8 +61,8 @@ resource "proxmox_virtual_environment_vm" "onramp_host" {
     }
 
     user_account {
-      username = var.onramp_host_cloud_init_user
-      keys     = length(var.onramp_host_ssh_public_keys) > 0 ? var.onramp_host_ssh_public_keys : var.lxc_ssh_public_keys
+      username = var.bootstrap_ssh_user
+      keys     = lookup(var.bootstrap_ssh_public_keys, "onramp_host", [])
     }
   }
 

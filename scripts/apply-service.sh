@@ -11,6 +11,6 @@ service="$1"
 source scripts/site-context.sh
 require_site_context
 
-INFRA_COPY_SSH_KEYS=true scripts/run-infra.sh python scripts/apply-ansible-services.py \
+INFRA_COPY_SSH_KEYS=true INFRA_SSH_IDENTITY_SOURCE=sops scripts/run-infra.sh python scripts/apply-ansible-services.py \
   --mode sequential \
   --service "${service}"

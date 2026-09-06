@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -43,6 +45,17 @@ class PublicSafetyScanTests(unittest.TestCase):
             findings = public_safety.scan_ips("tasks/main.yml", 1, line)
             self.assertEqual(findings, [], line)
 
+    def test_sudoers_nopasswd_policy_is_not_a_secret_assignment(self) -> None:
+        findings = public_safety.scan_secrets(
+            "tasks/main.yml", 1, 'content: "{{ user }} ALL=(ALL:ALL) NOPASSWD: ALL\\n"'
+        )
+        self.assertEqual(findings, [])
+
+    def test_password_assignment_remains_rejected(self) -> None:
+        key = "PASS" + "WORD"
+        findings = public_safety.scan_secrets("tasks/main.yml", 1, f"{key}: actual-value")
+        self.assertEqual(len(findings), 1)
+
     def test_allow_comment_skips_ip_scan(self) -> None:
         findings = public_safety.scan_ips(
             "README.md", 1, "host 192.168.1.10 # public-safety: allow-ip"
@@ -51,7 +64,7 @@ class PublicSafetyScanTests(unittest.TestCase):
 
     def test_placeholder_secret_assignment_passes(self) -> None:
         findings = public_safety.scan_secrets(
-            "scaffold/.env.example", 1, 'CF_DNS_API_TOKEN="REPLACE_ME"'
+            "scaffold/sites/_template/site.yaml", 1, 'CF_DNS_API_TOKEN="REPLACE_ME"'
         )
         self.assertEqual(findings, [])
 
@@ -67,11 +80,11 @@ class PublicSafetyScanTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_python_secret_key_constant_passes(self) -> None:
-        findings = public_safety.scan_secrets("scripts/migrate-values.py", 1, "SECRET_KEYS = {")
+        findings = public_safety.scan_secrets("scripts/secret_bundle_migration.py", 1, "SECRET_KEYS = {")
         self.assertEqual(findings, [])
 
     def test_lowercase_python_token_variable_passes(self) -> None:
-        findings = public_safety.scan_secrets("scripts/migrate-values.py", 1, "new_token = value")
+        findings = public_safety.scan_secrets("scripts/secret_bundle_migration.py", 1, "new_token = value")
         self.assertEqual(findings, [])
 
     def test_private_key_header_fails(self) -> None:
@@ -79,6 +92,16 @@ class PublicSafetyScanTests(unittest.TestCase):
             "README.md", 1, "-----BEGIN OPENSSH PRIVATE KEY-----"  # public-safety: allow-secret
         )
         self.assertEqual(len(findings), 1)
+
+    def test_worktree_file_inventory_includes_untracked_public_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            (root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=root, check=True)
+            (root / "untracked.txt").write_text("untracked\n", encoding="utf-8")
+            paths = {path.relative_to(root).as_posix() for path in public_safety.tracked_files(root)}
+        self.assertEqual(paths, {"tracked.txt", "untracked.txt"})
 
 
 if __name__ == "__main__":

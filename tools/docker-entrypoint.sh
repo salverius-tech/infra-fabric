@@ -18,32 +18,46 @@ install -d -m 0755 "${container_home}/.terraform.d" "${container_home}/.ansible"
 install -d -m 0755 "${container_home}/.terraform.d/plugin-cache"
 chown -R "${container_user}:${container_user}" "${container_home}/.terraform.d" "${container_home}/.ansible"
 
-# Keep generated bind-mounted artifacts writable by the host user that invoked
-# Docker. This is intentionally narrow: do not recursively chown the private
-# values repo, but do repair local state/lock/plan files that OpenTofu must
-# rewrite or replace.
-for path in /workspace /workspace/.ansible /workspace/infra/opentofu /workspace/values; do
+# Repair only known public runtime paths. In particular, do not traverse or
+# repair ownership below a separately-mounted private values repository.
+for path in /workspace/.ansible /workspace/infra/opentofu; do
   if [[ -e "${path}" ]]; then
     chown "${container_user}:${container_user}" "${path}" 2>/dev/null || true
   fi
 done
-
-find /workspace -type d \( -name __pycache__ -o -name .pytest_cache -o -name .terraform \) \
+find /workspace/infra/opentofu -maxdepth 2 -type d -name .terraform \
   -prune -exec chown -R "${container_user}:${container_user}" {} + 2>/dev/null || true
+find /workspace/infra/opentofu -maxdepth 2 -type f \( \
+  -name 'terraform.tfstate*' -o -name '*.tfstate*' -o -name '.terraform.tfstate.lock.info' \
+\) -exec chown "${container_user}:${container_user}" {} + 2>/dev/null || true
 
-find /workspace -maxdepth 1 -type f \( -name 'tfplan*' -o -name '*.tfplan*' \) \
-  -exec chown "${container_user}:${container_user}" {} + 2>/dev/null || true
-
-if [[ -d /workspace/values ]]; then
-  find /workspace/values -maxdepth 1 -type f \( \
-    -name 'terraform.tfstate*' -o \
-    -name '*.tfstate*' -o \
-    -name '.terraform.tfstate.lock.info' \
-  \) -exec chown "${container_user}:${container_user}" {} + 2>/dev/null || true
-fi
+cache_root=/tmp/infra-fabric
+install -d -m 0755 "${cache_root}/coverage" "${cache_root}/pycache" "${cache_root}/xdg-cache"
+chown -R "${container_user}:${container_user}" "${cache_root}"
+export COVERAGE_FILE="${cache_root}/coverage/.coverage"
+export PYTHONPYCACHEPREFIX="${cache_root}/pycache"
+export XDG_CACHE_HOME="${cache_root}/xdg-cache"
 
 if [[ -d /ssh-ro ]]; then
   install -d -m 0700 -o "${container_user}" -g "${container_user}" "${ssh_dir}"
+
+  case "${INFRA_SSH_IDENTITY_SOURCE:-external}" in
+    external|sops) ;;
+    *)
+      printf 'Unsupported SSH identity source.\n' >&2
+      exit 2
+      ;;
+  esac
+
+  if [[ "${INFRA_SSH_IDENTITY_SOURCE:-external}" == "sops" && "${INFRA_COPY_SSH_KEYS:-false}" == "true" && -n "${INFRA_VALUES_DIR:-}" ]]; then
+    if [[ -z "${INFRA_VALUES_DIR:-}" || -z "${SOPS_AGE_KEY_FILE:-}" ]]; then
+      printf 'SOPS-backed SSH identity inputs are unavailable.\n' >&2
+      exit 2
+    fi
+    python3 /workspace/scripts/canonical_ssh_identity.py --destination "${ssh_dir}/canonical-bootstrap"
+    python3 /workspace/scripts/canonical_ssh_identity.py --kind proxmox-management --destination "${ssh_dir}/canonical-proxmox-management"
+    export INFRA_SSH_IDENTITY_FILE=canonical-bootstrap
+  fi
 
   for path in /ssh-ro/known_hosts /ssh-ro/config /ssh-ro/*.pub; do
     if [[ -f "${path}" ]]; then
@@ -51,7 +65,7 @@ if [[ -d /ssh-ro ]]; then
     fi
   done
 
-  if [[ "${INFRA_COPY_SSH_KEYS:-false}" == "true" ]]; then
+  if [[ "${INFRA_COPY_SSH_KEYS:-false}" == "true" && "${INFRA_SSH_IDENTITY_SOURCE:-external}" != "sops" ]]; then
     identity_file="${INFRA_SSH_IDENTITY_FILE:-}"
     if [[ ! "${identity_file}" =~ ^[A-Za-z0-9._-]+$ ]]; then
       printf 'INFRA_SSH_IDENTITY_FILE must name one SSH identity file when INFRA_COPY_SSH_KEYS=true.\n' >&2

@@ -4,6 +4,7 @@
   gather_facts: false
   tasks:
     - name: Verify or enroll controller known_hosts for Proxmox  # noqa: run-once[task]
+      tags: [validation]
       ansible.builtin.shell: |
         set -euo pipefail
         host={{ hostvars['pve'].ansible_host | default('pve') | quote }}

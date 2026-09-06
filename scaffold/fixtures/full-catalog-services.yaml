@@ -1,0 +1,172 @@
+# Public-safe full service-catalog integration fixture.
+# Resource names deliberately point at the shared resource-runtime fixture.
+services:
+  technitium:
+    enabled: true
+    resource: example-lxc
+    release:
+      source: package
+      version: 15.2.0
+      checksum: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    state:
+      capable: true
+      disable_policy: retain
+  forgejo:
+    enabled: true
+    resource: example-lxc
+    release:
+      source: package
+      version: 1.0.0
+    state:
+      capable: true
+      disable_policy: retain
+    endpoints:
+      public_names:
+        - git.example.internal
+      public_url: https://git.example.internal/
+      protocols:
+        - ssh
+      ports:
+        ssh: 22
+  tailscale_client:
+    enabled: true
+    resource: example-vm
+  forgejo_runner:
+    enabled: true
+    resource: example-lxc
+    release:
+      version: 12.7.3
+    configuration:
+      url: https://git.example.internal
+      scope: example
+      label: forgejo-runner
+      compose_artifact:
+        version: 2.29.7
+        checksums:
+          amd64: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          arm64: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      just_artifact:
+        version: 1.36.0
+        checksums:
+          amd64: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          arm64: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      runner_artifact:
+        version: 12.7.3
+        checksums:
+          amd64: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          arm64: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    dependencies:
+      - forgejo
+  infisical:
+    enabled: true
+    resource: example-lxc
+    state:
+      capable: true
+      disable_policy: retain
+    endpoints:
+      public_names:
+        - secrets.example.internal
+    configuration:
+      caddy_artifact:
+        version: 2.8.4
+        checksums:
+          amd64: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          arm64: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      compose_artifact:
+        version: 2.29.7
+        checksums:
+          amd64: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          arm64: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+  infisical_onramp:
+    enabled: true
+    resource: onramp-host
+    state:
+      capable: true
+      disable_policy: retain
+    dependencies:
+      - onramp_host
+  hermes:
+    enabled: true
+    resource: example-vm
+    state:
+      capable: true
+      disable_policy: retain
+    endpoints:
+      public_names:
+        - hermes.example.internal
+      ports:
+        dashboard: 8080
+    configuration:
+      runtime_user: hermes
+      repository_path: /srv/hermes
+      allow_legacy_runtime: false
+      tuning:
+        compression_threshold: 0.8
+        max_concurrent_children: 2
+        max_spawn_depth: 1
+      node:
+        version: 22.14.0
+        checksums:
+          amd64: "1111111111111111111111111111111111111111111111111111111111111111"
+          arm64: "2222222222222222222222222222222222222222222222222222222222222222"
+      dashboard:
+        enabled: false
+        host: 127.0.0.1
+        auth_username: operator
+      web:
+        searxng_url: https://search.example.internal/
+      control:
+        enabled: true
+        domain: control.example.internal
+        source_url: https://code.example.internal/hermes-control.git
+        source_ref: "3333333333333333333333333333333333333333"
+      caddy_artifact:
+        version: 2.8.4
+        checksums:
+          amd64: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          arm64: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      compose_artifact:
+        version: 2.29.7
+        checksums:
+          amd64: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          arm64: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      just_artifact:
+        version: 1.36.0
+        checksums:
+          amd64: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          arm64: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  onramp_host:
+    enabled: true
+    resource: onramp-host
+    state:
+      capable: true
+      disable_policy: retain
+  searxng_onramp:
+    enabled: true
+    resource: onramp-host
+    state:
+      capable: true
+      disable_policy: retain
+    dependencies:
+      - onramp_host
+  sssf:
+    enabled: true
+    resource: example-vm
+    release:
+      commit: "0000000000000000000000000000000000000000"
+    state:
+      capable: true
+      disable_policy: retain
+    configuration:
+      runtime_user: sssf
+      workspace_root: /srv/sssf/workspaces
+      data_dir: /var/lib/sssf
+      config_path: /etc/sssf/sssf.config.yaml
+      upstream_repository: https://github.com/disler/super-simple-software-factory
+      pi_path: /usr/local/bin/pi
+      uv_path: /usr/local/bin/uv
+      visualizer_enabled: false
+      visualizer_host: 127.0.0.1
+      visualizer_port: 4600
+      allowed_repositories: []
+      provider: openrouter

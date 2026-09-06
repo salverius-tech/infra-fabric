@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,7 @@ RESTORE = ROOT / "infra" / "ansible" / "playbooks" / "service-state-restore.yml"
 ONRAMP_DEFAULTS = ROOT / "infra" / "ansible" / "roles" / "onramp_host" / "defaults" / "main.yml"
 COMPOSE = ROOT / "compose.yaml"
 SERVICE_STATE_CLI = ROOT / "scripts" / "service-state.sh"
+HERMES_STATE_CLI = ROOT / "scripts" / "hermes-state.sh"
 
 
 class ServiceStateTests(unittest.TestCase):
@@ -38,6 +40,25 @@ class ServiceStateTests(unittest.TestCase):
             ["hermes-gateway", "hermes-dashboard"],
         )
 
+    def test_sssf_backup_excludes_transient_managed_environment_links(self) -> None:
+        self.assertEqual(
+            self.catalog["sssf"]["tar_exclude_args"],
+            ["--exclude=*/.env", "--exclude=*/.uv-cache"],
+        )
+        for path in (BACKUP, RESTORE):
+            self.assertIn(
+                "service_state_definition.tar_exclude_args | default([])",
+                path.read_text(encoding="utf-8"),
+            )
+
+    def test_onramp_user_units_are_not_declared_as_system_services(self) -> None:
+        for service, unit in (
+            ("infisical_onramp", "infisical-onramp.service"),
+            ("searxng_onramp", "searxng-onramp.service"),
+        ):
+            self.assertNotIn(unit, self.catalog[service]["services"])
+            self.assertIn(unit, self.catalog[service]["user_services"])
+
     def test_forgejo_postgres_backup_and_restore_are_managed(self) -> None:
         backup = BACKUP.read_text(encoding="utf-8")
         restore = RESTORE.read_text(encoding="utf-8")
@@ -49,7 +70,70 @@ class ServiceStateTests(unittest.TestCase):
     def test_restore_uses_selected_site_root_and_local_preflight(self) -> None:
         restore = RESTORE.read_text(encoding="utf-8")
         self.assertIn("service_state_backup_root | regex_escape", restore)
+        self.assertNotIn("/workspace/values/service-backups", restore)
+        self.assertIn("service_state_backup_root | length > 0", restore)
         self.assertIn("delegate_to: localhost", restore)
+
+    def test_cli_derives_targets_from_state_catalog_and_uses_verified_projection_pair(self) -> None:
+        cli = SERVICE_STATE_CLI.read_text(encoding="utf-8")
+        stateful = {
+            name for name, config in json.loads(SERVICES.read_text(encoding="utf-8"))["services"].items()
+            if config.get("state_capable")
+        }
+        self.assertEqual(stateful, set(self.catalog))
+        self.assertIn("state_capable_services()", cli)
+        self.assertNotIn("supported_services=(", cli)
+        self.assertIn('print(name)', cli)
+        self.assertIn("ansible-vars.json", cli)
+        self.assertIn("flatten-ansible-vars.py", cli)
+        self.assertIn(".service-state-ansible-vars-", cli)
+        self.assertEqual(cli.count("trap 'rm -f"), 2)
+        self.assertNotIn("rc=\\$?; rm -f", cli)
+        self.assertIn("--site-file /workspace/${site_values_dir}/site.yaml", cli)
+        self.assertNotIn('"${repo_root}/${site_values_dir}/site.yaml"', cli)
+        self.assertIn('grep -Fx "${requested}" >/dev/null', cli)
+        self.assertNotIn('grep -Fxq "${requested}"', cli)
+        self.assertIn("/home/anvil/.ssh/canonical-bootstrap", cli)
+        self.assertIn("StrictHostKeyChecking=yes", cli)
+        self.assertEqual(cli.count("INFRA_SSH_IDENTITY_SOURCE=sops"), 2)
+
+    def test_cli_uses_effective_controller_local_projection_directory(self) -> None:
+        cli = SERVICE_STATE_CLI.read_text(encoding="utf-8")
+        self.assertEqual(
+            cli.count('generated_dir=\\"\\${INFRA_GENERATED_DIR:-/workspace/${site_values_dir}/generated}\\"'),
+            2,
+        )
+        self.assertEqual(cli.count('inventory=\\"\\${generated_dir}/ansible-inventory.json\\"'), 2)
+        self.assertEqual(cli.count('vars_file=\\"\\${generated_dir}/ansible-vars.json\\"'), 2)
+        self.assertEqual(cli.count('--generated-dir \\"\\${generated_dir}\\"'), 2)
+        self.assertNotIn('inventory="/workspace/${site_values_dir}/generated/ansible-inventory.json"', cli)
+        self.assertNotIn('vars_file="/workspace/${site_values_dir}/generated/ansible-vars.json"', cli)
+        self.assertEqual(cli.count("scripts/run-infra.sh bash -euo pipefail -c"), 2)
+        self.assertNotIn("scripts/run-infra.sh bash -lc", cli)
+
+    def test_hermes_compatibility_wrapper_requires_selected_site_paths(self) -> None:
+        wrapper = HERMES_STATE_CLI.read_text(encoding="utf-8")
+        self.assertIn("VALUES_SITE=<site> scripts/hermes-state.sh", wrapper)
+        self.assertIn("values/sites/<site>/service-backups/hermes/", wrapper)
+        self.assertNotIn("values/service-backups/hermes/", wrapper)
+
+    def test_forgejo_database_state_contract_fails_closed_without_projection(self) -> None:
+        for path in (BACKUP, RESTORE):
+            playbook = path.read_text(encoding="utf-8")
+            self.assertIn("forgejo_database is defined", playbook)
+            self.assertIn("forgejo_database.name is defined", playbook)
+            self.assertNotIn('forgejo_database.type | default("sqlite")', playbook)
+        restore = RESTORE.read_text(encoding="utf-8")
+        self.assertIn("Fail after attempting all managed service restarts", restore)
+        self.assertIn("service_state_system_restart", restore)
+        self.assertIn("Validate managed system service stop results", restore)
+        self.assertIn("Validate managed system service restart results", restore)
+        self.assertIn("item.rc | int in [0, 5]", restore)
+        self.assertIn("service_state_user_restart", restore)
+        self.assertNotIn("rsync", restore)
+        self.assertIn("--exclude=*/lost+found", restore)
+        backup = BACKUP.read_text(encoding="utf-8")
+        self.assertIn("--exclude=*/lost+found", backup)
 
     def test_onramp_recovery_dependencies_and_container_paths_are_wired(self) -> None:
         defaults = yaml.safe_load(ONRAMP_DEFAULTS.read_text(encoding="utf-8"))

@@ -62,15 +62,21 @@ class CapacityPreflightTests(unittest.TestCase):
         self.assertIn("validate-service-state-archive.py", restore)
         self.assertIn("fetch-service-state.py", restore)
         self.assertNotIn("ansible.builtin.fetch:", restore)
-        self.assertNotIn("failed_when: false", restore[:restore.index("Create temporary pre-restore")])
+        self.assertIn("Validate managed system service stop results", restore)
         self.assertNotIn("tar -tzf", restore)
         self.assertIn("- name: Restore service state with failure-safe service recovery\n      block:", restore)
+        self.assertNotIn("- name: Restore service state with failure-safe service recovery\n      tags:", restore)
         self.assertIn("      always:\n", restore)
         self.assertLess(restore.index("      always:"), restore.index("Report service-state restore result"))
         self.assertLess(
             restore.index("Preflight service-state restore capacity"),
             restore.index("Stop managed system services before restore"),
         )
+        self.assertIn("- --extract", restore)
+        self.assertIn("- --numeric-owner", restore)
+        self.assertIn("- --no-overwrite-dir", restore)
+        self.assertIn('ansible.builtin.raw: "systemctl stop {{ item | quote }}"', restore)
+        self.assertIn('ansible.builtin.raw: "systemctl start {{ item | quote }}"', restore)
 
 
 if __name__ == "__main__":

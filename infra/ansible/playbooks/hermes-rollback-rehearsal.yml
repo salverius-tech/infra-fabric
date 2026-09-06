@@ -1,0 +1,164 @@
+---
+- name: Rehearse development-only Hermes activation rollback
+  hosts: hermes
+  gather_facts: false
+  become: true
+  vars:
+    hermes_rollback_rehearsal_install_root: /usr/local/lib/hermes-agent
+  tasks:
+    - name: Require explicit development rollback rehearsal acknowledgement
+      tags: [validation]
+      ansible.builtin.assert:
+        that:
+          - canonical_site == 'dev'
+          - hermes_rollback_rehearsal_approved | default(false) | bool
+        fail_msg: Development-only Hermes rollback rehearsal requires canonical dev and explicit approval.
+
+    - name: Inspect active managed Hermes virtual environment link
+      tags: [validation]
+      ansible.builtin.stat:
+        path: "{{ hermes_rollback_rehearsal_install_root }}/venv"
+        follow: false
+      register: hermes_rollback_rehearsal_active
+
+    - name: Require a managed Hermes virtual environment link
+      tags: [validation]
+      ansible.builtin.assert:
+        that:
+          - hermes_rollback_rehearsal_active.stat.islnk | default(false)
+        fail_msg: Hermes rollback rehearsal requires an existing managed venv link.
+
+    - name: Resolve active managed Hermes virtual environment when healthy
+      tags: [validation]
+      ansible.builtin.command:
+        argv: [readlink, -e, "{{ hermes_rollback_rehearsal_install_root }}/venv"]
+      changed_when: false
+      failed_when: false
+      register: hermes_rollback_rehearsal_active_target
+
+    - name: Resolve retained Hermes rollback virtual environment when recovery is required
+      tags: [validation]
+      ansible.builtin.command:
+        argv: [readlink, -e, "{{ hermes_rollback_rehearsal_install_root }}/previous"]
+      changed_when: false
+      failed_when: false
+      register: hermes_rollback_rehearsal_retained_target
+
+    - name: Require a resolvable managed Hermes rollback target
+      tags: [validation]
+      ansible.builtin.assert:
+        that:
+          - >-
+            hermes_rollback_rehearsal_active_target.rc == 0 or
+            hermes_rollback_rehearsal_retained_target.rc == 0
+        fail_msg: Hermes rollback rehearsal cannot resolve an active or retained managed venv target.
+
+    - name: Select managed Hermes rollback target
+      tags: [validation]
+      ansible.builtin.set_fact:
+        hermes_rollback_rehearsal_previous: >-
+          {{ hermes_rollback_rehearsal_active_target.stdout
+             if hermes_rollback_rehearsal_active_target.rc == 0
+             else hermes_rollback_rehearsal_retained_target.stdout }}
+
+    - name: Initialize Hermes rollback rehearsal milestones
+      tags: [config]
+      ansible.builtin.set_fact:
+        hermes_rollback_rehearsal_switched: false
+
+    - name: Exercise Hermes failed activation rollback
+      block:
+        - name: Stop Hermes services before rehearsal activation
+          tags: [config]
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            state: stopped
+          loop: [hermes-gateway, hermes-dashboard]
+
+        - name: Switch Hermes virtual environment to invalid rehearsal target
+          tags: [config]
+          ansible.builtin.file:
+            src: "{{ hermes_rollback_rehearsal_install_root }}/releases/rollback-rehearsal-missing"
+            dest: "{{ hermes_rollback_rehearsal_install_root }}/venv"
+            state: link
+            force: true
+            follow: false
+
+        - name: Record rehearsal activation switch
+          tags: [config]
+          ansible.builtin.set_fact:
+            hermes_rollback_rehearsal_switched: true
+
+        - name: Start intentionally invalid Hermes gateway
+          tags: [service]
+          ansible.builtin.systemd:
+            name: hermes-gateway
+            state: started
+
+        - name: Require invalid rehearsal activation to fail
+          tags: [validation]
+          ansible.builtin.command:
+            argv: [systemctl, is-active, hermes-gateway]
+          changed_when: false
+          register: hermes_rollback_rehearsal_invalid_health
+          failed_when: false
+
+        - name: Enter rollback rescue after invalid rehearsal activation
+          tags: [validation]
+          ansible.builtin.fail:
+            msg: Invalid development rollback rehearsal activation failed as required.
+          when: hermes_rollback_rehearsal_invalid_health.rc != 0
+
+        - name: Reject an unexpectedly healthy invalid rehearsal activation
+          tags: [validation]
+          ansible.builtin.fail:
+            msg: Invalid development rollback rehearsal activation unexpectedly remained healthy.
+          when: hermes_rollback_rehearsal_invalid_health.rc == 0
+      rescue:
+        - name: Stop invalid Hermes rehearsal services
+          tags: [config]
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            state: stopped
+          loop: [hermes-gateway, hermes-dashboard]
+          failed_when: false
+
+        - name: Restore prior managed Hermes virtual environment link
+          tags: [restore]
+          ansible.builtin.file:
+            src: "{{ hermes_rollback_rehearsal_previous }}"
+            dest: "{{ hermes_rollback_rehearsal_install_root }}/venv"
+            state: link
+            force: true
+            follow: false
+          when: hermes_rollback_rehearsal_switched | bool
+
+        - name: Restart restored Hermes services
+          tags: [service]
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            enabled: true
+            state: started
+          loop: [hermes-dashboard, hermes-gateway]
+
+        - name: Verify restored Hermes gateway
+          tags: [validation]
+          ansible.builtin.command:
+            argv: [systemctl, is-active, hermes-gateway]
+          changed_when: false
+
+        - name: Verify restored Hermes dashboard login page
+          tags: [validation]
+          ansible.builtin.uri:
+            url: "http://127.0.0.1:{{ hermes_dashboard_port | default(9119) }}/login"
+            status_code: 200
+            return_content: false
+          register: hermes_rollback_dashboard_ready
+          retries: 30
+          delay: 2
+          until: hermes_rollback_dashboard_ready.status | default(0) == 200
+
+        - name: Record completed Hermes rollback rehearsal
+          tags: [restore]
+          ansible.builtin.debug:
+            msg: Hermes development rollback rehearsal restored the prior managed release.

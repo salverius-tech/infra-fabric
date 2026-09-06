@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -13,6 +15,12 @@ spec = importlib.util.spec_from_file_location("tfplan_metadata", SCRIPT)
 assert spec and spec.loader
 tfplan_metadata = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tfplan_metadata)
+
+sys.path.insert(0, str(SCRIPT.parent))
+from canonical_projections import render_projection_set
+from canonical_values import load_site, model_digest
+from projection_manifest import build_manifest
+from service_catalog import load_catalog
 
 
 class TfplanMetadataTests(unittest.TestCase):
@@ -50,6 +58,140 @@ class TfplanMetadataTests(unittest.TestCase):
         metadata = repo / "tfplan.meta.json"
         plan.write_text("plan-data\n")
         return temp_dir, repo, plan, metadata
+
+    def add_canonical_projection_set(self, repo: Path, fixture: str = "dev") -> None:
+        source_root = Path(__file__).resolve().parents[1]
+        site = repo / "values" / "sites" / "dev"
+        site.mkdir(parents=True)
+        source = source_root / "scaffold" / "sites" / fixture / "site.yaml"
+        text = source.read_text(encoding="utf-8")
+        if fixture != "dev":
+            text = text.replace("  name: example\n", "  name: dev\n", 1)
+        (site / "site.yaml").write_text(text, encoding="utf-8")
+        (repo / "infra" / "services.json").write_text(
+            (source_root / "infra" / "services.json").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        model = load_site(site / "site.yaml", expected_site="dev", catalog_path=repo / "infra" / "services.json")
+        catalog = load_catalog(repo / "infra" / "services.json")
+        projections = render_projection_set(model, catalog)
+        generated = site / "generated"
+        generated.mkdir(mode=0o700)
+        for name, value in projections.items():
+            path = generated / name
+            path.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
+            path.chmod(0o600)
+        manifest = build_manifest(
+            site="dev",
+            schema_version=model.schema_version,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+            renderer_version="test-renderer",
+            source_commit="test-source",
+        )
+        manifest_path = generated / "manifest.json"
+        manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+        manifest_path.chmod(0o600)
+
+    def test_canonical_identity_is_recorded_and_verified(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ):
+            data = tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            self.assertEqual(data["canonical"]["site"], "dev")
+            self.assertTrue(data["canonical"]["model_digest"])
+            self.assertTrue(data["canonical"]["projection_digest"])
+            tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_canonical_identity_accepts_explicit_generated_directory(self) -> None:
+        temp_dir, repo, _, _ = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        source = repo / "values/sites/dev/generated"
+        explicit = repo / "controller-local/generated"
+        explicit.parent.mkdir(parents=True)
+        source.rename(explicit)
+        with temp_dir, patch.dict(
+            os.environ,
+            {
+                "VALUES_SITE": "dev",
+                "VALUES_DIR": str(repo / "values"),
+                "INFRA_GENERATED_DIR": str(explicit),
+            },
+            clear=True,
+        ):
+            identity = tfplan_metadata.canonical_identity(repo)
+        self.assertEqual(identity["site"], "dev")
+
+    def test_canonical_stateful_selection_ignores_stale_site_json(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo, "_template")
+        site_dir = repo / "values" / "sites" / "dev"
+        (site_dir / "site.json").write_text('{"name": "dev", "services": ["technitium"]}\n', encoding="utf-8")
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ):
+            mapping = tfplan_metadata.enabled_stateful_services_by_address(repo)
+            self.assertIn("sssf", {service for services in mapping.values() for service in services})
+            sssf_address = next(address for address, services in mapping.items() if "sssf" in services)
+            forgejo_address = next(address for address, services in mapping.items() if "forgejo" in services)
+            summary = tfplan_metadata.summarize_plan(
+                {
+                    "resource_changes": [
+                        {"address": f"{forgejo_address}.example", "change": {"actions": ["delete"]}},
+                        {"address": f"{sssf_address}.example", "change": {"actions": ["delete"]}},
+                    ]
+                },
+                repo,
+            )
+            self.assertEqual(summary["stateful_services"], ["forgejo", "sssf"])
+            self.assertEqual(len(summary["stateful_targets"]), 2)
+
+    def test_changed_canonical_projection_fails(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ):
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            projection = repo / "values" / "sites" / "dev" / "generated" / "dns-records.json"
+            projection.write_text('{"altered": true}\n', encoding="utf-8")
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_changed_site_sops_policy_fails_metadata_verification(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        policy = repo / "values" / "sites" / "dev" / ".sops.yaml"
+        policy.write_text("creation_rules: []\n", encoding="utf-8")
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ):
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            policy.write_text("creation_rules: [changed]\n", encoding="utf-8")
+            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "inputs changed"):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_missing_canonical_manifest_fails_creation(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        self.add_canonical_projection_set(repo)
+        (repo / "values" / "sites" / "dev" / "generated" / "manifest.json").unlink()
+        with temp_dir, patch.dict(
+            os.environ,
+            {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+            clear=True,
+        ), self.assertRaises(tfplan_metadata.MetadataError):
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
 
     def test_create_and_verify_metadata(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
@@ -89,6 +231,38 @@ class TfplanMetadataTests(unittest.TestCase):
         with temp_dir:
             tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
             (repo / "values" / "dns-records.local.json").write_text('{"changed": true}\n')
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_docs_only_commit_change_keeps_identical_plan_valid(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir, patch.object(tfplan_metadata, "git_commit", side_effect=["plan-commit", "docs-commit"]):
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_operational_source_input_change_rejects_identical_plan(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            (repo / "infra" / "opentofu" / "main.tf").write_text("terraform { required_version = \">= 1.0\" }\n")
+            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "inputs changed"):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_changed_canonical_site_file_fails(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            (repo / "values" / "site.yaml").write_text("site: original\n", encoding="utf-8")
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            (repo / "values" / "site.yaml").write_text("site: altered\n", encoding="utf-8")
+            with self.assertRaises(tfplan_metadata.MetadataError):
+                tfplan_metadata.verify_metadata(plan, metadata, repo)
+
+    def test_changed_encrypted_secret_ciphertext_fails(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            (repo / "values" / "secrets.sops.yaml").write_text("ciphertext-a\n", encoding="utf-8")
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            (repo / "values" / "secrets.sops.yaml").write_text("ciphertext-b\n", encoding="utf-8")
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
@@ -183,6 +357,50 @@ class TfplanMetadataTests(unittest.TestCase):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo, target_service="hermes")
+
+    def test_destroy_metadata_cannot_execute_as_normal_apply(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            data = tfplan_metadata.create_metadata(
+                plan,
+                metadata,
+                repo,
+                24,
+                {"resource_changes": [{"address": "resource.delete", "change": {"actions": ["delete"]}}]},
+                operation="destroy",
+            )
+            self.assertEqual(data["operation"], "destroy")
+            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "operation differs"):
+                tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
+            tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True, operation="destroy")
+
+    def test_destroy_metadata_rejects_targeted_scope(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir, self.assertRaisesRegex(tfplan_metadata.MetadataError, "destroy plan cannot target"):
+            tfplan_metadata.create_metadata(
+                plan,
+                metadata,
+                repo,
+                24,
+                {"resource_changes": []},
+                target_service="forgejo",
+                operation="destroy",
+            )
+
+    def test_destroy_summary_has_no_normal_apply_acknowledgement(self) -> None:
+        text = tfplan_metadata.format_plan_summary(
+            {
+                "resource_changes": {"create": 0, "update": 0, "replace": 0, "delete": 1},
+                "destructive": True,
+                "destructive_changes": [{"address": "resource.delete", "actions": "delete"}],
+                "stateful_changes": [],
+                "stateful_targets": [],
+                "stateful_services": [],
+            },
+            operation="destroy",
+        )
+        self.assertIn("Guarded teardown apply", text)
+        self.assertNotIn("INFRA_ALLOW_DESTROY", text)
 
     def test_replacement_scope_requires_matching_target_service(self) -> None:
         with self.assertRaises(tfplan_metadata.MetadataError):

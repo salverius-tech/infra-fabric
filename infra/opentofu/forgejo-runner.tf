@@ -24,8 +24,7 @@ module "forgejo_runner" {
   ipv4_address  = var.forgejo_runner_ipv4_address
   ipv4_gateway  = var.forgejo_runner_ipv4_gateway
 
-  root_password   = var.lxc_root_password
-  ssh_public_keys = var.lxc_ssh_public_keys
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "forgejo_runner", [])
 
   network = {
     bridge      = var.forgejo_runner_bridge
@@ -55,6 +54,7 @@ module "forgejo_runner_vm" {
   tags          = ["forgejo", "runner", "actions", "opentofu"]
 
   cores     = var.forgejo_runner_cores
+  cpu_type  = local.vm_cpu_type["forgejo_runner"]
   memory_mb = var.forgejo_runner_memory_mb
 
   image = {
@@ -75,8 +75,8 @@ module "forgejo_runner_vm" {
   ipv4_address  = var.forgejo_runner_ipv4_address
   ipv4_gateway  = var.forgejo_runner_ipv4_gateway
 
-  cloud_init_user = coalesce(try(local.forgejo_runner_runtime.cloud_init_user, null), var.guest_vm_cloud_init_user)
-  ssh_public_keys = var.lxc_ssh_public_keys
+  cloud_init_user = var.bootstrap_ssh_user
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "forgejo_runner", [])
 
   network = {
     bridge      = var.forgejo_runner_bridge

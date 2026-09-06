@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
+import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "update.py"
 spec = importlib.util.spec_from_file_location("update_script", SCRIPT)
@@ -17,6 +21,30 @@ spec.loader.exec_module(update_script)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_catalog_update_statuses_are_public_safe_and_deterministic(self) -> None:
+        statuses = update_script.catalog_update_statuses(Path(__file__).resolve().parents[1])
+
+        self.assertEqual([entry["service"] for entry in statuses], sorted(entry["service"] for entry in statuses))
+        technitium = next(entry for entry in statuses if entry["service"] == "technitium")
+        forgejo = next(entry for entry in statuses if entry["service"] == "forgejo")
+        self.assertEqual(technitium["status"], "manual")
+        self.assertIn("version/checksum", technitium["detail"])
+        self.assertEqual(forgejo["status"], "managed")
+        self.assertNotIn("installed by upstream install script", repr(statuses))
+
+    def test_dry_run_output_includes_catalog_derived_service_statuses(self) -> None:
+        output = io.StringIO()
+        with patch.object(update_script, "run", return_value=[]), redirect_stdout(output):
+            exit_code = update_script.main(["--root", str(Path(__file__).resolve().parents[1]), "--dry-run"])
+
+        self.assertEqual(exit_code, 0)
+        rendered = output.getvalue()
+        self.assertIn("Service update policy (catalog):", rendered)
+        self.assertIn("MANAGED   forgejo:", rendered)
+        self.assertIn("MANUAL    technitium:", rendered)
+        self.assertIn("UNMANAGED tailscale_client:", rendered)
+        self.assertIn("Dry run: no pins or canonical values were written.", rendered)
+
     def fake_release(self, version: str, published_at: datetime) -> bytes:
         return json.dumps(
             {
@@ -68,6 +96,18 @@ class UpdateTests(unittest.TestCase):
                 "ARG OPENTOFU_LINUX_AMD64_SHA256=abc123\n",
             )
 
+    def test_dry_run_reports_eligible_repository_pin_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "tools").mkdir()
+            dockerfile = root / "tools" / "Dockerfile"
+            original = "ARG OPENTOFU_VERSION=1.0.0\nARG OPENTOFU_LINUX_AMD64_SHA256=old\n"
+            dockerfile.write_text(original, encoding="utf-8")
+            now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+            result = update_script.process_target(update_script.TARGETS[0], root, now, timedelta(hours=48), self.fake_opener("1.1.0", now - timedelta(hours=72)), dry_run=True)
+            self.assertEqual(result.status, "updated")
+            self.assertEqual(dockerfile.read_text(encoding="utf-8"), original)
+
     def test_holds_recent_release(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -89,6 +129,74 @@ class UpdateTests(unittest.TestCase):
             self.assertEqual(result.status, "hold")
             self.assertEqual(inventory.read_text(encoding="utf-8"), 'forgejo_version: "12.0.4"\n')
 
+    def test_updates_repository_owned_sssf_pin_and_checksum(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            defaults = root / "infra/ansible/roles/sssf/defaults/main.yml"
+            defaults.parent.mkdir(parents=True)
+            defaults.write_text(
+                "sssf_uv_version: 0.12.0\nsssf_uv_sha256: old\n",
+                encoding="utf-8",
+            )
+            target = next(target for target in update_script.TARGETS if target.name == "SSSF uv runtime")
+            now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+
+            def opener(url: str) -> bytes:
+                if url.endswith("/checksum"):
+                    return b"abc123  uv-x86_64-unknown-linux-gnu.tar.gz\n"
+                return json.dumps(
+                    {
+                        "tag_name": "0.12.1",
+                        "published_at": (now - timedelta(hours=72)).isoformat().replace("+00:00", "Z"),
+                        "html_url": "https://example.invalid/uv",
+                        "assets": [{"name": "sha256.sum", "browser_download_url": "https://example.invalid/checksum"}],
+                    }
+                ).encode("utf-8")
+
+            result = update_script.process_target(target, root, now, timedelta(hours=48), opener)
+
+            self.assertEqual(result.status, "updated")
+            self.assertEqual(
+                defaults.read_text(encoding="utf-8"),
+                "sssf_uv_version: 0.12.1\nsssf_uv_sha256: abc123\n",
+            )
+
+    def test_updates_canonical_release_owner(self) -> None:
+        document = {
+            "services": {"forgejo": {"release": {"version": "12.0.4"}}}
+        }
+        now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+        result, changed = update_script.process_canonical_target(
+            update_script.TARGETS[2],
+            document,
+            Path("."),
+            now,
+            timedelta(hours=48),
+            lambda _url: self.fake_release("12.1.0", now - timedelta(hours=72)),
+        )
+
+        self.assertEqual(result.status, "updated")
+        self.assertTrue(changed)
+        self.assertEqual(document["services"]["forgejo"]["release"]["version"], "12.1.0")
+
+    def test_canonical_update_holds_without_mutating(self) -> None:
+        document = {
+            "services": {"forgejo": {"release": {"version": "12.0.4"}}}
+        }
+        now = datetime(2026, 7, 5, tzinfo=timezone.utc)
+        result, changed = update_script.process_canonical_target(
+            update_script.TARGETS[2],
+            document,
+            Path("."),
+            now,
+            timedelta(hours=48),
+            lambda _url: self.fake_release("12.1.0", now - timedelta(hours=12)),
+        )
+
+        self.assertEqual(result.status, "hold")
+        self.assertFalse(changed)
+        self.assertEqual(document["services"]["forgejo"]["release"]["version"], "12.0.4")
+
     def test_skips_missing_private_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             target = update_script.TARGETS[2]
@@ -102,6 +210,22 @@ class UpdateTests(unittest.TestCase):
 
             self.assertEqual(result.status, "skip")
             self.assertEqual(result.detail, "file not present")
+
+    def test_canonical_site_does_not_mutate_legacy_service_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            site = root / "values" / "sites" / "dev"
+            inventory = site / "ansible" / "inventory"
+            inventory.mkdir(parents=True)
+            (site / "site.yaml").write_text("schema_version: 1\nsite:\n  name: dev\n", encoding="utf-8")
+            (inventory / "local.yml").write_text('forgejo_version: "12.0.4"\n', encoding="utf-8")
+            environment = {"VALUES_SITE": "dev", "VALUES_DIR": str(root / "values")}
+            with patch.dict(os.environ, environment, clear=False):
+                results = update_script.run(root, 48, lambda _url: self.fail("legacy release lookup must not run"))
+            forgejo = next(result for result in results if result.name == "Forgejo")
+            self.assertEqual(forgejo.status, "skip")
+            self.assertIn("not authoritative", forgejo.detail)
+            self.assertEqual((inventory / "local.yml").read_text(encoding="utf-8"), 'forgejo_version: "12.0.4"\n')
 
 
 if __name__ == "__main__":

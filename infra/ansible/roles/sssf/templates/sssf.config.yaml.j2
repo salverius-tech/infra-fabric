@@ -1,0 +1,55 @@
+# Managed SSSF roster policy: upstream install.py stamps factory code, prompts, and
+# visualizer unchanged. This file deliberately replaces only the stamped roster at
+# adws/adw_sssf_config/sssf.config.yaml; it never refreshes upstream artifacts with --force.
+defaults:
+  coding_agent: pi
+{% if sssf_provider == 'openrouter' %}  model: openrouter/google/gemini-3.6-flash
+{% elif sssf_provider == 'openai' %}  model: openai/gpt-5.6-terra
+{% elif sssf_provider == 'fireworks' %}  model: fireworks/accounts/fireworks/models/kimi-k3
+{% else %}  model: invalid-provider/invalid-model
+{% endif %}  thinking: medium
+  tools: [read, bash, edit, write, grep, find, ls]
+  protected_files: [adws/adw_modules/, adws/adw_sssf_config/, adws/adw_*.py]
+  data_dir: {{ sssf_data_dir }}/factory/adw_data
+observability:
+  db: {{ sssf_data_dir }}/factory/adw_data/sssf.db
+  poll_ms: 500
+agents:
+  - name: planner
+    thinking: high
+    purpose: Turn a request into a plan the builder can implement without asking questions.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/planner/system.md
+      user: adws/adw_data/prompt_engineering/planner/user.md
+    harness_engineering: [adws/adw_data/harness_engineering/subagents.ts]
+    writes: [specs/]
+    tools: [read, grep, find, ls, bash, write, subagent_create, subagent_continue, subagent_list, subagent_remove]
+  - name: builder
+    purpose: Implement the plan exactly; report every changed file in the envelope.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/builder/system.md
+      user: adws/adw_data/prompt_engineering/builder/user.md
+    tools: [read, grep, find, ls, bash, edit, write]
+  - name: scout
+    purpose: Find and report where things live; change nothing.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/scout/system.md
+      user: adws/adw_data/prompt_engineering/scout/user.md
+    harness_engineering: [adws/adw_data/harness_engineering/subagents.ts]
+    writes: []
+    tools: [read, grep, find, ls, bash, write, subagent_create, subagent_continue, subagent_list, subagent_remove]
+  - name: reviewer
+    thinking: high
+    purpose: Confirm that what was built is what was asked for; change nothing.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/reviewer/system.md
+      user: adws/adw_data/prompt_engineering/reviewer/user.md
+    writes: []
+    tools: [read, grep, find, ls, bash, write]
+  - name: documenter
+    purpose: Write up the change that was just made, from the diff; document only.
+    prompt_engineering:
+      system: adws/adw_data/prompt_engineering/documenter/system.md
+      user: adws/adw_data/prompt_engineering/documenter/user.md
+    writes: [app_docs/, docs/, "**/*.md", "*.md"]
+    tools: [read, grep, find, ls, bash, edit, write]

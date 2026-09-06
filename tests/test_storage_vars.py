@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -58,20 +60,16 @@ class StorageVarsTests(unittest.TestCase):
             ],
         )
 
-    def test_builds_legacy_forgejo_bind_mount_vars(self) -> None:
-        tfvars = {
-            "forgejo_data_dataset": "tank/forgejo",
-            "forgejo_data_host_path": "/tank/forgejo",
-            "forgejo_data_host_uid": 100000,
-            "forgejo_data_host_gid": 100000,
-        }
+    def test_retired_flat_forgejo_storage_is_not_accepted(self) -> None:
+        mounts = storage_vars.build_storage_mounts(
+            ["forgejo"],
+            {
+                "forgejo_data_dataset": "tank/forgejo",
+                "forgejo_data_host_path": "/tank/forgejo",
+            },
+        )
 
-        mounts = storage_vars.build_storage_mounts(["forgejo"], tfvars)
-
-        self.assertEqual(mounts[0]["source"], "/tank/forgejo")
-        self.assertEqual(mounts[0]["target"], "/var/lib/forgejo")
-        self.assertEqual(mounts[0]["host_prepare"]["type"], "zfs_dataset")
-        self.assertEqual(mounts[0]["host_prepare"]["dataset"], "tank/forgejo")
+        self.assertEqual(mounts, [])
 
     def test_format_storage_summary_outputs_none(self) -> None:
         self.assertEqual(storage_vars.format_storage_summary([]), "Storage prep summary:\n  none")
@@ -97,19 +95,16 @@ class StorageVarsTests(unittest.TestCase):
     def test_main_outputs_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            settings_path = root / "settings.json"
-            tfvars_path = root / "terraform.tfvars"
-            settings_path.write_text('{"services":["forgejo"]}\n', encoding="utf-8")
-            tfvars_path.write_text(
-                "service_storage = {\n"
-                "  forgejo = {\n"
-                "    data = {\n"
-                '      type = "bind"\n'
-                '      source = "/srv/homelab/forgejo"\n'
-                '      target = "/var/lib/forgejo"\n'
-                "    }\n"
-                "  }\n"
-                "}\n",
+            projection = root / "terraform.auto.tfvars.json"
+            projection.write_text(
+                json.dumps({
+                    "enabled_services": ["forgejo"],
+                    "service_storage": {"forgejo": {"data": {
+                        "type": "bind",
+                        "source": "/srv/homelab/forgejo",
+                        "target": "/var/lib/forgejo",
+                    }}},
+                }),
                 encoding="utf-8",
             )
 
@@ -119,7 +114,7 @@ class StorageVarsTests(unittest.TestCase):
             output: list[str] = []
             buffer = io.StringIO()
             with contextlib.redirect_stdout(buffer):
-                rc = storage_vars.main(["--settings", str(settings_path), "--tfvars", str(tfvars_path)])
+                rc = storage_vars.main(["--projection", str(projection)])
 
             self.assertEqual(rc, 0)
             output.append(buffer.getvalue())
@@ -127,17 +122,50 @@ class StorageVarsTests(unittest.TestCase):
             self.assertEqual(payload["storage_bind_mounts"][0]["source"], "/srv/homelab/forgejo")
             self.assertEqual(payload["storage_bind_mounts"][0]["host_prepare"]["type"], "directory")
 
+    def test_main_accepts_generated_canonical_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            projection = Path(temp) / "terraform.auto.tfvars.json"
+            projection.write_text(
+                json.dumps(
+                    {
+                        "enabled_services": ["forgejo"],
+                        "service_storage": {
+                            "forgejo": {
+                                "data": {
+                                    "type": "bind",
+                                    "source": "/srv/canonical/forgejo",
+                                    "target": "/var/lib/forgejo",
+                                }
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            import contextlib
+            import io
+
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                rc = storage_vars.main(["--projection", str(projection)])
+
+            self.assertEqual(rc, 0)
+            payload = json.loads(buffer.getvalue())
+            self.assertEqual(payload["storage_bind_mounts"][0]["source"], "/srv/canonical/forgejo")
+
     def test_main_filters_to_requested_service(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            settings_path = root / "settings.json"
-            tfvars_path = root / "terraform.tfvars"
-            settings_path.write_text('{"services":["forgejo","hermes"]}\n', encoding="utf-8")
-            tfvars_path.write_text(
-                "service_storage = {\n"
-                "  forgejo = { data = { type = \"bind\", source = \"/srv/forgejo\", target = \"/var/lib/forgejo\" } }\n"
-                "  hermes = { data = { type = \"bind\", source = \"/srv/hermes\", target = \"/var/lib/hermes\" } }\n"
-                "}\n",
+            projection = root / "terraform.auto.tfvars.json"
+            projection.write_text(
+                json.dumps({
+                    "enabled_services": ["forgejo", "hermes"],
+                    "service_storage": {
+                        "forgejo": {"data": {"type": "bind", "source": "/srv/forgejo", "target": "/var/lib/forgejo"}},
+                        "hermes": {"data": {"type": "bind", "source": "/srv/hermes", "target": "/var/lib/hermes"}},
+                    },
+                }),
                 encoding="utf-8",
             )
 
@@ -147,10 +175,8 @@ class StorageVarsTests(unittest.TestCase):
             buffer = io.StringIO()
             with contextlib.redirect_stdout(buffer):
                 rc = storage_vars.main([
-                    "--settings",
-                    str(settings_path),
-                    "--tfvars",
-                    str(tfvars_path),
+                    "--projection",
+                    str(projection),
                     "--service",
                     "hermes",
                 ])
@@ -162,20 +188,44 @@ class StorageVarsTests(unittest.TestCase):
     def test_main_outputs_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            settings_path = root / "settings.json"
-            tfvars_path = root / "terraform.tfvars"
-            settings_path.write_text('{"services":["technitium"]}\n', encoding="utf-8")
-            tfvars_path.write_text("", encoding="utf-8")
+            projection = root / "terraform.auto.tfvars.json"
+            projection.write_text(
+                json.dumps(
+                    {
+                        "enabled_services": ["technitium"],
+                        "service_storage": {},
+                    }
+                ),
+                encoding="utf-8",
+            )
 
             import contextlib
             import io
 
             buffer = io.StringIO()
             with contextlib.redirect_stdout(buffer):
-                rc = storage_vars.main(["--settings", str(settings_path), "--tfvars", str(tfvars_path), "--summary"])
+                rc = storage_vars.main(["--projection", str(projection), "--summary"])
 
             self.assertEqual(rc, 0)
             self.assertIn("Storage prep summary:", buffer.getvalue())
+
+    def test_main_rejects_missing_or_malformed_storage_projection(self) -> None:
+        for payload in (
+            {},
+            {"enabled_services": ["forgejo"], "service_storage": []},
+            {
+                "enabled_services": ["forgejo"],
+                "service_storage": {"forgejo": []},
+            },
+        ):
+            with self.subTest(payload=payload), tempfile.TemporaryDirectory() as temp:
+                projection = Path(temp) / "terraform.auto.tfvars.json"
+                projection.write_text(json.dumps(payload), encoding="utf-8")
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(
+                        storage_vars.main(["--projection", str(projection)]),
+                        1,
+                    )
 
 
 if __name__ == "__main__":

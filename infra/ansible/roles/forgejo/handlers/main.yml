@@ -1,13 +1,16 @@
 ---
 - name: Restart forgejo
+  tags: [service]
   ansible.builtin.systemd:
     name: forgejo
     state: restarted
 - name: Restart ssh
+  tags: [service]
   ansible.builtin.systemd:
     name: ssh
     state: restarted
 - name: Restart caddy
+  tags: [service]
   ansible.builtin.systemd:
     name: caddy
     state: restarted

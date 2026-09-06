@@ -1,27 +1,39 @@
 #!/usr/bin/env python3
-"""Create a Technitium DNS API token for automation when values/.env lacks one."""
+"""Rotate a Technitium API token into the canonical SOPS bundle when needed."""
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
-import secrets
+import os
+from pathlib import Path
 import sys
 import time
 import urllib.parse
 import urllib.request
-from pathlib import Path
 from typing import Any, Mapping
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from envfile import EnvEntry, parse_env_lines, read_lines, set_env, write_lines
-from values_context import from_environment
 
-PLACEHOLDER_PREFIXES = ("REPLACE", "CHANGE_ME", "TODO")
-DEFAULT_TOKEN_NAME = "homelab-infra"  # public-safety: allow-secret
+CANONICAL_API_CREDENTIAL_PATH = "services.technitium.secrets.api_token"
+DEFAULT_TOKEN_NAME = "infra-fabric"  # public-safety: allow-secret
 
 
 class BootstrapError(ValueError):
     pass
+
+
+def _canonical_secret_setter():
+    path = Path(__file__).with_name("canonical-secret-set.py")
+    spec = importlib.util.spec_from_file_location("canonical_secret_set", path)
+    if spec is None or spec.loader is None:
+        raise BootstrapError("canonical secret setter is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.set_secret
+
+
+set_canonical_secret = _canonical_secret_setter()
 
 
 class TechnitiumBootstrapClient:
@@ -34,17 +46,15 @@ class TechnitiumBootstrapClient:
         params: Mapping[str, str] | None = None,
         token: str | None = None,
         timeout: int = 30,
+        method: str = "POST",
     ) -> dict[str, Any]:
         data = urllib.parse.urlencode(params or {}).encode()
-        headers = {}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
         request = urllib.request.Request(
-            f"{self.api_url}{path}", data=data, headers=headers, method="POST"
+            f"{self.api_url}{path}", data=data if method == "POST" else None, headers=headers, method=method
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            body = response.read().decode()
-        result = json.loads(body)
+            result = json.loads(response.read().decode())
         if result.get("status") != "ok":
             raise BootstrapError(str(result))
         return result
@@ -53,7 +63,7 @@ class TechnitiumBootstrapClient:
         last_error: Exception | None = None
         for _attempt in range(retries):
             try:
-                return self.call("/status", timeout=10)
+                return self.call("/status", timeout=10, method="GET")
             except BootstrapError as error:
                 if "invalid-token" in str(error).lower():
                     return {"status": "ok", "hasDefaultCredentials": False}
@@ -65,27 +75,17 @@ class TechnitiumBootstrapClient:
         raise BootstrapError(f"Technitium API did not become ready: {last_error}")
 
 
-def is_placeholder(value: str) -> bool:
-    stripped = value.strip().strip('"\'')
-    return not stripped or any(stripped.upper().startswith(prefix) for prefix in PLACEHOLDER_PREFIXES)
-
-
-def env_value(entries: Mapping[str, EnvEntry], key: str) -> str:
-    entry = entries.get(key)
-    return entry.value if entry else ""
-
-
 def validate_existing_token(client: TechnitiumBootstrapClient, token: str) -> bool:
-    if is_placeholder(token):
+    if not token:
         return False
     try:
         client.call("/user/session/get", token=token)
-    except Exception:  # noqa: BLE001 - invalid/expired token should trigger regeneration.
+    except Exception:  # noqa: BLE001 - invalid/expired token should trigger rotation.
         return False
     return True
 
 
-def login(client: TechnitiumBootstrapClient, user: str, password: str) -> str:
+def login(client: TechnitiumBootstrapClient, password: str, user: str = "admin") -> str:
     result = client.call("/user/login", {"user": user, "pass": password, "includeInfo": "true"})
     token = str(result.get("token", ""))
     if not token:
@@ -101,79 +101,61 @@ def create_api_token(client: TechnitiumBootstrapClient, session_token: str, toke
     return token
 
 
-def ensure_admin_password(
-    client: TechnitiumBootstrapClient,
-    status: Mapping[str, Any],
-    env_file: Path,
-    env_lines: list[str],
-    entries: dict[str, EnvEntry],
-    user: str,
-) -> str:
-    configured = env_value(entries, "TECHNITIUM_ADMIN_PASSWORD") or env_value(entries, "TECHNITIUM_ADMIN_PASS")
-    if not is_placeholder(configured):
-        return configured
-
-    if not bool(status.get("hasDefaultCredentials")):
-        raise BootstrapError(
-            "TECHNITIUM_ADMIN_PASSWORD is required because Technitium default credentials are not active"
-        )
-
-    new_password = secrets.token_urlsafe(32)
-    session_token = login(client, user, "admin")
-    client.call("/user/changePassword", {"pass": "admin", "newPass": new_password}, token=session_token)
-    set_env(env_lines, entries, "TECHNITIUM_ADMIN_PASSWORD", new_password)
-    write_lines(env_file, env_lines)
-    print("Generated and stored Technitium admin password.")
-    return new_password
-
-
-def bootstrap(env_file: Path, retries: int, delay: int, token_name: str) -> bool:
-    env_lines = read_lines(env_file)
-    entries = parse_env_lines(env_lines, env_file)
-    api_url = env_value(entries, "TECHNITIUM_API_URL")
-    if is_placeholder(api_url):
-        raise BootstrapError("TECHNITIUM_API_URL must be set before bootstrapping Technitium API token")
-
+def bootstrap_canonical(
+    *,
+    api_url: str,
+    api_token: str,
+    admin_password: str,
+    bundle: Path,
+    key_file: Path,
+    retries: int,
+    delay: int,
+    token_name: str,
+) -> bool:
+    if not api_url or not admin_password:
+        raise BootstrapError("canonical Technitium API URL and administrator password are required")
     client = TechnitiumBootstrapClient(api_url)
-    status = client.wait_for_status(retries, delay)
-
-    existing_token = env_value(entries, "TECHNITIUM_API_TOKEN")
-    if validate_existing_token(client, existing_token):
-        print("Technitium API token already works.")
+    client.wait_for_status(retries, delay)
+    if validate_existing_token(client, api_token):
+        print("Canonical Technitium API token already works.")
         return False
-
-    user = env_value(entries, "TECHNITIUM_ADMIN_USER") or "admin"
-    admin_password = ensure_admin_password(client, status, env_file, env_lines, entries, user)
     try:
-        session_token = login(client, user, admin_password)
-    except BootstrapError:
-        if not bool(status.get("hasDefaultCredentials")):
-            raise
-        new_password = secrets.token_urlsafe(32)
-        default_session_token = login(client, user, "admin")
-        client.call("/user/changePassword", {"pass": "admin", "newPass": new_password}, token=default_session_token)
-        set_env(env_lines, entries, "TECHNITIUM_ADMIN_PASSWORD", new_password)
-        write_lines(env_file, env_lines)
-        print("Replaced stale Technitium admin password from default credentials.")
-        session_token = login(client, user, new_password)
+        session_token = login(client, admin_password)
+    except BootstrapError as configured_login_error:
+        try:
+            default_session_token = login(client, "admin")
+        except BootstrapError:
+            raise configured_login_error
+        client.call("/user/changePassword", {"pass": "admin", "newPass": admin_password}, token=default_session_token)
+        session_token = login(client, admin_password)
     api_token = create_api_token(client, session_token, token_name)
-    set_env(env_lines, entries, "TECHNITIUM_API_TOKEN", api_token)
-    write_lines(env_file, env_lines)
-    print("Generated and stored Technitium API token.")
+    try:
+        set_canonical_secret(bundle, CANONICAL_API_CREDENTIAL_PATH, api_token, key_file, replace=True, sops="sops")
+    except Exception as error:  # noqa: BLE001 - preserve a redacted canonical persistence boundary.
+        raise BootstrapError("canonical Technitium API token persistence failed") from error
+    print("Rotated canonical Technitium API token.")
     return True
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--env-file", type=Path, default=None)
+    parser.add_argument("--bundle", type=Path, required=True)
+    parser.add_argument("--key-file", type=Path, required=True)
     parser.add_argument("--retries", type=int, default=20)
     parser.add_argument("--delay", type=int, default=6)
     parser.add_argument("--token-name", default=DEFAULT_TOKEN_NAME)
     args = parser.parse_args(argv)
-
     try:
-        env_file = args.env_file or from_environment().path(".env")
-        bootstrap(env_file, args.retries, args.delay, args.token_name)
+        bootstrap_canonical(
+            api_url=os.environ.get("TECHNITIUM_API_URL", ""),
+            api_token=os.environ.get("TECHNITIUM_API_TOKEN", ""),
+            admin_password=os.environ.get("TECHNITIUM_ADMIN_PASSWORD", ""),
+            bundle=args.bundle,
+            key_file=args.key_file,
+            retries=args.retries,
+            delay=args.delay,
+            token_name=args.token_name,
+        )
     except BootstrapError as error:
         print(error, file=sys.stderr)
         return 1

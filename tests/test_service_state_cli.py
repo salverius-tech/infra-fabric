@@ -43,6 +43,7 @@ class ServiceStateCliTests(unittest.TestCase):
                 '"allow_apply":true,"allow_destroy":true,"services":["hermes"]}\n',
                 encoding="utf-8",
             )
+            (site_values / "site.yaml").write_text("schema_version: 1\nsite:\n  name: dev\n", encoding="utf-8")
             archive = site_values / "service-backups" / "hermes" / "state.tar.gz"
             archive.parent.mkdir(parents=True)
             archive.touch()
@@ -63,11 +64,46 @@ class ServiceStateCliTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
+            captured = capture.read_text(encoding="utf-8")
             self.assertIn(
                 "MSYS2_ENV_CONV_EXCL=KEEP;SERVICE_STATE_BACKUP_ROOT;SERVICE_STATE_RESTORE_FILE",
-                capture.read_text(encoding="utf-8"),
+                captured,
             )
+            self.assertIn('generated_dir="${INFRA_GENERATED_DIR:-/workspace/values/sites/dev/generated}"', captured)
+            self.assertIn('inventory="${generated_dir}/ansible-inventory.json"', captured)
+            self.assertIn('vars_file="${generated_dir}/ansible-vars.json"', captured)
+            self.assertIn('--generated-dir "${generated_dir}"', captured)
 
+    def test_latest_local_archive_skips_pre_restore_safety_archives(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            script = self.make_fixture(root)
+            site_values = root / "values" / "sites" / "dev"
+            backup_dir = site_values / "service-backups" / "hermes"
+            backup_dir.mkdir(parents=True)
+            (backup_dir / "hermes-state-20260101T000000Z.tar.gz").write_text("old")
+            (backup_dir / "hermes-state-pre-restore-20260201T000000Z.tar.gz").write_text("safety")
+            probe = root / "probe.sh"
+            probe.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                f"repo_root={root}\n"
+                'site_values_dir="values/sites/dev"\n'
+                f"source <(sed -n '/^latest_local_archive()/,/^}}/p' {script})\n"
+                "latest_local_archive hermes\n",
+                encoding="utf-8",
+            )
+            probe.chmod(0o755)
+            result = subprocess.run(
+                [str(probe)],
+                cwd=root,
+                env=os.environ | {"VALUES_SITE": "dev"},
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(backup_dir / "hermes-state-20260101T000000Z.tar.gz"))
 
 if __name__ == "__main__":
     unittest.main()

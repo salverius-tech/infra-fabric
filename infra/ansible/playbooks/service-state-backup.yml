@@ -6,28 +6,36 @@
   vars_files:
     - ../vars/service-state.yml
   vars:
-    service_state_backup_root: "{{ lookup('env', 'SERVICE_STATE_BACKUP_ROOT') | default('/workspace/values/service-backups', true) }}"
+    service_state_backup_root: "{{ lookup('env', 'SERVICE_STATE_BACKUP_ROOT') }}"
   tasks:
     - name: Validate service-state backup input
+      tags: [backup]
       ansible.builtin.assert:
         that:
           - service_state_service is defined
           - service_state_service in managed_service_state_catalog
           - service_state_hosts is defined
+          - service_state_backup_root | length > 0
+          - service_state_service != "forgejo" or forgejo_database is defined
+          - service_state_service != "forgejo" or forgejo_database.type is defined
+          - service_state_service != "forgejo" or forgejo_database.name is defined
         fail_msg: service_state_service and service_state_hosts are required for service state backup.
 
     - name: Select managed service-state definition
+      tags: [config]
       ansible.builtin.set_fact:
         service_state_definition: "{{ managed_service_state_catalog[service_state_service] }}"
         service_state_timestamp: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
 
     - name: Set service-state backup archive paths
+      tags: [backup]
       ansible.builtin.set_fact:
         service_state_archive_name: "{{ service_state_service }}-state-{{ service_state_timestamp }}.tar.gz"
         service_state_local_dir: "{{ service_state_backup_root }}/{{ service_state_service }}"
         service_state_remote_archive: "/tmp/{{ service_state_service }}-state-{{ service_state_timestamp }}.tar.gz"
 
     - name: Ensure local service-state backup directory exists
+      tags: [backup]
       ansible.builtin.file:
         path: "{{ service_state_local_dir }}"
         state: directory
@@ -38,21 +46,24 @@
     - name: Create and stream service-state backup transaction
       block:
         - name: Create temporary service-state snapshot directory
+          tags: [config]
           ansible.builtin.tempfile:
             state: directory
             suffix: "{{ service_state_service }}-state"
           register: service_state_snapshot_dir
 
         - name: Allow PostgreSQL to access its temporary dump directory
+          tags: [config]
           ansible.builtin.file:
             path: "{{ service_state_snapshot_dir.path }}"
             state: directory
             mode: "0711"
           when:
             - service_state_service == "forgejo"
-            - forgejo_database.type | default("sqlite") == "postgres"
+            - forgejo_database.type == "postgres"
 
         - name: Ensure Forgejo database snapshot directory exists
+          tags: [config]
           ansible.builtin.file:
             path: "{{ service_state_snapshot_dir.path }}/.service-state"
             state: directory
@@ -61,9 +72,10 @@
             mode: "0700"
           when:
             - service_state_service == "forgejo"
-            - forgejo_database.type | default("sqlite") == "postgres"
+            - forgejo_database.type == "postgres"
 
         - name: Export managed Forgejo PostgreSQL database
+          tags: [config]
           ansible.builtin.command:
             argv:
               - runuser
@@ -77,15 +89,17 @@
           changed_when: true
           when:
             - service_state_service == "forgejo"
-            - forgejo_database.type | default("sqlite") == "postgres"
+            - forgejo_database.type == "postgres"
 
         - name: Check managed service-state paths
+          tags: [validation]
           ansible.builtin.stat:
             path: "{{ item }}"
           loop: "{{ service_state_definition.paths }}"
           register: service_state_path_stats
 
         - name: Build existing managed service-state path list
+          tags: [packages]
           ansible.builtin.set_fact:
             service_state_existing_paths: >-
               {{ service_state_path_stats.results
@@ -94,11 +108,13 @@
                  | list }}
 
         - name: Fail when no managed service-state paths exist
+          tags: [config]
           ansible.builtin.fail:
             msg: "None of the configured state paths exist for {{ service_state_service }}."
           when: service_state_existing_paths | length == 0
 
         - name: Create service-state snapshot parent directories
+          tags: [config]
           ansible.builtin.file:
             path: "{{ service_state_snapshot_dir.path }}{{ item | dirname }}"
             state: directory
@@ -106,16 +122,42 @@
           loop: "{{ service_state_existing_paths }}"
 
         - name: Snapshot managed service-state paths
+          tags: [config]
           ansible.builtin.command:
-            argv:
-              - cp
-              - -a
-              - "{{ item }}"
-              - "{{ service_state_snapshot_dir.path }}{{ item }}"
+            argv: >-
+              {{ ['tar', '--numeric-owner', '--exclude=*/lost+found']
+                 + (service_state_definition.tar_exclude_args | default([]))
+                 + ['-C', '/', '-cf',
+                    service_state_snapshot_dir.path ~ '/.snapshot-' ~ service_state_path_index ~ '.tar',
+                    item | regex_replace('^/', '')] }}
           loop: "{{ service_state_existing_paths }}"
+          loop_control:
+            index_var: service_state_path_index
+          changed_when: true
+
+        - name: Extract service-state path snapshots
+          tags: [config]
+          ansible.builtin.unarchive:
+            src: "{{ service_state_snapshot_dir.path }}/.snapshot-{{ service_state_path_index }}.tar"
+            dest: "{{ service_state_snapshot_dir.path }}"
+            remote_src: true
+          loop: "{{ service_state_existing_paths }}"
+          loop_control:
+            index_var: service_state_path_index
+          changed_when: true
+
+        - name: Remove temporary service-state path archives
+          tags: [packages]
+          ansible.builtin.file:
+            path: "{{ service_state_snapshot_dir.path }}/.snapshot-{{ service_state_path_index }}.tar"
+            state: absent
+          loop: "{{ service_state_existing_paths }}"
+          loop_control:
+            index_var: service_state_path_index
           changed_when: true
 
         - name: Write service-state backup manifest
+          tags: [backup]
           ansible.builtin.copy:
             dest: "{{ service_state_snapshot_dir.path }}/MANIFEST.json"
             mode: "0600"
@@ -128,6 +170,7 @@
               }
 
         - name: Create service-state archive on service host
+          tags: [config]
           ansible.builtin.command:
             argv:
               - tar
@@ -140,6 +183,7 @@
           changed_when: true
 
         - name: Stream service-state archive into private values
+          tags: [config]
           ansible.builtin.command:
             argv:
               - python3
@@ -150,6 +194,8 @@
               - "{{ ansible_user | default(ansible_user_id) }}"
               - --port
               - "{{ ansible_port | default(22) | string }}"
+              - --identity-file
+              - /home/anvil/.ssh/canonical-bootstrap
               - --ssh-common-args
               - "{{ ansible_ssh_common_args | default('') }}"
               - --remote-archive
@@ -166,6 +212,7 @@
 
       always:
         - name: Remove temporary service-state artifacts from service host
+          tags: [packages]
           ansible.builtin.file:
             path: "{{ item }}"
             state: absent
@@ -175,11 +222,13 @@
           when: service_state_snapshot_dir is defined
 
     - name: Record streamed service-state archive checksum
+      tags: [config]
       ansible.builtin.set_fact:
         service_state_checksum: "{{ service_state_stream.stdout | from_json }}"
       changed_when: false
 
     - name: Write local service-state checksum manifest
+      tags: [config]
       ansible.builtin.copy:
         dest: "{{ service_state_local_dir }}/{{ service_state_archive_name }}.sha256"
         mode: "0600"
@@ -188,5 +237,6 @@
       become: false
 
     - name: Report service-state backup path
+      tags: [backup]
       ansible.builtin.debug:
         msg: "{{ service_state_service }} state backup written to {{ service_state_local_dir }}/{{ service_state_archive_name }}"

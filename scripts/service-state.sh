@@ -6,11 +6,11 @@ usage() {
 Usage:
   scripts/service-state.sh list
   scripts/service-state.sh backup <service|all>
-  scripts/service-state.sh restore <service> values/service-backups/<service>/<archive>.tar.gz
-  scripts/service-state.sh restore-if-present <service> [values/service-backups/<service>/<archive>.tar.gz]
+  VALUES_SITE=<site> scripts/service-state.sh restore <service> values/sites/<site>/service-backups/<service>/<archive>.tar.gz
+  VALUES_SITE=<site> scripts/service-state.sh restore-if-present <service> [values/sites/<site>/service-backups/<service>/<archive>.tar.gz]
 
 Managed service-state archives are private operational state. They are written
-under values/service-backups/ in the ignored private values repo.
+under the selected site's values/sites/<site>/service-backups/ directory.
 USAGE
 }
 
@@ -19,23 +19,20 @@ source "${repo_root}/scripts/site-context.sh"
 site_values_dir="$(site_values_dir)"
 backup_root="${SERVICE_STATE_BACKUP_ROOT:-/workspace/${site_values_dir}/service-backups}"
 
-supported_services=(
-  hermes
-  forgejo
-  infisical
-  technitium
-  onramp_host
-  infisical_onramp
-  searxng_onramp
-)
+state_capable_services() {
+  scripts/python.sh - <<'PY'
+from pathlib import Path
+import yaml
+
+catalog = yaml.safe_load(Path("infra/ansible/vars/service-state.yml").read_text(encoding="utf-8"))
+for service in sorted(catalog["managed_service_state_catalog"]):
+    print(service)
+PY
+}
 
 is_supported_service() {
   local service="$1"
-  local item
-  for item in "${supported_services[@]}"; do
-    [[ "${item}" == "${service}" ]] && return 0
-  done
-  return 1
+  state_capable_services | grep -Fxq "${service}"
 }
 
 container_path() {
@@ -67,6 +64,7 @@ latest_local_archive() {
     return 1
   fi
   find "${backup_dir}" -maxdepth 1 -type f -name "${service}-state-*.tar.gz" \
+    ! -name "${service}-state-pre-restore-*.tar.gz" \
     -printf '%T@ %p\n' | sort -nr | awk 'NR == 1 { $1=""; sub(/^ /, ""); print }'
 }
 
@@ -100,6 +98,28 @@ PY
 
 enabled_supported_services() {
   local service
+  if [[ -n "${VALUES_SITE:-}" ]]; then
+    while IFS= read -r service; do
+      if is_supported_service "${service}"; then
+        printf '%s\n' "${service}"
+      fi
+    done < <(scripts/python.sh - <<'PY'
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "scripts")
+from canonical_values import load_site
+from values_context import from_environment
+
+context = from_environment(Path.cwd())
+model = load_site(context.canonical_site_path, expected_site=context.site, catalog_path=Path("infra/services.json"))
+for name, service in model.services.items():
+    if service.enabled:
+        print(name)
+PY
+)
+    return
+  fi
   while IFS= read -r service; do
     if is_supported_service "${service}"; then
       printf '%s\n' "${service}"
@@ -107,11 +127,23 @@ enabled_supported_services() {
   done < <(scripts/python.sh scripts/settings.py services | tr ' ' '\n')
 }
 
+require_canonical_service_enabled() {
+  local requested="$1"
+  if [[ -z "${VALUES_SITE:-}" ]]; then
+    return 0
+  fi
+  if ! enabled_supported_services | grep -Fx "${requested}" >/dev/null; then
+    printf 'Service-state target is not enabled in the canonical site: %s\n' "${requested}" >&2
+    exit 2
+  fi
+}
+
 run_playbook() {
   local mode="$1"
   local service="$2"
   local group
   group="$(service_group "${service}")"
+  local flat_vars_file="/tmp/.service-state-ansible-vars-${service}.json"
 
   local msys_env_conv_excl="${MSYS2_ENV_CONV_EXCL:-}"
   if [[ -n "${msys_env_conv_excl}" ]]; then
@@ -121,17 +153,19 @@ run_playbook() {
 
   if [[ "${mode}" == "backup" ]]; then
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
+      INFRA_SSH_IDENTITY_SOURCE=sops \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
-      scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i \${INFRA_VALUES_DIR}/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml"
+      scripts/run-infra.sh bash -euo pipefail -c \
+      "export PATH=/opt/ansible/bin:\$PATH; trap 'rm -f ${flat_vars_file}' EXIT; generated_dir=\"\${INFRA_GENERATED_DIR:-/workspace/${site_values_dir}/generated}\"; inventory=\"\${generated_dir}/ansible-inventory.json\"; vars_file=\"\${generated_dir}/ansible-vars.json\"; python /workspace/scripts/verify-projections.py --site-file /workspace/${site_values_dir}/site.yaml --generated-dir \"\${generated_dir}\"; python /workspace/scripts/flatten-ansible-vars.py --input \"\${vars_file}\" --output ${flat_vars_file@Q}; ansible-playbook -i \"\${inventory}\" -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-backup.yml"
   else
     INFRA_COPY_SSH_KEYS="${INFRA_COPY_SSH_KEYS:-true}" \
+      INFRA_SSH_IDENTITY_SOURCE=sops \
       MSYS2_ENV_CONV_EXCL="${msys_env_conv_excl}" \
       SERVICE_STATE_BACKUP_ROOT="${backup_root}" \
       SERVICE_STATE_RESTORE_FILE="${restore_file}" \
-      scripts/run-infra.sh bash -lc \
-      "export PATH=/opt/ansible/bin:\$PATH; ansible-playbook -i \${INFRA_VALUES_DIR}/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml"
+      scripts/run-infra.sh bash -euo pipefail -c \
+      "export PATH=/opt/ansible/bin:\$PATH; trap 'rm -f ${flat_vars_file}' EXIT; generated_dir=\"\${INFRA_GENERATED_DIR:-/workspace/${site_values_dir}/generated}\"; inventory=\"\${generated_dir}/ansible-inventory.json\"; vars_file=\"\${generated_dir}/ansible-vars.json\"; python /workspace/scripts/verify-projections.py --site-file /workspace/${site_values_dir}/site.yaml --generated-dir \"\${generated_dir}\"; python /workspace/scripts/flatten-ansible-vars.py --input \"\${vars_file}\" --output ${flat_vars_file@Q}; ansible-playbook -i \"\${inventory}\" -e @${flat_vars_file@Q} -e '{\"ansible_ssh_private_key_file\":\"/home/anvil/.ssh/canonical-bootstrap\",\"ansible_ssh_common_args\":\"-o UserKnownHostsFile=/workspace/${site_values_dir}/ansible/known_hosts -o StrictHostKeyChecking=yes\"}' -e service_state_service=${service@Q} -e service_state_hosts=${group@Q} infra/ansible/playbooks/service-state-restore.yml"
   fi
 }
 
@@ -150,10 +184,11 @@ case "${command_name}" in
       exit 2
     fi
     printf 'Supported service-state targets:\n'
-    printf '  %s\n' "${supported_services[@]}"
+    state_capable_services | sed 's/^/  /'
     ;;
   backup)
     require_site_context
+    require_canonical_authority
     if [[ $# -ne 1 ]]; then
       usage
       exit 2
@@ -174,11 +209,13 @@ case "${command_name}" in
         printf 'Unsupported service-state target: %s\n' "${target}" >&2
         exit 2
       fi
+      require_canonical_service_enabled "${target}"
       run_playbook backup "${target}"
     fi
     ;;
   restore)
     require_site_context
+    require_canonical_authority
     if [[ $# -ne 2 ]]; then
       usage
       exit 2
@@ -188,12 +225,14 @@ case "${command_name}" in
       printf 'Unsupported service-state target: %s\n' "${service}" >&2
       exit 2
     fi
+    require_canonical_service_enabled "${service}"
     restore_file="$(container_path "$2")"
     validate_restore_file "${service}" "${restore_file}"
     run_playbook restore "${service}"
     ;;
   restore-if-present)
     require_site_context
+    require_canonical_authority
     if [[ $# -lt 1 || $# -gt 2 ]]; then
       usage
       exit 2
@@ -203,6 +242,7 @@ case "${command_name}" in
       printf 'Unsupported service-state target: %s\n' "${service}" >&2
       exit 2
     fi
+    require_canonical_service_enabled "${service}"
     if [[ $# -eq 2 ]]; then
       local_restore_file="$2"
       if [[ ! -f "${local_restore_file}" ]]; then

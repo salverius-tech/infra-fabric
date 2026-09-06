@@ -1,5 +1,6 @@
 ---
 - name: Validate Infisical onramp required variables
+  tags: [validation]
   ansible.builtin.assert:
     that:
       - ansible_distribution == "Debian"
@@ -26,6 +27,7 @@
   no_log: true
 
 - name: Install Infisical onramp OS dependencies
+  tags: [packages]
   ansible.builtin.apt:
     name: "{{ infisical_onramp_required_packages }}"
     state: present
@@ -33,6 +35,7 @@
   when: infisical_onramp_required_packages | length > 0
 
 - name: Ensure Infisical onramp deployment directories exist
+  tags: [config]
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
@@ -56,6 +59,7 @@
       mode: "0750"
 
 - name: Install Infisical onramp env
+  tags: [packages]
   ansible.builtin.template:
     src: infisical.env.j2
     dest: "{{ infisical_onramp_base_dir }}/infisical.env"
@@ -66,6 +70,7 @@
   notify: Restart infisical onramp
 
 - name: Install Infisical onramp compose file
+  tags: [packages]
   ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ infisical_onramp_base_dir }}/docker-compose.yml"
@@ -75,6 +80,7 @@
   notify: Restart infisical onramp
 
 - name: Resolve Infisical onramp deploy user UID
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - id
@@ -84,6 +90,7 @@
   changed_when: false
 
 - name: Install Infisical onramp rootless systemd unit
+  tags: [packages]
   ansible.builtin.template:
     src: infisical-onramp.service.j2
     dest: "/home/{{ onramp_host_deploy_user }}/.config/systemd/user/infisical-onramp.service"
@@ -93,6 +100,7 @@
   notify: Restart infisical onramp
 
 - name: Enable Infisical onramp rootless systemd unit
+  tags: [service]
   become: true
   become_user: "{{ onramp_host_deploy_user }}"
   ansible.builtin.systemd_service:
@@ -105,6 +113,7 @@
     XDG_RUNTIME_DIR: "/run/user/{{ infisical_onramp_deploy_user_uid.stdout | trim }}"
 
 - name: Install Infisical onramp Caddy site snippet
+  tags: [packages]
   ansible.builtin.template:
     src: infisical.caddy.j2
     dest: /etc/caddy/sites.d/infisical.caddy
@@ -114,6 +123,7 @@
   notify: Restart caddy
 
 - name: Validate Infisical onramp Caddy config
+  tags: [validation]
   ansible.builtin.command:
     argv:
       - bash
@@ -122,9 +132,11 @@
   changed_when: false
 
 - name: Flush Infisical onramp restarts before endpoint checks
+  tags: [health]
   ansible.builtin.meta: flush_handlers
 
 - name: Verify Infisical onramp rootless service is active
+  tags: [health]
   become: true
   become_user: "{{ onramp_host_deploy_user }}"
   ansible.builtin.command:
@@ -142,6 +154,7 @@
   until: infisical_onramp_service_active.rc == 0
 
 - name: Verify Infisical onramp Caddy service is active
+  tags: [health]
   ansible.builtin.command:
     argv:
       - systemctl
@@ -154,6 +167,7 @@
   until: infisical_onramp_caddy_active.rc == 0
 
 - name: Verify Infisical onramp loopback endpoint
+  tags: [health]
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ infisical_onramp_container_port }}/"
     status_code:
@@ -168,6 +182,7 @@
   until: infisical_onramp_loopback_check.status in [200, 302, 401, 404]
 
 - name: Verify Infisical onramp HTTPS route locally
+  tags: [health]
   ansible.builtin.command:
     argv:
       - curl

@@ -11,6 +11,11 @@ variable "node_name" {
 variable "vm_id" {
   description = "Proxmox VMID."
   type        = number
+
+  validation {
+    condition     = var.vm_id == floor(var.vm_id) && var.vm_id >= 100 && var.vm_id <= 999999999
+    error_message = "vm_id must be an integer in the Proxmox VMID range 100 through 999999999."
+  }
 }
 
 variable "name" {
@@ -37,18 +42,23 @@ variable "start_on_boot" {
 }
 
 variable "image" {
-  description = "Cloud image import settings. Set create=false with file_id when reusing an image managed outside this module."
+  description = "Verified cloud image reference managed outside this module."
   type = object({
     datastore_id = string
     url          = string
     file_name    = string
-    file_id      = optional(string)
-    create       = optional(bool, true)
+    file_id      = string
+    create       = optional(bool, false)
   })
 
   validation {
-    condition     = var.image.create || var.image.file_id != null
-    error_message = "image.file_id is required when image.create is false."
+    condition     = trimspace(var.image.file_id) != ""
+    error_message = "image.file_id must reference a separately checksum-verified Proxmox image."
+  }
+
+  validation {
+    condition     = !var.image.create
+    error_message = "debian-vm does not download images; set image.create=false and provide a checksum-verified image.file_id."
   }
 }
 
@@ -58,16 +68,61 @@ variable "disk" {
     datastore_id = string
     size_gb      = number
   })
+
+  validation {
+    condition     = trimspace(var.disk.datastore_id) != "" && var.disk.size_gb > 0
+    error_message = "disk requires a non-empty datastore_id and a positive size_gb."
+  }
+}
+
+variable "extra_disks" {
+  description = "Additional Proxmox-managed VM disks."
+  type = list(object({
+    datastore_id = string
+    size_gb      = number
+    interface    = string
+  }))
+  default = []
+
+  validation {
+    condition     = alltrue([for disk in var.extra_disks : trimspace(disk.datastore_id) != "" && disk.size_gb > 0 && can(regex("^[a-z]+[0-9]+$", disk.interface))])
+    error_message = "Each extra disk requires a non-empty datastore_id, positive size_gb, and interface such as scsi1."
+  }
+
+  validation {
+    condition     = length(distinct([for disk in var.extra_disks : disk.interface])) == length(var.extra_disks)
+    error_message = "extra_disks interfaces must be unique."
+  }
 }
 
 variable "cores" {
   description = "CPU cores."
   type        = number
+
+  validation {
+    condition     = var.cores == floor(var.cores) && var.cores > 0
+    error_message = "cores must be a positive integer."
+  }
+}
+
+variable "cpu_type" {
+  description = "Portable Proxmox virtual CPU baseline."
+  type        = string
+
+  validation {
+    condition     = contains(["x86-64-v2-AES", "x86-64-v3"], var.cpu_type)
+    error_message = "cpu_type must be x86-64-v2-AES or x86-64-v3."
+  }
 }
 
 variable "memory_mb" {
   description = "Dedicated memory in MiB."
   type        = number
+
+  validation {
+    condition     = var.memory_mb == floor(var.memory_mb) && var.memory_mb > 0
+    error_message = "memory_mb must be a positive integer."
+  }
 }
 
 variable "search_domain" {
@@ -83,12 +138,22 @@ variable "dns_servers" {
 variable "ipv4_address" {
   description = "IPv4 address/CIDR, or dhcp."
   type        = string
+
+  validation {
+    condition     = var.ipv4_address == "dhcp" || can(cidrhost(var.ipv4_address, 0))
+    error_message = "ipv4_address must be dhcp or an IPv4 CIDR address."
+  }
 }
 
 variable "ipv4_gateway" {
   description = "IPv4 gateway."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.ipv4_gateway == null || can(cidrhost("${var.ipv4_gateway}/32", 0))
+    error_message = "ipv4_gateway must be null or an IPv4 address."
+  }
 }
 
 variable "cloud_init_user" {
@@ -100,7 +165,11 @@ variable "cloud_init_user" {
 variable "ssh_public_keys" {
   description = "SSH public keys installed for the cloud-init user."
   type        = list(string)
-  default     = []
+
+  validation {
+    condition     = length(var.ssh_public_keys) > 0
+    error_message = "At least one canonical bootstrap SSH public key is required."
+  }
 }
 
 variable "network" {
@@ -110,6 +179,11 @@ variable "network" {
     mac_address = optional(string)
     vlan_id     = optional(number)
   })
+
+  validation {
+    condition     = trimspace(var.network.bridge) != "" && (try(var.network.mac_address, null) == null || can(regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$", var.network.mac_address))) && (try(var.network.vlan_id, null) == null || (var.network.vlan_id >= 1 && var.network.vlan_id <= 4094))
+    error_message = "network requires a bridge; optional mac_address must be colon-delimited and vlan_id must be 1 through 4094."
+  }
 }
 
 variable "startup" {

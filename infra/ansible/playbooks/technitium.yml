@@ -9,16 +9,23 @@
       vars:
         lxc_ready_vmid: '{{ technitium_vmid }}'
         lxc_ready_name: technitium
-      when: technitium_runtime.type | default('lxc') == 'lxc'
+      when:
+        - technitium_runtime.type | default('lxc') == 'lxc'
+        - not (infra_host_identity_skip_root | default(false) | bool)
 - name: Run direct access handoff for Technitium DNS
   ansible.builtin.import_playbook: direct-access-ready.yml
   vars:
     direct_access_ready_hosts: technitium
+- name: Converge canonical host identities for Technitium DNS
+  ansible.builtin.import_playbook: host-identity.yml
+  vars:
+    host_identity_hosts: technitium
 - name: Configure Technitium DNS service directly
   hosts: technitium
   gather_facts: false
   become: true
+  vars:
+    technitium_api_token: "{{ lookup('env', 'TECHNITIUM_API_TOKEN') }}"
+    technitium_admin_password: "{{ lookup('env', 'TECHNITIUM_ADMIN_PASSWORD') }}"
   roles:
-    - role: lxc_credentials
-      when: technitium_runtime.type | default('lxc') == 'lxc'
     - technitium

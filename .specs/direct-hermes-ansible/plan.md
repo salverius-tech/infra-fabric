@@ -10,7 +10,7 @@ completed:
 
 The operator access model for this homelab is direct service access: operators should SSH to the service endpoint, for example `ssh <user>@hermes.example.internal`, and browse the service-local HTTPS endpoint. The current Hermes Ansible role contradicts that model by targeting `hosts: pve` and performing steady-state service configuration through Proxmox-mediated `pct exec` and `pct push` commands.
 
-The user explicitly corrected the access assumption: Hermes should be accessed directly as `user@hermes.ilude.com`, not by SSHing to Proxmox and entering the LXC. `AGENTS.md` has been updated to state that direct service SSH/HTTPS is the normal path, while Proxmox `pct` access is for lifecycle diagnostics, bootstrap, console recovery, or explicit operator instruction. This plan turns that policy into the actual Hermes Ansible implementation.
+The user explicitly corrected the access assumption: Hermes should be accessed directly as `user@hermes.example.internal`, not by SSHing to Proxmox and entering the LXC. `AGENTS.md` has been updated to state that direct service SSH/HTTPS is the normal path, while Proxmox `pct` access is for lifecycle diagnostics, bootstrap, console recovery, or explicit operator instruction. This plan turns that policy into the actual Hermes Ansible implementation.
 
 ## Constraints
 

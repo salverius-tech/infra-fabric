@@ -8,6 +8,7 @@
     storage_bind_mounts: []
   tasks:
     - name: Prepare requested host bind storage paths
+      tags: [always]
       ansible.builtin.include_tasks: ../tasks/host-storage.yml
       loop: "{{ storage_bind_mounts }}"
       loop_control:

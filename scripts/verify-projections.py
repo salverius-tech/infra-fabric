@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Verify installed canonical consumer projections against their site identity."""
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from canonical_values import CanonicalValuesError, load_site, model_digest
+from canonical_projections import ProjectionError, verify_cross_projection_identity, verify_onramp_handoff_identity
+from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
+from service_catalog import ServiceCatalogError, load_catalog
+
+PROJECTION_FILES = (
+    "terraform.auto.tfvars.json",
+    "ansible-inventory.json",
+    "ansible-vars.json",
+    "dns-records.json",
+    "onramp-handoff.json",
+)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--site-file", type=Path, required=True)
+    parser.add_argument("--generated-dir", type=Path, required=True)
+    parser.add_argument("--catalog", type=Path, default=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+    args = parser.parse_args(argv)
+    try:
+        model = load_site(args.site_file, catalog_path=args.catalog)
+        catalog = load_catalog(args.catalog)
+        verify_projection_permissions(args.generated_dir)
+        manifest = json.loads((args.generated_dir / "manifest.json").read_text(encoding="utf-8"))
+        projections = {
+            name: json.loads((args.generated_dir / name).read_text(encoding="utf-8"))
+            for name in PROJECTION_FILES
+        }
+        verify_cross_projection_identity(
+            site=model.site.name,
+            opentofu=projections["terraform.auto.tfvars.json"],
+            inventory=projections["ansible-inventory.json"],
+            ansible_vars=projections["ansible-vars.json"],
+        )
+        verify_onramp_handoff_identity(model, catalog, projections["onramp-handoff.json"])
+        verify_manifest(
+            manifest,
+            site=model.site.name,
+            model_digest=model_digest(model),
+            secret_digest=None,
+            projections=projections,
+        )
+    except (CanonicalValuesError, ProjectionError, ServiceCatalogError, ManifestError, OSError, json.JSONDecodeError) as error:
+        print(f"canonical projection verification failed: {error}", file=sys.stderr)
+        return 1
+    print(f"verified canonical projections for {model.site.name} in {args.generated_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,17 +1,5 @@
 locals {
-  image_file_id = var.image.create ? proxmox_download_file.cloud_image[0].id : var.image.file_id
-}
-
-resource "proxmox_download_file" "cloud_image" {
-  count = var.image.create ? 1 : 0
-
-  content_type        = "import"
-  datastore_id        = var.image.datastore_id
-  file_name           = var.image.file_name
-  node_name           = var.node_name
-  url                 = var.image.url
-  overwrite           = false
-  overwrite_unmanaged = false
+  image_file_id = var.image.file_id
 }
 
 resource "proxmox_virtual_environment_vm" "this" {
@@ -31,7 +19,7 @@ resource "proxmox_virtual_environment_vm" "this" {
 
   cpu {
     cores = var.cores
-    type  = "x86-64-v2-AES"
+    type  = var.cpu_type
   }
 
   memory {
@@ -43,6 +31,15 @@ resource "proxmox_virtual_environment_vm" "this" {
     import_from  = local.image_file_id
     interface    = "scsi0"
     size         = var.disk.size_gb
+  }
+
+  dynamic "disk" {
+    for_each = var.extra_disks
+    content {
+      datastore_id = disk.value.datastore_id
+      interface    = disk.value.interface
+      size         = disk.value.size_gb
+    }
   }
 
   initialization {

@@ -15,6 +15,7 @@ CADDY_TASK_FILES = (
     REPO / "infra" / "ansible" / "roles" / "hermes" / "tasks" / "main.yml",
     REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "tasks" / "main.yml",
 )
+TECHNITIUM_DNS_PLAYBOOK = REPO / "infra" / "ansible" / "playbooks" / "technitium-dns.yml"
 ANSIBLE_TASK_FILES = tuple((REPO / "infra" / "ansible" / "roles").glob("*/tasks/*.yml"))
 SERVICE_SMOKE_TASK_FILES = (
     REPO / "infra" / "ansible" / "roles" / "technitium" / "tasks" / "main.yml",
@@ -63,6 +64,11 @@ def command_text(task: dict[str, Any]) -> str:
 
 
 class AnsibleSafetyTests(unittest.TestCase):
+    def test_production_lint_does_not_globally_skip_idempotence(self) -> None:
+        config = yaml.safe_load((REPO / ".ansible-lint").read_text(encoding="utf-8"))
+        self.assertEqual(config.get("profile"), "production")
+        self.assertNotIn("no-changed-when", config.get("skip_list", []))
+
     def test_service_roles_do_not_use_pct_for_steady_state(self) -> None:
         for path in sorted((REPO / "infra" / "ansible" / "roles").glob("*/**/*.yml")):
             if path in ALLOWLIST_PCT:
@@ -86,6 +92,11 @@ class AnsibleSafetyTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("caddy fmt --overwrite", text, str(path))
             self.assertIn("caddy validate --config /etc/caddy/Caddyfile", text, str(path))
+
+    def test_dns_sync_requires_the_canonical_generated_projection_transport(self) -> None:
+        playbook = TECHNITIUM_DNS_PLAYBOOK.read_text(encoding="utf-8")
+        self.assertIn("lookup('env', 'DNS_RECORDS_FILE')", playbook)
+        self.assertNotIn("dns-records.local.json", playbook)
 
     def test_curl_output_is_not_accidentally_streamed_to_ansible(self) -> None:
         for path in ANSIBLE_TASK_FILES:
@@ -137,6 +148,21 @@ class AnsibleSafetyTests(unittest.TestCase):
         self.assertEqual(task_by_name(RUNNER_TASKS, "Normalize Forgejo repository-scoped runner ownership in PostgreSQL").get("delegate_to"), "{{ groups['forgejo'][0] }}")
         self.assertNotIn("forgejo_runner_registration.stdout", str(config))
         self.assertIn("forgejo_runner_uuid", str(task_by_name(RUNNER_TASKS, "Set Forgejo runner UUID")))
+
+    def test_forgejo_runner_registration_secret_matches_cli_contract(self) -> None:
+        validation = task_by_name(RUNNER_TASKS, "Validate Forgejo Actions runner variables")
+        assertion = validation.get("ansible.builtin.assert", {})
+        self.assertIn("forgejo_runner_registration_secret is match", str(assertion.get("that")))
+        self.assertIn("{40}", str(assertion.get("that")))
+
+    def test_forgejo_runner_registration_uses_transient_secret_file(self) -> None:
+        registration = task_by_name(RUNNER_TASKS, "Register Forgejo Actions runner with Forgejo")
+        text = command_text(registration)
+        self.assertIn("mktemp", text)
+        self.assertIn("trap", text)
+        self.assertIn("--secret-file", text)
+        self.assertIn("--labels \"$3\"", text)
+        self.assertNotIn("--secret \"${FORGEJO_RUNNER_SECRET}\"", text)
 
     def test_forgejo_runner_registration_task_order(self) -> None:
         names = task_names(RUNNER_TASKS)
@@ -195,6 +221,12 @@ class AnsibleSafetyTests(unittest.TestCase):
         self.assertNotIn("0.0.0.0:{{ searxng_onramp_container_port }}:8080", text)  # public-safety: allow-ip
         task = task_by_name(REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "tasks" / "main.yml", "Validate SearXNG onramp required variables")
         self.assertIn("searxng_onramp_bind_address in ['127.0.0.1', '::1']", str(task))  # public-safety: allow-ip
+
+    def test_searxng_onramp_allows_json_search_for_hermes_consumer(self) -> None:
+        settings = REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "templates" / "settings.yml.j2"
+        text = settings.read_text(encoding="utf-8")
+        self.assertIn("formats:", text)
+        self.assertRegex(text, r"(?m)^\s+- json$")
 
 
 if __name__ == "__main__":

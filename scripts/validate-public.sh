@@ -5,44 +5,147 @@ export INFRA_HOST_UID="${INFRA_HOST_UID:-$(scripts/host-id.sh uid)}"
 export INFRA_HOST_GID="${INFRA_HOST_GID:-$(scripts/host-id.sh gid)}"
 
 docker compose config >/dev/null
+git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
 
 # shellcheck disable=SC2016
-docker compose run --rm infra bash -euo pipefail -c '
-python scripts/workspace-preflight.py
-
-tofu -chdir=infra/opentofu init -backend=false
-tofu fmt -check -recursive infra/opentofu scaffold/terraform.tfvars
-tofu -chdir=infra/opentofu validate
-tflint --chdir=infra/opentofu --minimum-failure-severity=error
-
-shellcheck scripts/*.sh tools/docker-entrypoint.sh
-
-mapfile -t python_files < <(find infra/ansible scripts tests -type f -name "*.py" | sort)
-python -m py_compile "${python_files[@]}"
-
-python infra/ansible/scripts/apply-technitium-dns.py --check scaffold/dns-records.local.json
-python scripts/parse-env.py --env-file scaffold/.env.example >/dev/null
-python scripts/settings.py --settings settings.example.json validate >/dev/null
-python -m unittest discover -s tests -p "test_*.py"
-
-export ANSIBLE_TFVARS_FILE=scaffold/terraform.tfvars
-export INFRA_SETTINGS_FILE=settings.example.json
-ansible-inventory -i scaffold/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py --list >/dev/null
-mapfile -t playbooks < <(python scripts/settings.py --settings settings.example.json ansible-playbooks --all)
-ansible-playbook -i scaffold/ansible/inventory/local.yml -i infra/ansible/inventory/tfvars.py --syntax-check \
-  infra/ansible/playbooks/site.yml \
-  infra/ansible/playbooks/storage-prep.yml \
-  infra/ansible/playbooks/guest-mount-feature-preflight.yml \
-  "${playbooks[@]}"
-
-lint_root="$(mktemp -d)"
-cleanup_lint_root() {
-  rm -rf "$lint_root"
+# The isolated inner Ansible lint stage retains these public-source contracts:
+# lint_root="$(mktemp -d)"; cleanup_lint_root(); trap cleanup_lint_root EXIT;
+# cp -a .ansible-lint ansible.cfg settings.example.json infra scaffold scripts "${lint_root}/";
+# cd "${lint_root}"; ANSIBLE_CONFIG="${lint_root}/ansible.cfg" ansible-lint infra/ansible.
+docker compose run --rm -v "${git_common_dir}:${git_common_dir}:ro" infra bash -euo pipefail -c '
+stages=()
+current_stage=""
+fixture_root=""
+cleanup_fixture_root() {
+  [[ -z "${fixture_root}" ]] || rm -rf -- "${fixture_root}"
 }
-trap cleanup_lint_root EXIT
-cp -a .ansible-lint ansible.cfg settings.example.json infra scaffold scripts "${lint_root}/"
-(
-  cd "${lint_root}"
-  ANSIBLE_CONFIG="${lint_root}/ansible.cfg" ansible-lint infra/ansible
-)
+print_summary() {
+  status=$?
+  cleanup_fixture_root
+  if [[ ${status} -ne 0 && -n ${current_stage} ]]; then
+    stages+=("FAIL ${current_stage}")
+  fi
+  printf "\n=== validation summary (exit %s) ===\n" "${status}"
+  printf "%s\n" "${stages[@]:-no completed stages}"
+  exit "${status}"
+}
+run_stage() {
+  local name=$1
+  shift
+  current_stage=${name}
+  printf "\n=== validation stage: %s ===\n" "${name}"
+  "$@"
+  stages+=("PASS ${name}")
+  current_stage=""
+}
+trap print_summary EXIT
+
+fixture_root="$(mktemp -d)"
+fixture_site="${fixture_root}/public-validation"
+mkdir -p "${fixture_site}"
+python - "scaffold/sites/_template/site.yaml" "${fixture_site}/site.yaml" <<'"'"'PY'"'"'
+from pathlib import Path
+from ruamel.yaml import YAML
+
+source, target = map(Path, __import__("sys").argv[1:])
+yaml = YAML()
+data = yaml.load(source.read_text(encoding="utf-8"))
+data["site"]["name"] = target.parent.name
+with target.open("w", encoding="utf-8") as handle:
+    yaml.dump(data, handle)
+PY
+python scripts/canonical-render.py \
+  --site-file "${fixture_site}/site.yaml" \
+  --output-dir "${fixture_root}/generated" \
+  --source-commit public-validation >/dev/null
+python scripts/verify-projections.py \
+  --site-file "${fixture_site}/site.yaml" \
+  --generated-dir "${fixture_root}/generated" >/dev/null
+fixture_tfvars="${fixture_root}/generated/terraform.auto.tfvars.json"
+fixture_inventory="${fixture_root}/generated/ansible-inventory.json"
+fixture_vars="${fixture_root}/generated/ansible-vars.json"
+
+full_catalog_root="${fixture_root}/full-catalog"
+mkdir -p "${full_catalog_root}"
+python - \
+  "scaffold/sites/dev/site.yaml" \
+  "scaffold/fixtures/resource-runtime.yaml" \
+  "scaffold/fixtures/full-catalog-services.yaml" \
+  "${full_catalog_root}/site.yaml" <<'"'"'PY'"'"'
+from pathlib import Path
+from ruamel.yaml import YAML
+
+site_path, resources_path, services_path, target = map(Path, __import__("sys").argv[1:])
+yaml = YAML()
+site = yaml.load(site_path.read_text(encoding="utf-8"))
+site["site"]["name"] = target.parent.name
+site["resources"] = yaml.load(resources_path.read_text(encoding="utf-8"))
+site["services"] = yaml.load(services_path.read_text(encoding="utf-8"))["services"]
+with target.open("w", encoding="utf-8") as handle:
+    yaml.dump(site, handle)
+PY
+python scripts/canonical-render.py \
+  --site-file "${full_catalog_root}/site.yaml" \
+  --output-dir "${full_catalog_root}/generated" \
+  --source-commit public-validation-full-catalog >/dev/null
+python scripts/verify-projections.py \
+  --site-file "${full_catalog_root}/site.yaml" \
+  --generated-dir "${full_catalog_root}/generated" >/dev/null
+full_catalog_tfvars="${full_catalog_root}/generated/terraform.auto.tfvars.json"
+full_catalog_inventory="${full_catalog_root}/generated/ansible-inventory.json"
+full_catalog_vars="${full_catalog_root}/generated/ansible-vars.json"
+
+run_stage "preflight" python scripts/workspace-preflight.py
+run_stage "opentofu" bash -euo pipefail -c "
+  tofu -chdir=infra/opentofu init -backend=false
+  tofu fmt -check -recursive infra/opentofu
+  tofu -chdir=infra/opentofu validate
+  tofu -chdir=infra/opentofu console -var-file=\"${fixture_tfvars}\" <<<\"length(var.enabled_services)\" >/dev/null
+  tflint --chdir=infra/opentofu --minimum-failure-severity=error
+"
+run_stage "shell" shellcheck scripts/*.sh tools/docker-entrypoint.sh
+run_stage "python-quality" bash -euo pipefail -c "
+  mapfile -t python_files < <(find infra/ansible scripts tests -type f -name '\''*.py'\'' | sort)
+  python -m py_compile \"\${python_files[@]}\"
+  quality_files=()
+  while IFS= read -r file; do
+    if [[ -n \"\${file}\" && \"\${file}\" != \#* ]]; then quality_files+=(\"\${file}\"); fi
+  done < tools/python-format-files.txt
+  black --check --diff \"\${quality_files[@]}\"
+  ruff check --select=E9,F63,F7,F82 \"\${python_files[@]}\"
+  mypy --follow-imports=skip --ignore-missing-imports scripts/canonical_values.py scripts/service_catalog.py
+"
+run_stage "contracts" bash -euo pipefail -c "
+  if ! command -v just >/dev/null 2>&1; then
+    printf \"%s\\n\" \"just is required for public validation; tooling image must include it.\" >&2
+    exit 127
+  fi
+  python infra/ansible/scripts/apply-technitium-dns.py --check scaffold/dns-records.local.json
+  python scripts/settings.py --settings settings.example.json validate >/dev/null
+  python scripts/validate-service-contracts.py --repo .
+  python scripts/validate-design-reconciliation.py --check
+  coverage erase
+  coverage run --source=scripts -m unittest discover -s tests -p '\''test_*.py'\''
+  coverage report --fail-under=70
+"
+run_stage "ansible" bash -euo pipefail -c "
+  ansible-inventory -i \"${fixture_inventory}\" --list >/dev/null
+  mapfile -t playbooks < <(python scripts/settings.py ansible-playbooks --projection \"${fixture_tfvars}\")
+  ansible-playbook -i \"${fixture_inventory}\" -e @\"${fixture_vars}\" --syntax-check \\
+    infra/ansible/playbooks/storage-prep.yml \\
+    infra/ansible/playbooks/guest-mount-feature-preflight.yml \\
+    \"\${playbooks[@]}\"
+  ansible-inventory -i \"${full_catalog_inventory}\" --list >/dev/null
+  mapfile -t full_catalog_playbooks < <(python scripts/settings.py ansible-playbooks --projection \"${full_catalog_tfvars}\")
+  ansible-playbook -i \"${full_catalog_inventory}\" -e @\"${full_catalog_vars}\" --syntax-check \\
+    infra/ansible/playbooks/storage-prep.yml \\
+    infra/ansible/playbooks/guest-mount-feature-preflight.yml \\
+    \"\${full_catalog_playbooks[@]}\"
+  lint_root=\"\$(mktemp -d)\"
+  cleanup_lint_root() { rm -rf \"\${lint_root}\"; }
+  trap cleanup_lint_root EXIT
+  cp -a .ansible-lint ansible.cfg settings.example.json infra scaffold scripts \"\${lint_root}/\"
+  (cd \"\${lint_root}\" && ANSIBLE_CONFIG=\"\${lint_root}/ansible.cfg\" ansible-lint infra/ansible)
+"
+run_stage "summary" true
 '

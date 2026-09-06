@@ -11,6 +11,16 @@ argument_specs:
         type: str
         required: true
         description: Reviewed SHA-256 for the pinned portable archive.
+      technitium_admin_password:
+        type: str
+        required: false
+        no_log: true
+        description: Transient canonical administrator password for API-token bootstrap.
+      technitium_api_token:
+        type: str
+        required: false
+        no_log: true
+        description: Transient canonical API token for Technitium service convergence.
       technitium_artifact_path:
         type: path
         default: ""

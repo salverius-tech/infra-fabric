@@ -26,8 +26,25 @@ argument_specs:
       caddy_cloudflare_api_token:
         type: str
         required: true
+        no_log: true
         description: "Cloudflare DNS API token used by Caddy's DNS challenge provider."
       caddy_extra_vhosts:
         type: list
         required: false
         description: "Optional extra vhosts, each with server_name/server_names and upstream (default: [])."
+      caddy_proxy_caddy_cloudflare_version:
+        type: str
+        required: false
+        description: "Reviewed Caddy artifact version."
+      caddy_proxy_caddy_cloudflare_sha256_amd64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed amd64 Caddy artifact."
+      caddy_proxy_caddy_cloudflare_sha256_arm64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed arm64 Caddy artifact."
+      caddy_proxy_artifact_cache_root:
+        type: str
+        required: false
+        description: "Controller-side reviewed artifact cache root."

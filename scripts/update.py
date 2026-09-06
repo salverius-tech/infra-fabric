@@ -6,6 +6,7 @@ import argparse
 import json
 import re
 import sys
+import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -13,11 +14,16 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Callable
 
+import yaml
+
 try:
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from values_context import from_environment
+
+from canonical_values import CanonicalValuesError, load_site
+from service_catalog import ServiceCatalogError, load_catalog
 
 DEFAULT_MIN_AGE_HOURS = 48
 USER_AGENT = "homelab-infra-update/1.0"
@@ -47,6 +53,7 @@ class Target:
     checksum_replacement: str | None = None
     checksum_asset_template: str | None = None
     checksum_file_template: str | None = None
+    canonical_path: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -88,6 +95,7 @@ TARGETS = (
         pattern=r'(?m)^(\s*forgejo_version:\s*["\']?)([^"\'\s]+)(["\']?\s*)$',
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://code.forgejo.org/api/v1/repos/forgejo/forgejo/releases/latest",
+        canonical_path=("services", "forgejo", "release", "version"),
     ),
     Target(
         name="Forgejo runner",
@@ -95,6 +103,7 @@ TARGETS = (
         pattern=r'(?m)^(\s*forgejo_runner_version:\s*["\']?)([^"\'\s]+)(["\']?\s*)$',
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://code.forgejo.org/api/v1/repos/forgejo/runner/releases/latest",
+        canonical_path=("services", "forgejo_runner", "release", "version"),
     ),
     Target(
         name="Docker Compose plugin",
@@ -102,6 +111,7 @@ TARGETS = (
         pattern=r"(version=\"{{ forgejo_runner_compose_version \| default\(')([^']+)('\) }}\";)",
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://api.github.com/repos/docker/compose/releases/latest",
+        canonical_path=("services", "forgejo_runner", "configuration", "compose_version"),
     ),
     Target(
         name="just",
@@ -109,6 +119,41 @@ TARGETS = (
         pattern=r"(version=\"{{ forgejo_runner_just_version \| default\(')([^']+)('\) }}\";)",
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://api.github.com/repos/casey/just/releases/latest",
+        canonical_path=("services", "forgejo_runner", "configuration", "just_version"),
+    ),
+    Target(
+        name="SSSF uv runtime",
+        path=Path("infra/ansible/roles/sssf/defaults/main.yml"),
+        pattern=r"(?m)^(sssf_uv_version:\s*)([^\s]+)$",
+        replacement=r"\g<1>{version}",
+        release_url="https://api.github.com/repos/astral-sh/uv/releases/latest",
+        checksum_pattern=r"(?m)^(sssf_uv_sha256:\s*)([^\s]+)$",
+        checksum_replacement=r"\g<1>{checksum}",
+        checksum_asset_template="sha256.sum",
+        checksum_file_template="uv-x86_64-unknown-linux-gnu.tar.gz",
+    ),
+    Target(
+        name="SSSF Pi runtime",
+        path=Path("infra/ansible/roles/sssf/defaults/main.yml"),
+        pattern=r"(?m)^(sssf_pi_version:\s*)([^\s]+)$",
+        replacement=r"\g<1>{version}",
+        release_url="https://api.github.com/repos/earendil-works/pi/releases/latest",
+        checksum_pattern=r"(?m)^(sssf_pi_sha256:\s*)([^\s]+)$",
+        checksum_replacement=r"\g<1>{checksum}",
+        checksum_asset_template="SHA256SUMS",
+        checksum_file_template="pi-linux-x64.tar.gz",
+    ),
+    Target(
+        name="SSSF Bun runtime",
+        path=Path("infra/ansible/roles/sssf/defaults/main.yml"),
+        pattern=r"(?m)^(sssf_bun_version:\s*)([^\s]+)$",
+        replacement=r"\g<1>{version}",
+        release_url="https://api.github.com/repos/oven-sh/bun/releases/latest",
+        strip_prefix="bun-v",
+        checksum_pattern=r"(?m)^(sssf_bun_sha256:\s*)([^\s]+)$",
+        checksum_replacement=r"\g<1>{checksum}",
+        checksum_asset_template="SHASUMS256.txt",
+        checksum_file_template="bun-linux-x64.zip",
     ),
 )
 
@@ -254,6 +299,7 @@ def process_target(
     now: datetime,
     min_age: timedelta,
     opener: Callable[[str], bytes] | None = None,
+    dry_run: bool = False,
 ) -> UpdateResult:
     current, text = read_current(target, root)
     if text is None:
@@ -295,7 +341,8 @@ def process_target(
 
     checksum = checksum_for_release(target, release, opener)
     updated = replace_version(target, text, release, checksum)
-    (root / target.path).write_text(updated, encoding="utf-8", newline="\n")
+    if not dry_run:
+        (root / target.path).write_text(updated, encoding="utf-8", newline="\n")
     return UpdateResult(
         target.name,
         target.path,
@@ -306,14 +353,107 @@ def process_target(
     )
 
 
+def canonical_value(document: dict[str, object], path: tuple[str, ...]) -> object:
+    current: object = document
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            raise UpdateError(f"canonical path is missing: {'.'.join(path)}")
+        current = current[key]
+    return current
+
+
+def set_canonical_value(document: dict[str, object], path: tuple[str, ...], value: str) -> None:
+    current: object = document
+    for key in path[:-1]:
+        if not isinstance(current, dict) or key not in current:
+            raise UpdateError(f"canonical path is missing: {'.'.join(path)}")
+        current = current[key]
+    if not isinstance(current, dict):
+        raise UpdateError(f"canonical path parent is not an object: {'.'.join(path)}")
+    current[path[-1]] = value
+
+
+def process_canonical_target(
+    target: Target,
+    document: dict[str, object],
+    root: Path,
+    now: datetime,
+    min_age: timedelta,
+    opener: Callable[[str], bytes] | None = None,
+    dry_run: bool = False,
+) -> tuple[UpdateResult, bool]:
+    if target.canonical_path is None:
+        return UpdateResult(target.name, Path("values/sites/<site>/site.yaml"), None, None, "skip", "no canonical owner"), False
+    try:
+        current_value = canonical_value(document, target.canonical_path)
+    except UpdateError as error:
+        return UpdateResult(target.name, Path("values/sites/<site>/site.yaml"), None, None, "skip", f"{error}; legacy inventory is not authoritative"), False
+    if not isinstance(current_value, str) or not current_value:
+        raise UpdateError(f"{target.name}: canonical release value must be a non-empty string")
+    release = release_from_payload(target, fetch_release(target.release_url, opener))
+    age = now - release.published_at
+    display_path = Path("values/sites/<site>/site.yaml")
+    if release.version == current_value:
+        return UpdateResult(target.name, display_path, current_value, release.version, "current", f"already at latest ({release.url})"), False
+    if age < min_age:
+        remaining = min_age - age
+        hours = int(remaining.total_seconds() // 3600)
+        minutes = int((remaining.total_seconds() % 3600) // 60)
+        return UpdateResult(target.name, display_path, current_value, release.version, "hold", f"published {release.published_at.isoformat()}; wait {hours}h {minutes}m more ({release.url})"), False
+    if not dry_run:
+        set_canonical_value(document, target.canonical_path, release.version)
+    return UpdateResult(target.name, display_path, current_value, release.version, "updated", f"release age {age}; {release.url}"), not dry_run
+
+
 def run(
     root: Path,
     min_age_hours: int,
     opener: Callable[[str], bytes] | None = None,
+    dry_run: bool = False,
 ) -> list[UpdateResult]:
     now = datetime.now(timezone.utc)
     min_age = timedelta(hours=min_age_hours)
     context = from_environment(root)
+    if context.canonical_site_path is not None:
+        site_path = context.canonical_site_path
+        try:
+            document = yaml.safe_load(site_path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as error:
+            raise UpdateError(f"cannot load canonical site {site_path}: {error}") from error
+        if not isinstance(document, dict):
+            raise UpdateError(f"canonical site {site_path} must contain an object")
+        results: list[UpdateResult] = []
+        changed = False
+        for target in TARGETS:
+            if target.canonical_path is None:
+                results.append(process_target(target, root, now, min_age, opener, dry_run))
+                continue
+            result, target_changed = process_canonical_target(target, document, root, now, min_age, opener, dry_run)
+            results.append(result)
+            changed = changed or target_changed
+        if changed:
+            rendered = yaml.safe_dump(document, sort_keys=False)
+            candidate_path: Path | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    "w",
+                    encoding="utf-8",
+                    newline="\n",
+                    dir=site_path.parent,
+                    prefix=f".{site_path.name}.update-",
+                    suffix=".tmp",
+                    delete=False,
+                ) as candidate:
+                    candidate.write(rendered)
+                    candidate_path = Path(candidate.name)
+                load_site(candidate_path, expected_site=site_path.parent.name)
+                candidate_path.replace(site_path)
+            except (OSError, CanonicalValuesError) as error:
+                raise UpdateError(f"canonical update failed validation: {error}") from error
+            finally:
+                if candidate_path is not None:
+                    candidate_path.unlink(missing_ok=True)
+        return results
     inventory_path = context.path("ansible/inventory/local.yml").relative_to(root)
     targets = tuple(
         Target(
@@ -330,7 +470,22 @@ def run(
         )
         for target in TARGETS
     )
-    return [process_target(target, root, now, min_age, opener) for target in targets]
+    results: list[UpdateResult] = []
+    for target in targets:
+        if context.canonical_site_path is not None and target.path == inventory_path:
+            results.append(
+                UpdateResult(
+                    target.name,
+                    target.path,
+                    None,
+                    None,
+                    "skip",
+                    "canonical service release updates require canonical model mutation; legacy inventory is not authoritative",
+                )
+            )
+            continue
+        results.append(process_target(target, root, now, min_age, opener, dry_run))
+    return results
 
 
 def print_results(results: list[UpdateResult]) -> None:
@@ -345,10 +500,23 @@ def print_results(results: list[UpdateResult]) -> None:
             print(f"SKIP    {result.name}: {result.detail} ({result.path})")
 
 
+def catalog_update_statuses(root: Path) -> tuple[dict[str, str], ...]:
+    """Read public-safe service update statuses from the authoritative catalog."""
+    try:
+        catalog = load_catalog(root / "infra" / "services.json")
+        catalog.validate_registry_completeness()
+        return catalog.update_policy_report()
+    except ServiceCatalogError as error:
+        raise UpdateError(f"cannot load service update policy: {error}") from error
+
+
+def print_catalog_update_statuses(statuses: tuple[dict[str, str], ...]) -> None:
+    print("\nService update policy (catalog):")
+    for entry in statuses:
+        print(f"- {entry['status'].upper():<9} {entry['service']}: {entry['detail']}")
+
+
 UNMANAGED = (
-    "Technitium: installed by upstream install script only when missing; "
-    "no pinned upgrade target yet.",
-    "Tailscale: installed only when missing; package upgrade policy is not defined yet.",
     "Caddy: apt/custom xcaddy rebuild upgrade policy is not defined yet.",
     "Debian LXC OS packages: required packages are installed during playbooks, "
     "but full OS upgrades are not managed.",
@@ -359,15 +527,19 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--min-age-hours", type=int, default=DEFAULT_MIN_AGE_HOURS)
+    parser.add_argument("--dry-run", action="store_true", help="report eligible updates without writing pins or canonical values")
     args = parser.parse_args(argv)
 
     try:
-        results = run(args.root, args.min_age_hours)
+        results = run(args.root, args.min_age_hours, dry_run=args.dry_run)
     except UpdateError as error:
         print(error, file=sys.stderr)
         return 1
 
     print_results(results)
+    print_catalog_update_statuses(catalog_update_statuses(args.root))
+    if args.dry_run:
+        print("\nDry run: no pins or canonical values were written.")
     print("\nUnmanaged by just update:")
     for item in UNMANAGED:
         print(f"- {item}")

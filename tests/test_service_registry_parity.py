@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import sys
-import types
 import unittest
 from pathlib import Path
 
@@ -14,21 +12,6 @@ settings_spec = importlib.util.spec_from_file_location("settings_script", SETTIN
 assert settings_spec and settings_spec.loader
 settings_script = importlib.util.module_from_spec(settings_spec)
 settings_spec.loader.exec_module(settings_script)
-
-try:
-    import hcl2  # noqa: F401
-except ImportError:
-    if "hcl2" not in sys.modules:
-        hcl2_stub = types.ModuleType("hcl2")
-        hcl2_stub.load = lambda _file: {}
-        sys.modules["hcl2"] = hcl2_stub
-
-TFVARS_INVENTORY = REPO / "infra" / "ansible" / "inventory" / "tfvars.py"
-tfvars_spec = importlib.util.spec_from_file_location("tfvars_inventory", TFVARS_INVENTORY)
-assert tfvars_spec and tfvars_spec.loader
-tfvars_inventory = importlib.util.module_from_spec(tfvars_spec)
-sys.modules[tfvars_spec.name] = tfvars_inventory
-tfvars_spec.loader.exec_module(tfvars_inventory)
 
 SERVICE_REGISTRY = REPO / "infra" / "services.json"
 service_registry = json.loads(SERVICE_REGISTRY.read_text(encoding="utf-8"))
@@ -45,6 +28,7 @@ class ServiceRegistryParityTests(unittest.TestCase):
                     runtime: tuple(addresses)
                     for runtime, addresses in config.get("terraform_replace_addresses", {}).items()
                 },
+                "execution_resource": str(config.get("inventory", {}).get("host", "")).strip(),
             }
             for name, config in service_registry["services"].items()
         }
@@ -52,12 +36,6 @@ class ServiceRegistryParityTests(unittest.TestCase):
         self.assertEqual(expected_services, settings_script.SERVICES)
         self.assertEqual(set(service_registry["services"]), settings_script.SERVICE_NAMES)
 
-    def test_inventory_service_hosts_are_derived_from_registry(self) -> None:
-        expected_hosts = {
-            name: config["inventory"]
-            for name, config in service_registry["services"].items()
-        }
-        self.assertEqual(expected_hosts, tfvars_inventory.SERVICE_HOSTS)
 
     def test_opentofu_enabled_services_validation_reads_registry(self) -> None:
         variables = (REPO / "infra" / "opentofu" / "variables.tf").read_text(encoding="utf-8")
@@ -76,7 +54,10 @@ class ServiceRegistryParityTests(unittest.TestCase):
             "infra/ansible/playbooks/caddy-proxy.yml": "technitium",
             "infra/ansible/playbooks/technitium-dns.yml": "localhost",
         }
-        groups = {service: config["group"] for service, config in tfvars_inventory.SERVICE_HOSTS.items()}
+        groups = {
+            service: config["inventory"]["group"]
+            for service, config in service_registry["services"].items()
+        }
         for service, config in settings_script.SERVICES.items():
             for playbook in config["playbooks"]:
                 group = special.get(playbook, groups[service])

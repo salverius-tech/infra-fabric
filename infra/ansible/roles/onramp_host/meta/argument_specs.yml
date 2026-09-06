@@ -30,11 +30,12 @@ argument_specs:
       caddy_cloudflare_api_token:
         type: str
         required: true
+        no_log: true
         description: "Cloudflare DNS API token used by shared onramp Caddy DNS-01 challenges."
-      onramp_host_ssh_public_keys:
+      onramp_host_bootstrap_ssh_public_keys:
         type: list
         required: false
-        description: "Authorized key entries installed for the deploy user (default: [])."
+        description: "Canonical bootstrap key entries installed for the deploy user (default: [])."
       onramp_host_podman_packages:
         type: list
         required: false
@@ -54,3 +55,23 @@ argument_specs:
         type: list
         required: false
         description: "Ports allowed through UFW for reverse-proxy ingress (default: 80 and 443)."
+      onramp_host_allow_passwordless_sudo:
+        type: bool
+        required: false
+        description: "Canonical policy flag retained for projection parity; this role never installs broad sudo by default."
+      onramp_host_caddy_cloudflare_version:
+        type: str
+        required: false
+        description: "Reviewed Caddy artifact version."
+      onramp_host_caddy_cloudflare_sha256_amd64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed amd64 Caddy artifact."
+      onramp_host_caddy_cloudflare_sha256_arm64:
+        type: str
+        required: false
+        description: "Lowercase SHA-256 for the reviewed arm64 Caddy artifact."
+      onramp_host_artifact_cache_root:
+        type: str
+        required: false
+        description: "Controller-side reviewed artifact cache root."

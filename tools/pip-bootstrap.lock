@@ -1,0 +1,3 @@
+# Hash-verified bootstrap wheel used to upgrade the tooling virtualenv installer.
+pip==26.1.2 \
+    --hash=sha256:382ff9f685ee3bc25864f820aa50505825f10f5458ffff07e30a6d96e5715cab

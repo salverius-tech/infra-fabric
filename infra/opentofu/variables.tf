@@ -1,7 +1,35 @@
 variable "enabled_services" {
-  description = "Services OpenTofu should build and maintain. Service selection is normally supplied from settings.local.json by just plan. Null uses infra/services.json default_services."
+  description = "Services OpenTofu should build and maintain. Canonical projections set this value; null uses the catalog default service set."
   type        = list(string)
   default     = null
+}
+
+variable "stateful_service_disable_policies" {
+  description = "Canonical disable policy for explicitly state-capable services. Generated from site.yaml; do not author directly."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for policy in values(var.stateful_service_disable_policies) : contains(["retain", "archive", "destroy"], policy)])
+    error_message = "stateful_service_disable_policies values must be retain, archive, or destroy."
+  }
+}
+
+variable "stateful_destroy_acknowledged" {
+  description = "Explicit one-run acknowledgement permitting a canonically retained stateful service to be disabled. Use repository wrappers."
+  type        = bool
+  default     = false
+}
+
+variable "vm_cpu_types" {
+  description = "Canonical effective Proxmox CPU type by VM resource ID. Generated from site.yaml; do not author directly."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition     = alltrue([for cpu_type in values(var.vm_cpu_types) : contains(["x86-64-v2-AES", "x86-64-v3"], cpu_type)])
+    error_message = "vm_cpu_types values must be x86-64-v2-AES or x86-64-v3."
+  }
 }
 
 
@@ -44,11 +72,13 @@ variable "proxmox_node_name" {
 variable "technitium_container_vmid" {
   description = "Proxmox VMID for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "technitium_container_hostname" {
   description = "Hostname for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "technitium_container_description" {
@@ -60,31 +90,36 @@ variable "technitium_container_description" {
 variable "technitium_container_ipv4_address" {
   description = "Static IPv4 address/CIDR for the Technitium DNS LXC. Use an address outside DHCP scope. Set in terraform.tfvars."
   type        = string
+  default     = null
 
   validation {
-    condition     = can(cidrhost(var.technitium_container_ipv4_address, 0))
-    error_message = "technitium_container_ipv4_address must be a valid IPv4 CIDR address, for example 192.0.2.10/24."
+    condition     = var.technitium_container_ipv4_address == null || can(cidrhost(var.technitium_container_ipv4_address, 0))
+    error_message = "technitium_container_ipv4_address must be null or a valid IPv4 CIDR address, for example 192.0.2.10/24."
   }
 }
 
 variable "technitium_container_ipv4_gateway" {
   description = "IPv4 gateway for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "technitium_container_dns_servers" {
   description = "DNS servers used by the LXC before it becomes the primary resolver. Set in terraform.tfvars."
   type        = list(string)
+  default     = null
 }
 
 variable "technitium_container_search_domain" {
   description = "DNS search domain for the LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "technitium_container_bridge" {
   description = "Proxmox bridge for the LXC interface. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "technitium_container_vlan_id" {
@@ -159,46 +194,93 @@ variable "lxc_template_download_timeout_seconds" {
   default     = 1800
 }
 
-variable "lxc_root_password" {
-  description = "Initial and Ansible-managed root password for LXCs. Store only in terraform.tfvars or environment injection."
+variable "bootstrap_ssh_user" {
+  description = "Canonical SSH/bootstrap user for managed resources."
   type        = string
-  sensitive   = true
+  default     = "infra"
+
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.bootstrap_ssh_user))
+    error_message = "bootstrap_ssh_user must be a valid Linux user name."
+  }
 }
 
-variable "lxc_ssh_public_keys" {
-  description = "SSH public keys to install for root in the LXC."
-  type        = list(string)
-  default     = []
+variable "bootstrap_ssh_public_keys" {
+  description = "Canonical SSH public keys by managed resource ID."
+  type        = map(list(string))
+  default     = {}
+}
+
+variable "operator_user" {
+  description = "Canonical operator account converged by Ansible on managed resources."
+  type        = string
+  default     = "systemboss"
+}
+
+variable "operator_ssh_public_keys" {
+  description = "Canonical operator SSH public keys by managed resource ID."
+  type        = map(list(string))
+  default     = {}
+}
+
+variable "operator_dotfiles_repository" {
+  description = "Pinned public operator dotfiles repository URL."
+  type        = string
+  default     = "https://github.com/salverius-tech/dotfiles"
+}
+
+variable "operator_dotfiles_revision" {
+  description = "Immutable operator dotfiles Git revision."
+  type        = string
+  default     = "4aeeadd928b0d03090e5aa973d10d989e846cf15"
+}
+
+variable "operator_chezmoi_version" {
+  description = "Pinned chezmoi release used by Ansible."
+  type        = string
+  default     = "v2.71.1"
+}
+
+variable "operator_chezmoi_sha256" {
+  description = "Verified SHA-256 for the pinned chezmoi Linux AMD64 archive."
+  type        = string
+  default     = "e1fb16c962644d57f4d451c324aa86163d00faf5d035500f41fb48943a66dfed"
 }
 
 variable "technitium_container_cores" {
   description = "CPU cores for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "technitium_container_memory_mb" {
   description = "Dedicated memory for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "technitium_container_swap_mb" {
   description = "Swap for the Technitium DNS LXC. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "technitium_container_disk_gb" {
   description = "Root filesystem size in GB. Set in terraform.tfvars."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_vmid" {
   description = "Proxmox VMID for the Forgejo LXC. Set in terraform.tfvars. Import existing CTs before applying this resource."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_hostname" {
   description = "Hostname for the Forgejo LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "forgejo_container_description" {
@@ -210,10 +292,11 @@ variable "forgejo_container_description" {
 variable "forgejo_container_ipv4_address" {
   description = "IPv4 address/CIDR for the Forgejo LXC, or dhcp when the router supplies a static DHCP reservation."
   type        = string
+  default     = null
 
   validation {
-    condition     = var.forgejo_container_ipv4_address == "dhcp" || can(cidrhost(var.forgejo_container_ipv4_address, 0))
-    error_message = "forgejo_container_ipv4_address must be dhcp or a valid IPv4 CIDR address."
+    condition     = var.forgejo_container_ipv4_address == null || var.forgejo_container_ipv4_address == "dhcp" || can(cidrhost(var.forgejo_container_ipv4_address, 0))
+    error_message = "forgejo_container_ipv4_address must be null, dhcp, or a valid IPv4 CIDR address."
   }
 }
 
@@ -226,36 +309,42 @@ variable "forgejo_container_ipv4_gateway" {
 variable "forgejo_container_mac_address" {
   description = "MAC address for the Forgejo LXC, used by the router static DHCP reservation."
   type        = string
+  default     = null
 
   validation {
-    condition     = can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.forgejo_container_mac_address))
-    error_message = "forgejo_container_mac_address must use colon-separated hex octets, for example BC:24:11:00:00:00."
+    condition     = var.forgejo_container_mac_address == null || can(regex("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", var.forgejo_container_mac_address))
+    error_message = "forgejo_container_mac_address must be null or use colon-separated hex octets, for example BC:24:11:00:00:00."
   }
 }
 
 variable "forgejo_lan_ip" {
   description = "Expected LAN IP for Forgejo, without CIDR. Used for outputs and DNS/proxy documentation when the LXC uses DHCP reservation."
   type        = string
+  default     = null
 }
 
 variable "forgejo_server_name" {
   description = "DNS hostname users should use for Forgejo. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "forgejo_container_dns_servers" {
   description = "DNS servers used by the Forgejo LXC. Set in terraform.tfvars."
   type        = list(string)
+  default     = null
 }
 
 variable "forgejo_container_search_domain" {
   description = "DNS search domain for the Forgejo LXC. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "forgejo_container_bridge" {
   description = "Proxmox bridge for the Forgejo LXC interface. Set in terraform.tfvars."
   type        = string
+  default     = null
 }
 
 variable "forgejo_container_vlan_id" {
@@ -272,33 +361,37 @@ variable "forgejo_container_vlan_id" {
 variable "forgejo_container_cores" {
   description = "CPU cores for the Forgejo LXC."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_memory_mb" {
   description = "Dedicated memory for the Forgejo LXC."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_swap_mb" {
   description = "Swap for the Forgejo LXC."
   type        = number
+  default     = null
 }
 
 variable "forgejo_container_disk_gb" {
   description = "Root filesystem size in GB for the Forgejo guest."
   type        = number
+  default     = null
 }
 
 variable "service_runtime" {
-  description = "Per-service platform runtime selection. Runtime type defaults to lxc when a service is not listed."
+  description = "Per-service platform runtime selection. Accepted services and default runtime types come from infra/services.json."
   type = map(object({
-    type            = optional(string, "lxc")
+    type            = optional(string)
     cloud_init_user = optional(string)
   }))
   default = {}
 
   validation {
-    condition     = alltrue([for service_name, runtime in var.service_runtime : contains(["lxc", "vm"], runtime.type)])
+    condition     = alltrue([for service_name, runtime in var.service_runtime : runtime.type == null || contains(["lxc", "vm"], runtime.type)])
     error_message = "service_runtime entries must use type lxc or vm."
   }
 
@@ -306,6 +399,23 @@ variable "service_runtime" {
     condition     = alltrue([for service_name, runtime in var.service_runtime : runtime.cloud_init_user == null || can(regex("^[a-z_][a-z0-9_-]{0,31}$", runtime.cloud_init_user))])
     error_message = "service_runtime cloud_init_user values must be valid Linux user names."
   }
+}
+
+variable "forgejo_runtime" {
+  description = "Retired compatibility alias. It must remain null; use service_runtime.forgejo."
+  type = object({
+    type            = optional(string)
+    cloud_init_user = optional(string)
+  })
+  default  = null
+  nullable = true
+}
+
+variable "tailscale_client_enabled" {
+  description = "Retired compatibility alias. It must remain null; use enabled_services."
+  type        = bool
+  default     = null
+  nullable    = true
 }
 
 variable "guest_vm_image_datastore_id" {
@@ -356,71 +466,6 @@ variable "guest_vm_image_checksum" {
   }
 }
 
-variable "guest_vm_cloud_init_user" {
-  description = "Default cloud-init SSH/bootstrap user for service VMs unless service_runtime.<service>.cloud_init_user overrides it."
-  type        = string
-  default     = "root"
-
-  validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.guest_vm_cloud_init_user))
-    error_message = "guest_vm_cloud_init_user must be a valid Linux user name."
-  }
-}
-
-variable "forgejo_runtime" {
-  description = "Deprecated Forgejo-specific runtime compatibility alias. Prefer service_runtime.forgejo."
-  type = object({
-    type = optional(string, "lxc")
-  })
-  default = {
-    type = "lxc"
-  }
-
-  validation {
-    condition     = contains(["lxc", "vm"], var.forgejo_runtime.type)
-    error_message = "forgejo_runtime.type must be lxc or vm."
-  }
-}
-
-variable "forgejo_vm_image_datastore_id" {
-  description = "Proxmox datastore for the Forgejo VM cloud image when forgejo_runtime.type is vm."
-  type        = string
-  default     = "local"
-}
-
-variable "forgejo_vm_image_url" {
-  description = "Pinned Debian cloud image URL used when Forgejo runs as a VM."
-  type        = string
-  default     = "https://cloud.debian.org/images/cloud/trixie/20260623-2518/debian-13-genericcloud-amd64-20260623-2518.qcow2"
-
-  validation {
-    condition     = can(regex("^https://", var.forgejo_vm_image_url))
-    error_message = "forgejo_vm_image_url must be an HTTPS URL."
-  }
-}
-
-variable "forgejo_vm_image_file_name" {
-  description = "Cloud image file name used when Forgejo runs as a VM."
-  type        = string
-  default     = "debian-13-genericcloud-amd64.qcow2"
-
-  validation {
-    condition     = can(regex("^[A-Za-z0-9._-]+\\.qcow2$", var.forgejo_vm_image_file_name))
-    error_message = "forgejo_vm_image_file_name must be a qcow2 file name."
-  }
-}
-
-variable "forgejo_vm_cloud_init_user" {
-  description = "Cloud-init SSH/bootstrap user when Forgejo runs as a VM."
-  type        = string
-  default     = "root"
-
-  validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.forgejo_vm_cloud_init_user))
-    error_message = "forgejo_vm_cloud_init_user must be a valid Linux user name."
-  }
-}
-
 variable "forgejo_database" {
   description = "Forgejo database configuration. Defaults to SQLite. Use type=postgres with managed=true for a local PostgreSQL server inside the Forgejo LXC. Store passwords in values/.env, not terraform.tfvars."
   type = object({
@@ -450,6 +495,132 @@ variable "forgejo_database" {
     condition     = var.forgejo_database.type != "postgres" || try(can(regex("^[A-Za-z_][A-Za-z0-9_]*$", var.forgejo_database.name)) && can(regex("^[A-Za-z_][A-Za-z0-9_]*$", var.forgejo_database.user)), false)
     error_message = "PostgreSQL Forgejo database name and user must be simple SQL identifiers."
   }
+}
+
+variable "sssf_vmid" {
+  description = "Proxmox VMID for the SSSF guest."
+  type        = number
+  default     = 113
+}
+
+variable "sssf_hostname" {
+  description = "Hostname for the SSSF guest."
+  type        = string
+  default     = "sssf-factory"
+}
+
+variable "sssf_description" {
+  description = "Description for the SSSF guest."
+  type        = string
+  default     = "Super Simple Software Factory service VM managed by OpenTofu."
+}
+
+variable "sssf_ipv4_address" {
+  description = "IPv4 address/CIDR for SSSF, or dhcp when the router supplies a static DHCP reservation."
+  type        = string
+  default     = "dhcp"
+}
+
+variable "sssf_ipv4_gateway" {
+  description = "IPv4 gateway for SSSF. Use null when the address is dhcp."
+  type        = string
+  default     = null
+}
+
+variable "sssf_mac_address" {
+  description = "Optional MAC address for SSSF."
+  type        = string
+  default     = null
+}
+
+variable "sssf_lan_ip" {
+  description = "Expected SSSF LAN IP without CIDR."
+  type        = string
+  default     = "192.0.2.73"
+}
+
+variable "sssf_dns_servers" {
+  description = "DNS servers used by SSSF."
+  type        = list(string)
+  default     = ["192.0.2.1"]
+}
+
+variable "sssf_search_domain" {
+  description = "DNS search domain for SSSF."
+  type        = string
+  default     = "example.internal"
+}
+
+variable "sssf_bridge" {
+  description = "Proxmox bridge for SSSF."
+  type        = string
+  default     = "vmbr0"
+}
+
+variable "sssf_vlan_id" {
+  description = "Optional VLAN tag for SSSF."
+  type        = number
+  default     = null
+}
+
+variable "sssf_cores" {
+  description = "CPU cores for SSSF."
+  type        = number
+  default     = 4
+}
+
+variable "sssf_memory_mb" {
+  description = "Dedicated memory in MiB for SSSF."
+  type        = number
+  default     = 8192
+}
+
+variable "sssf_swap_mb" {
+  description = "Swap in MiB for SSSF when using the LXC compatibility runtime."
+  type        = number
+  default     = 1024
+}
+
+variable "sssf_disk_gb" {
+  description = "Root filesystem size in GB for SSSF."
+  type        = number
+  default     = 40
+}
+
+variable "sssf_data_disk_gb" {
+  description = "Separate durable data disk size in GB for SSSF workspaces and traces."
+  type        = number
+  default     = 100
+}
+
+variable "sssf_started" {
+  description = "Whether OpenTofu should start SSSF."
+  type        = bool
+  default     = true
+}
+
+variable "sssf_start_on_boot" {
+  description = "Whether Proxmox should start SSSF on host boot."
+  type        = bool
+  default     = true
+}
+
+variable "sssf_startup_order" {
+  description = "Proxmox startup order for SSSF."
+  type        = string
+  default     = "7"
+}
+
+variable "sssf_startup_up_delay" {
+  description = "Seconds to wait after starting SSSF."
+  type        = string
+  default     = "20"
+}
+
+variable "sssf_startup_down_delay" {
+  description = "Seconds to wait after stopping SSSF."
+  type        = string
+  default     = "20"
 }
 
 variable "service_storage" {
@@ -1186,23 +1357,6 @@ variable "onramp_host_disk_gb" {
   default     = 32
 }
 
-variable "onramp_host_cloud_init_user" {
-  description = "Initial non-root cloud-init user for SSH/bootstrap on the onramp-host VM."
-  type        = string
-  default     = "anvil"
-
-  validation {
-    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.onramp_host_cloud_init_user))
-    error_message = "onramp_host_cloud_init_user must be a valid Linux user name."
-  }
-}
-
-variable "onramp_host_ssh_public_keys" {
-  description = "SSH public keys authorized for the onramp-host cloud-init user. Store real keys in private values. Falls back to lxc_ssh_public_keys when empty."
-  type        = list(string)
-  default     = []
-}
-
 variable "onramp_host_password_authentication" {
   description = "Whether SSH password authentication should remain enabled on the onramp-host. Keep false by default."
   type        = bool
@@ -1284,14 +1438,8 @@ variable "onramp_host_startup_down_delay" {
   default     = "20"
 }
 
-variable "tailscale_client_enabled" {
-  description = "Create the Tailscale client LXC. Keep false for backup-only documentation until a reviewed plan should create it."
-  type        = bool
-  default     = false
-}
-
 variable "tailscale_client_vmid" {
-  description = "Proxmox VMID for the Tailscale client LXC. Set in terraform.tfvars before enabling tailscale_client_enabled."
+  description = "VMID for the Tailscale client guest when selected by canonical enabled_services."
   type        = number
   default     = 108
 }

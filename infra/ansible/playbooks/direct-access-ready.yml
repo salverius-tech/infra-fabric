@@ -4,6 +4,7 @@
   gather_facts: false
   tasks:
     - name: Describe direct access handoff boundary
+      tags: [config]
       ansible.builtin.debug:
         msg:
           - Proxmox guest lifecycle readiness runs before this handoff when required.
@@ -15,10 +16,11 @@
   hosts: "{{ direct_access_ready_hosts | default('services') }}"
   gather_facts: false
   tasks:
-    - name: Verify or enroll controller known_hosts for direct service endpoints  # noqa: run-once[task]
+    - name: Verify or enroll controller known_hosts for each direct service endpoint
+      tags: [health]
       ansible.builtin.shell: |
         set -euo pipefail
-        host={{ hostvars[service_inventory_host].ansible_host | quote }}
+        host={{ ansible_host | quote }}
         known_hosts={{ direct_access_ready_known_hosts_file | default(
           '/workspace/' ~ (lookup('env', 'INFRA_VALUES_DIR') | default('values', true)) ~
           '/ansible/known_hosts', true
@@ -27,6 +29,8 @@
         install -d -m 0700 "$(dirname "${known_hosts}")"
         touch "${known_hosts}"
         chmod 0600 "${known_hosts}"
+        exec 9>"${known_hosts}.lock"
+        flock -x 9
         tmp="$(mktemp)"
         trap 'rm -f "${tmp}"' EXIT
         deadline=$((SECONDS + {{ direct_access_ready_ssh_scan_timeout | default(180) }}))
@@ -56,27 +60,29 @@
         executable: /bin/bash
       delegate_to: localhost
       changed_when: false
-      run_once: true
-      loop: "{{ ansible_play_hosts }}"
-      loop_control:
-        loop_var: service_inventory_host
       when:
-        - hostvars[service_inventory_host].ansible_host is defined
-        - hostvars[service_inventory_host].ansible_host | length > 0
+        - ansible_host is defined
+        - ansible_host | length > 0
 
 - name: Verify direct service SSH and Python readiness
   hosts: "{{ direct_access_ready_hosts | default('services') }}"
   gather_facts: false
   tasks:
-    - name: Wait for direct service SSH
-      ansible.builtin.wait_for_connection:
-        timeout: "{{ direct_access_ready_connection_timeout | default(180) }}"
-    - name: Probe direct service Python execution
-      ansible.builtin.ping:
-    - name: Wait for VM cloud-init completion before steady-state roles
-      ansible.builtin.command: cloud-init status --wait
-      become: true
-      register: direct_access_ready_cloud_init
-      changed_when: false
-      failed_when: direct_access_ready_cloud_init.rc not in [0, 2]
-      when: service_runtime_current.type | default('lxc') == 'vm'
+    - name: Run direct service readiness probes
+      when: not (direct_access_ready_enroll_only | default(false) | bool)
+      block:
+        - name: Wait for direct service SSH
+          tags: [config]
+          ansible.builtin.wait_for_connection:
+            timeout: "{{ direct_access_ready_connection_timeout | default(180) }}"
+        - name: Probe direct service Python execution
+          tags: [health]
+          ansible.builtin.ping:
+        - name: Wait for VM cloud-init completion before steady-state roles
+          tags: [config]
+          ansible.builtin.command: cloud-init status --wait
+          become: true
+          register: direct_access_ready_cloud_init
+          changed_when: false
+          failed_when: direct_access_ready_cloud_init.rc not in [0, 2]
+          when: service_runtime_current.type | default('lxc') == 'vm'

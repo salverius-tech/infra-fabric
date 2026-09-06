@@ -36,8 +36,7 @@ module "tailscale_client" {
   ipv4_address  = var.tailscale_client_ipv4_address
   ipv4_gateway  = var.tailscale_client_ipv4_gateway
 
-  root_password   = var.lxc_root_password
-  ssh_public_keys = var.lxc_ssh_public_keys
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "tailscale_client", [])
 
   network = {
     bridge      = var.tailscale_client_bridge
@@ -67,6 +66,7 @@ module "tailscale_client_vm" {
   tags          = ["tailscale", "vpn", "opentofu"]
 
   cores     = var.tailscale_client_cores
+  cpu_type  = local.vm_cpu_type["tailscale_client"]
   memory_mb = var.tailscale_client_memory_mb
 
   image = {
@@ -87,8 +87,8 @@ module "tailscale_client_vm" {
   ipv4_address  = var.tailscale_client_ipv4_address
   ipv4_gateway  = var.tailscale_client_ipv4_gateway
 
-  cloud_init_user = coalesce(try(local.tailscale_client_runtime.cloud_init_user, null), var.guest_vm_cloud_init_user)
-  ssh_public_keys = var.lxc_ssh_public_keys
+  cloud_init_user = var.bootstrap_ssh_user
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "tailscale_client", [])
 
   network = {
     bridge      = var.tailscale_client_bridge

@@ -47,6 +47,23 @@ class ValuesContextTests(unittest.TestCase):
             with self.assertRaises(values_context.ValuesContextError):
                 context.path("../prod/terraform.tfvars")
 
+    def test_selected_site_exposes_canonical_site_yaml_without_changing_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            site = repo / "values" / "sites" / "dev"
+            site.mkdir(parents=True)
+            canonical = site / "site.yaml"
+            canonical.write_text("schema_version: 1\n", encoding="utf-8")
+            with patch.dict(os.environ, {"VALUES_SITE": "dev"}, clear=True):
+                context = values_context.from_environment(repo)
+            self.assertEqual(context.canonical_site_path, canonical)
+            self.assertEqual(context.generated_dir, site / "generated")
+            self.assertEqual(context.projection_manifest_path, site / "generated" / "manifest.json")
+            self.assertEqual(context.generated_path("terraform.auto.tfvars.json"), site / "generated" / "terraform.auto.tfvars.json")
+            self.assertIsNone(context.metadata_path)
+            with self.assertRaises(values_context.ValuesContextError):
+                context.generated_path("../outside.json")
+
     def test_unknown_site_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             with patch.dict(os.environ, {"VALUES_SITE": "missing"}, clear=True):

@@ -24,8 +24,7 @@ module "hermes" {
   ipv4_address  = var.hermes_container_ipv4_address
   ipv4_gateway  = var.hermes_container_ipv4_gateway
 
-  root_password   = var.lxc_root_password
-  ssh_public_keys = var.lxc_ssh_public_keys
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "hermes", [])
 
   network = {
     bridge      = var.hermes_container_bridge
@@ -55,6 +54,7 @@ module "hermes_vm" {
   tags          = ["hermes", "management", "opentofu"]
 
   cores     = var.hermes_container_cores
+  cpu_type  = local.vm_cpu_type["hermes"]
   memory_mb = var.hermes_container_memory_mb
 
   image = {
@@ -75,8 +75,8 @@ module "hermes_vm" {
   ipv4_address  = var.hermes_container_ipv4_address
   ipv4_gateway  = var.hermes_container_ipv4_gateway
 
-  cloud_init_user = coalesce(try(local.hermes_runtime.cloud_init_user, null), var.guest_vm_cloud_init_user)
-  ssh_public_keys = var.lxc_ssh_public_keys
+  cloud_init_user = var.bootstrap_ssh_user
+  ssh_public_keys = lookup(var.bootstrap_ssh_public_keys, "hermes", [])
 
   network = {
     bridge      = var.hermes_container_bridge
