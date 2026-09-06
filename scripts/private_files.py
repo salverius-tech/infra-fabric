@@ -395,9 +395,14 @@ def atomic_copy(
     *,
     label: str,
     expected_identity: tuple[int, int, int, int] | None = None,
+    expected_sha256: str | None = None,
     replace_existing: bool = True,
 ) -> None:
-    """Copy a stable regular source through one verified destination parent FD."""
+    """Copy a stable regular source from byte zero through a verified parent FD.
+
+    A caller-owned source handle remains open. Its final cursor position is
+    unspecified; callers must seek before reusing it.
+    """
     try:
         with _private_directory_fd(
             destination.parent, create=True, private_final=True
@@ -422,18 +427,31 @@ def atomic_copy(
                         and _identity(before) != expected_identity
                     ):
                         raise PrivateFileError(f"{label} changed during copy")
+                    if (
+                        expected_sha256 is not None
+                        and stream_sha256_handle(input_file) != expected_sha256
+                    ):
+                        raise PrivateFileError(f"{label} changed during copy")
                     descriptor, temporary = _temporary_file(
                         parent_fd, f".{destination.name}."
                     )
+                    digest = hashlib.sha256()
                     with os.fdopen(descriptor, "wb") as output_file:
                         os.fchmod(output_file.fileno(), 0o600)
                         input_file.seek(0)
                         for chunk in iter(lambda: input_file.read(1024 * 1024), b""):
+                            digest.update(chunk)
                             output_file.write(chunk)
                         output_file.flush()
                         os.fsync(output_file.fileno())
                     after = os.fstat(input_file.fileno())
-                    if _identity(before) != _identity(after):
+                    if _identity(before) != _identity(after) or (
+                        expected_sha256 is not None
+                        and (
+                            digest.hexdigest() != expected_sha256
+                            or stream_sha256_handle(input_file) != expected_sha256
+                        )
+                    ):
                         raise PrivateFileError(f"{label} changed during copy")
                 os.chmod(temporary, 0o600, dir_fd=parent_fd, follow_symlinks=False)
                 if replace_existing:

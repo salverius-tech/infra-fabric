@@ -243,8 +243,30 @@ class StateSnapshotTests(unittest.TestCase):
             state.write_bytes(state_bytes(1))
             original_copy = STATE_SNAPSHOT.atomic_copy
 
+            original_metadata = state.stat()
+            original_identity = (
+                original_metadata.st_dev,
+                original_metadata.st_ino,
+                original_metadata.st_size,
+                original_metadata.st_mtime_ns,
+            )
+
             def mutate_then_copy(source, *args, **kwargs):
                 state.write_bytes(state_bytes(2))
+                os.utime(
+                    state,
+                    ns=(original_metadata.st_atime_ns, original_metadata.st_mtime_ns),
+                )
+                mutated = state.stat()
+                self.assertEqual(
+                    (
+                        mutated.st_dev,
+                        mutated.st_ino,
+                        mutated.st_size,
+                        mutated.st_mtime_ns,
+                    ),
+                    original_identity,
+                )
                 return original_copy(source, *args, **kwargs)
 
             with patch.object(
@@ -276,6 +298,37 @@ class StateSnapshotTests(unittest.TestCase):
                 snapshot = STATE_SNAPSHOT.create_snapshot(state, root / "backups")
             assert snapshot is not None
             self.assertEqual((snapshot / "terraform.tfstate").read_bytes(), expected)
+
+    def test_restore_rejects_held_source_mutation_after_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "terraform.tfstate"
+            source.write_bytes(state_bytes(1))
+            snapshot = STATE_SNAPSHOT.create_snapshot(source, root / "backups")
+            assert snapshot is not None
+            destination = root / "recovered" / "terraform.tfstate"
+            destination.parent.mkdir()
+            destination.write_bytes(b"existing")
+            original_copy = STATE_SNAPSHOT.atomic_copy
+            snapshot_state = snapshot / "terraform.tfstate"
+
+            def mutate_then_copy(held, *args, **kwargs):
+                metadata = snapshot_state.stat()
+                snapshot_state.write_bytes(state_bytes(2))
+                os.utime(
+                    snapshot_state,
+                    ns=(metadata.st_atime_ns, metadata.st_mtime_ns),
+                )
+                return original_copy(held, *args, **kwargs)
+
+            with patch.object(
+                STATE_SNAPSHOT, "atomic_copy", side_effect=mutate_then_copy
+            ), self.assertRaisesRegex(STATE_SNAPSHOT.StateSnapshotError, "changed"):
+                STATE_SNAPSHOT.restore_snapshot(
+                    snapshot, destination, replace_existing=True
+                )
+            self.assertEqual(destination.read_bytes(), b"existing")
+            self.assertFalse(list(destination.parent.glob(".terraform.tfstate.*")))
 
     def test_restore_cli_rejects_concurrent_site_operation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -314,17 +367,23 @@ class StateSnapshotTests(unittest.TestCase):
         self.assertLess(source.index(snapshot_call), source.index(apply_command))
         self.assertIn("Diagnostic only: mutation was authorized", source)
 
-    def test_lifecycle_state_snapshot_root_override_preserves_the_default_and_container_boundary(self) -> None:
+    def test_lifecycle_state_snapshot_root_override_preserves_the_default_and_container_boundary(
+        self,
+    ) -> None:
         apply_source = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
-        teardown_source = (ROOT / "scripts" / "teardown-infra.sh").read_text(encoding="utf-8")
+        teardown_source = (ROOT / "scripts" / "teardown-infra.sh").read_text(
+            encoding="utf-8"
+        )
         wrapper_source = (ROOT / "scripts" / "run-infra.sh").read_text(encoding="utf-8")
         default = '"${INFRA_STATE_SNAPSHOT_ROOT:-${INFRA_VALUES_DIR}/state-backups}"'
         self.assertIn(default, apply_source)
         self.assertIn(default, teardown_source)
         self.assertIn('--backup-dir "${state_snapshot_root}"', apply_source)
         self.assertIn('--backup-dir "${state_snapshot_root}"', teardown_source)
-        self.assertIn('must be an absolute private host path', wrapper_source)
-        self.assertIn('INFRA_STATE_SNAPSHOT_ROOT=/run/infra-fabric/state-backups', wrapper_source)
+        self.assertIn("must be an absolute private host path", wrapper_source)
+        self.assertIn(
+            "INFRA_STATE_SNAPSHOT_ROOT=/run/infra-fabric/state-backups", wrapper_source
+        )
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import json
 import os
 import sys
@@ -20,8 +21,6 @@ try:
         open_regular_child,
         open_regular_file,
         staging_directory,
-        stream_sha256,
-        stream_sha256_handle,
         write_private_manifest,
     )
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
@@ -34,8 +33,6 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
         open_regular_child,
         open_regular_file,
         staging_directory,
-        stream_sha256,
-        stream_sha256_handle,
         write_private_manifest,
     )
 
@@ -56,25 +53,11 @@ class StateSnapshotError(RuntimeError):
     """Raised when a local-state snapshot operation cannot proceed safely."""
 
 
-def _sha256(path: Path) -> str:
-    try:
-        return stream_sha256(path)
-    except PrivateFileError as error:
-        raise StateSnapshotError(str(error)) from error
-
-
-def _validate_state_document(path: Path) -> None:
-    try:
-        with open_regular_file(path, "local state") as handle:
-            _validate_state_stream(handle)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise StateSnapshotError("local state document is invalid") from error
-
-
-def _validate_state_stream(handle) -> None:
+def _validate_state_stream(handle) -> str:
     handle.seek(0)
+    raw = handle.read()
     try:
-        document = json.loads(handle.read().decode("utf-8"))
+        document = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise StateSnapshotError("local state document is invalid") from error
     if (
@@ -86,6 +69,7 @@ def _validate_state_stream(handle) -> None:
         or not isinstance(document.get("resources"), list)
     ):
         raise StateSnapshotError("local state document structure is invalid")
+    return hashlib.sha256(raw).hexdigest()
 
 
 def _private_directory(path: Path) -> None:
@@ -130,12 +114,14 @@ def _verified_snapshot_source(snapshot: Path):
             )
             if not isinstance(expected_hash, str) or len(expected_hash) != 64:
                 raise StateSnapshotError("state snapshot checksum metadata is invalid")
-            if (
-                expected_size != state_metadata.st_size
-                or stream_sha256_handle(state) != expected_hash
-            ):
+            try:
+                actual_hash = _validate_state_stream(state)
+            except StateSnapshotError as error:
+                raise StateSnapshotError(
+                    "state snapshot integrity check failed"
+                ) from error
+            if expected_size != state_metadata.st_size or actual_hash != expected_hash:
                 raise StateSnapshotError("state snapshot integrity check failed")
-            _validate_state_stream(state)
             state.seek(0)
             yield manifest, state
     except StateSnapshotError:
@@ -167,7 +153,7 @@ def create_snapshot(
                 source_metadata.st_size,
                 source_metadata.st_mtime_ns,
             )
-            _validate_state_stream(source)
+            source_hash = _validate_state_stream(source)
             with staging_directory(backup_dir, prefix=".snapshot-next-") as staging:
                 temporary = staging.path
                 snapshot_state = temporary / STATE_NAME
@@ -176,9 +162,9 @@ def create_snapshot(
                     snapshot_state,
                     label="local state",
                     expected_identity=source_identity,
+                    expected_sha256=source_hash,
                 )
-                _validate_state_document(snapshot_state)
-                digest = _sha256(snapshot_state)
+                digest = source_hash
                 created_at = datetime.now(timezone.utc)
                 manifest = {
                     "schema_version": SCHEMA_VERSION,
@@ -209,12 +195,13 @@ def restore_snapshot(
 ) -> None:
     """Atomically restore a verified snapshot to a disposable or acknowledged state path."""
     try:
-        with _verified_snapshot_source(snapshot) as (_manifest, source):
+        with _verified_snapshot_source(snapshot) as (manifest, source):
             try:
                 atomic_copy(
                     source,
                     state,
                     label="snapshot state",
+                    expected_sha256=manifest["sha256"],
                     replace_existing=replace_existing,
                 )
             except PrivateFileError as error:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import errno
+import hashlib
 import os
 import stat
 import sys
@@ -40,11 +41,72 @@ class PrivateFilesTests(unittest.TestCase):
             ) as fsync, patch.object(
                 private_files.os, "replace", wraps=os.replace
             ) as replace:
-                private_files.atomic_copy(source, destination, label="source")
+                private_files.atomic_copy(
+                    source,
+                    destination,
+                    label="source",
+                    expected_sha256=hashlib.sha256(b"durable data").hexdigest(),
+                )
             self.assertEqual(destination.read_bytes(), b"durable data")
             self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
             self.assertGreaterEqual(fsync.call_count, 2)
             self.assertEqual(replace.call_count, 1)
+
+    def test_atomic_copy_from_caller_handle_copies_complete_source_and_keeps_open(
+        self,
+    ) -> None:
+        contents = b"complete caller-owned source"
+        for expected_sha256 in (None, hashlib.sha256(contents).hexdigest()):
+            with self.subTest(
+                expected_sha256=expected_sha256
+            ), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                source = root / "source"
+                source.write_bytes(contents)
+                destination = root / "private" / "destination"
+                with source.open("rb") as handle:
+                    handle.seek(7)
+                    private_files.atomic_copy(
+                        handle,
+                        destination,
+                        label="source",
+                        expected_sha256=expected_sha256,
+                    )
+                    self.assertFalse(handle.closed)
+                self.assertEqual(destination.read_bytes(), contents)
+
+    def test_atomic_copy_hash_mismatch_preserves_destination_and_cleans_temp(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.write_bytes(b"verified")
+            destination = root / "private" / "destination"
+            destination.parent.mkdir()
+            destination.write_bytes(b"existing")
+            original_temporary_file = private_files._temporary_file
+
+            def mutate_source_after_precheck(parent_fd, prefix):
+                descriptor, name = original_temporary_file(parent_fd, prefix)
+                metadata = source.stat()
+                source.write_bytes(b"mutated!")
+                os.utime(source, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
+                return descriptor, name
+
+            with patch.object(
+                private_files,
+                "_temporary_file",
+                side_effect=mutate_source_after_precheck,
+            ), self.assertRaisesRegex(private_files.PrivateFileError, "changed"):
+                private_files.atomic_copy(
+                    source,
+                    destination,
+                    label="source",
+                    expected_sha256=hashlib.sha256(b"verified").hexdigest(),
+                )
+            self.assertEqual(destination.read_bytes(), b"existing")
+            self.assertFalse(list(destination.parent.glob(".destination.*")))
 
     def test_private_directory_and_manifest_are_restrictive_and_durable(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
