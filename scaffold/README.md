@@ -27,7 +27,7 @@ just setup "" <site>
 export VALUES_SITE=<site>
 ```
 
-Complete the selected private SOPS policy, encrypted bundle, and external age identity before protected-input operations or planning. Structural validation can run immediately after setup and does not decrypt secrets. Follow the [Canonical site quick start](https://github.com/salverius-tech/infra-fabric/blob/feat/canonical-values-model/docs/canonical-quick-start.md).
+Complete the selected private SOPS policy, encrypted bundle, and external age identity before protected-input operations or planning. Structural validation can run immediately after setup and does not decrypt secrets. Follow the [Canonical site quick start](https://github.com/salverius-tech/infra-fabric/blob/main/docs/canonical-quick-start.md).
 
 ## Canonical workflow
 
@@ -54,7 +54,7 @@ The first two commands are explicit protected-input operations. Validation is st
 
 ## Adding a service
 
-Read [Canonical service authoring](https://github.com/salverius-tech/infra-fabric/blob/feat/canonical-values-model/docs/canonical-service-authoring.md) from the runbook repository before changing the service catalog. Generate a public-safe contract manifest first:
+Read [Canonical service authoring](https://github.com/salverius-tech/infra-fabric/blob/main/docs/canonical-service-authoring.md) from the runbook repository before changing the service catalog. Generate a public-safe contract manifest first:
 
 ```bash
 scripts/python.sh scripts/service-author.py \

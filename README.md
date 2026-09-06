@@ -1,16 +1,26 @@
-# homelab-infra
+# infra-fabric
 
 A public-safe, repo-driven runbook for canonical site infrastructure. Proxmox resources, service placement, networking, releases, DNS, HTTPS, Ansible orchestration, and service state are described by the selected canonical site model.
 
 ## Source of truth
 
-For a selected site, operators edit only:
+`infra-fabric` is the public runbook and implementation repository. The `values/`
+directory is a separate private Git checkout mounted under the runbook root; it
+is not a second public configuration tree.
 
-- `values/sites/<site>/site.yaml` — non-secret site and service configuration;
-- `values/sites/<site>/.sops.yaml` — private SOPS policy supplied outside this public repository;
-- `values/sites/<site>/secrets.sops.yaml` — encrypted canonical secret bundle.
+For a selected site, the canonical inputs are:
 
-Generated projections under `values/sites/<site>/generated/` are derived artifacts. Do not edit them. Age identities, recipient policy, credentials, state, plans, and live site values remain private and outside tracked public source.
+- `values/sites/<site>/site.yaml` — non-secret site, resource, service,
+  endpoint, release, storage, and state configuration;
+- `values/sites/<site>/secrets.sops.yaml` — encrypted logical secret values;
+- `values/sites/<site>/.sops.yaml` — private SOPS policy, not part of the
+  non-secret model.
+
+Generated projections under `values/sites/<site>/generated/` and runtime
+artifacts such as plans, state, backups, and host-key material are derived
+private artifacts. Do not edit them. Age identities, recipient policy,
+credentials, and live site values remain private and outside tracked public
+source.
 
 ## Prerequisites
 
