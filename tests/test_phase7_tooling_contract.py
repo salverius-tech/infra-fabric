@@ -92,6 +92,18 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("scripts/canonical-render.py", text)
         self.assertIn("scripts/verify-projections.py", text)
 
+    def test_validation_requires_just_before_unittest_contracts(self) -> None:
+        text = VALIDATE.read_text(encoding="utf-8")
+        guard = "if ! command -v just >/dev/null 2>&1; then"
+
+        self.assertIn(guard, text)
+        self.assertIn("just is required for public validation", text)
+        self.assertLess(text.index('run_stage "contracts"'), text.index(guard))
+        self.assertLess(
+            text.index(guard),
+            text.index("coverage run --source=scripts -m unittest discover"),
+        )
+
     def test_workflow_scans_dependencies_and_image_on_manual_schedule_only(
         self,
     ) -> None:

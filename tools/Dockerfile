@@ -7,6 +7,8 @@ ARG TFLINT_VERSION=0.63.1
 ARG TFLINT_LINUX_AMD64_SHA256=8441a7d97df20431f19c9b9d27ff4c63e308c964e86660bc7cc0cf7bbe0725e8
 ARG SOPS_VERSION=3.13.3
 ARG SOPS_LINUX_AMD64_SHA256=e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
+ARG JUST_VERSION=1.46.0
+ARG JUST_LINUX_AMD64_MUSL_SHA256=79966e6e353f535ee7d1c6221641bcc8e3381c55b0d0a6dc6e54b34f9db36eaa
 
 COPY tools/pip-bootstrap.lock tools/requirements.lock /tmp/
 
@@ -48,6 +50,12 @@ RUN apt-get update \
         "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64" \
     && printf '%s  %s\n' "${SOPS_LINUX_AMD64_SHA256}" /usr/local/bin/sops | sha256sum -c - \
     && chmod 0755 /usr/local/bin/sops \
+    && curl -fsSL -o /tmp/just.tar.gz \
+        "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+    && printf '%s  %s\n' "${JUST_LINUX_AMD64_MUSL_SHA256}" /tmp/just.tar.gz | sha256sum -c - \
+    && tar -xzf /tmp/just.tar.gz -C /usr/local/bin just \
+    && chmod 0755 /usr/local/bin/just \
+    && rm -f /tmp/just.tar.gz \
     && python3 -m venv /opt/ansible \
     && /opt/ansible/bin/pip install --no-cache-dir --require-hashes --upgrade -r /tmp/pip-bootstrap.lock \
     && /opt/ansible/bin/pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock \

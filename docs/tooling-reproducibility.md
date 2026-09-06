@@ -1,6 +1,10 @@
 # Tooling reproducibility and advisory policy
 
-The public validation image is a reviewable Linux **amd64** artifact. Its Debian base is pinned by manifest-list digest; direct OpenTofu, TFLint, and SOPS downloads are version- and SHA-256-pinned; and Python packages are installed only from `tools/pip-bootstrap.lock` and `tools/requirements.lock` with pip `--require-hashes`.
+The public validation image is a reviewable Linux **amd64** artifact. Its Debian base is pinned by manifest-list digest; direct OpenTofu, TFLint, SOPS, and Just downloads are version- and SHA-256-pinned; and Python packages are installed only from `tools/pip-bootstrap.lock` and `tools/requirements.lock` with pip `--require-hashes`.
+
+Just is pinned to 1.46.0 using the Linux amd64 musl release archive. The checksum, `79966e6e353f535ee7d1c6221641bcc8e3381c55b0d0a6dc6e54b34f9db36eaa`, is the entry for `just-1.46.0-x86_64-unknown-linux-musl.tar.gz` in the [official Just 1.46.0 `SHA256SUMS` release asset](https://github.com/casey/just/releases/download/1.46.0/SHA256SUMS). The Docker build verifies the downloaded archive before extracting `just`.
+
+A host still needs Just to invoke public `just` recipes. The tooling image supplies Just for CLI regression tests, so public validation does not require a private Compose bind override or a host-mounted Just binary.
 
 ## Architecture policy
 

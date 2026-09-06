@@ -116,6 +116,10 @@ run_stage "python-quality" bash -euo pipefail -c "
   mypy --follow-imports=skip --ignore-missing-imports scripts/canonical_values.py scripts/service_catalog.py
 "
 run_stage "contracts" bash -euo pipefail -c "
+  if ! command -v just >/dev/null 2>&1; then
+    printf \"%s\\n\" \"just is required for public validation; tooling image must include it.\" >&2
+    exit 127
+  fi
   python infra/ansible/scripts/apply-technitium-dns.py --check scaffold/dns-records.local.json
   python scripts/settings.py --settings settings.example.json validate >/dev/null
   python scripts/validate-service-contracts.py --repo .
