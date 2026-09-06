@@ -71,33 +71,10 @@ test *args:
 edit-secrets SITE="dev":
     @site_arg="{{SITE}}"; site="${site_arg#SITE=}"; VALUES_SITE="${site}" bash -c 'set -euo pipefail; source scripts/site-context.sh; require_site_context; require_canonical_authority; values_dir="$(site_values_dir)"; SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${HOME}/.config/infra-fabric/keys/${VALUES_SITE}/site.age}"; export SOPS_AGE_KEY_FILE; [[ -f "${SOPS_AGE_KEY_FILE}" && -r "${SOPS_AGE_KEY_FILE}" ]] || { printf "External site age identity is missing or unreadable: %s\\n" "${SOPS_AGE_KEY_FILE}" >&2; exit 2; }; [[ -f "${values_dir}/.sops.yaml" && -f "${values_dir}/secrets.sops.yaml" ]] || { printf "Selected site SOPS policy or bundle is missing: %s\\n" "${values_dir}" >&2; exit 2; }; sops_bin="$(command -v sops || true)"; [[ -n "${sops_bin}" ]] || [[ -x "${HOME}/.local/bin/sops" ]] && sops_bin="${sops_bin:-${HOME}/.local/bin/sops}"; if [[ -n "${sops_bin}" ]]; then SOPS_EDITOR="${SOPS_EDITOR:-${EDITOR:-vi}}" "${sops_bin}" --config "${values_dir}/.sops.yaml" edit "${values_dir}/secrets.sops.yaml"; else source scripts/container-secret-transport.sh; transport_prepare; docker compose run --rm "${transport_compose_mount_args[@]}" "${transport_compose_env_args[@]}" infra sops --config "/workspace/${values_dir}/.sops.yaml" edit "/workspace/${values_dir}/secrets.sops.yaml"; fi'
 
-# Site age-identity lifecycle: generate | store | fetch | verify (pass --force after store/fetch to allow replacement)
-site-identity action="" SITE="dev" *extra="":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    site_arg="{{SITE}}"; site="${site_arg#SITE=}"
-    action_arg="{{action}}"; action="${action_arg#action=}"
-    # Flags and assignments may arrive via {{extra}} rather than positional
-    # arguments (shebang recipes do not forward variadic positionals), so the
-    # extra string is scanned for a SITE= override before passthrough.
-    if [[ -z "${site}" || "${site}" == -* ]]; then
-      site="${VALUES_SITE:-}"
-    fi
-    extra_args="{{extra}}"
-    rest=()
-    for arg in ${extra_args}; do
-      case "${arg}" in
-        SITE=*) candidate="${arg#SITE=}"; [[ -n "${candidate}" && "${candidate}" != -* ]] && site="${candidate}" ;;
-        *) rest+=("${arg}") ;;
-      esac
-    done
-    if [[ -z "${action}" ]]; then
-      printf 'Usage: just site-identity {generate|store|fetch|verify} [SITE=<site>] [--force]\n       Flags must follow the site (e.g.: store SITE=dev --force); or set VALUES_SITE=<site> in the environment for any flag order.\n' >&2
-      exit 2
-    fi
-    export VALUES_SITE="${site}"
-    exec scripts/site-age-identity.sh "${action}" ${rest[@]+"${rest[@]}"}
-
+# Site age-identity lifecycle: generate | store | fetch | verify (store/fetch accept --force)
+[positional-arguments]
+site-identity +args:
+    @scripts/site-age-identity.sh "$@"
 
 # Check upstream releases and update eligible pinned versions after the safety hold period; pass --dry-run to report without writes
 update *args:
