@@ -104,6 +104,20 @@ class Phase7ToolingContractTests(unittest.TestCase):
             text.index("coverage run --source=scripts -m unittest discover"),
         )
 
+    def test_validate_public_checkout_fetches_full_history_for_reconciliation(
+        self,
+    ) -> None:
+        workflow = yaml.load(
+            WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader
+        )
+        checkout = workflow["jobs"]["validate-public"]["steps"][0]
+
+        self.assertEqual(
+            checkout["uses"],
+            "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+        )
+        self.assertEqual(checkout["with"]["fetch-depth"], "0")
+
     def test_workflow_scans_dependencies_and_image_on_manual_schedule_only(
         self,
     ) -> None:
