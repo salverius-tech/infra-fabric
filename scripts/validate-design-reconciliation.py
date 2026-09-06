@@ -18,7 +18,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 RECON = ROOT / ".hermes" / "reconciliation"
-AUDIT_PATH = ".hermes/plans/2026-08-04-comprehensive-project-audit.md"
+AUDIT_PATH = ".hermes/reconciliation/audit-dispositions.md"
 PLAN_PATH = ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md"
 # Last committed lossless ledger before P10-A.  It remains inspectable with:
 # git show <ref>:.hermes/reconciliation/design-implementation-ledger.json
@@ -33,7 +33,7 @@ AUDIT_IDS = tuple(
     + [f"M{i}" for i in range(1, 19)]
     + [f"L{i}" for i in range(1, 9)]
 )
-AUDIT_HEADING = re.compile(r"^###\s+((?:H|M|L)\d+)\.\s+(.+?)\s*$")
+AUDIT_ROW = re.compile(r"^\|\s*((?:H|M|L)\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|")
 DECISION = re.compile(r"^- \*\*Decision (D(?:10|[1-9])) — ([^.]+)\.\*\*")
 
 AUDIT_PACKAGE = {
@@ -248,16 +248,15 @@ def citation_errors(citation: dict[str, str]) -> list[str]:
 def audit_findings() -> list[dict[str, Any]]:
     findings = []
     for line, text in enumerate((ROOT / AUDIT_PATH).read_text(encoding="utf-8").splitlines(), 1):
-        match = AUDIT_HEADING.match(text)
+        match = AUDIT_ROW.match(text)
         if not match:
             continue
-        finding_id, title = match.groups()
-        package = AUDIT_PACKAGE[finding_id]
+        finding_id, package, disposition = match.groups()
         findings.append({
             "id": finding_id,
-            "title": title,
+            "title": f"Finding {finding_id}",
             "package": package,
-            "disposition": "implemented-static",
+            "disposition": disposition,
             "source": {"path": AUDIT_PATH, "lines": str(line)},
             "evidence": {role: {**citation, "role": role} for role, citation in PACKAGE_EVIDENCE[package].items()},
             "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance",

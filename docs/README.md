@@ -31,11 +31,10 @@ Public-safe documentation for canonical site infrastructure.
 
 ## Contributor and architecture references
 
-- [Documentation authority inventory](documentation-inventory.json) — maintained classification of current public documentation and superseded historical documents.
+- [Documentation authority inventory](documentation-inventory.json) — maintained classification of current public documentation.
 - [Production acquisition inventory](production-acquisition-inventory.json) — source-only register of every tracked production image/network installer consumer, its static integrity evidence, and explicit unresolved paths.
 - [Development environment](development-environment.md) — disposable development workflow and implementation safety.
 
 - [Normalized plan equivalence](normalized-plan-equivalence.md) — report-only comparison schema and boundaries.
-- [Canonical values secret operations](canonical-values-secret-operations.md) — protected-value lifecycle contract.
 
 All current documents assume a selected canonical site. Generated projections are derived and must not be edited. Live site values, state, credentials, identities, and plans remain private and are not examples in this documentation. The scaffold template is the complete public-safe starting shape for `site.yaml`; the matching SOPS policy and encrypted bundle are always created privately.

@@ -113,17 +113,6 @@ class DocumentationContractTests(unittest.TestCase):
 
     def test_retired_implementation_trackers_are_not_active_backlog_authorities(self) -> None:
         inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
-        historical_trackers = (
-            ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
-            ".hermes/plans/canonical-values-model-implementation.md",
-            ".hermes/plans/site-aware-values-migration.md",
-            ".hermes/plans/upstream-capability-adoption.md",
-        )
-        for relative in historical_trackers:
-            self.assertEqual(inventory["documents"][relative], "historical reference", relative)
-            opening = "\n".join((ROOT / relative).read_text(encoding="utf-8").splitlines()[:12])
-            self.assertIn("Historical", opening, relative)
-
         matrix = json.loads((ROOT / ".hermes" / "reconciliation" / "acceptance-matrix.json").read_text(encoding="utf-8"))
         development = matrix["rows"]["development"]
         self.assertEqual(
@@ -367,18 +356,6 @@ class DocumentationContractTests(unittest.TestCase):
         self.assertIn("generated inventory and variables", state)
         self.assertNotIn("normal direct Ansible inventory group", state)
 
-        mapping = (ROOT / "docs/canonical-values-mapping-v1.md").read_text(
-            encoding="utf-8"
-        )
-        for retired_path in (
-            "scripts/parse-env.py",
-            "scripts/envfile.py",
-            "infra/ansible/inventory/tfvars.py",
-            "scripts/migrate-values.py",
-            "scaffold/terraform.tfvars",
-        ):
-            self.assertNotIn(retired_path, mapping)
-        self.assertIn("historical inputs to this mapping's provenance only", mapping)
 
 
 if __name__ == "__main__":
