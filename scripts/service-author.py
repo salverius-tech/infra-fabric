@@ -276,7 +276,7 @@ def _validate_catalog_entry(service_id: str, entry: Any, service_ids: set[str]) 
         if not isinstance(inventory, dict):
             errors.append("catalog metadata: inventory is required for runtime services")
         else:
-            for key in ("host", "group", "canonical_play_vars"):
+            for key in ("host", "group", "ansible_var_mappings"):
                 if not inventory.get(key):
                     errors.append(f"catalog metadata: inventory.{key} is required")
     dependencies = entry.get("dependencies", [])

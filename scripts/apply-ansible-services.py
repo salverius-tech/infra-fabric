@@ -438,14 +438,14 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
     }
     flattened["canonical_enabled_services"] = sorted(services)
     for service, values in sorted(services.items()):
-        legacy_vars = values.get("legacy_vars", {}) if isinstance(values, dict) else None
-        if not isinstance(legacy_vars, dict):
-            raise RuntimeError(f"canonical Ansible compatibility vars are invalid: {service}")
-        for key, value in legacy_vars.items():
+        ansible_vars = values.get("ansible_vars", {}) if isinstance(values, dict) else None
+        if not isinstance(ansible_vars, dict):
+            raise RuntimeError(f"canonical Ansible adapter vars are invalid: {service}")
+        for key, value in ansible_vars.items():
             if not isinstance(key, str):
-                raise RuntimeError(f"canonical Ansible compatibility key is invalid: {service}")
+                raise RuntimeError(f"canonical Ansible adapter key is invalid: {service}")
             if key in flattened and flattened[key] != value:
-                raise RuntimeError(f"conflicting canonical Ansible compatibility var: {key}")
+                raise RuntimeError(f"conflicting canonical Ansible adapter variable: {key}")
             flattened[key] = value
     file_descriptor, vars_name = tempfile.mkstemp(
         prefix=".canonical-ansible-vars-",

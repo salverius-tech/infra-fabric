@@ -68,10 +68,10 @@
       "inventory": {
         "host": "technitium_dns",
         "group": "technitium",
-        "vmid_var": "technitium_vmid",
+        "ansible_vmid_var": "technitium_vmid",
         "tf_vmid": "technitium_container_vmid",
         "tf_host": "technitium_container_ipv4_address",
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "technitium_api_url": "configuration.api_url",
           "technitium_admin_user": "configuration.admin_user",
           "technitium_discovery_version": "release.version",
@@ -159,7 +159,7 @@
       "inventory": {
         "host": "forgejo_lxc",
         "group": "forgejo",
-        "vmid_var": "forgejo_vmid",
+        "ansible_vmid_var": "forgejo_vmid",
         "tf_vmid": "forgejo_container_vmid",
         "tf_host": "forgejo_lan_ip",
         "domain_var": "forgejo_domain",
@@ -167,10 +167,10 @@
         "user_var": "forgejo_ansible_user",
         "tf_user": "forgejo_vm_cloud_init_user",
         "tf_user_runtime": "vm",
-        "extra_play_vars": {
+        "opentofu_ansible_var_mappings": {
           "forgejo_database": "forgejo_database"
         },
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "forgejo_domain": "endpoints.public_names.0",
           "forgejo_root_url": "endpoints.public_url",
           "forgejo_ssh_port": "endpoints.ports.ssh",
@@ -244,10 +244,10 @@
       "inventory": {
         "host": "tailscale_client_lxc",
         "group": "tailscale_client",
-        "vmid_var": "tailscale_client_vmid",
+        "ansible_vmid_var": "tailscale_client_vmid",
         "tf_vmid": "tailscale_client_vmid",
         "tf_host": "tailscale_client_ipv4_address",
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "tailscale_client_restore_backup": "configuration.restore_backup",
           "tailscale_client_backup_archive": "configuration.backup_archive",
           "tailscale_client_enable_ip_forwarding": "configuration.enable_ip_forwarding",
@@ -322,10 +322,10 @@
       "inventory": {
         "host": "forgejo_runner_lxc",
         "group": "forgejo_runner",
-        "vmid_var": "forgejo_runner_vmid",
+        "ansible_vmid_var": "forgejo_runner_vmid",
         "tf_vmid": "forgejo_runner_vmid",
         "tf_host": "forgejo_runner_ipv4_address",
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "forgejo_runner_version": "release.version",
           "forgejo_runner_url": "configuration.url",
           "forgejo_runner_name": "configuration.name",
@@ -413,11 +413,11 @@
       "inventory": {
         "host": "infisical_lxc",
         "group": "infisical",
-        "vmid_var": "infisical_vmid",
+        "ansible_vmid_var": "infisical_vmid",
         "tf_vmid": "infisical_container_vmid",
         "tf_host": "infisical_lan_ip",
         "domain_var": "infisical_domain",
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "infisical_domain": "endpoints.public_names.0",
           "infisical_version": "release.version",
           "infisical_data_dir": "configuration.data_dir",
@@ -477,14 +477,14 @@
       "inventory": {
         "host": "onramp_host_vm",
         "group": "onramp_host",
-        "vmid_var": "onramp_host_vmid",
+        "ansible_vmid_var": "onramp_host_vmid",
         "tf_vmid": "onramp_host_vmid",
         "tf_host": "onramp_host_ipv4_address",
         "domain_var": "infisical_domain",
         "tf_domain": "infisical_server_name",
         "user_var": "onramp_host_deploy_user",
         "tf_user": "onramp_host_deploy_user",
-        "extra_play_vars": {
+        "opentofu_ansible_var_mappings": {
           "onramp_host_deploy_dir": "onramp_host_deploy_dir",
           "infisical_container_port": "infisical_container_port",
           "infisical_bind_address": "infisical_bind_address"
@@ -576,16 +576,16 @@
       "inventory": {
         "host": "hermes_lxc",
         "group": "hermes",
-        "vmid_var": "hermes_vmid",
+        "ansible_vmid_var": "hermes_vmid",
         "tf_vmid": "hermes_container_vmid",
         "tf_host": "hermes_lan_ip",
         "domain_var": "hermes_domain",
         "tf_domain": "hermes_server_name",
         "tf_user": "hermes_ansible_user",
-        "extra_play_vars": {
+        "opentofu_ansible_var_mappings": {
           "hermes_runtime_user": "hermes_runtime_user"
         },
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "hermes_domain": "endpoints.public_names.0",
           "hermes_runtime_user": "configuration.runtime_user",
           "hermes_repo_path": "configuration.repository_path",
@@ -700,12 +700,12 @@
       "inventory": {
         "host": "sssf_vm",
         "group": "sssf",
-        "vmid_var": "sssf_vmid",
+        "ansible_vmid_var": "sssf_vmid",
         "tf_vmid": "sssf_vmid",
         "tf_host": "sssf_ipv4_address",
         "user_var": "bootstrap_ssh_user",
         "tf_user": "bootstrap_ssh_user",
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "sssf_runtime_user": "configuration.runtime_user",
           "sssf_workspace_root": "configuration.workspace_root",
           "sssf_data_dir": "configuration.data_dir",
@@ -788,12 +788,12 @@
       "inventory": {
         "host": "onramp_host_vm",
         "group": "onramp_host",
-        "vmid_var": "onramp_host_vmid",
+        "ansible_vmid_var": "onramp_host_vmid",
         "tf_vmid": "onramp_host_vmid",
         "tf_host": "onramp_host_ipv4_address",
         "domain_var": "onramp_host_hostname",
         "tf_domain": "onramp_host_hostname",
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "onramp_host_password_authentication": "resources.shared_hosts.onramp_host.security.password_authentication",
           "onramp_host_permit_root_login": "resources.shared_hosts.onramp_host.security.permit_root_login",
           "onramp_host_deploy_user": "resources.shared_hosts.onramp_host.security.deploy_user",
@@ -806,7 +806,7 @@
         },
         "user_var": "onramp_host_deploy_user",
         "tf_user": "onramp_host_deploy_user",
-        "extra_play_vars": {
+        "opentofu_ansible_var_mappings": {
           "onramp_host_cloud_init_user": "onramp_host_cloud_init_user",
           "onramp_host_deploy_dir": "onramp_host_deploy_dir",
           "onramp_host_password_authentication": "onramp_host_password_authentication",
@@ -868,20 +868,20 @@
       "inventory": {
         "host": "onramp_host_vm",
         "group": "onramp_host",
-        "vmid_var": "onramp_host_vmid",
+        "ansible_vmid_var": "onramp_host_vmid",
         "tf_vmid": "onramp_host_vmid",
         "tf_host": "onramp_host_ipv4_address",
         "domain_var": "onramp_host_hostname",
         "tf_domain": "onramp_host_hostname",
         "user_var": "onramp_host_deploy_user",
         "tf_user": "onramp_host_deploy_user",
-        "canonical_play_vars": {
+        "ansible_var_mappings": {
           "searxng_container_port": "configuration.container_port",
           "searxng_bind_address": "configuration.bind_address",
           "searxng_instance_name": "configuration.instance_name",
           "searxng_enable_public_url": "configuration.enable_public_url"
         },
-        "extra_play_vars": {
+        "opentofu_ansible_var_mappings": {
           "onramp_host_deploy_dir": "onramp_host_deploy_dir",
           "searxng_server_name": "searxng_server_name",
           "searxng_public_url": "searxng_public_url",

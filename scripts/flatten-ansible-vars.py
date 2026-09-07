@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Flatten canonical Ansible service compatibility variables."""
+"""Flatten canonical Ansible adapter variables."""
 
 from __future__ import annotations
 
@@ -15,13 +15,13 @@ def flatten(projection: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("canonical Ansible vars projection has an invalid shape")
     flattened = {key: value for key, value in projection.items() if key != "services"}
     for service, values in sorted(services.items()):
-        if not isinstance(values, dict) or not isinstance(values.get("legacy_vars"), dict):
-            raise ValueError(f"canonical Ansible compatibility vars are invalid: {service}")
-        for key, value in values["legacy_vars"].items():
+        if not isinstance(values, dict) or not isinstance(values.get("ansible_vars"), dict):
+            raise ValueError(f"canonical Ansible adapter vars are invalid: {service}")
+        for key, value in values["ansible_vars"].items():
             if not isinstance(key, str):
-                raise ValueError(f"canonical Ansible compatibility key is invalid: {service}")
+                raise ValueError(f"canonical Ansible adapter key is invalid: {service}")
             if key in flattened and flattened[key] != value:
-                raise ValueError(f"conflicting canonical Ansible compatibility var: {key}")
+                raise ValueError(f"conflicting canonical Ansible adapter variable: {key}")
             flattened[key] = value
     return flattened
 

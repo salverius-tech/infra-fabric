@@ -25,12 +25,12 @@ A first-class service change is incomplete until the relevant contract is covere
 
 1. **Catalog** — add the service to `infra/services.json`, including runtime owner, dependencies, state capability, release source, update policy/status, playbooks, resource addresses, secret classification, and typed configuration schema.
 2. **Canonical schema** — define the typed `site.yaml` configuration and endpoint/release/state fields. Opaque per-consumer override maps are unsupported; add a typed configuration field and explicit projection instead.
-3. **Projection** — emit only the compatibility variables required by consumers and identity-bind them to the canonical service/resource.
+3. **Projection** — emit only the consumer adapter variables required by OpenTofu or Ansible and identity-bind them to the canonical service/resource.
 4. **OpenTofu** — declare or bind the resource lifecycle, storage, network, release inputs, and outputs.
 5. **Ansible** — add the playbook/role for guest or shared-host convergence; keep steady-state service configuration at direct service endpoints.
 6. **Secrets** — declare logical secret paths, provider namespaces, classifications, and transient environment bindings. Never persist decrypted values in generated files.
 7. **State** — add backup/restore behavior and a state policy for state-capable services.
-8. **Tests** — cover schema, catalog, projection identity, secret delivery, Ansible compatibility, and relevant orchestration behavior.
+8. **Tests** — cover schema, catalog, projection identity, secret delivery, Ansible adapter output, and relevant orchestration behavior.
 9. **Documentation** — document ownership, prerequisites, health checks, update/rollback behavior, and recovery evidence.
 
 Use the service authoring manifest as design evidence, not as permission to create site values, secrets, state, plans, or infrastructure.

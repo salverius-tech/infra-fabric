@@ -88,8 +88,8 @@ class CrossProjectionIdentityTests(unittest.TestCase):
             "canonical_service": "forgejo_runner",
             "canonical_resource": "forgejo_runner",
         }
-        ansible_vars["services"]["forgejo"]["legacy_vars"] = {"forgejo_bootstrap_repo_scope": "owner/repo"}
-        ansible_vars["services"]["forgejo_runner"]["legacy_vars"] = {"forgejo_runner_scope": "owner/other"}
+        ansible_vars["services"]["forgejo"]["ansible_vars"] = {"forgejo_bootstrap_repo_scope": "owner/repo"}
+        ansible_vars["services"]["forgejo_runner"]["ansible_vars"] = {"forgejo_runner_scope": "owner/other"}
         with self.assertRaisesRegex(ProjectionError, "registration scope disagree"):
             verify_cross_projection_identity(
                 site="dev", opentofu=opentofu, inventory=inventory, ansible_vars=ansible_vars
@@ -106,8 +106,8 @@ class CrossProjectionIdentityTests(unittest.TestCase):
             "canonical_service": "forgejo_runner",
             "canonical_resource": "forgejo_runner",
         }
-        ansible_vars["services"]["forgejo"]["legacy_vars"] = {"forgejo_bootstrap_repo_scope": "owner/repo"}
-        ansible_vars["services"]["forgejo_runner"]["legacy_vars"] = {"forgejo_runner_scope": "owner/repo"}
+        ansible_vars["services"]["forgejo"]["ansible_vars"] = {"forgejo_bootstrap_repo_scope": "owner/repo"}
+        ansible_vars["services"]["forgejo_runner"]["ansible_vars"] = {"forgejo_runner_scope": "owner/repo"}
         result = verify_cross_projection_identity(
             site="dev", opentofu=opentofu, inventory=inventory, ansible_vars=ansible_vars
         )

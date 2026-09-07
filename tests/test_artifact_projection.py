@@ -10,7 +10,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from canonical_projections import _compatibility_value, _resource, render_ansible_vars
+from canonical_projections import _resolve_mapping_value, _resource, render_ansible_vars
 from canonical_values import CanonicalSite, load_site
 from service_catalog import load_catalog
 
@@ -33,7 +33,7 @@ class ArtifactProjectionTests(unittest.TestCase):
             model = load_site(site, catalog_path=ROOT / "infra/services.json")
         projected = render_ansible_vars(model, load_catalog(ROOT / "infra/services.json"))
         for service, prefix in (("technitium", "caddy_proxy"), ("forgejo", "forgejo")):
-            legacy = projected["services"][service]["legacy_vars"]
+            legacy = projected["services"][service]["ansible_vars"]
             self.assertEqual(legacy[f"{prefix}_caddy_cloudflare_version"], "2.8.4")
             self.assertEqual(legacy[f"{prefix}_caddy_cloudflare_sha256_amd64"], "a" * 64)
             self.assertEqual(legacy[f"{prefix}_caddy_cloudflare_sha256_arm64"], "b" * 64)
@@ -97,9 +97,9 @@ class ArtifactProjectionTests(unittest.TestCase):
             with self.subTest(service=service):
                 selected = model.services[service]
                 resource = _resource(model, selected.resource)
-                mapping = catalog.get(service).inventory["canonical_play_vars"]
+                mapping = catalog.get(service).inventory["ansible_var_mappings"]
                 resolved = {
-                    key: _compatibility_value(model, selected, resource, mapping[key])
+                    key: _resolve_mapping_value(model, selected, resource, mapping[key])
                     for key in values
                 }
                 self.assertEqual(resolved, values)
@@ -120,7 +120,7 @@ class ArtifactProjectionTests(unittest.TestCase):
             )["argument_specs"]["main"]["options"]
             artifact_vars = {
                 name
-                for name in catalog.get(service).inventory["canonical_play_vars"]
+                for name in catalog.get(service).inventory["ansible_var_mappings"]
                 if "caddy_cloudflare" in name or "_sha256_" in name
             }
             self.assertLessEqual(artifact_vars, set(spec), service)

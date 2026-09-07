@@ -116,7 +116,7 @@ def _path_value(value: Any, path: str) -> Any:
     return value
 
 
-def _compatibility_value(
+def _resolve_mapping_value(
     model_or_service: CanonicalSite | Any,
     service_or_resource: Any,
     resource_or_path: Any,
@@ -307,19 +307,19 @@ def render_opentofu_variables(model: CanonicalSite, catalog: ServiceCatalog | No
         tf_domain = catalog.get(name).inventory.get("tf_domain")
         if endpoint_names and isinstance(tf_domain, str) and tf_domain not in values:
             values[tf_domain] = endpoint_names[0]
-        extra_play_vars = catalog.get(name).inventory.get("extra_play_vars")
-        if isinstance(extra_play_vars, Mapping):
-            canonical_play_vars = inventory.get("canonical_play_vars")
-            for tf_key in extra_play_vars.values():
+        opentofu_ansible_var_mappings = catalog.get(name).inventory.get("opentofu_ansible_var_mappings")
+        if isinstance(opentofu_ansible_var_mappings, Mapping):
+            ansible_var_mappings = inventory.get("ansible_var_mappings")
+            for tf_key in opentofu_ansible_var_mappings.values():
                 if not isinstance(tf_key, str) or tf_key in values:
                     continue
                 if tf_key.endswith("_server_name") and endpoint_names:
                     values[tf_key] = endpoint_names[0]
                 elif tf_key.endswith("_public_url") and not tf_key.endswith("_enable_public_url") and service.endpoints.public_url:
                     values[tf_key] = service.endpoints.public_url
-                elif isinstance(canonical_play_vars, Mapping) and isinstance(canonical_play_vars.get(tf_key), str):
+                elif isinstance(ansible_var_mappings, Mapping) and isinstance(ansible_var_mappings.get(tf_key), str):
                     try:
-                        value = _compatibility_value(model, service, resource, canonical_play_vars[tf_key])
+                        value = _resolve_mapping_value(model, service, resource, ansible_var_mappings[tf_key])
                     except ProjectionError:
                         continue
                     if value is not None:
@@ -415,33 +415,33 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                 "inventory_group": capability.inventory.get("group"),
             },
         }
-        legacy_vars: dict[str, Any] = {}
-        compatibility = capability.inventory.get("canonical_play_vars")
-        if isinstance(compatibility, Mapping):
-            legacy_vars: dict[str, Any] = {}
-            for legacy_name, canonical_path in compatibility.items():
-                if not isinstance(legacy_name, str) or not isinstance(canonical_path, str):
-                    raise ProjectionError(f"invalid canonical compatibility mapping for service {name}")
-                if name == "forgejo" and legacy_name == "forgejo_ssh_port" and "ssh" not in service.endpoints.protocols:
+        ansible_vars: dict[str, Any] = {}
+        ansible_var_mappings = capability.inventory.get("ansible_var_mappings")
+        if isinstance(ansible_var_mappings, Mapping):
+            ansible_vars: dict[str, Any] = {}
+            for ansible_var_name, canonical_path in ansible_var_mappings.items():
+                if not isinstance(ansible_var_name, str) or not isinstance(canonical_path, str):
+                    raise ProjectionError(f"invalid canonical Ansible variable mapping for service {name}")
+                if name == "forgejo" and ansible_var_name == "forgejo_ssh_port" and "ssh" not in service.endpoints.protocols:
                     continue
-                value = _compatibility_value(model, service, resource, canonical_path)
+                value = _resolve_mapping_value(model, service, resource, canonical_path)
                 if value is not None:
-                    legacy_vars[legacy_name] = value
-        extra_play_vars = capability.inventory.get("extra_play_vars")
-        if isinstance(extra_play_vars, Mapping):
-            for legacy_name, tf_key in extra_play_vars.items():
-                if isinstance(legacy_name, str) and isinstance(tf_key, str) and tf_key in opentofu_values:
-                    legacy_vars[legacy_name] = opentofu_values[tf_key]
-        vmid_var = capability.inventory.get("vmid_var")
-        if isinstance(vmid_var, str) and vmid_var:
-            legacy_vars[vmid_var] = resource.identity.vmid
-        legacy_vars[f"{name}_runtime"] = resource.runtime.model_dump(mode="json", exclude_none=True)
-        legacy_vars["caddy_email"] = model.platform.ingress.acme.email
+                    ansible_vars[ansible_var_name] = value
+        opentofu_ansible_var_mappings = capability.inventory.get("opentofu_ansible_var_mappings")
+        if isinstance(opentofu_ansible_var_mappings, Mapping):
+            for ansible_var_name, tf_key in opentofu_ansible_var_mappings.items():
+                if isinstance(ansible_var_name, str) and isinstance(tf_key, str) and tf_key in opentofu_values:
+                    ansible_vars[ansible_var_name] = opentofu_values[tf_key]
+        ansible_vmid_var = capability.inventory.get("ansible_vmid_var")
+        if isinstance(ansible_vmid_var, str) and ansible_vmid_var:
+            ansible_vars[ansible_vmid_var] = resource.identity.vmid
+        ansible_vars[f"{name}_runtime"] = resource.runtime.model_dump(mode="json", exclude_none=True)
+        ansible_vars["caddy_email"] = model.platform.ingress.acme.email
         if name == "technitium":
             caddy = service.configuration.get("caddy")
             if isinstance(caddy, Mapping) and caddy.get("enabled", True):
                 upstream = caddy["upstream"]
-                legacy_vars.update(
+                ansible_vars.update(
                     {
                         "caddy_email": model.platform.ingress.acme.email,
                         "caddy_server_name": caddy["server_names"][0],
@@ -451,9 +451,9 @@ def render_ansible_vars(model: CanonicalSite, catalog: ServiceCatalog) -> dict[s
                     }
                 )
         if name == "onramp_host":
-            legacy_vars["onramp_host_bootstrap_ssh_public_keys"] = _bootstrap_ssh_keys(model, service.resource or "")
-        if legacy_vars:
-            service_vars["legacy_vars"] = legacy_vars
+            ansible_vars["onramp_host_bootstrap_ssh_public_keys"] = _bootstrap_ssh_keys(model, service.resource or "")
+        if ansible_vars:
+            service_vars["ansible_vars"] = ansible_vars
         services[name] = service_vars
     result = {
         "canonical_site": model.site.name,
@@ -671,12 +671,12 @@ def verify_cross_projection_identity(
             raise ProjectionError(f"resource identity disagrees across projections: {name}")
         identities[name] = {"resource": resource, "resource_type": resource_type}
     forgejo_scope = (
-        services.get("forgejo", {}).get("legacy_vars", {}).get("forgejo_bootstrap_repo_scope")
+        services.get("forgejo", {}).get("ansible_vars", {}).get("forgejo_bootstrap_repo_scope")
         if isinstance(services.get("forgejo"), Mapping)
         else None
     )
     runner_scope = (
-        services.get("forgejo_runner", {}).get("legacy_vars", {}).get("forgejo_runner_scope")
+        services.get("forgejo_runner", {}).get("ansible_vars", {}).get("forgejo_runner_scope")
         if isinstance(services.get("forgejo_runner"), Mapping)
         else None
     )

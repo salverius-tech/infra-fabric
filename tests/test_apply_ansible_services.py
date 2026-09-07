@@ -233,11 +233,11 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             stale.mkdir()
             current.mkdir()
             (stale / "ansible-vars.json").write_text(
-                '{"services": {"sssf": {"legacy_vars": {"sssf_allowed_repositories": []}}}}\n',
+                '{"services": {"sssf": {"ansible_vars": {"sssf_allowed_repositories": []}}}}\n',
                 encoding="utf-8",
             )
             (current / "ansible-vars.json").write_text(
-                '{"services": {"sssf": {"legacy_vars": {"sssf_allowed_repositories": ["https://example.invalid/org/repo"]}}}}\n',
+                '{"services": {"sssf": {"ansible_vars": {"sssf_allowed_repositories": ["https://example.invalid/org/repo"]}}}}\n',
                 encoding="utf-8",
             )
             (current / "ansible-inventory.json").write_text("{}\n", encoding="utf-8")
