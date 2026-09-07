@@ -63,7 +63,7 @@ The wrapper validates service selection against the catalog and uses the paired 
 
 ## Compatibility and migration boundary
 
-The canonical inputs are `values/sites/<site>/site.yaml` and `values/sites/<site>/secrets.sops.yaml`; `generated/` is derived. Migration/import compatibility is limited to the explicit tooling documented in [canonical model operations](canonical-values-migration.md). Resolve migration errors with its validation/render path, preserve legacy inputs until the documented parity and retirement decision gates pass, and never use a legacy `.env`, raw tfvars, direct `site.yml`, or raw OpenTofu command as a fallback authoring or recovery path.
+The canonical inputs are `values/sites/<site>/site.yaml` and `values/sites/<site>/secrets.sops.yaml`; `generated/` is derived. Migration/import compatibility is limited to the explicit tooling documented in [canonical model operations](canonical-model-operations.md). Resolve migration errors with its validation/render path, preserve legacy inputs until the documented parity and retirement decision gates pass, and never use a legacy `.env`, raw tfvars, direct `site.yml`, or raw OpenTofu command as a fallback authoring or recovery path.
 
 ## Evidence status
 

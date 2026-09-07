@@ -15,6 +15,7 @@ Public-safe documentation for canonical site infrastructure.
 
 ## Canonical operations
 
+- [Canonical model operations](canonical-model-operations.md) — selected-site model, projection, secret, and recovery boundaries.
 - [Canonical secret operations](canonical-values-secret-operations.md) — SOPS/age policy, bootstrap identity, rotation, backup, recovery, and restore rehearsal.
 - [Canonical teardown and site retirement](canonical-teardown.md) — reviewed destroy plans, state handling, artifact cleanup, and retirement boundaries.
 - [Service update policy](service-update-policy.md) — managed releases, pins, checksums, rollback, and maintenance windows.

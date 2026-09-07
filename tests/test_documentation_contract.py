@@ -302,7 +302,7 @@ class DocumentationContractTests(unittest.TestCase):
 
     def test_operator_command_snippets_preserve_supported_boundaries(self) -> None:
         matrix = (ROOT / "docs" / "service-operations.md").read_text(encoding="utf-8")
-        migration = (ROOT / "docs" / "canonical-values-migration.md").read_text(encoding="utf-8")
+        migration = (ROOT / "docs" / "canonical-model-operations.md").read_text(encoding="utf-8")
         troubleshooting = (ROOT / "docs" / "canonical-troubleshooting.md").read_text(encoding="utf-8")
         for command in ("VALUES_SITE=<site> just validate", "VALUES_SITE=<site> just plan", "VALUES_SITE=<site> just apply"):
             self.assertIn(command, matrix)
