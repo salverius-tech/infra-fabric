@@ -159,9 +159,9 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 
 ## Resolved pilot decisions
 
-The ten approved decisions and their implementation boundaries are recorded in the
-[combined remediation and reconciliation plan](../.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md#approved-decision-record-2026-08-06).
-For this pilot specifically:
+The ten approved decisions and their commit-qualified historical references are
+recorded in the [explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md)
+authority. For this pilot specifically:
 
 - The initial Hermes surface is read-only: status, validate, plan, sanitized
   summaries, and read-only Forgejo monitoring.

@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REQUIRED_SCAFFOLD = (
-    "scaffold/dns-records.local.json",
     "scaffold/sites/_template/site.yaml",
     "settings.example.json",
 )

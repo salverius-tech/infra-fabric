@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.model = load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=ROOT / "infra/services.json")
+        cls.model = load_site(ROOT / "tests/fixtures/sites/dev/site.yaml", catalog_path=ROOT / "infra/services.json")
         cls.catalog = load_catalog(ROOT / "infra/services.json")
 
     def test_inventory_has_consistent_catalog_owned_enabled_service_hosts(self) -> None:

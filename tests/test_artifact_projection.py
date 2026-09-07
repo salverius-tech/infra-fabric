@@ -39,7 +39,7 @@ class ArtifactProjectionTests(unittest.TestCase):
             self.assertEqual(legacy[f"{prefix}_caddy_cloudflare_sha256_arm64"], "b" * 64)
 
     def test_artifact_pin_rejects_uppercase_digest_and_version(self) -> None:
-        data = yaml.safe_load((ROOT / "scaffold/sites/dev/site.yaml").read_text())
+        data = yaml.safe_load((ROOT / "tests/fixtures/sites/dev/site.yaml").read_text())
         data["services"]["technitium"]["configuration"] = {
             "caddy": {"enabled": True, "server_names": ["dns.example.internal"], "upstream": {"host": "127.0.0.1", "port": 5380}, "tls": {"dns_provider": "cloudflare"}, "artifact": {"version": "V2.8.4", "checksums": {"amd64": "A" * 64, "arm64": "b" * 64}}}
         }
@@ -50,9 +50,9 @@ class ArtifactProjectionTests(unittest.TestCase):
                 load_site(site, catalog_path=ROOT / "infra/services.json")
 
     def test_full_catalog_projects_every_unconditional_artifact_consumer(self) -> None:
-        data = yaml.safe_load((ROOT / "scaffold/sites/dev/site.yaml").read_text())
-        data["resources"] = yaml.safe_load((ROOT / "scaffold/fixtures/resource-runtime.yaml").read_text())
-        data["services"] = yaml.safe_load((ROOT / "scaffold/fixtures/full-catalog-services.yaml").read_text())["services"]
+        data = yaml.safe_load((ROOT / "tests/fixtures/sites/dev/site.yaml").read_text())
+        data["resources"] = yaml.safe_load((ROOT / "tests/fixtures/resource-runtime.yaml").read_text())
+        data["services"] = yaml.safe_load((ROOT / "tests/fixtures/full-catalog-services.yaml").read_text())["services"]
         model = CanonicalSite.model_validate(data)
         catalog = load_catalog(ROOT / "infra/services.json")
         catalog.validate_model_services(model.services, model.resources)

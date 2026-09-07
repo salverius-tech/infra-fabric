@@ -37,7 +37,7 @@ class ServiceAuthorTests(unittest.TestCase):
                 "infra/ansible/roles/metrics/tasks/main.yml",
                 "tests/test_metrics.py",
                 "docs/metrics.md",
-                "scaffold/fixtures/metrics.yaml",
+                "tests/fixtures/metrics.yaml",
             ):
                 path = repo / relative
                 path.parent.mkdir(parents=True, exist_ok=True)

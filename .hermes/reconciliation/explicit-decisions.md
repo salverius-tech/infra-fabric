@@ -4,13 +4,13 @@ No unresolved decisions remain; consequently there is no active `DECISIONS` pack
 
 | Decision | Title | Source |
 | --- | --- | --- |
-| D1 | State and locking policy | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:165` |
-| D2 | Temporary SearXNG ownership | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:170` |
-| D3 | Hermes/Forgejo execution semantics | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:175` |
-| D4 | Durable audit contract | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:180` |
-| D5 | Compatibility retirement | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:185` |
-| D6 | Acceptance environments | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:191` |
-| D7 | First Hermes pilot scope | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:196` |
-| D8 | Onramp substrate handoff | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:203` |
-| D9 | Future private-values edits | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:209` |
-| D10 | Hermes-independent recovery | `.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:215` |
+| D1 | State and locking policy | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:165-169` |
+| D2 | Temporary SearXNG ownership | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:170-174` |
+| D3 | Hermes/Forgejo execution semantics | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:175-179` |
+| D4 | Durable audit contract | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:180-184` |
+| D5 | Compatibility retirement | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:185-190` |
+| D6 | Acceptance environments | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:191-195` |
+| D7 | First Hermes pilot scope | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:196-202` |
+| D8 | Onramp substrate handoff | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:203-208` |
+| D9 | Future private-values edits | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:209-214` |
+| D10 | Hermes-independent recovery | `db51a30f635f6b41fc9d5d546b896bdcd22b8f03:.hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:215-218` |

@@ -408,7 +408,7 @@ class CanonicalValuesTests(unittest.TestCase):
             canonical_values.service_configuration_contract(set(catalog.names) - {"technitium"})
 
     def test_public_service_configuration_fixture_matches_registry(self) -> None:
-        fixture = Path(__file__).resolve().parents[1] / "scaffold" / "fixtures" / "service-configurations.yaml"
+        fixture = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "service-configurations.yaml"
         yaml = canonical_values.YAML(typ="safe")
         document = yaml.load(fixture.read_text(encoding="utf-8"))
         self.assertIsInstance(document, dict)
@@ -429,11 +429,11 @@ class CanonicalValuesTests(unittest.TestCase):
     def test_public_scaffold_declares_every_catalog_service(self) -> None:
         root = Path(__file__).resolve().parents[1]
         catalog = load_catalog(root / "infra" / "services.json")
-        site = load_site(root / "scaffold" / "sites" / "dev" / "site.yaml", expected_site="dev", catalog_path=root / "infra" / "services.json")
+        site = load_site(root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", expected_site="dev", catalog_path=root / "infra" / "services.json")
         self.assertEqual(set(site.services), set(catalog.names))
         self.assertEqual({name for name, service in site.services.items() if service.enabled}, {"forgejo", "technitium"})
 
-        fixture = Path(__file__).resolve().parents[1] / "scaffold" / "fixtures" / "resource-runtime.yaml"
+        fixture = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "resource-runtime.yaml"
         yaml = canonical_values.YAML(typ="safe")
         document = yaml.load(fixture.read_text(encoding="utf-8"))
         resources = canonical_values.Resources.model_validate(document)
@@ -464,9 +464,9 @@ class CanonicalValuesTests(unittest.TestCase):
     def _full_catalog_site_document(self) -> dict:
         root = Path(__file__).resolve().parents[1]
         yaml = canonical_values.YAML(typ="safe")
-        site = yaml.load((root / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8"))
-        site["resources"] = yaml.load((root / "scaffold/fixtures/resource-runtime.yaml").read_text(encoding="utf-8"))
-        site["services"] = yaml.load((root / "scaffold/fixtures/full-catalog-services.yaml").read_text(encoding="utf-8"))["services"]
+        site = yaml.load((root / "tests/fixtures/sites/dev/site.yaml").read_text(encoding="utf-8"))
+        site["resources"] = yaml.load((root / "tests/fixtures/resource-runtime.yaml").read_text(encoding="utf-8"))
+        site["services"] = yaml.load((root / "tests/fixtures/full-catalog-services.yaml").read_text(encoding="utf-8"))["services"]
         return site
 
     def test_full_catalog_fixture_loads_as_one_valid_canonical_site(self) -> None:
@@ -903,7 +903,7 @@ class CanonicalValuesTests(unittest.TestCase):
             load_site(self.write_site(content))
 
     def test_loads_public_scaffold_fixture(self) -> None:
-        path = Path(__file__).resolve().parents[1] / "scaffold" / "sites" / "dev" / "site.yaml"
+        path = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "sites" / "dev" / "site.yaml"
         model = load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
         self.assertEqual(model.site.class_, "development")
         self.assertEqual(sorted(name for name, service in model.services.items() if service.enabled), ["forgejo", "technitium"])
@@ -912,7 +912,7 @@ class CanonicalValuesTests(unittest.TestCase):
         root = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: self._remove(root))
         script = Path(__file__).resolve().parents[1] / "scripts" / "canonical-render.py"
-        site = Path(__file__).resolve().parents[1] / "scaffold" / "sites" / "dev" / "site.yaml"
+        site = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "sites" / "dev" / "site.yaml"
         catalog = Path(__file__).resolve().parents[1] / "infra" / "services.json"
         output = root / "generated"
         result = subprocess.run(
@@ -943,7 +943,7 @@ class CanonicalValuesTests(unittest.TestCase):
         output.mkdir()
         (output / "previous.json").write_text("previous\n", encoding="utf-8")
         script = Path(__file__).resolve().parents[1] / "scripts" / "canonical-render.py"
-        site = Path(__file__).resolve().parents[1] / "scaffold" / "sites" / "dev" / "site.yaml"
+        site = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "sites" / "dev" / "site.yaml"
         catalog = Path(__file__).resolve().parents[1] / "infra" / "services.json"
         invalid_site = root / "invalid-site.yaml"
         invalid_site.write_text(

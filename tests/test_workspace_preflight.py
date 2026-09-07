@@ -67,7 +67,7 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
         (root / "infra" / "services.json").write_text(
             (source_root / "infra" / "services.json").read_text(encoding="utf-8"),
             encoding="utf-8",
@@ -96,7 +96,7 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
         (site / "secrets.sops.yaml").write_text("encrypted\n", encoding="utf-8")
         with temp, patch.dict(os.environ, {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"}, clear=True), patch.object(
             workspace_preflight,
@@ -115,7 +115,7 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
         policy = site / ".sops.yaml"
         policy.write_text(
             "creation_rules:\n  - path_regex: '^secrets\\.sops\\.yaml$'\n    age: age1publictestrecipient\n",
@@ -135,7 +135,7 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        scaffold = (source_root / "scaffold" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8")
+        scaffold = (source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8")
         (site / "site.yaml").write_text(
             scaffold.replace(
                 "bootstrap:\n  ssh:\n",
@@ -181,7 +181,7 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
         (site / "secrets.sops.yaml").write_text("encrypted\n", encoding="utf-8")
         policy = root / "private.sops.yaml"
         policy.write_text("private-policy-metadata\n", encoding="utf-8")
@@ -214,7 +214,7 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "scaffold" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
         (site / "secrets.sops.yaml").write_text("SECRET_SENTINEL\n", encoding="utf-8")
         with temp, patch.dict(os.environ, {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"}, clear=True), patch.object(
             workspace_preflight,

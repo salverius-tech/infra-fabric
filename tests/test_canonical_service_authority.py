@@ -39,7 +39,7 @@ ONRAMP_CHECKS_TF = ROOT / "infra/opentofu/onramp-host-checks.tf"
 class CanonicalServiceAuthorityTests(unittest.TestCase):
     @staticmethod
     def tofu_plan(*variables: str) -> subprocess.CompletedProcess[str]:
-        model = load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
+        model = load_site(ROOT / "tests/fixtures/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
         projection = render_opentofu_variables(model, load_catalog(CATALOG_PATH))
         projection.update(
             {
@@ -73,7 +73,7 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
 
     @staticmethod
     def tofu_console(expression: str, *variables: str) -> subprocess.CompletedProcess[str]:
-        model = load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
+        model = load_site(ROOT / "tests/fixtures/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
         projection = render_opentofu_variables(model, load_catalog(CATALOG_PATH))
         with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8") as handle:
             json.dump(projection, handle)
@@ -84,7 +84,7 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
             )
 
     def test_tailscale_selection_projects_to_tofu_and_inventory_without_legacy_gate(self) -> None:
-        data = yaml.safe_load((ROOT / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8"))
+        data = yaml.safe_load((ROOT / "tests/fixtures/sites/dev/site.yaml").read_text(encoding="utf-8"))
         resource = deepcopy(data["resources"]["guests"]["technitium"])
         resource["identity"].update({"vmid": 108, "hostname": "tailscale-client"})
         resource["network"]["address"] = "192.0.2.108/24"
@@ -124,7 +124,7 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
         self.assertIn("var.forgejo_runtime == null", services)
         self.assertIn("var.tailscale_client_enabled == null", services)
         projection = render_opentofu_variables(
-            load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH), load_catalog(CATALOG_PATH)
+            load_site(ROOT / "tests/fixtures/sites/dev/site.yaml", catalog_path=CATALOG_PATH), load_catalog(CATALOG_PATH)
         )
         self.assertNotIn("tailscale_client_enabled", projection)
 
@@ -194,7 +194,7 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
                 self.assertIn(expected, result.stdout + result.stderr)
 
     def test_retained_stateful_disable_policy_is_projected_to_tofu_precondition(self) -> None:
-        data = yaml.safe_load((ROOT / "scaffold/sites/dev/site.yaml").read_text(encoding="utf-8"))
+        data = yaml.safe_load((ROOT / "tests/fixtures/sites/dev/site.yaml").read_text(encoding="utf-8"))
         data["services"]["forgejo"]["enabled"] = False
         with tempfile.TemporaryDirectory() as temporary:
             site_dir = Path(temporary) / "dev"
@@ -241,7 +241,7 @@ class CanonicalServiceAuthorityTests(unittest.TestCase):
                 self.assertRegex(source, rf'{attribute}\s+=\s+local\.vm_cpu_type\["{resource_id}"\]')
 
     def test_conditional_service_root_inputs_are_optional_until_canonical_enablement_requires_them(self) -> None:
-        model = load_site(ROOT / "scaffold/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
+        model = load_site(ROOT / "tests/fixtures/sites/dev/site.yaml", catalog_path=CATALOG_PATH)
         projected = render_opentofu_variables(model, load_catalog(CATALOG_PATH))
         variables = VARIABLES_TF.read_text(encoding="utf-8")
         services = SERVICES_TF.read_text(encoding="utf-8")

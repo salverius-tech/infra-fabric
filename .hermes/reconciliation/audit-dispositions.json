@@ -9,12 +9,13 @@
   "findings": [
     {
       "id": "H1",
-      "title": "Finding H1",
+      "title": "Stateful destructive-change classification does not use the canonical service selection",
       "package": "S1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "7"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "35"
       },
       "evidence": {
         "production": {
@@ -32,12 +33,13 @@
     },
     {
       "id": "H2",
-      "title": "Finding H2",
+      "title": "Forgejo VM images can be downloaded without checksum verification",
       "package": "O3",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "8"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "57"
       },
       "evidence": {
         "production": {
@@ -55,12 +57,13 @@
     },
     {
       "id": "H3",
-      "title": "Finding H3",
+      "title": "Parallel Ansible waves do not serialize services that share one host",
       "package": "O2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "9"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "75"
       },
       "evidence": {
         "production": {
@@ -78,12 +81,13 @@
     },
     {
       "id": "H4",
-      "title": "Finding H4",
+      "title": "Canonical service-state backup and restore is broken across selection, inputs, and documentation",
       "package": "R1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "10"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "92"
       },
       "evidence": {
         "production": {
@@ -101,12 +105,13 @@
     },
     {
       "id": "H5",
-      "title": "Finding H5",
+      "title": "Fresh-site onboarding has a circular validation dependency",
       "package": "R2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "11"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "110"
       },
       "evidence": {
         "production": {
@@ -124,12 +129,13 @@
     },
     {
       "id": "H6",
-      "title": "Finding H6",
+      "title": "Tailscale canonical enablement is silently double-gated",
       "package": "S1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "12"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "127"
       },
       "evidence": {
         "production": {
@@ -147,12 +153,13 @@
     },
     {
       "id": "H7",
-      "title": "Finding H7",
+      "title": "Pre-mutation secret preflight omits required host-identity secrets",
       "package": "S2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "13"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "143"
       },
       "evidence": {
         "production": {
@@ -170,12 +177,13 @@
     },
     {
       "id": "H8",
-      "title": "Finding H8",
+      "title": "Documented teardown bypasses saved-plan identity and freshness controls",
       "package": "S3",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "14"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "158"
       },
       "evidence": {
         "production": {
@@ -193,12 +201,13 @@
     },
     {
       "id": "H9",
-      "title": "Finding H9",
+      "title": "Hermes Control authenticated readiness always sends a malformed bearer token",
       "package": "O1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "15"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "174"
       },
       "evidence": {
         "production": {
@@ -216,12 +225,13 @@
     },
     {
       "id": "H10",
-      "title": "Finding H10",
+      "title": "Canonical secret namespaces and migration targets contradict runtime consumers",
       "package": "S2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "16"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "189"
       },
       "evidence": {
         "production": {
@@ -239,12 +249,13 @@
     },
     {
       "id": "H11",
-      "title": "Finding H11",
+      "title": "Runtime artifact installation is not consistently immutable",
       "package": "O3",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "17"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "205"
       },
       "evidence": {
         "production": {
@@ -262,12 +273,13 @@
     },
     {
       "id": "H12",
-      "title": "Finding H12",
+      "title": "Apply verification has a mutation-time TOCTOU window",
       "package": "S3",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "18"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "222"
       },
       "evidence": {
         "production": {
@@ -285,12 +297,13 @@
     },
     {
       "id": "M1",
-      "title": "Finding M1",
+      "title": "`site.yml` is a misleading, incomplete, unconditional orchestration surface",
       "package": "O2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "19"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "240"
       },
       "evidence": {
         "production": {
@@ -308,12 +321,13 @@
     },
     {
       "id": "M2",
-      "title": "Finding M2",
+      "title": "Public validation is sensitive to ignored local Markdown files",
       "package": "R2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "20"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "257"
       },
       "evidence": {
         "production": {
@@ -331,12 +345,13 @@
     },
     {
       "id": "M3",
-      "title": "Finding M3",
+      "title": "Local OpenTofu state has no locking or documented single-writer control",
       "package": "S3",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "21"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "274"
       },
       "evidence": {
         "production": {
@@ -354,12 +369,13 @@
     },
     {
       "id": "M4",
-      "title": "Finding M4",
+      "title": "Ansible lint globally disables the principal command-idempotence rule",
       "package": "Q1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "22"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "290"
       },
       "evidence": {
         "production": {
@@ -377,12 +393,13 @@
     },
     {
       "id": "M5",
-      "title": "Finding M5",
+      "title": "Operator password hashing is not idempotent and root salts are globally reused",
       "package": "Q1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "23"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "306"
       },
       "evidence": {
         "production": {
@@ -400,12 +417,13 @@
     },
     {
       "id": "M6",
-      "title": "Finding M6",
+      "title": "OpenTofu validation is inconsistent across service-specific inputs",
       "package": "Q2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "24"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "322"
       },
       "evidence": {
         "production": {
@@ -423,12 +441,13 @@
     },
     {
       "id": "M7",
-      "title": "Finding M7",
+      "title": "The OpenTofu root contract remains a large compatibility surface",
       "package": "Q2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "25"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "338"
       },
       "evidence": {
         "production": {
@@ -446,12 +465,13 @@
     },
     {
       "id": "M8",
-      "title": "Finding M8",
+      "title": "Supply-chain controls stop short of immutable base/container inputs and automated scanning",
       "package": "O3",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "26"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "354"
       },
       "evidence": {
         "production": {
@@ -469,12 +489,13 @@
     },
     {
       "id": "M9",
-      "title": "Finding M9",
+      "title": "Canonical update behavior contradicts update policy",
       "package": "Q3",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "27"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "371"
       },
       "evidence": {
         "production": {
@@ -492,12 +513,13 @@
     },
     {
       "id": "M10",
-      "title": "Finding M10",
+      "title": "Site-local SOPS recipient policy verification can fail open",
       "package": "S2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "28"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "383"
       },
       "evidence": {
         "production": {
@@ -515,12 +537,13 @@
     },
     {
       "id": "M11",
-      "title": "Finding M11",
+      "title": "Every service subprocess receives the bootstrap root password",
       "package": "S2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "29"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "394"
       },
       "evidence": {
         "production": {
@@ -538,12 +561,13 @@
     },
     {
       "id": "M12",
-      "title": "Finding M12",
+      "title": "Restore can report success after service restart failures",
       "package": "R1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "30"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "405"
       },
       "evidence": {
         "production": {
@@ -561,12 +585,13 @@
     },
     {
       "id": "M13",
-      "title": "Finding M13",
+      "title": "Sensitive Ansible role arguments are inconsistently protected",
       "package": "S2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "31"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "416"
       },
       "evidence": {
         "production": {
@@ -584,12 +609,13 @@
     },
     {
       "id": "M14",
-      "title": "Finding M14",
+      "title": "Check-mode and task-tag contracts are absent, and the static checker is inaccurate",
       "package": "Q1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "32"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "427"
       },
       "evidence": {
         "production": {
@@ -607,12 +633,13 @@
     },
     {
       "id": "M15",
-      "title": "Finding M15",
+      "title": "Stateful retention policy exists only in wrappers",
       "package": "S1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "33"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "438"
       },
       "evidence": {
         "production": {
@@ -630,12 +657,13 @@
     },
     {
       "id": "M16",
-      "title": "Finding M16",
+      "title": "Arbitrary override maps rely on secret-looking key names",
       "package": "S2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "34"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "449"
       },
       "evidence": {
         "production": {
@@ -653,12 +681,13 @@
     },
     {
       "id": "M17",
-      "title": "Finding M17",
+      "title": "Python quality and coverage are largely ungated",
       "package": "CI",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "35"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "460"
       },
       "evidence": {
         "production": {
@@ -676,12 +705,13 @@
     },
     {
       "id": "M18",
-      "title": "Finding M18",
+      "title": "Role interface contracts are incomplete",
       "package": "O1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "36"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "472"
       },
       "evidence": {
         "production": {
@@ -699,12 +729,13 @@
     },
     {
       "id": "L1",
-      "title": "Finding L1",
+      "title": "Documentation lacks a complete service-by-service operations matrix",
       "package": "R1",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "37"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "485"
       },
       "evidence": {
         "production": {
@@ -722,12 +753,13 @@
     },
     {
       "id": "L2",
-      "title": "Finding L2",
+      "title": "Documentation link checks validate paths but not anchors or executable snippets",
       "package": "R2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "38"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "500"
       },
       "evidence": {
         "production": {
@@ -745,12 +777,13 @@
     },
     {
       "id": "L3",
-      "title": "Finding L3",
+      "title": "CI validates only main pushes and pull requests",
       "package": "O3",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "39"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "515"
       },
       "evidence": {
         "production": {
@@ -768,12 +801,13 @@
     },
     {
       "id": "L4",
-      "title": "Finding L4",
+      "title": "Aggregate local validation gives little failure-stage summary",
       "package": "CI",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "40"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "529"
       },
       "evidence": {
         "production": {
@@ -791,12 +825,13 @@
     },
     {
       "id": "L5",
-      "title": "Finding L5",
+      "title": "Copied scaffold README links resolve outside the private values repository",
       "package": "R2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "41"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "543"
       },
       "evidence": {
         "production": {
@@ -814,12 +849,13 @@
     },
     {
       "id": "L6",
-      "title": "Finding L6",
+      "title": "Documentation inventory conflates active truth with unfinished design material",
       "package": "DOCS",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "42"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "547"
       },
       "evidence": {
         "production": {
@@ -837,12 +873,13 @@
     },
     {
       "id": "L7",
-      "title": "Finding L7",
+      "title": "Provider compatibility is broader than the reviewed pre-1.0 series",
       "package": "Q2",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "43"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "551"
       },
       "evidence": {
         "production": {
@@ -860,12 +897,13 @@
     },
     {
       "id": "L8",
-      "title": "Finding L8",
+      "title": "Tooling architecture and host prerequisites are not declared",
       "package": "DOCS",
       "disposition": "implemented-static",
       "source": {
-        "path": ".hermes/reconciliation/audit-dispositions.md",
-        "lines": "44"
+        "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+        "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md",
+        "lines": "555"
       },
       "evidence": {
         "production": {

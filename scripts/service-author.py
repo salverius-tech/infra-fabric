@@ -93,7 +93,7 @@ def build_manifest(
             "Ansible playbook and role contract" if provisioning_contract else "runtime integration contract",
             "secret delivery tests" if secrets else "secret-free service review",
             "state backup and restore contract" if stateful else "stateless lifecycle contract",
-            "public-safe scaffold fixtures",
+            "public-safe test fixtures",
             "service-specific tests and operator documentation",
         ],
         "safety": {
@@ -169,13 +169,13 @@ def validate_repository_surfaces(
                 and module_declaration not in terraform_text
             ):
                 errors.append(f"Terraform address: {address} is not represented")
-        fixture_directory = repo / "scaffold" / "fixtures"
+        fixture_directory = repo / "tests" / "fixtures"
         fixture_matches = [
             path for path in fixture_directory.rglob("*")
             if path.is_file() and service_id in path.read_text(encoding="utf-8", errors="ignore")
         ] if fixture_directory.is_dir() else []
         if not fixture_matches:
-            errors.append(f"scaffold fixture: no fixture mentions {service_id!r}")
+            errors.append(f"test fixture: no fixture mentions {service_id!r}")
         if catalog_entry.get("state_capable") is True:
             state_policy = repo / "infra" / "ansible" / "vars" / "service-state.yml"
             if not state_policy.is_file() or service_id not in state_policy.read_text(encoding="utf-8", errors="ignore"):

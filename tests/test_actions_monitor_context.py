@@ -24,7 +24,7 @@ from service_catalog import load_catalog
 
 class ActionsMonitorContextTests(unittest.TestCase):
     def make_projection_context(self, temporary: str) -> SimpleNamespace:
-        site_file = ROOT / "scaffold" / "sites" / "dev" / "site.yaml"
+        site_file = ROOT / "tests" / "fixtures" / "sites" / "dev" / "site.yaml"
         catalog_path = ROOT / "infra" / "services.json"
         model = load_site(site_file, expected_site="dev", catalog_path=catalog_path)
         catalog = load_catalog(catalog_path)

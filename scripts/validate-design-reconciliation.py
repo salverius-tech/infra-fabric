@@ -18,8 +18,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 RECON = ROOT / ".hermes" / "reconciliation"
-AUDIT_PATH = ".hermes/reconciliation/audit-dispositions.md"
-PLAN_PATH = ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md"
+AUTHORITY_PATH = RECON / "reconciliation-authority.json"
 # Last committed lossless ledger before P10-A.  It remains inspectable with:
 # git show <ref>:.hermes/reconciliation/design-implementation-ledger.json
 HISTORICAL_LEDGER = {
@@ -33,8 +32,6 @@ AUDIT_IDS = tuple(
     + [f"M{i}" for i in range(1, 19)]
     + [f"L{i}" for i in range(1, 9)]
 )
-AUDIT_ROW = re.compile(r"^\|\s*((?:H|M|L)\d+)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|")
-DECISION = re.compile(r"^- \*\*Decision (D(?:10|[1-9])) — ([^.]+)\.\*\*")
 
 AUDIT_PACKAGE = {
     "H1":"S1", "H2":"O3", "H3":"O2", "H4":"R1", "H5":"R2", "H6":"S1", "H7":"S2", "H8":"S3", "H9":"O1", "H10":"S2", "H11":"O3", "H12":"S3",
@@ -89,125 +86,6 @@ MATRIX_ROWS = {
     "isolated-recovery": {column: "not-evidenced" for column in MATRIX_COLUMNS},
     "production": {column: "not-evidenced" for column in MATRIX_COLUMNS},
 }
-DEVELOPMENT_ACCEPTANCE_COMMIT = "9c568a3f03c7a125a3c398e3f6bf5ab860259033"
-MATRIX_EVIDENCE = {
-    f"development/{category}": {
-        "environment": "development",
-        "category": category,
-        "audited_commit": DEVELOPMENT_ACCEPTANCE_COMMIT,
-        "citation": {"path": PLAN_PATH, "lines": lines},
-        "procedure_id": procedure,
-        "result": "passed",
-        "date": "2026-08-22",
-        "boundary": boundary,
-    }
-    for category, lines, procedure, boundary in (
-        (
-            "plan",
-            "635-648",
-            "phase-9-gate-1",
-            "Disposable development plan only; no prior normalized baseline established semantic equivalence.",
-        ),
-        (
-            "apply",
-            "635-648",
-            "phase-9-gate-2",
-            "Reviewed disposable development apply only; no isolated-recovery or production acceptance.",
-        ),
-        (
-            "health-idempotence",
-            "635-648",
-            "phase-9-gate-3",
-            "Direct development health and second-run idempotence only.",
-        ),
-        (
-            "service-restore",
-            "635-648",
-            "phase-9-gate-4",
-            "Enabled disposable development stateful services only; not controller or infrastructure recovery.",
-        ),
-        (
-            "infrastructure-recovery",
-            "635-658",
-            "phase-9-gate-5",
-            "Disposable development controller/infrastructure recovery rehearsal: private audit and state snapshots were verified and restored through guarded paths, post-recovery canonical convergence and redacted connectivity passed, and fresh provider plans were zero-change. It does not establish independent external audit durability, rollback, or production acceptance.",
-        ),
-        (
-            "hermes-integration",
-            "661-674",
-            "phase-9-gate-6-read-only-bridge",
-            "Disposable development deployed-plugin read-only status and audit verification only; uses a non-secret service-ID context and guest-local private empty audit baseline. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance.",
-        ),
-    )
-}
-MATRIX_EVIDENCE["development/hermes-integration"]["audited_commit"] = (
-    "9c568a3f03c7a125a3c398e3f6bf5ab860259033"
-)
-MATRIX_EVIDENCE["development/hermes-integration"]["date"] = "2026-08-22"
-MATRIX_EVIDENCE["development/plan"]["audited_commit"] = "b25d0037ef510bc848786e18582fab95bf9661fc"
-MATRIX_EVIDENCE["development/infrastructure-recovery"]["audited_commit"] = "b25d0037ef510bc848786e18582fab95bf9661fc"
-MATRIX_EVIDENCE["development/rollback"] = {
-    "environment": "development",
-    "category": "rollback",
-    "audited_commit": "2249405d2c4a45c3c14cfcff74f2bb6a610c103f",
-    "citation": {"path": PLAN_PATH, "lines": "676-687"},
-    "procedure_id": "phase-9-gate-7-development-hermes-rollback",
-    "result": "passed",
-    "date": "2026-08-22",
-    "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance.",
-}
-RUNBOOK_PATH = "docs/development-acceptance-gate-runbook.md"
-# 2026-08-23 re-execution at the final development HEAD after the destructive-rebuild
-# rehearsal fixes and the forgejo scope binding.
-GATE_RERUN_COMMIT = "f878a8ff95a0329a468c7084741980226d233ba9"
-# 2026-08-22 local-filesystem host re-execution of docs/development-acceptance-gate-runbook.md
-# gates 1-7 after fixes in GATE_RERUN_COMMIT; apply and rollback were not exercised and retain
-# their historical evidence.
-MATRIX_EVIDENCE["development/plan"].update(
-    {
-        "audited_commit": GATE_RERUN_COMMIT,
-        "citation": {"path": RUNBOOK_PATH, "lines": "40-50"},
-        "date": "2026-08-23",
-        "procedure_id": "dev-gate-runbook-gate-3",
-        "boundary": "Disposable development plan review only; no apply performed. Fresh plans before convergence and after recovery were zero-change with no destructive changes.",
-    }
-)
-MATRIX_EVIDENCE["development/health-idempotence"].update(
-    {
-        "audited_commit": GATE_RERUN_COMMIT,
-        "citation": {"path": RUNBOOK_PATH, "lines": "51-68"},
-        "date": "2026-08-23",
-        "procedure_id": "dev-gate-runbook-gate-4",
-        "boundary": "Development guests only across two full convergence passes plus direct-service connectivity; nonzero changes limited to the accepted imperative-bootstrap exceptions recorded in .hermes/reconciliation/validation-findings-2026-08-22.md, including the sssf pinned-checkout changed_when declaration; Technitium DNS sync verified zero-change after the rData matching fix.",
-    }
-)
-MATRIX_EVIDENCE["development/service-restore"].update(
-    {
-        "audited_commit": GATE_RERUN_COMMIT,
-        "citation": {"path": RUNBOOK_PATH, "lines": "69-80"},
-        "date": "2026-08-23",
-        "procedure_id": "dev-gate-runbook-gate-5",
-        "boundary": "Enabled development stateful services only; not controller or infrastructure recovery. All enabled services backed up and restored with automatic pre-restore safety archives and zero failures; post-restore connectivity and reconvergence passed.",
-    }
-)
-MATRIX_EVIDENCE["development/infrastructure-recovery"].update(
-    {
-        "audited_commit": GATE_RERUN_COMMIT,
-        "citation": {"path": RUNBOOK_PATH, "lines": "81-120"},
-        "date": "2026-08-23",
-        "procedure_id": "dev-gate-runbook-gate-6",
-        "boundary": "Disposable development controller/infrastructure recovery rehearsal on a local-filesystem host: guarded audit-journal and state snapshots were created, verified, and restored through the site lock inside one wrapped tooling session; canonical projections verified afterward followed by a fresh zero-change plan and connectivity pass. No external durability claim.",
-    }
-)
-MATRIX_EVIDENCE["development/hermes-integration"].update(
-    {
-        "audited_commit": GATE_RERUN_COMMIT,
-        "citation": {"path": RUNBOOK_PATH, "lines": "121-137"},
-        "date": "2026-08-23",
-        "procedure_id": "dev-gate-runbook-gate-7",
-        "boundary": "Deployed-plugin read-only status and audit verification only: zero-change non-destructive saved plan reported and audit chain verified with no unresolved correlations. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance.",
-    }
-)
 RETIRED_ARTIFACTS = (
     "audit-package-evidence-registry.json", "audit-package-evidence-registry.md",
     "backlog.json", "contradiction-register.md", "decision-register.md",
@@ -229,49 +107,131 @@ def retire_declared_artifacts(reconciliation: Path) -> None:
         (reconciliation / "waves" / name).unlink(missing_ok=True)
 
 
-def line_count(path: str) -> int:
-    return len((ROOT / path).read_text(encoding="utf-8").splitlines())
+def authority() -> dict[str, Any]:
+    """Load a well-formed compact authority, never generated output."""
+    try:
+        data = json.loads(AUTHORITY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"cannot load reconciliation authority: {error}") from error
+    if not isinstance(data, dict):
+        raise ValueError("malformed reconciliation authority: root must be an object")
+    audit = data.get("audit")
+    decisions = data.get("decisions")
+    if not isinstance(audit, dict) or not isinstance(decisions, dict):
+        raise ValueError("malformed reconciliation authority: audit and decisions are required")
+    findings = audit.get("findings")
+    records = decisions.get("records")
+    if not has_exact_ids(findings, set(AUDIT_IDS)):
+        raise ValueError("malformed reconciliation authority: audit IDs are incomplete or duplicated")
+    if not has_exact_ids(records, {f"D{number}" for number in range(1, 11)}):
+        raise ValueError("malformed reconciliation authority: decision IDs are incomplete or duplicated")
+    for name, source in (("audit", audit.get("source")), ("decisions", decisions.get("source"))):
+        if not isinstance(source, dict):
+            raise ValueError(f"malformed reconciliation authority {name} source")
+        citation_problems = citation_errors(
+            {**source, "lines": "1"}, require_historical=True
+        )
+        if citation_problems:
+            raise ValueError(
+                f"malformed reconciliation authority {name} source: "
+                f"{'; '.join(citation_problems)}"
+            )
+    for record in [*findings, *records]:
+        if not isinstance(record.get("title"), str) or not record["title"]:
+            raise ValueError("malformed reconciliation authority: title is required")
+        if not isinstance(record.get("lines"), str):
+            raise ValueError("malformed reconciliation authority: citation lines are required")
+    return data
 
 
-def citation_errors(citation: dict[str, str]) -> list[str]:
+def citation_errors(
+    citation: Any, *, require_historical: bool = False
+) -> list[str]:
+    """Validate a current or commit-qualified citation without fallbacks."""
+    if not isinstance(citation, dict):
+        return ["citation must be an object"]
     path = citation.get("path", "")
+    lines = citation.get("lines", "")
+    if not isinstance(path, str) or not path or not isinstance(lines, str):
+        return [f"invalid citation syntax: {path}:{lines}"]
+    try:
+        start, _, end = lines.partition("-")
+        first, last = int(start), int(end or start)
+    except ValueError:
+        return [f"invalid citation syntax: {path}:{lines}"]
+    git_ref = citation.get("git_ref")
+    if require_historical and not git_ref:
+        return [f"historical citation must use an immutable full Git commit reference: {path}"]
+    if git_ref:
+        if not isinstance(git_ref, str) or not re.fullmatch(r"[0-9a-f]{40}", git_ref):
+            return [f"citation must use an immutable full Git commit reference: {path}"]
+        if subprocess.run(
+            ["git", "cat-file", "-e", f"{git_ref}^{{commit}}"],
+            cwd=ROOT,
+            capture_output=True,
+        ).returncode:
+            return [f"historical citation is not resolvable: {git_ref}:{path}"]
+        result = subprocess.run(
+            ["git", "show", f"{git_ref}:{path}"], cwd=ROOT, text=True, capture_output=True
+        )
+        if result.returncode:
+            return [f"historical citation is not resolvable: {git_ref}:{path}"]
+        count = len(result.stdout.splitlines())
+    elif (ROOT / path).is_file():
+        count = len((ROOT / path).read_text(encoding="utf-8").splitlines())
+    else:
+        return [f"invalid citation range: {path}:{lines}"]
+    if not 1 <= first <= last <= count:
+        return [f"invalid citation range: {path}:{lines}"]
+    return []
+
+
+def cited_text(citation: dict[str, str]) -> str | None:
+    """Return cited historical text after citation_errors has established validity."""
+    git_ref = citation.get("git_ref")
+    if not git_ref:
+        return None
+    result = subprocess.run(
+        ["git", "show", f"{git_ref}:{citation['path']}"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode:
+        return None
     try:
         start, _, end = citation["lines"].partition("-")
         first, last = int(start), int(end or start)
     except (KeyError, ValueError):
-        return [f"invalid citation syntax: {path}:{citation.get('lines', '')}"]
-    if not (ROOT / path).is_file() or not 1 <= first <= last <= line_count(path):
-        return [f"invalid citation range: {path}:{citation.get('lines', '')}"]
-    return []
+        return None
+    return "\n".join(result.stdout.splitlines()[first - 1:last])
 
 
-def audit_findings() -> list[dict[str, Any]]:
-    findings = []
-    for line, text in enumerate((ROOT / AUDIT_PATH).read_text(encoding="utf-8").splitlines(), 1):
-        match = AUDIT_ROW.match(text)
-        if not match:
-            continue
-        finding_id, package, disposition = match.groups()
-        findings.append({
-            "id": finding_id,
-            "title": f"Finding {finding_id}",
-            "package": package,
-            "disposition": disposition,
-            "source": {"path": AUDIT_PATH, "lines": str(line)},
-            "evidence": {role: {**citation, "role": role} for role, citation in PACKAGE_EVIDENCE[package].items()},
+def audit_findings(data: dict[str, Any]) -> list[dict[str, Any]]:
+    source = data["audit"]["source"]
+    return [
+        {
+            "id": finding["id"],
+            "title": finding["title"],
+            "package": AUDIT_PACKAGE[finding["id"]],
+            "disposition": "implemented-static",
+            "source": {**source, "lines": finding["lines"]},
+            "evidence": {
+                role: {**citation, "role": role}
+                for role, citation in PACKAGE_EVIDENCE[AUDIT_PACKAGE[finding["id"]]].items()
+            },
             "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance",
-        })
-    return findings
+        }
+        for finding in data["audit"]["findings"]
+    ]
 
 
-def explicit_decisions() -> list[dict[str, str]]:
-    decisions = []
-    for line, text in enumerate((ROOT / PLAN_PATH).read_text(encoding="utf-8").splitlines(), 1):
-        match = DECISION.match(text)
-        if match:
-            decision_id, title = match.groups()
-            decisions.append({"id": decision_id, "title": title, "source": f"{PLAN_PATH}:{line}"})
-    return decisions
+def explicit_decisions(data: dict[str, Any]) -> list[dict[str, Any]]:
+    source = data["decisions"]["source"]
+    return [
+        {"id": decision["id"], "title": decision["title"], "source": {**source, "lines": decision["lines"]}}
+        for decision in data["decisions"]["records"]
+    ]
 
 
 def build() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
@@ -282,20 +242,24 @@ def build() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
             "source_status": "source-complete",
             "evidence": PACKAGE_EVIDENCE[package["id"]],
         })
-    findings = audit_findings()
-    decisions = explicit_decisions()
+    data = authority()
+    findings = audit_findings(data)
+    decisions = explicit_decisions(data)
+    evidence = {
+        f"{record['environment']}/{record['category']}": record
+        for record in data["acceptance"]["evidence"]
+    }
     matrix = {
         "environments": list(MATRIX_ROWS),
         "columns": list(MATRIX_COLUMNS),
         "rows": MATRIX_ROWS,
-        "evidence": MATRIX_EVIDENCE,
+        "evidence": evidence,
         "evidence_boundary": (
             "Active authority for environment-specific external acceptance only. "
             "An evidenced or historical-evidence cell records a rehearsal at its exact environment, audited commit, "
             "procedure, result, citation, date, and stated boundary; source completion "
             "does not populate this matrix, and later lifecycle changes require revalidation."
         ),
-        "development_source": f"{PLAN_PATH}:635-648",
     }
     completion = {
         "schema_version": 1,
@@ -309,6 +273,29 @@ def build() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
     audit = {"schema_version": 1, "historical_ledger": HISTORICAL_LEDGER, "findings": findings}
     coverage = "Active authority for source-package completion only. Static repository evidence does not establish provider, live-service, recovery, or production acceptance; lossless per-claim provenance is frozen in Git history."
     return completion, audit, completion, coverage
+
+
+def has_exact_ids(records: Any, expected_ids: set[str]) -> bool:
+    """Return whether records contain every required identity exactly once."""
+    return (
+        isinstance(records, list)
+        and all(isinstance(record, dict) for record in records)
+        and len(records) == len(expected_ids)
+        and {record.get("id") for record in records} == expected_ids
+    )
+
+
+def cited_identity_matches(
+    citation: dict[str, str], expected_line: str, *, line_may_continue: bool = False
+) -> bool:
+    """Match the exact immutable heading or decision identity at the citation start."""
+    text = cited_text(citation)
+    if text is None or not text.splitlines():
+        return False
+    first_line = text.splitlines()[0]
+    return first_line == expected_line or (
+        line_may_continue and first_line.startswith(f"{expected_line} ")
+    )
 
 
 def validate(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any]) -> list[str]:
@@ -343,18 +330,44 @@ def validate(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any
     if completion.get("frontier") != expected_frontier:
         errors.append("frontier must contain only incomplete source packages")
     decisions = completion.get("explicit_decisions", [])
-    if {decision.get("id") for decision in decisions} != {f"D{number}" for number in range(1, 11)}:
-        errors.append("explicit decision authority must retain D1 through D10")
+    expected_decision_ids = {f"D{number}" for number in range(1, 11)}
+    if not has_exact_ids(decisions, expected_decision_ids):
+        errors.append("explicit decision authority must retain D1 through D10 exactly once")
     if completion.get("unresolved_decisions"):
         errors.append("unresolved decisions require an explicit DECISIONS package")
+    for decision in decisions if isinstance(decisions, list) else []:
+        if not isinstance(decision, dict):
+            continue
+        source = decision.get("source")
+        if not isinstance(source, dict):
+            errors.append(f"explicit decision source is missing: {decision.get('id')}")
+        else:
+            source_errors = citation_errors(source, require_historical=True)
+            errors.extend(source_errors)
+            expected = f"- **Decision {decision.get('id')} — {decision.get('title')}.**"
+            if not source_errors and not cited_identity_matches(
+                source, expected, line_may_continue=True
+            ):
+                errors.append(f"explicit decision provenance does not match: {decision.get('id')}")
     findings = audit.get("findings", [])
-    if {finding.get("id") for finding in findings} != set(AUDIT_IDS):
-        errors.append("audit finding coverage incomplete")
-    for finding in findings:
+    if not has_exact_ids(findings, set(AUDIT_IDS)):
+        errors.append("audit finding coverage incomplete or duplicated")
+    for finding in findings if isinstance(findings, list) else []:
+        if not isinstance(finding, dict):
+            continue
         if finding.get("package") not in package_ids or finding.get("disposition") not in {"implemented-static", "outstanding", "blocked-external", "superseded"}:
             errors.append(f"invalid audit disposition: {finding.get('id')}")
         if set(finding.get("evidence", {})) != {"production", "verification"}:
             errors.append(f"audit finding lacks production/verification evidence: {finding.get('id')}")
+        source = finding.get("source")
+        if not isinstance(source, dict):
+            errors.append(f"audit finding source is missing: {finding.get('id')}")
+        else:
+            source_errors = citation_errors(source, require_historical=True)
+            errors.extend(source_errors)
+            expected = f"### {finding.get('id')}. {finding.get('title')}"
+            if not source_errors and not cited_identity_matches(source, expected):
+                errors.append(f"audit finding provenance does not match: {finding.get('id')}")
         for citation in finding.get("evidence", {}).values():
             errors.extend(citation_errors(citation))
     matrix = completion.get("acceptance_matrix", {})
@@ -384,10 +397,12 @@ def validate(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any
             if record.get("environment") != environment or record.get("category") != category:
                 errors.append(f"acceptance evidence cell identity mismatch: {cell}")
             commit = record.get("audited_commit", "")
-            if commit != MATRIX_EVIDENCE.get(cell, {}).get("audited_commit") or not re.fullmatch(r"[0-9a-f]{40}", commit):
-                errors.append(f"acceptance evidence audited commit mismatch: {cell}")
+            if not re.fullmatch(r"[0-9a-f]{40}", commit):
+                errors.append(f"acceptance evidence must use an immutable full Git commit: {cell}")
             elif subprocess.run(
-                ["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=ROOT
+                ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+                cwd=ROOT,
+                capture_output=True,
             ).returncode:
                 errors.append(f"acceptance evidence commit is not resolvable: {cell}")
             citation = record.get("citation")
@@ -395,6 +410,8 @@ def validate(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any
                 errors.append(f"acceptance evidence citation is missing: {cell}")
             else:
                 errors.extend(citation_errors(citation))
+                if citation.get("git_ref") != commit:
+                    errors.append(f"acceptance evidence citation commit mismatch: {cell}")
             if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(record.get("procedure_id", ""))):
                 errors.append(f"acceptance evidence procedure is invalid: {cell}")
             if record.get("result") != "passed":
@@ -417,13 +434,18 @@ def markdown_table(headers: list[str], rows: list[list[str]]) -> str:
     return "\n".join(["| " + " | ".join(headers) + " |", "| " + " | ".join(["---"] * len(headers)) + " |", *["| " + " | ".join(row) + " |" for row in rows]])
 
 
+def citation_label(citation: dict[str, str]) -> str:
+    prefix = f"{citation['git_ref']}:" if citation.get("git_ref") else ""
+    return f"`{prefix}{citation['path']}:{citation['lines']}`"
+
+
 def artifacts(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, Any], coverage: str) -> dict[Path, str]:
     packages = completion["packages"]
     package_rows = [[p["id"], p["title"], p["source_status"], "; ".join(f"{role}: `{item['path']}:{item['lines']}`" for role, item in p["evidence"].items())] for p in packages]
     package_md = "\n".join(["# Package source completion", "", coverage, "", f"Frozen lossless provenance: `git show {HISTORICAL_LEDGER['git_ref']}:{HISTORICAL_LEDGER['path']}` ({HISTORICAL_LEDGER['record_count']} records).", "", markdown_table(["Package", "Title", "Source completion", "Evidence"], package_rows), "", "## Source frontier", "", "No incomplete source packages remain. External acceptance is tracked only in the acceptance matrix.", ""])
-    audit_rows = [[f["id"], f["package"], f["disposition"], f"`{f['source']['path']}:{f['source']['lines']}`", "; ".join(f"{role}: `{item['path']}:{item['lines']}`" for role, item in f["evidence"].items())] for f in audit["findings"]]
-    audit_md = "\n".join(["# Original audit finding dispositions", "", "All 38 original findings retain package, disposition, and current production/verification citations. External evidence remains in the acceptance matrix.", "", markdown_table(["Finding", "Package", "Disposition", "Audit source", "Evidence"], audit_rows), ""])
-    decision_rows = [[decision["id"], decision["title"], f"`{decision['source']}`"] for decision in completion["explicit_decisions"]]
+    audit_rows = [[f["id"], f["title"], f["package"], f["disposition"], citation_label(f["source"]), "; ".join(f"{role}: `{item['path']}:{item['lines']}`" for role, item in f["evidence"].items())] for f in audit["findings"]]
+    audit_md = "\n".join(["# Original audit finding dispositions", "", "All 38 original findings retain title, package, disposition, and current production/verification citations. Original audit provenance is commit-qualified; external evidence remains in the acceptance matrix.", "", markdown_table(["Finding", "Title", "Package", "Disposition", "Audit source", "Evidence"], audit_rows), ""])
+    decision_rows = [[decision["id"], decision["title"], citation_label(decision["source"])] for decision in completion["explicit_decisions"]]
     decisions_md = "\n".join(["# Explicit approved decisions", "", "No unresolved decisions remain; consequently there is no active `DECISIONS` package.", "", markdown_table(["Decision", "Title", "Source"], decision_rows), ""])
     matrix = completion["acceptance_matrix"]
     matrix_rows = [[environment, *[matrix["rows"][environment][column] for column in matrix["columns"]]] for environment in matrix["environments"]]
@@ -433,11 +455,10 @@ def artifacts(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, An
         evidence_lines.append(
             f"- `{cell}` — commit `{record['audited_commit']}`; procedure "
             f"`{record['procedure_id']}`; result `{record['result']}` on "
-            f"`{record['date']}`; evidence `{citation['path']}:{citation['lines']}`; "
+            f"`{record['date']}`; evidence {citation_label(citation)}; "
             f"boundary: {record['boundary']}"
         )
-    matrix_md = "\n".join(["# Environment-specific acceptance matrix", "", matrix["evidence_boundary"], "", markdown_table(["Environment", *matrix["columns"]], matrix_rows), "", "## Evidence records", "", *evidence_lines, "", f"Development evidence source: `{matrix['development_source']}`. Current evidenced cells apply only to disposable development and do not establish isolated-recovery or production acceptance.", ""])
-    backlog_md = "\n".join(["# Evidence-backed canonical backlog", "", "Active reconciliation is intentionally compact. Package source completion, original audit dispositions, approved decisions, and environment acceptance are the active authorities; the full per-claim ledger is frozen in Git history.", "", "- [Package source completion](../.hermes/reconciliation/package-completion.md)", "- [Original audit finding dispositions](../.hermes/reconciliation/audit-dispositions.md)", "- [Explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md)", "- [Environment-specific acceptance matrix](../.hermes/reconciliation/acceptance-matrix.md)", "", "Only external acceptance remains active; no incomplete source package or unresolved decision is reported as frontier work.", ""])
+    matrix_md = "\n".join(["# Environment-specific acceptance matrix", "", matrix["evidence_boundary"], "", markdown_table(["Environment", *matrix["columns"]], matrix_rows), "", "## Evidence records", "", *evidence_lines, "", "Current evidenced cells apply only to disposable development and do not establish isolated-recovery or production acceptance.", ""])
     return {
         RECON / "package-completion.json": json.dumps(completion, indent=2) + "\n",
         RECON / "package-completion.md": package_md,
@@ -446,7 +467,6 @@ def artifacts(completion: dict[str, Any], audit: dict[str, Any], _: dict[str, An
         RECON / "explicit-decisions.md": decisions_md,
         RECON / "acceptance-matrix.json": json.dumps(matrix, indent=2) + "\n",
         RECON / "acceptance-matrix.md": matrix_md,
-        ROOT / "docs/design-implementation-backlog.md": backlog_md,
     }
 
 
@@ -454,8 +474,20 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--reconciliation-dir",
+        type=Path,
+        help="write/check generated reconciliation artifacts in this directory",
+    )
     args = parser.parse_args()
-    completion, audit, legacy_backlog, coverage = build()
+    global RECON
+    if args.reconciliation_dir:
+        RECON = args.reconciliation_dir.resolve()
+    try:
+        completion, audit, legacy_backlog, coverage = build()
+    except ValueError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 1
     expected = artifacts(completion, audit, legacy_backlog, coverage)
     if args.write:
         retire_declared_artifacts(RECON)

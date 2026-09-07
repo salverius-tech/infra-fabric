@@ -13,7 +13,7 @@ settings.local.json
 *.tfplan
 *.tfplan.meta.json
 dns-records.local.json
-!scaffold/dns-records.local.json
+!tests/fixtures/dns-records.local.json
 values
 local
 secrets
@@ -24,3 +24,11 @@ __pycache__
 .idea
 .DS_Store
 Thumbs.db
+
+# Local scratch and tool caches
+.cache/
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tmp/

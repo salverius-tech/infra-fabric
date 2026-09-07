@@ -16,7 +16,7 @@ settings.local.json
 
 # Local DNS inventory
 dns-records.local.json
-!scaffold/dns-records.local.json
+!tests/fixtures/dns-records.local.json
 
 # Nested site values repo
 values/
@@ -34,7 +34,12 @@ infra/ansible/inventory/local.yml
 __pycache__/
 *.py[cod]
 
-# Local scratch/log output
+# Local scratch and tool caches
+.cache/
+.coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 .tmp/
 
 # Hermes dashboard runtime bundle (tracked asset, despite the global dist/ ignore)

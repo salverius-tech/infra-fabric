@@ -72,18 +72,15 @@ case "${command_name}" in
     fi
     install -d -m 0755 "${values_dir}"
     copy_if_missing "${template_dir}/README.md" "${values_root}/README.md"
-    site_yaml_template="${template_dir}/sites/${site}/site.yaml"
+    # Setup always starts from the non-permissive operator template. Test
+    # fixtures must never become an implicit site-specific policy source.
+    site_yaml_template="${template_dir}/sites/_template/site.yaml"
     if [[ ! -f "${site_yaml_template}" ]]; then
-      site_yaml_template="${template_dir}/sites/_template/site.yaml"
-      if [[ ! -f "${site_yaml_template}" ]]; then
-        printf 'Missing canonical site scaffold: %s\n' "${site_yaml_template}" >&2
-        exit 1
-      fi
-      if [[ ! -e "${values_dir}/site.yaml" ]]; then
-        python3 "${repo_root}/scripts/render-site-template.py" "${site_yaml_template}" "${values_dir}/site.yaml" "${site}"
-      fi
-    else
-      copy_if_missing "${site_yaml_template}" "${values_dir}/site.yaml"
+      printf 'Missing canonical site scaffold: %s\n' "${site_yaml_template}" >&2
+      exit 1
+    fi
+    if [[ ! -e "${values_dir}/site.yaml" ]]; then
+      python3 "${repo_root}/scripts/render-site-template.py" "${site_yaml_template}" "${values_dir}/site.yaml" "${site}"
     fi
     if [[ ! -d "${values_root}/.git" ]]; then
       git -C "${values_root}" init

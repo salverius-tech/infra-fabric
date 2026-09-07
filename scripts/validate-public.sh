@@ -68,9 +68,9 @@ fixture_vars="${fixture_root}/generated/ansible-vars.json"
 full_catalog_root="${fixture_root}/full-catalog"
 mkdir -p "${full_catalog_root}"
 python - \
-  "scaffold/sites/dev/site.yaml" \
-  "scaffold/fixtures/resource-runtime.yaml" \
-  "scaffold/fixtures/full-catalog-services.yaml" \
+  "tests/fixtures/sites/dev/site.yaml" \
+  "tests/fixtures/resource-runtime.yaml" \
+  "tests/fixtures/full-catalog-services.yaml" \
   "${full_catalog_root}/site.yaml" <<'"'"'PY'"'"'
 from pathlib import Path
 from ruamel.yaml import YAML
@@ -120,7 +120,7 @@ run_stage "contracts" bash -euo pipefail -c "
     printf \"%s\\n\" \"just is required for public validation; tooling image must include it.\" >&2
     exit 127
   fi
-  python infra/ansible/scripts/apply-technitium-dns.py --check scaffold/dns-records.local.json
+  python infra/ansible/scripts/apply-technitium-dns.py --check tests/fixtures/dns-records.local.json
   python scripts/settings.py --settings settings.example.json validate >/dev/null
   python scripts/validate-service-contracts.py --repo .
   python scripts/validate-design-reconciliation.py --check

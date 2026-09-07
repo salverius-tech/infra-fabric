@@ -9,7 +9,6 @@ trap cleanup EXIT HUP INT TERM
 
 : >"${ignored_file}"
 for path in \
-  scaffold/dns-records.local.json \
   scaffold/sites/_template/site.yaml \
   settings.example.json; do
   if git check-ignore -q -- "${path}"; then

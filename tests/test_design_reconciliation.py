@@ -2,6 +2,7 @@ import copy
 import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,7 +27,7 @@ class DesignReconciliationTests(unittest.TestCase):
 
     def test_generated_compact_authorities_are_current(self):
         result = subprocess.run(
-            ["python3", "-B", str(SCRIPT), "--check"],
+            [sys.executable, "-B", str(SCRIPT), "--check"],
             cwd=ROOT,
             text=True,
             capture_output=True,
@@ -49,7 +50,6 @@ class DesignReconciliationTests(unittest.TestCase):
                 self.module.RECON / "explicit-decisions.md",
                 self.module.RECON / "acceptance-matrix.json",
                 self.module.RECON / "acceptance-matrix.md",
-                ROOT / "docs/design-implementation-backlog.md",
             },
         )
 
@@ -62,6 +62,9 @@ class DesignReconciliationTests(unittest.TestCase):
             all(
                 finding["package"]
                 in {package["id"] for package in self.completion["packages"]}
+                and finding["title"] != f"Finding {finding['id']}"
+                and finding["source"]["git_ref"]
+                == "db51a30f635f6b41fc9d5d546b896bdcd22b8f03"
                 and finding["disposition"] == "implemented-static"
                 and set(finding["evidence"]) == {"production", "verification"}
                 for finding in findings
@@ -133,6 +136,9 @@ class DesignReconciliationTests(unittest.TestCase):
             self.assertEqual(evidence["environment"], environment)
             self.assertEqual(evidence["category"], category)
             self.assertRegex(evidence["audited_commit"], r"^[0-9a-f]{40}$")
+            self.assertEqual(
+                evidence["citation"]["git_ref"], evidence["audited_commit"]
+            )
             self.assertEqual(evidence["result"], "passed")
             self.assertTrue(evidence["boundary"])
 
@@ -147,10 +153,127 @@ class DesignReconciliationTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_validation_fails_closed_for_stale_audit_citation(self):
+    def test_validation_fails_closed_for_stale_or_mismatched_audit_provenance(self):
         invalid = copy.deepcopy(self.audit)
         invalid["findings"][0]["evidence"]["production"]["lines"] = "999999"
-        self.assertTrue(self.module.validate(self.completion, invalid, self.backlog))
+        invalid["findings"][0]["title"] = "Invented finding"
+        errors = self.module.validate(self.completion, invalid, self.backlog)
+        self.assertTrue(any("invalid citation" in error for error in errors))
+        self.assertTrue(any("provenance does not match" in error for error in errors))
+
+    def test_validation_requires_immutable_audit_and_decision_references(self):
+        invalid_completion = copy.deepcopy(self.completion)
+        invalid_audit = copy.deepcopy(self.audit)
+        invalid_audit["findings"][0]["source"].pop("git_ref")
+        invalid_completion["explicit_decisions"][0]["source"].pop("git_ref")
+
+        errors = self.module.validate(invalid_completion, invalid_audit, self.backlog)
+
+        self.assertEqual(
+            sum("historical citation must use" in error for error in errors), 2
+        )
+
+    def test_validation_rejects_historical_provenance_substituted_with_working_tree(
+        self,
+    ):
+        invalid = copy.deepcopy(self.audit)
+        invalid["findings"][0]["source"] = {
+            "path": "scripts/validate-design-reconciliation.py",
+            "lines": "1",
+        }
+
+        errors = self.module.validate(self.completion, invalid, self.backlog)
+
+        self.assertTrue(
+            any("historical citation must use" in error for error in errors)
+        )
+
+    def test_validation_rejects_altered_or_shortened_historical_titles(self):
+        invalid_completion = copy.deepcopy(self.completion)
+        invalid_audit = copy.deepcopy(self.audit)
+        invalid_audit["findings"][0][
+            "title"
+        ] = "Stateful destructive-change classification"
+        invalid_completion["explicit_decisions"][0]["title"] = "State and locking"
+
+        errors = self.module.validate(invalid_completion, invalid_audit, self.backlog)
+
+        self.assertTrue(
+            any(
+                "audit finding provenance does not match: H1" in error
+                for error in errors
+            )
+        )
+        self.assertTrue(
+            any(
+                "explicit decision provenance does not match: D1" in error
+                for error in errors
+            )
+        )
+
+    def test_validation_rejects_duplicate_historical_authority_ids(self):
+        invalid_completion = copy.deepcopy(self.completion)
+        invalid_audit = copy.deepcopy(self.audit)
+        invalid_audit["findings"].append(copy.deepcopy(invalid_audit["findings"][0]))
+        invalid_completion["explicit_decisions"].append(
+            copy.deepcopy(invalid_completion["explicit_decisions"][0])
+        )
+
+        errors = self.module.validate(invalid_completion, invalid_audit, self.backlog)
+
+        self.assertTrue(
+            any(
+                "audit finding coverage incomplete or duplicated" in error
+                for error in errors
+            )
+        )
+        self.assertTrue(any("explicit decision authority" in error for error in errors))
+
+    def test_authority_rejects_duplicate_ids_cleanly(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            authority_path = Path(temporary_directory) / "authority.json"
+            invalid = self.module.authority()
+            invalid["audit"]["findings"].append(
+                copy.deepcopy(invalid["audit"]["findings"][0])
+            )
+            authority_path.write_text(json.dumps(invalid), encoding="utf-8")
+            original_authority_path = self.module.AUTHORITY_PATH
+            setattr(self.module, "AUTHORITY_PATH", authority_path)
+            try:
+                with self.assertRaisesRegex(ValueError, "audit IDs are incomplete"):
+                    self.module.authority()
+            finally:
+                setattr(self.module, "AUTHORITY_PATH", original_authority_path)
+
+    def test_generation_is_idempotent_and_never_uses_generated_output_as_input(self):
+        artifacts = self.module.artifacts(
+            self.completion, self.audit, self.backlog, self.coverage
+        )
+        before = {path: path.read_text(encoding="utf-8") for path in artifacts}
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory) / "reconciliation"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(SCRIPT),
+                    "--write",
+                    "--check",
+                    "--reconciliation-dir",
+                    str(output_directory),
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for path, content in artifacts.items():
+                generated = output_directory / path.relative_to(self.module.RECON)
+                self.assertEqual(generated.read_text(encoding="utf-8"), content)
+
+        after = {path: path.read_text(encoding="utf-8") for path in artifacts}
+        self.assertEqual(after, before)
 
     def test_validation_fails_closed_for_promoted_recovery_evidence(self):
         invalid = copy.deepcopy(self.completion)
@@ -171,7 +294,7 @@ class DesignReconciliationTests(unittest.TestCase):
         record["audited_commit"] = "0" * 40
         errors = self.module.validate(invalid, self.audit, self.backlog)
         self.assertTrue(any("identity mismatch" in error for error in errors))
-        self.assertTrue(any("commit mismatch" in error for error in errors))
+        self.assertTrue(any("commit is not resolvable" in error for error in errors))
 
     def test_validation_rejects_dangling_or_private_evidence(self):
         invalid = copy.deepcopy(self.completion)

@@ -33,8 +33,8 @@ class ValidatePublicLintTests(unittest.TestCase):
 
     def test_public_gate_renders_every_catalog_service_through_consumers(self) -> None:
         text = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("scaffold/fixtures/full-catalog-services.yaml", text)
-        self.assertIn("scaffold/fixtures/resource-runtime.yaml", text)
+        self.assertIn("tests/fixtures/full-catalog-services.yaml", text)
+        self.assertIn("tests/fixtures/resource-runtime.yaml", text)
         self.assertIn('full_catalog_root="${fixture_root}/full-catalog"', text)
         self.assertIn('full_catalog_inventory="${full_catalog_root}/generated/ansible-inventory.json"', text)
         self.assertIn('full_catalog_vars="${full_catalog_root}/generated/ansible-vars.json"', text)

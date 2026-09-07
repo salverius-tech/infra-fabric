@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "audit": {
+    "source": {
+      "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+      "path": ".hermes/plans/2026-08-04-comprehensive-project-audit.md"
+    },
+    "findings": [
+      {"id": "H1", "title": "Stateful destructive-change classification does not use the canonical service selection", "lines": "35"},
+      {"id": "H2", "title": "Forgejo VM images can be downloaded without checksum verification", "lines": "57"},
+      {"id": "H3", "title": "Parallel Ansible waves do not serialize services that share one host", "lines": "75"},
+      {"id": "H4", "title": "Canonical service-state backup and restore is broken across selection, inputs, and documentation", "lines": "92"},
+      {"id": "H5", "title": "Fresh-site onboarding has a circular validation dependency", "lines": "110"},
+      {"id": "H6", "title": "Tailscale canonical enablement is silently double-gated", "lines": "127"},
+      {"id": "H7", "title": "Pre-mutation secret preflight omits required host-identity secrets", "lines": "143"},
+      {"id": "H8", "title": "Documented teardown bypasses saved-plan identity and freshness controls", "lines": "158"},
+      {"id": "H9", "title": "Hermes Control authenticated readiness always sends a malformed bearer token", "lines": "174"},
+      {"id": "H10", "title": "Canonical secret namespaces and migration targets contradict runtime consumers", "lines": "189"},
+      {"id": "H11", "title": "Runtime artifact installation is not consistently immutable", "lines": "205"},
+      {"id": "H12", "title": "Apply verification has a mutation-time TOCTOU window", "lines": "222"},
+      {"id": "M1", "title": "`site.yml` is a misleading, incomplete, unconditional orchestration surface", "lines": "240"},
+      {"id": "M2", "title": "Public validation is sensitive to ignored local Markdown files", "lines": "257"},
+      {"id": "M3", "title": "Local OpenTofu state has no locking or documented single-writer control", "lines": "274"},
+      {"id": "M4", "title": "Ansible lint globally disables the principal command-idempotence rule", "lines": "290"},
+      {"id": "M5", "title": "Operator password hashing is not idempotent and root salts are globally reused", "lines": "306"},
+      {"id": "M6", "title": "OpenTofu validation is inconsistent across service-specific inputs", "lines": "322"},
+      {"id": "M7", "title": "The OpenTofu root contract remains a large compatibility surface", "lines": "338"},
+      {"id": "M8", "title": "Supply-chain controls stop short of immutable base/container inputs and automated scanning", "lines": "354"},
+      {"id": "M9", "title": "Canonical update behavior contradicts update policy", "lines": "371"},
+      {"id": "M10", "title": "Site-local SOPS recipient policy verification can fail open", "lines": "383"},
+      {"id": "M11", "title": "Every service subprocess receives the bootstrap root password", "lines": "394"},
+      {"id": "M12", "title": "Restore can report success after service restart failures", "lines": "405"},
+      {"id": "M13", "title": "Sensitive Ansible role arguments are inconsistently protected", "lines": "416"},
+      {"id": "M14", "title": "Check-mode and task-tag contracts are absent, and the static checker is inaccurate", "lines": "427"},
+      {"id": "M15", "title": "Stateful retention policy exists only in wrappers", "lines": "438"},
+      {"id": "M16", "title": "Arbitrary override maps rely on secret-looking key names", "lines": "449"},
+      {"id": "M17", "title": "Python quality and coverage are largely ungated", "lines": "460"},
+      {"id": "M18", "title": "Role interface contracts are incomplete", "lines": "472"},
+      {"id": "L1", "title": "Documentation lacks a complete service-by-service operations matrix", "lines": "485"},
+      {"id": "L2", "title": "Documentation link checks validate paths but not anchors or executable snippets", "lines": "500"},
+      {"id": "L3", "title": "CI validates only main pushes and pull requests", "lines": "515"},
+      {"id": "L4", "title": "Aggregate local validation gives little failure-stage summary", "lines": "529"},
+      {"id": "L5", "title": "Copied scaffold README links resolve outside the private values repository", "lines": "543"},
+      {"id": "L6", "title": "Documentation inventory conflates active truth with unfinished design material", "lines": "547"},
+      {"id": "L7", "title": "Provider compatibility is broader than the reviewed pre-1.0 series", "lines": "551"},
+      {"id": "L8", "title": "Tooling architecture and host prerequisites are not declared", "lines": "555"}
+    ]
+  },
+  "decisions": {
+    "source": {
+      "git_ref": "db51a30f635f6b41fc9d5d546b896bdcd22b8f03",
+      "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md"
+    },
+    "records": [
+      {"id": "D1", "title": "State and locking policy", "lines": "165-169"},
+      {"id": "D2", "title": "Temporary SearXNG ownership", "lines": "170-174"},
+      {"id": "D3", "title": "Hermes/Forgejo execution semantics", "lines": "175-179"},
+      {"id": "D4", "title": "Durable audit contract", "lines": "180-184"},
+      {"id": "D5", "title": "Compatibility retirement", "lines": "185-190"},
+      {"id": "D6", "title": "Acceptance environments", "lines": "191-195"},
+      {"id": "D7", "title": "First Hermes pilot scope", "lines": "196-202"},
+      {"id": "D8", "title": "Onramp substrate handoff", "lines": "203-208"},
+      {"id": "D9", "title": "Future private-values edits", "lines": "209-214"},
+      {"id": "D10", "title": "Hermes-independent recovery", "lines": "215-218"}
+    ]
+  },
+  "acceptance": {
+    "evidence": [
+      {"environment": "development", "category": "plan", "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9", "citation": {"git_ref": "f878a8ff95a0329a468c7084741980226d233ba9", "path": "docs/development-acceptance-gate-runbook.md", "lines": "40-50"}, "procedure_id": "dev-gate-runbook-gate-3", "result": "passed", "date": "2026-08-23", "boundary": "Disposable development plan review only; no apply performed. Fresh plans before convergence and after recovery were zero-change with no destructive changes."},
+      {"environment": "development", "category": "apply", "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033", "citation": {"git_ref": "9c568a3f03c7a125a3c398e3f6bf5ab860259033", "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md", "lines": "635-648"}, "procedure_id": "phase-9-gate-2", "result": "passed", "date": "2026-08-22", "boundary": "Reviewed disposable development apply only; no isolated-recovery or production acceptance."},
+      {"environment": "development", "category": "health-idempotence", "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9", "citation": {"git_ref": "f878a8ff95a0329a468c7084741980226d233ba9", "path": "docs/development-acceptance-gate-runbook.md", "lines": "51-68"}, "procedure_id": "dev-gate-runbook-gate-4", "result": "passed", "date": "2026-08-23", "boundary": "Development guests only across two full convergence passes plus direct-service connectivity; nonzero changes limited to the accepted imperative-bootstrap exceptions recorded in .hermes/reconciliation/validation-findings-2026-08-22.md, including the sssf pinned-checkout changed_when declaration; Technitium DNS sync verified zero-change after the rData matching fix."},
+      {"environment": "development", "category": "service-restore", "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9", "citation": {"git_ref": "f878a8ff95a0329a468c7084741980226d233ba9", "path": "docs/development-acceptance-gate-runbook.md", "lines": "69-80"}, "procedure_id": "dev-gate-runbook-gate-5", "result": "passed", "date": "2026-08-23", "boundary": "Enabled development stateful services only; not controller or infrastructure recovery. All enabled services backed up and restored with automatic pre-restore safety archives and zero failures; post-restore connectivity and reconvergence passed."},
+      {"environment": "development", "category": "infrastructure-recovery", "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9", "citation": {"git_ref": "f878a8ff95a0329a468c7084741980226d233ba9", "path": "docs/development-acceptance-gate-runbook.md", "lines": "81-120"}, "procedure_id": "dev-gate-runbook-gate-6", "result": "passed", "date": "2026-08-23", "boundary": "Disposable development controller/infrastructure recovery rehearsal on a local-filesystem host: guarded audit-journal and state snapshots were created, verified, and restored through the site lock inside one wrapped tooling session; canonical projections verified afterward followed by a fresh zero-change plan and connectivity pass. No external durability claim."},
+      {"environment": "development", "category": "hermes-integration", "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9", "citation": {"git_ref": "f878a8ff95a0329a468c7084741980226d233ba9", "path": "docs/development-acceptance-gate-runbook.md", "lines": "121-137"}, "procedure_id": "dev-gate-runbook-gate-7", "result": "passed", "date": "2026-08-23", "boundary": "Deployed-plugin read-only status and audit verification only: zero-change non-destructive saved plan reported and audit chain verified with no unresolved correlations. It does not establish authenticated dashboard/API or WebSocket acceptance, external audit durability, mutation approval identity, rollback, isolated-recovery, or production acceptance."},
+      {"environment": "development", "category": "rollback", "audited_commit": "2249405d2c4a45c3c14cfcff74f2bb6a610c103f", "citation": {"git_ref": "2249405d2c4a45c3c14cfcff74f2bb6a610c103f", "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md", "lines": "676-687"}, "procedure_id": "phase-9-gate-7-development-hermes-rollback", "result": "passed", "date": "2026-08-22", "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance."}
+    ]
+  }
+}

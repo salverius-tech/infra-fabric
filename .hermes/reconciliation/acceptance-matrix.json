@@ -48,6 +48,7 @@
       "category": "plan",
       "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
       "citation": {
+        "git_ref": "f878a8ff95a0329a468c7084741980226d233ba9",
         "path": "docs/development-acceptance-gate-runbook.md",
         "lines": "40-50"
       },
@@ -61,6 +62,7 @@
       "category": "apply",
       "audited_commit": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
       "citation": {
+        "git_ref": "9c568a3f03c7a125a3c398e3f6bf5ab860259033",
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "lines": "635-648"
       },
@@ -74,6 +76,7 @@
       "category": "health-idempotence",
       "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
       "citation": {
+        "git_ref": "f878a8ff95a0329a468c7084741980226d233ba9",
         "path": "docs/development-acceptance-gate-runbook.md",
         "lines": "51-68"
       },
@@ -87,6 +90,7 @@
       "category": "service-restore",
       "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
       "citation": {
+        "git_ref": "f878a8ff95a0329a468c7084741980226d233ba9",
         "path": "docs/development-acceptance-gate-runbook.md",
         "lines": "69-80"
       },
@@ -100,6 +104,7 @@
       "category": "infrastructure-recovery",
       "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
       "citation": {
+        "git_ref": "f878a8ff95a0329a468c7084741980226d233ba9",
         "path": "docs/development-acceptance-gate-runbook.md",
         "lines": "81-120"
       },
@@ -113,6 +118,7 @@
       "category": "hermes-integration",
       "audited_commit": "f878a8ff95a0329a468c7084741980226d233ba9",
       "citation": {
+        "git_ref": "f878a8ff95a0329a468c7084741980226d233ba9",
         "path": "docs/development-acceptance-gate-runbook.md",
         "lines": "121-137"
       },
@@ -126,6 +132,7 @@
       "category": "rollback",
       "audited_commit": "2249405d2c4a45c3c14cfcff74f2bb6a610c103f",
       "citation": {
+        "git_ref": "2249405d2c4a45c3c14cfcff74f2bb6a610c103f",
         "path": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md",
         "lines": "676-687"
       },
@@ -135,6 +142,5 @@
       "boundary": "Disposable development Hermes managed-release rollback rehearsal only: an intentionally invalid activation entered the guarded rescue path, restored the prior managed venv link, restarted gateway and dashboard, verified local gateway/dashboard health, and was followed by a zero-change provider plan. It does not establish rollback for other services, isolated-recovery, external audit durability, or production acceptance."
     }
   },
-  "evidence_boundary": "Active authority for environment-specific external acceptance only. An evidenced or historical-evidence cell records a rehearsal at its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix, and later lifecycle changes require revalidation.",
-  "development_source": ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md:635-648"
+  "evidence_boundary": "Active authority for environment-specific external acceptance only. An evidenced or historical-evidence cell records a rehearsal at its exact environment, audited commit, procedure, result, citation, date, and stated boundary; source completion does not populate this matrix, and later lifecycle changes require revalidation."
 }

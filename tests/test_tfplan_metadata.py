@@ -63,7 +63,11 @@ class TfplanMetadataTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = repo / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        source = source_root / "scaffold" / "sites" / fixture / "site.yaml"
+        source = (
+            source_root / "scaffold" / "sites" / "_template" / "site.yaml"
+            if fixture == "_template"
+            else source_root / "tests" / "fixtures" / "sites" / fixture / "site.yaml"
+        )
         text = source.read_text(encoding="utf-8")
         if fixture != "dev":
             text = text.replace("  name: example\n", "  name: dev\n", 1)

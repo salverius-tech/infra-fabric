@@ -31,7 +31,7 @@ scripts/python.sh scripts/service-author.py \
   --output /tmp/<service_id>-authoring-manifest.json
 ```
 
-The check requires catalog registration with the required schema/release/override/field/runtime metadata and representations in canonical schema, projections, OpenTofu, Ansible, tests, scaffold fixtures, state policy when stateful, and operator documentation. For services with catalog-required secrets, pass matching `--secret logical_path:classification:environment` entries so the manifest can be checked against the catalog without exposing values. It does not claim the service is deployable; run the normal validation and reviewed site plan separately.
+The check requires catalog registration with the required schema/release/override/field/runtime metadata and representations in canonical schema, projections, OpenTofu, Ansible, tests, public test fixtures, state policy when stateful, and operator documentation. For services with catalog-required secrets, pass matching `--secret logical_path:classification:environment` entries so the manifest can be checked against the catalog without exposing values. It does not claim the service is deployable; run the normal validation and reviewed site plan separately.
 
 To validate every registered public service contract in one read-only gate:
 
@@ -60,7 +60,7 @@ Supported archetypes:
 | Secrets | Catalog logical paths, classifications, consumer environment bindings, `secret_provider.py`, `secret_delivery.py`, and delivery tests |
 | State | `infra/ansible/vars/service-state.yml`, backup paths, restore behavior, disable policy, and restore tests when stateful |
 | Release | Immutable version/source/checksum or image digest and update/rollback behavior |
-| Scaffold | Public-safe canonical fixture under `scaffold/sites/` and service configuration fixtures |
+| Scaffold | Public-safe canonical operator template under `scaffold/sites/_template/` and test fixtures under `tests/fixtures/` |
 | Tests | Catalog parity, canonical model, projections, OpenTofu bindings, Ansible contract, secret delivery, state, and health tests |
 | Documentation | Operator setup, update, diagnostics, backup/restore, rollback, and direct-access runbook |
 

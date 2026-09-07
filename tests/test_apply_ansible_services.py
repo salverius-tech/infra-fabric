@@ -124,7 +124,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             root = Path(temp)
 
             class CanonicalContext:
-                canonical_site_path = apply_ansible_services.REPO / "scaffold/sites/dev/site.yaml"
+                canonical_site_path = apply_ansible_services.REPO / "tests/fixtures/sites/dev/site.yaml"
                 site = "dev"
                 projection_manifest_path = root / "manifest.json"
 
@@ -384,7 +384,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             bundle.write_text("encrypted-placeholder\n", encoding="utf-8")
 
             class Context:
-                canonical_site_path = apply_ansible_services.REPO / "scaffold/sites/dev/site.yaml"
+                canonical_site_path = apply_ansible_services.REPO / "tests/fixtures/sites/dev/site.yaml"
                 site = "dev"
 
                 @staticmethod
@@ -444,7 +444,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             (root / "secrets.sops.yaml").write_text("encrypted-placeholder\n", encoding="utf-8")
 
             class Context:
-                canonical_site_path = apply_ansible_services.REPO / "scaffold/sites/dev/site.yaml"
+                canonical_site_path = apply_ansible_services.REPO / "tests/fixtures/sites/dev/site.yaml"
                 site = "dev"
 
                 @staticmethod
@@ -496,7 +496,7 @@ class ApplyAnsibleServicesTests(unittest.TestCase):
             (root / "secrets.sops.yaml").write_text("encrypted-placeholder\n", encoding="utf-8")
 
             class Context:
-                canonical_site_path = apply_ansible_services.REPO / "scaffold/sites/dev/site.yaml"
+                canonical_site_path = apply_ansible_services.REPO / "tests/fixtures/sites/dev/site.yaml"
                 site = "dev"
 
                 @staticmethod

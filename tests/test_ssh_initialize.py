@@ -53,7 +53,7 @@ class SshInitializeTests(unittest.TestCase):
             root = Path(temp_dir) / "dev"
             root.mkdir()
             site_file = root / "site.yaml"
-            site_file.write_text((ROOT / "scaffold" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8"), encoding="utf-8")
+            site_file.write_text((ROOT / "tests" / "fixtures" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8"), encoding="utf-8")
             bundle = root / "secrets.sops.yaml"
             key_file = Path(temp_dir) / "age.key"
             key_file.write_text("age-placeholder\n", encoding="utf-8")
@@ -84,7 +84,7 @@ class SshInitializeTests(unittest.TestCase):
             private_path = root / "source-key"
             private_path.write_text(private_text, encoding="utf-8")
             site_file = root / "site.yaml"
-            site_file.write_text((ROOT / "scaffold" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8").replace(
+            site_file.write_text((ROOT / "tests" / "fixtures" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8").replace(
                 "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIpublicsafeexample public@example.invalid", public
             ), encoding="utf-8")
             key_file = Path(temp_dir) / "age.key"

@@ -60,6 +60,8 @@ class ValuesScriptTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             site = values / "sites" / "dev"
             self.assertTrue((site / "site.yaml").is_file())
+            self.assertIn("allow_apply: false", (site / "site.yaml").read_text(encoding="utf-8"))
+            self.assertIn("allow_destroy: false", (site / "site.yaml").read_text(encoding="utf-8"))
             self.assertFalse((site / "site.json").exists())
             self.assertFalse((site / "terraform.tfvars").exists())
             self.assertFalse((site / "dns-records.local.json").exists())
@@ -78,6 +80,42 @@ class ValuesScriptTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual((site / "site.yaml").read_bytes(), b"operator-edited\n")
             self.assertNotEqual(original, b"operator-edited\n")
+
+    def test_site_init_never_prefers_permissive_site_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            template = workspace / "scaffold"
+            fake_bin = workspace / "bin"
+            fake_bin.mkdir()
+            fake_git = fake_bin / "git"
+            fake_git.write_text("#!/bin/sh\nif [ \"$1\" = \"-C\" ] && [ \"$3\" = \"init\" ]; then mkdir -p \"$2/.git\"; fi\nexit 0\n", encoding="utf-8")
+            fake_git.chmod(0o755)
+            (template / "sites" / "_template").mkdir(parents=True)
+            (template / "sites" / "_template" / "site.yaml").write_text(
+                "site:\n  name: example\n  allow_apply: false\n  allow_destroy: false\n",
+                encoding="utf-8",
+            )
+            (template / "sites" / "dev").mkdir()
+            (template / "sites" / "dev" / "site.yaml").write_text(
+                "site:\n  name: dev\n  allow_apply: true\n  allow_destroy: true\n",
+                encoding="utf-8",
+            )
+            (template / "README.md").write_text("placeholder\n", encoding="utf-8")
+            environment = os.environ.copy()
+            environment.update({
+                "VALUES_DIR": str(workspace / "values"),
+                "VALUES_SITE": "dev",
+                "VALUES_TEMPLATE_DIR": str(template),
+                "PATH": f"{fake_bin}{os.pathsep}{environment['PATH']}",
+            })
+            result = subprocess.run(
+                [str(ROOT / "scripts" / "values.sh"), "init"],
+                cwd=ROOT, env=environment, text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            site = (workspace / "values" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8")
+            self.assertIn("allow_apply: false", site)
+            self.assertIn("allow_destroy: false", site)
 
     def test_site_init_fails_when_canonical_scaffold_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

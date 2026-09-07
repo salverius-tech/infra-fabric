@@ -15,7 +15,7 @@ just setup "" <site>
 export VALUES_SITE=<site>
 ```
 
-This creates or preserves the selected site directory and public-safe `site.yaml` scaffold. If no site-specific fixture exists, setup renders `scaffold/sites/_template/site.yaml` and replaces its example site name. It does not create credentials or a private SOPS policy.
+This creates or preserves the selected site directory and renders the public-safe `site.yaml` scaffold from `scaffold/sites/_template/site.yaml`, replacing its example site name. It does not create credentials or a private SOPS policy.
 
 ## 2. Establish private secret prerequisites
 
