@@ -8,7 +8,7 @@ Public-safe documentation for canonical site infrastructure.
 - [Canonical architecture and ownership](canonical-architecture.md) — source layers, generated projections, OpenTofu/Ansible boundaries, lifecycle, and private artifacts.
 - [Public Just recipes](just-recipes.md) — supported commands, parameters, side effects, and safety gates.
 - [Service catalog and implementation map](service-catalog.md) — every catalog service, runtime owner, dependency, state behavior, and implementation coverage requirement.
-- [Canonical service authoring](canonical-service-authoring.md) — implement a service across the catalog, schema, projections, OpenTofu, Ansible, secrets, state, tests, and operations.
+- [Canonical service authoring](canonical-service-authoring.md) — end-to-end guide for choosing an archetype and implementing catalog, schema, projections, OpenTofu, Ansible, secrets, state, tests, and operations.
 - [Canonical readiness matrix](canonical-readiness.md) — distinguish structural validation, provider planning, convergence, drift, and recovery gates.
 - [Canonical troubleshooting](canonical-troubleshooting.md) — diagnose site, SOPS, projection, provider, host-trust, service, storage, and drift failures.
 - [Governance records](governance/package-completion.md) — source completion, original audit dispositions, approved decisions, and environment-specific acceptance evidence.

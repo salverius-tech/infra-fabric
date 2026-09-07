@@ -17,11 +17,11 @@ The service catalog in `infra/services.json` is the implementation contract. It 
 | `infisical_onramp` | host-contained workload | `onramp_host` | yes | `infisical-onramp.yml` |
 | `tailscale_client` | dedicated guest | — | no | `tailscale-client.yml` |
 
-A service with runtime owner `none` does not own a separate guest. Its resource and lifecycle belong to its declared host dependency.
+A service with runtime owner `none` does not own a separate guest. When it is a host-contained workload, its resource and lifecycle belong to its declared host dependency; provider or control-plane integrations may have no guest lifecycle at all.
 
 ## What must be covered for a service
 
-A first-class service change is incomplete until the relevant contract is covered in all applicable layers:
+A first-class service change is incomplete until the relevant contract is covered in all applicable layers. The detailed implementation order, archetype decision table, catalog metadata, projection rules, Ansible and OpenTofu boundaries, secret/state requirements, and rollout gates are in [Canonical service authoring](canonical-service-authoring.md).
 
 1. **Catalog** — add the service to `infra/services.json`, including runtime owner, dependencies, state capability, release source, update policy/status, playbooks, resource addresses, secret classification, and typed configuration schema.
 2. **Canonical schema** — define the typed `site.yaml` configuration and endpoint/release/state fields. Opaque per-consumer override maps are unsupported; add a typed configuration field and explicit projection instead.
