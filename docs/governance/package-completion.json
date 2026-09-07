@@ -93,7 +93,6 @@
         "infra/services.json",
         "scripts/secret_delivery.py",
         "scripts/workspace-preflight.py",
-        "scripts/secret_bundle_migration.py",
         "tests/test_secret_delivery.py"
       ],
       "source_status": "source-complete",

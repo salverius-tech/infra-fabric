@@ -80,11 +80,11 @@ class PublicSafetyScanTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_python_secret_key_constant_passes(self) -> None:
-        findings = public_safety.scan_secrets("scripts/secret_bundle_migration.py", 1, "SECRET_KEYS = {")
+        findings = public_safety.scan_secrets("scripts/secret_delivery.py", 1, "SECRET_KEYS = {")
         self.assertEqual(findings, [])
 
     def test_lowercase_python_token_variable_passes(self) -> None:
-        findings = public_safety.scan_secrets("scripts/secret_bundle_migration.py", 1, "new_token = value")
+        findings = public_safety.scan_secrets("scripts/secret_delivery.py", 1, "new_token = value")
         self.assertEqual(findings, [])
 
     def test_private_key_header_fails(self) -> None:
