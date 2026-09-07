@@ -36,6 +36,14 @@ class DesignReconciliationTests(unittest.TestCase):
         self.assertIn("38 audit findings", result.stdout)
         self.assertIn("external acceptance only", result.stdout)
 
+    def test_governance_records_use_repository_documentation_directory(self):
+        self.assertEqual(self.module.RECON, ROOT / "docs" / "governance")
+        self.assertEqual(
+            self.module.AUTHORITY_PATH,
+            ROOT / "docs" / "governance" / "reconciliation-authority.json",
+        )
+        self.assertFalse((ROOT / ".hermes" / "reconciliation").exists())
+
     def test_active_artifacts_are_only_compact_authorities(self):
         artifacts = self.module.artifacts(
             self.completion, self.audit, self.backlog, self.coverage

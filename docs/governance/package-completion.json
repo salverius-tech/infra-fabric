@@ -523,7 +523,7 @@
         "procedure_id": "dev-gate-runbook-gate-4",
         "result": "passed",
         "date": "2026-08-23",
-        "boundary": "Development guests only across two full convergence passes plus direct-service connectivity; nonzero changes limited to the accepted imperative-bootstrap exceptions recorded in .hermes/reconciliation/validation-findings-2026-08-22.md, including the sssf pinned-checkout changed_when declaration; Technitium DNS sync verified zero-change after the rData matching fix."
+        "boundary": "Development guests only across two full convergence passes plus direct-service connectivity; nonzero changes limited to the accepted imperative-bootstrap exceptions recorded in docs/governance/validation-findings-2026-08-22.md, including the sssf pinned-checkout changed_when declaration; Technitium DNS sync verified zero-change after the rData matching fix."
       },
       "development/service-restore": {
         "environment": "development",

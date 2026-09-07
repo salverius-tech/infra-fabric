@@ -12,7 +12,7 @@ repository root with `VALUES_SITE=dev` exported unless stated otherwise.
 
 Recorded exceptions: `host_identity` and the Hermes installer chain report
 nonzero changes every pass by design; see the 2026-08-22 validation findings
-note in `.hermes/reconciliation/` before interpreting convergence recaps.
+note in `docs/governance/` before interpreting convergence recaps.
 
 ## Gate 1 — Static validation
 
@@ -130,9 +130,12 @@ verification succeeds.
 
 ## Evidence recording
 
-After all gates pass, update `.hermes/reconciliation/acceptance-matrix.md` and
-its JSON companion: one row per gate at the exact commit, with procedure,
-result, date, and stated boundary (development-only; cite the findings note
-for the accepted imperative-bootstrap exceptions). Register any new tracked
+After all gates pass, update the evidence records in
+`docs/governance/reconciliation-authority.json`: one record per gate at the
+exact commit, with procedure, result, date, and stated boundary
+(development-only; cite the findings note for the accepted imperative-bootstrap
+exceptions). Regenerate and verify the derived reports with
+`scripts/python.sh scripts/validate-design-reconciliation.py --write --check`;
+do not edit the generated acceptance matrix directly. Register any new tracked
 markdown in `docs/documentation-inventory.json`. Commit the private values
 repo's source-of-truth files so validated state matches committed state.

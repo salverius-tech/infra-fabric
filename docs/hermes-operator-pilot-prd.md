@@ -1,6 +1,6 @@
 # PRD: Hermes Operator Pilot for Homelab Infrastructure
 
-**Status:** Working design — source implementation and bounded disposable-development plan, apply, health/idempotence, service restore, infrastructure recovery, read-only Hermes integration, and Hermes rollback evidence are recorded in the [acceptance matrix](../.hermes/reconciliation/acceptance-matrix.md). Provider-equivalence, isolated-recovery, production, external audit durability, authenticated dashboard/API and WebSocket acceptance, mutation approval identity, and live search smoke remain unevidenced. The [explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md) are closed; the acceptance matrix is the active environment-status authority.
+**Status:** Working design — source implementation and bounded disposable-development plan, apply, health/idempotence, service restore, infrastructure recovery, read-only Hermes integration, and Hermes rollback evidence are recorded in the [acceptance matrix](governance/acceptance-matrix.md). Provider-equivalence, isolated-recovery, production, external audit durability, authenticated dashboard/API and WebSocket acceptance, mutation approval identity, and live search smoke remain unevidenced. The [explicit approved decisions](governance/explicit-decisions.md) are closed; the acceptance matrix is the active environment-status authority.
 
 ## Summary
 
@@ -160,7 +160,7 @@ The default runtime target is a Debian 13 VM running Podman. Podman-in-LXC is ex
 ## Resolved pilot decisions
 
 The ten approved decisions and their commit-qualified historical references are
-recorded in the [explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md)
+recorded in the [explicit approved decisions](governance/explicit-decisions.md)
 authority. For this pilot specifically:
 
 - The initial Hermes surface is read-only: status, validate, plan, sanitized

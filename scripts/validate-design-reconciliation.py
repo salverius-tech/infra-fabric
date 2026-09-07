@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-RECON = ROOT / ".hermes" / "reconciliation"
+RECON = ROOT / "docs" / "governance"
 AUTHORITY_PATH = RECON / "reconciliation-authority.json"
 # Last committed lossless ledger before P10-A.  It remains inspectable with:
 # git show <ref>:.hermes/reconciliation/design-implementation-ledger.json

@@ -9,11 +9,6 @@
     "superseded"
   ],
   "documents": {
-    ".hermes/reconciliation/acceptance-matrix.md": "acceptance evidence",
-    ".hermes/reconciliation/audit-dispositions.md": "acceptance evidence",
-    ".hermes/reconciliation/explicit-decisions.md": "acceptance evidence",
-    ".hermes/reconciliation/package-completion.md": "acceptance evidence",
-    ".hermes/reconciliation/validation-findings-2026-08-22.md": "acceptance evidence",
     "AGENTS.md": "current authority",
     "README.md": "current authority",
     "docs/README.md": "current authority",
@@ -28,6 +23,11 @@
     "docs/debian-baseline.md": "working design",
     "docs/development-acceptance-gate-runbook.md": "operator guidance",
     "docs/development-environment.md": "working design",
+    "docs/governance/acceptance-matrix.md": "acceptance evidence",
+    "docs/governance/audit-dispositions.md": "acceptance evidence",
+    "docs/governance/explicit-decisions.md": "acceptance evidence",
+    "docs/governance/package-completion.md": "acceptance evidence",
+    "docs/governance/validation-findings-2026-08-22.md": "acceptance evidence",
     "docs/hermes-control-operations.md": "operator guidance",
     "docs/hermes-independent-recovery.md": "operator guidance",
     "docs/hermes-operator-pilot-prd.md": "working design",
@@ -55,7 +55,7 @@
     "docs/repository-audit-2026-07-19.md": "docs/README.md",
     "docs/upstream-commit-review.md": "docs/README.md",
     "docs/upstream-gap-review-2026-07-19.md": "docs/canonical-readiness.md",
-    ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md": ".hermes/reconciliation/package-completion.md",
+    ".hermes/plans/2026-08-04-combined-remediation-and-backlog-reconciliation.md": "docs/governance/package-completion.md",
     ".specs/direct-hermes-ansible/plan.md": "docs/hermes-operator-pilot-prd.md",
     "docs/design-implementation-backlog.md": "docs/README.md"
   },

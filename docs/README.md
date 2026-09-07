@@ -11,7 +11,7 @@ Public-safe documentation for canonical site infrastructure.
 - [Canonical service authoring](canonical-service-authoring.md) — implement a service across the catalog, schema, projections, OpenTofu, Ansible, secrets, state, tests, and operations.
 - [Canonical readiness matrix](canonical-readiness.md) — distinguish structural validation, provider planning, convergence, drift, and recovery gates.
 - [Canonical troubleshooting](canonical-troubleshooting.md) — diagnose site, SOPS, projection, provider, host-trust, service, storage, and drift failures.
-- [Reconciliation authorities](../.hermes/reconciliation/package-completion.md) — source completion, original audit dispositions, approved decisions, and environment-specific acceptance evidence.
+- [Governance records](governance/package-completion.md) — source completion, original audit dispositions, approved decisions, and environment-specific acceptance evidence.
 
 ## Canonical operations
 
@@ -36,9 +36,9 @@ Public-safe documentation for canonical site infrastructure.
 - [Documentation authority inventory](documentation-inventory.json) — maintained classification of current public documentation.
 - [Production acquisition inventory](production-acquisition-inventory.json) — source-only register of every tracked production image/network installer consumer, its static integrity evidence, and explicit unresolved paths.
 - [Development environment](development-environment.md) — disposable development workflow and implementation safety.
-- [Original audit finding dispositions](../.hermes/reconciliation/audit-dispositions.md) — commit-qualified original finding provenance and static remediation evidence.
-- [Explicit approved decisions](../.hermes/reconciliation/explicit-decisions.md) — closed decision authority with commit-qualified references.
-- [Environment-specific acceptance matrix](../.hermes/reconciliation/acceptance-matrix.md) — development-only evidence and unevidenced environment boundaries.
+- [Original audit finding dispositions](governance/audit-dispositions.md) — commit-qualified original finding provenance and static remediation evidence.
+- [Explicit approved decisions](governance/explicit-decisions.md) — closed decision authority with commit-qualified references.
+- [Environment-specific acceptance matrix](governance/acceptance-matrix.md) — development-only evidence and unevidenced environment boundaries.
 
 - [Normalized plan equivalence](normalized-plan-equivalence.md) — report-only comparison schema and boundaries.
 
