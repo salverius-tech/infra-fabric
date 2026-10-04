@@ -82,8 +82,8 @@ MATRIX_ROWS = {
         "infrastructure-recovery": "evidenced",
         "hermes-integration": "evidenced", "rollback": "evidenced",
     },
-    "isolated-recovery": {column: "not-evidenced" for column in MATRIX_COLUMNS},
-    "production": {column: "not-evidenced" for column in MATRIX_COLUMNS},
+    "isolated-recovery": dict.fromkeys(MATRIX_COLUMNS, "not-evidenced"),
+    "production": dict.fromkeys(MATRIX_COLUMNS, "not-evidenced"),
 }
 RETIRED_ARTIFACTS = (
     "audit-package-evidence-registry.json", "audit-package-evidence-registry.md",

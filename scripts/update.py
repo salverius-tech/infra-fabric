@@ -8,6 +8,7 @@ import re
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -172,7 +173,26 @@ def normalize_version(tag: str, strip_prefix: str) -> str:
     return tag
 
 
+class HTTPSOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        request: urllib.request.Request,
+        file: object,
+        code: int,
+        message: str,
+        headers: object,
+        new_url: str,
+    ) -> urllib.request.Request | None:
+        parsed_url = urllib.parse.urlsplit(new_url)
+        if parsed_url.scheme != "https" or not parsed_url.hostname:
+            raise UpdateError("release URL redirect must remain on HTTPS")
+        return super().redirect_request(request, file, code, message, headers, new_url)
+
+
 def fetch_url(url: str, opener: Callable[[str], bytes] | None = None) -> bytes:
+    parsed_url = urllib.parse.urlsplit(url)
+    if parsed_url.scheme != "https" or not parsed_url.hostname or parsed_url.username or parsed_url.password:
+        raise UpdateError("release URL must be an HTTPS URL without embedded credentials")
     if opener is not None:
         return opener(url)
     request = urllib.request.Request(
@@ -180,7 +200,8 @@ def fetch_url(url: str, opener: Callable[[str], bytes] | None = None) -> bytes:
         headers={"Accept": "application/json", "User-Agent": USER_AGENT},
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        http_opener = urllib.request.build_opener(HTTPSOnlyRedirectHandler())
+        with http_opener.open(request, timeout=30) as response:
             return response.read()
     except urllib.error.URLError as error:
         raise UpdateError(f"failed to fetch {url}: {error}") from error

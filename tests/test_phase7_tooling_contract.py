@@ -84,7 +84,10 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("black --check", text)
         self.assertIn("tools/python-format-files.txt", text)
         self.assertIn("ruff check", text)
-        self.assertIn('"F401"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        self.assertIn(
+            'select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107"]',
+            (ROOT / "pyproject.toml").read_text(encoding="utf-8"),
+        )
         self.assertIn("${python_files[@]}", text)
         self.assertIn("mypy", text)
         self.assertIn("coverage run", text)

@@ -21,6 +21,23 @@ spec.loader.exec_module(update_script)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_release_fetch_rejects_non_https_and_embedded_credentials(self) -> None:
+        for url in ("http://example.invalid/release", "https://user:pass@example.invalid/release"):
+            with self.subTest(url=url), self.assertRaises(update_script.UpdateError):
+                update_script.fetch_url(url, opener=lambda _: b"unused")
+
+    def test_release_redirect_rejects_downgrade(self) -> None:
+        handler = update_script.HTTPSOnlyRedirectHandler()
+        with self.assertRaisesRegex(update_script.UpdateError, "redirect must remain on HTTPS"):
+            handler.redirect_request(
+                update_script.urllib.request.Request("https://example.invalid/release"),
+                None,
+                302,
+                "Found",
+                {},
+                "http://example.invalid/release",
+            )
+
     def test_catalog_update_statuses_are_public_safe_and_deterministic(self) -> None:
         statuses = update_script.catalog_update_statuses(Path(__file__).resolve().parents[1])
 

@@ -95,7 +95,7 @@ def operator_password_requirements() -> tuple[SecretRequirement, ...]:
 def root_password_secret_path(
     resource_id: str,
     *,
-    default_secret: str = "secrets.bootstrap.root_password",
+    default_secret: str = "secrets.bootstrap.root_password",  # noqa: S107 - logical path, not a value
     host_overrides: Mapping[str, str] | None = None,
 ) -> str:
     """Resolve a host root-password secret, preferring an explicit override."""
@@ -106,7 +106,7 @@ def root_password_secret_path(
 def root_password_requirements(
     resource_ids: list[str] | tuple[str, ...],
     *,
-    default_secret: str = "secrets.bootstrap.root_password",
+    default_secret: str = "secrets.bootstrap.root_password",  # noqa: S107 - logical path, not a value
     host_overrides: Mapping[str, str] | None = None,
     consumer: str = "ansible-bootstrap",
 ) -> tuple[SecretRequirement, ...]:

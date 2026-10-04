@@ -230,14 +230,6 @@ class ServiceCatalogTests(unittest.TestCase):
                 )
 
     def test_invalid_required_secret_path_fails_at_load(self) -> None:
-        with self.assertRaisesRegex(ServiceCatalogError, "required_secrets must be logical paths"):
-            load_catalog(
-                self.write_catalog(
-                    {"services": {"app": {"dependencies": [], "required_secrets": ["services..app.token"]}}}
-                )
-            )
-
-    def test_invalid_required_secret_path_fails_at_load(self) -> None:
         for path in ("services..app.token", "Services.app.token", "services/app/token", "services.app.bad key"):
             with self.subTest(path=path), self.assertRaisesRegex(ServiceCatalogError, "required_secrets must be logical paths"):
                 load_catalog(

@@ -950,7 +950,8 @@ class SiteAgeJustTests(SiteAgeIntegrationBase):
         self.assertEqual(self.identity_file(site).read_text(encoding="utf-8"), _age_secret("NEW"))
 
     def test_just_explicit_site_overrides_env(self) -> None:
-        self.make_site("acme"); self.make_site("dev")
+        self.make_site("acme")
+        self.make_site("dev")
         self.seed_canonical("dev", _age_secret("DEVNEW"))
         self.seed_canonical("acme", _age_secret("ACMENEW"))
         self.seed_identity("acme", _age_secret("acme-old"))

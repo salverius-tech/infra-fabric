@@ -111,7 +111,6 @@ class DocumentationContractTests(unittest.TestCase):
             self.assertNotIn(retired, text.lower())
 
     def test_retired_implementation_trackers_are_not_active_backlog_authorities(self) -> None:
-        inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
         matrix = json.loads((ROOT / "docs" / "governance" / "acceptance-matrix.json").read_text(encoding="utf-8"))
         development = matrix["rows"]["development"]
         self.assertEqual(

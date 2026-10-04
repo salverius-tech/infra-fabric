@@ -99,8 +99,9 @@ class SopsAgeProvider:
         if self.key_file is not None:
             env["SOPS_AGE_KEY_FILE"] = str(self.key_file)
         try:
+            # The executable and arguments are passed without a shell; SOPS stdout stays in memory.
             result = subprocess.run(
-                [self.executable, "--decrypt", "--input-type", "yaml", "--output-type", "yaml", str(self.path)],
+                [self.executable, "--decrypt", "--input-type", "yaml", "--output-type", "yaml", str(self.path)],  # noqa: S603
                 check=False,
                 capture_output=True,
                 text=True,
