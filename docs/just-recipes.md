@@ -88,6 +88,16 @@ just test
 
 Runs the full Python test suite in the pinned tooling container. It does not require `values/` and does not touch infrastructure.
 
+## `test-local`
+
+```bash
+just test-local
+```
+
+Runs only the host-portable documentation inventory and link contracts. This
+limited signal does not replace the full suite in `just test`; see
+[the test-suite guide](../tests/README.md).
+
 ## `validate`
 
 ```bash

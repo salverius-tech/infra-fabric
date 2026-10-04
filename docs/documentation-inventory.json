@@ -12,6 +12,7 @@
     "AGENTS.md": "current authority",
     "README.md": "current authority",
     "SECURITY.md": "current authority",
+    "tests/README.md": "operator guidance",
     "docs/README.md": "current authority",
     "docs/canonical-architecture.md": "current authority",
     "docs/canonical-quick-start.md": "operator guidance",

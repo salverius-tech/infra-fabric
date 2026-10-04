@@ -14,6 +14,7 @@ default:
 # Fresh-checkout canonical setup: build tools, create or clone values/, then show selected site inputs
 setup remote="" site="":
     @site_arg="{{site}}"; [[ -n "${site_arg}" ]] || { printf 'A canonical site is required. Run `just setup "" <site>`; use explicit migration or recovery tools for legacy forensics.\n' >&2; exit 2; }
+    @source scripts/host-ssh-directory.sh; require_host_ssh_directory
     docker compose build infra
     @selected_remote="{{remote}}"; \
     if [[ -d values ]]; then \
@@ -66,6 +67,13 @@ validate:
 # Run the full Python test suite in the pinned tooling container; does not require values/
 test *args:
     scripts/python.sh -m unittest discover -s tests -p 'test_*.py' {{args}}
+
+# Run portable documentation contracts on the host; not a substitute for just test
+test-local:
+    python3 -m unittest \\
+        tests.test_documentation_contract.DocumentationContractTests.test_documentation_inventory_covers_every_tracked_markdown_file \\
+        tests.test_documentation_contract.DocumentationContractTests.test_tracked_markdown_relative_links_and_anchors_resolve \\
+        tests.test_documentation_contract.DocumentationContractTests.test_installed_scaffold_readme_has_no_broken_relative_document_links
 
 # Edit the selected site's encrypted SOPS bundle; the external site age key is required
 edit-secrets SITE="dev":

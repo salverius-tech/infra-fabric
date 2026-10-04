@@ -49,7 +49,7 @@ class RunInfraTests(unittest.TestCase):
                 "TMPDIR": str(root),
             }
         )
-        (root / "home").mkdir()
+        (root / "home" / ".ssh").mkdir(parents=True)
         age_key = root / "site.age"
         age_key.write_text("synthetic-test-age-identity\n", encoding="utf-8")
         age_key.chmod(0o600)

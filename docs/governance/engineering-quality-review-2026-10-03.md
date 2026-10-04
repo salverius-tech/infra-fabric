@@ -657,9 +657,9 @@ Recorded so these findings are not over-read:
 - The tooling image build was **fully cached** (1.9s). Pin freshness was
   therefore not re-verified against upstream, and the cold build cost is
   unmeasured.
-- Coverage figures come from `coverage run --source=scripts` with no subprocess
-  instrumentation, exactly as the current gate runs. They are a floor on real
-  coverage, not a measurement of it (P1-3).
+- Section 2 coverage figures describe the initial reconduct baseline. The
+  current working branch enables subprocess instrumentation and includes
+  `infra/ansible/scripts`; the progress table records the updated result.
 - The credential-propagation probe in P2-5 stubbed the credential source and
   printed environment variable **names** only. No secret value was read,
   decrypted, or emitted. It demonstrates environment propagation, not the
@@ -677,15 +677,20 @@ This section records source changes, not acceptance evidence.
 | Finding | Progress |
 | --- | --- |
 | P1-3 | Added subprocess coverage collection and included `infra/ansible/scripts` in the source set. Confirmed subprocess attribution: `canonical-provider-env.py` now measures 97%. |
+| P1-1 | Broadened Ruff to E/F/W/I/B/UP/C4/PERF/SIM plus targeted S107, with documented rule ignores; added a clean mypy gate for nine core modules. Security rules, all-script typing, and the Black baseline remain outstanding. |
 | P2-2 | Added `tools/coverage-floors.json` and a named per-module floor check for all seven critical modules. |
+| P2-6 | Added `tests/README.md` and `just test-local` for host-portable documentation contracts; registered and documented the recipe. |
 | P2-5 | Provider child environment now removes `SOPS_AGE_KEY`; five direct tests cover propagation, failure paths, and the no-site case. |
 | P2-1 | Extracted `edit-secrets` and `ssh-initialize` shell logic into linted scripts; recipes delegate to those scripts and a contract test checks the delegation. |
 | P2-4 | Positive recipe assertions now use `just --dump` and behavioral checks rather than justfile comments/source formatting. |
 | P3-1 | Deleted `compare-plans.py`; documented `hermes-password-hash.py` and added a retirement/documentation contract. |
+| P3-2 | Consolidated duplicate Caddy templates under `caddy_proxy`; preserved the `onramp_host` systemd difference as an explicit template variable and added tests. |
+| P3-6 | Added `CODEOWNERS`, `SECURITY.md`, `.editorconfig`, and the inventory entry. GitHub private-reporting availability still requires repository-settings verification. |
 | P3-4 | Removed the identity function and its call sites; callers now invoke `require_site_context` directly, and compatibility tests exercise that contract. |
-| P3-8 | Added an initial `pyproject.toml` with explicit Black/Ruff line length, current ruff rules, mypy settings, and subprocess-aware coverage configuration. Broader lint rules and formatting ratchets remain outstanding. |
+| P3-8 | Added `pyproject.toml` with explicit Black/Ruff line length, Ruff rules/ignores, mypy scope, and subprocess-aware coverage configuration. Broader security lint and the Black baseline remain outstanding. |
+| P4-1 | Added fail-closed SSH mount directory validation to `just setup` and `scripts/run-infra.sh`. |
 
 After these changes, `VALUES_SITE=dev just validate` passes all stages;
-824 tests pass, aggregate coverage is 77%, and all seven per-module floors pass.
+831 tests pass, aggregate coverage is 77%, and all seven per-module floors pass.
 No plan, apply, or teardown command was run. Remaining recommendations are not
 considered complete by this progress entry.

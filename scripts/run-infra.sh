@@ -3,7 +3,9 @@ set -euo pipefail
 
 source scripts/site-context.sh
 source scripts/container-secret-transport.sh
+source scripts/host-ssh-directory.sh
 require_site_context
+require_host_ssh_directory
 transport_parse_args "$@"
 set -- "${transport_remaining_args[@]}"
 transport_prepare
