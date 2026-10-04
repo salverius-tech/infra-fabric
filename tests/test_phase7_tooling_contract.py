@@ -87,18 +87,37 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("tools/python-format-files.txt", text)
         self.assertIn("ruff check", text)
         config_text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-        self.assertIn(
-            'select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S101", "S107", "S201", "S301", "S310", "S324", "S501", "S608"]',
-            config_text,
+        ruff_config = tomllib.loads(config_text)["tool"]["ruff"]["lint"]
+        selected = set(ruff_config["select"])
+        self.assertTrue(
+            {
+                "S101",
+                "S102",
+                "S104",
+                "S105",
+                "S106",
+                "S107",
+                "S108",
+                "S201",
+                "S301",
+                "S310",
+                "S324",
+                "S501",
+                "S506",
+                "S608",
+                "S701",
+            }
+            <= selected
         )
-        self.assertIn('"tests/**/*.py" = ["S101"]', config_text)
-        self.assertIn(
-            '"scripts/bootstrap-technitium-api-token.py" = ["S310"]',
-            config_text,
+        self.assertTrue({"S603", "S606", "S607"}.isdisjoint(selected))
+        per_file = ruff_config["per-file-ignores"]
+        self.assertEqual(per_file["tests/**/*.py"], ["S101"])
+        self.assertEqual(
+            per_file["scripts/bootstrap-technitium-api-token.py"],
+            ["S105", "S310"],
         )
-        self.assertIn(
-            '"infra/ansible/scripts/apply-technitium-dns.py" = ["S310"]',
-            config_text,
+        self.assertEqual(
+            per_file["infra/ansible/scripts/apply-technitium-dns.py"], ["S310"]
         )
         self.assertIn("${python_files[@]}", text)
         self.assertIn("mypy", text)
