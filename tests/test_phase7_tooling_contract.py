@@ -89,6 +89,8 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("coverage run", text)
         self.assertIn("coverage combine --quiet", text)
         self.assertIn("coverage report --fail-under=", text)
+        self.assertIn("scripts/check-coverage-floors.py", text)
+        self.assertTrue((ROOT / "tools" / "coverage-floors.json").is_file())
         self.assertIn('stages+=("FAIL ${current_stage}")', text)
         self.assertIn("scripts/canonical-render.py", text)
         self.assertIn("scripts/verify-projections.py", text)

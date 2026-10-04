@@ -5,6 +5,7 @@ import json
 import os
 import sys
 import tempfile
+from io import StringIO
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -390,6 +391,19 @@ class TfplanMetadataTests(unittest.TestCase):
                 target_service="forgejo",
                 operation="destroy",
             )
+
+    def test_summary_command_loads_and_formats_metadata(self) -> None:
+        temp_dir, repo, plan, metadata = self.make_repo()
+        with temp_dir:
+            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            output = StringIO()
+            with patch("sys.stdout", output):
+                result = tfplan_metadata.main(
+                    ["--repo", str(repo), "summary", "--metadata", str(metadata)]
+                )
+
+        self.assertEqual(result, 0)
+        self.assertIn("OpenTofu plan summary:", output.getvalue())
 
     def test_destroy_summary_has_no_normal_apply_acknowledgement(self) -> None:
         text = tfplan_metadata.format_plan_summary(

@@ -128,6 +128,8 @@ run_stage "contracts" bash -euo pipefail -c "
   coverage run -m unittest discover -s tests -p '\''test_*.py'\''
   coverage combine --quiet
   coverage report --fail-under=70
+  coverage json --quiet -o "${fixture_root}/coverage.json"
+  python scripts/check-coverage-floors.py --report "${fixture_root}/coverage.json"
 "
 run_stage "ansible" bash -euo pipefail -c "
   ansible-inventory -i \"${fixture_inventory}\" --list >/dev/null
