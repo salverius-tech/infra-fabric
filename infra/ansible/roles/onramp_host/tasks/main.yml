@@ -151,7 +151,7 @@
 - name: Install onramp-host Caddy env
   tags: [packages]
   ansible.builtin.template:
-    src: caddy.env.j2
+    src: "{{ role_path }}/../caddy_proxy/templates/caddy.env.j2"
     dest: /etc/caddy/env
     mode: "0600"
     owner: root
@@ -162,11 +162,13 @@
 - name: Install onramp-host Caddy systemd override
   tags: [packages]
   ansible.builtin.template:
-    src: caddy-override.conf.j2
+    src: "{{ role_path }}/../caddy_proxy/templates/caddy-override.conf.j2"
     dest: /etc/systemd/system/caddy.service.d/override.conf
     mode: "0644"
     owner: root
     group: root
+  vars:
+    caddy_override_execstart: false
   notify: Restart caddy
 
 - name: Install onramp-host base Caddyfile
