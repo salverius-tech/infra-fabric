@@ -86,9 +86,18 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("black --check", text)
         self.assertIn("tools/python-format-files.txt", text)
         self.assertIn("ruff check", text)
+        config_text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn(
-            'select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107", "S201", "S301", "S324", "S501"]',
-            (ROOT / "pyproject.toml").read_text(encoding="utf-8"),
+            'select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107", "S201", "S301", "S310", "S324", "S501"]',
+            config_text,
+        )
+        self.assertIn(
+            '"scripts/bootstrap-technitium-api-token.py" = ["S310"]',
+            config_text,
+        )
+        self.assertIn(
+            '"infra/ansible/scripts/apply-technitium-dns.py" = ["S310"]',
+            config_text,
         )
         self.assertIn("${python_files[@]}", text)
         self.assertIn("mypy", text)

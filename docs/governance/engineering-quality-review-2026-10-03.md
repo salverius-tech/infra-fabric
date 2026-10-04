@@ -677,7 +677,7 @@ This section records source changes, not acceptance evidence.
 | Finding | Progress |
 | --- | --- |
 | P1-3 | Added subprocess coverage collection and included `infra/ansible/scripts` in the source set. Confirmed subprocess attribution: `canonical-provider-env.py` now measures 97%. |
-| P1-1 | Ruff now also gates targeted Bandit S107/S201/S301/S324/S501 rules; MyPy gates all 50 modules under `scripts/` and `infra/ansible/scripts`; Black covers every Python source. Broader Bandit triage remains outstanding. |
+| P1-1 | Ruff gates S107/S201/S301/S310/S324/S501. Reviewed the recommended hotspots: updater HTTPS validation, the secret provider's fixed-argv subprocess, and no applicable findings in `secret_delivery.py`; local Technitium URL exceptions are path-scoped. MyPy gates all 50 script modules and Black covers every Python source. Other subprocess/tmp/assertion Bandit triage remains outstanding. |
 | P2-2 | Added `tools/coverage-floors.json` and a named per-module floor check for all seven critical modules. |
 | P2-3 | Split validation into cached-image `unit` and dependent `full` jobs; moved filesystem scanning to PR/push events. Both profiles pass locally; an uncached tooling image build took 42s on this runner. Hosted Actions cache behavior remains unverified. |
 | P3-7 | Added weekly/manual update eligibility reporting via `just update --dry-run` against a disposable scaffold-only site fixture; no private site values or PR side effects are used. |

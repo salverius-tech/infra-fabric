@@ -210,7 +210,7 @@ def fetch_url(url: str, opener: Callable[[str], bytes] | None = None) -> bytes:
         )
     if opener is not None:
         return opener(url)
-    request = urllib.request.Request(
+    request = urllib.request.Request(  # noqa: S310 - the URL was HTTPS-validated above
         url,
         headers={"Accept": "application/json", "User-Agent": USER_AGENT},
     )

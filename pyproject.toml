@@ -5,7 +5,7 @@ line-length = 88
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107", "S201", "S301", "S324", "S501"]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107", "S201", "S301", "S310", "S324", "S501"]
 ignore = [
   "E402",
   "E501",
@@ -17,6 +17,10 @@ ignore = [
   "UP022",
   "UP031",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/bootstrap-technitium-api-token.py" = ["S310"] # Uses the canonical local Technitium API endpoint.
+"infra/ansible/scripts/apply-technitium-dns.py" = ["S310"] # Uses the configured in-guest Technitium endpoint.
 
 [tool.mypy]
 follow_imports = "silent"
