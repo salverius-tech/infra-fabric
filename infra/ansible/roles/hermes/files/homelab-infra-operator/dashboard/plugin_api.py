@@ -1,4 +1,5 @@
 """Authenticated dashboard API for guarded homelab-infra actions."""
+
 from __future__ import annotations
 
 import json
@@ -22,7 +23,9 @@ def _mutation_enabled() -> bool:
 def _bridge(action: str, *extra: str) -> dict[str, Any]:
     repo_value = os.environ.get("HERMES_OPERATOR_REPO_PATH", "").strip()
     if not repo_value:
-        raise HTTPException(status_code=503, detail="operator repository is not configured")
+        raise HTTPException(
+            status_code=503, detail="operator repository is not configured"
+        )
     repo = Path(repo_value).expanduser().resolve()
     script = repo / "scripts" / "hermes-operator.py"
     if not script.is_file():
@@ -38,9 +41,13 @@ def _bridge(action: str, *extra: str) -> dict[str, Any]:
     try:
         payload = json.loads(result.stdout or "{}")
     except json.JSONDecodeError as error:
-        raise HTTPException(status_code=502, detail="operator bridge returned invalid JSON") from error
+        raise HTTPException(
+            status_code=502, detail="operator bridge returned invalid JSON"
+        ) from error
     if not isinstance(payload, dict):
-        raise HTTPException(status_code=502, detail="operator bridge returned invalid data")
+        raise HTTPException(
+            status_code=502, detail="operator bridge returned invalid data"
+        )
     return payload
 
 
@@ -73,9 +80,13 @@ async def apply(request: Request) -> dict[str, Any]:
     try:
         body = await request.json()
     except Exception as error:
-        raise HTTPException(status_code=400, detail="request body must be JSON") from error
+        raise HTTPException(
+            status_code=400, detail="request body must be JSON"
+        ) from error
     if not isinstance(body, dict) or body.get("confirm") != "APPLY":
-        raise HTTPException(status_code=400, detail="explicit APPLY confirmation is required")
+        raise HTTPException(
+            status_code=400, detail="explicit APPLY confirmation is required"
+        )
     extra = ["--approve"]
     for key, flag in (
         ("allow_destructive", "--allow-destructive"),

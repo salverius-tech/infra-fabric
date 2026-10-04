@@ -71,7 +71,9 @@ def validate_audit_lifecycles(records: list[dict[str, object]]) -> list[str]:
     lifecycles: dict[str, dict[str, object]] = {}
     for record in records:
         if not LIFECYCLE_FIELDS.issubset(record):
-            if any(field in record for field in ("correlation_id", "phase")) or not LEGACY_RESULT_FIELDS.issubset(record):
+            if any(
+                field in record for field in ("correlation_id", "phase")
+            ) or not LEGACY_RESULT_FIELDS.issubset(record):
                 raise AuditChainError(
                     "Hermes operator audit lifecycle record shape is invalid"
                 )
@@ -79,8 +81,14 @@ def validate_audit_lifecycles(records: list[dict[str, object]]) -> list[str]:
             returncode = record["returncode"]
             ok = record["ok"]
             if not isinstance(action, str) or action not in SUPPORTED_AUDIT_ACTIONS:
-                raise AuditChainError("Hermes operator audit action is empty or unsupported")
-            if isinstance(returncode, bool) or not isinstance(returncode, int) or not isinstance(ok, bool):
+                raise AuditChainError(
+                    "Hermes operator audit action is empty or unsupported"
+                )
+            if (
+                isinstance(returncode, bool)
+                or not isinstance(returncode, int)
+                or not isinstance(ok, bool)
+            ):
                 raise AuditChainError("Hermes operator legacy result shape is invalid")
             if ok != (returncode == 0):
                 raise AuditChainError("Hermes operator legacy result is inconsistent")

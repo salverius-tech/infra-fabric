@@ -19,12 +19,17 @@ class ServiceStateCliTests(unittest.TestCase):
         script = scripts / "service-state.sh"
         shutil.copy2(SOURCE_SCRIPT, script)
         shutil.copy2(SITE_CONTEXT_SCRIPT, scripts / "site-context.sh")
-        (scripts / "python.sh").write_text("#!/usr/bin/env bash\nif [[ \"$1\" == \"-\" ]]; then echo hermes; else echo hermes; fi\n", encoding="utf-8")
-        (scripts / "settings.py").write_text("#!/usr/bin/env bash\necho hermes\n", encoding="utf-8")
+        (scripts / "python.sh").write_text(
+            '#!/usr/bin/env bash\nif [[ "$1" == "-" ]]; then echo hermes; else echo hermes; fi\n',
+            encoding="utf-8",
+        )
+        (scripts / "settings.py").write_text(
+            "#!/usr/bin/env bash\necho hermes\n", encoding="utf-8"
+        )
         (scripts / "run-infra.sh").write_text(
             "#!/usr/bin/env bash\n"
-            "printf 'MSYS2_ENV_CONV_EXCL=%s\\n' \"${MSYS2_ENV_CONV_EXCL:-}\" >> \"${CAPTURE_FILE}\"\n"
-            "printf '%s\\n' \"$*\" >> \"${CAPTURE_FILE}\"\n",
+            'printf \'MSYS2_ENV_CONV_EXCL=%s\\n\' "${MSYS2_ENV_CONV_EXCL:-}" >> "${CAPTURE_FILE}"\n'
+            'printf \'%s\\n\' "$*" >> "${CAPTURE_FILE}"\n',
             encoding="utf-8",
         )
         for path in scripts.iterdir():
@@ -42,7 +47,9 @@ class ServiceStateCliTests(unittest.TestCase):
                 '"allow_apply":true,"allow_destroy":true,"services":["hermes"]}\n',
                 encoding="utf-8",
             )
-            (site_values / "site.yaml").write_text("schema_version: 1\nsite:\n  name: dev\n", encoding="utf-8")
+            (site_values / "site.yaml").write_text(
+                "schema_version: 1\nsite:\n  name: dev\n", encoding="utf-8"
+            )
             archive = site_values / "service-backups" / "hermes" / "state.tar.gz"
             archive.parent.mkdir(parents=True)
             archive.touch()
@@ -68,8 +75,13 @@ class ServiceStateCliTests(unittest.TestCase):
                 "MSYS2_ENV_CONV_EXCL=KEEP;SERVICE_STATE_BACKUP_ROOT;SERVICE_STATE_RESTORE_FILE",
                 captured,
             )
-            self.assertIn('generated_dir="${INFRA_GENERATED_DIR:-/workspace/values/sites/dev/generated}"', captured)
-            self.assertIn('inventory="${generated_dir}/ansible-inventory.json"', captured)
+            self.assertIn(
+                'generated_dir="${INFRA_GENERATED_DIR:-/workspace/values/sites/dev/generated}"',
+                captured,
+            )
+            self.assertIn(
+                'inventory="${generated_dir}/ansible-inventory.json"', captured
+            )
             self.assertIn('vars_file="${generated_dir}/ansible-vars.json"', captured)
             self.assertIn('--generated-dir "${generated_dir}"', captured)
 
@@ -81,7 +93,9 @@ class ServiceStateCliTests(unittest.TestCase):
             backup_dir = site_values / "service-backups" / "hermes"
             backup_dir.mkdir(parents=True)
             (backup_dir / "hermes-state-20260101T000000Z.tar.gz").write_text("old")
-            (backup_dir / "hermes-state-pre-restore-20260201T000000Z.tar.gz").write_text("safety")
+            (
+                backup_dir / "hermes-state-pre-restore-20260201T000000Z.tar.gz"
+            ).write_text("safety")
             probe = root / "probe.sh"
             probe.write_text(
                 "#!/usr/bin/env bash\n"
@@ -102,7 +116,11 @@ class ServiceStateCliTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.strip(), str(backup_dir / "hermes-state-20260101T000000Z.tar.gz"))
+            self.assertEqual(
+                result.stdout.strip(),
+                str(backup_dir / "hermes-state-20260101T000000Z.tar.gz"),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

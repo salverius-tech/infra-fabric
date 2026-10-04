@@ -20,7 +20,9 @@ class IgnoreContractTests(unittest.TestCase):
             with self.subTest(filename=filename):
                 entries = {
                     line.strip()
-                    for line in (ROOT / filename).read_text(encoding="utf-8").splitlines()
+                    for line in (ROOT / filename)
+                    .read_text(encoding="utf-8")
+                    .splitlines()
                     if line.strip() and not line.startswith("#")
                 }
                 self.assertTrue(expected <= entries)

@@ -77,6 +77,7 @@ class Phase7ToolingContractTests(unittest.TestCase):
             "shell",
             "python-quality",
             "contracts",
+            "unit-tests",
             "ansible",
             "summary",
         ):
@@ -98,6 +99,19 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn('stages+=("FAIL ${current_stage}")', text)
         self.assertIn("scripts/canonical-render.py", text)
         self.assertIn("scripts/verify-projections.py", text)
+
+    def test_black_inventory_covers_every_python_source(self) -> None:
+        sources = sorted(
+            str(path.relative_to(ROOT))
+            for base in (ROOT / "infra/ansible", ROOT / "scripts", ROOT / "tests")
+            for path in base.rglob("*.py")
+        )
+        formatted = (
+            (ROOT / "tools/python-format-files.txt")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        self.assertEqual(formatted, sources)
 
     def test_validation_requires_just_before_unittest_contracts(self) -> None:
         text = VALIDATE.read_text(encoding="utf-8")

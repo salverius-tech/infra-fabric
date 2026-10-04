@@ -10,7 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PlanProjectionLifecycleTests(unittest.TestCase):
-    def test_setup_requires_an_explicit_remote_and_has_no_legacy_discovery_entrypoint(self) -> None:
+    def test_setup_requires_an_explicit_remote_and_has_no_legacy_discovery_entrypoint(
+        self,
+    ) -> None:
         # Safety category: pre-mutation ordering. Setup can initialize or clone a
         # private values repository, so retain this narrow public entrypoint guard.
         dumped = subprocess.run(
@@ -28,7 +30,9 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertEqual(missing_site.returncode, 2)
         self.assertIn("A canonical site is required", missing_site.stderr)
 
-    def test_shared_projection_set_helper_fails_closed_and_accepts_complete_set(self) -> None:
+    def test_shared_projection_set_helper_fails_closed_and_accepts_complete_set(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             generated = Path(temporary) / "generated"
             generated.mkdir()
@@ -61,7 +65,9 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
             )
             self.assertEqual(complete.returncode, 0, complete.stderr)
 
-    def test_normal_operator_workflows_fail_closed_before_container_execution(self) -> None:
+    def test_normal_operator_workflows_fail_closed_before_container_execution(
+        self,
+    ) -> None:
         workflows = (
             ("validate-values.sh", ()),
             ("plan-infra.sh", ()),
@@ -75,7 +81,7 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
             docker_called = temporary_root / "docker-called"
             fake_docker = fake_bin / "docker"
             fake_docker.write_text(
-                "#!/usr/bin/env bash\ntouch \"${DOCKER_CALLED}\"\nexit 99\n",
+                '#!/usr/bin/env bash\ntouch "${DOCKER_CALLED}"\nexit 99\n',
                 encoding="utf-8",
             )
             fake_docker.chmod(0o755)
@@ -124,9 +130,9 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         ordered_steps = (
             "python scripts/workspace-preflight.py --require-values --require-secrets",
             'generated_dir="${INFRA_GENERATED_DIR:-${INFRA_VALUES_DIR}/generated}"',
-            'python scripts/canonical-render.py',
-            'python scripts/verify-projections.py',
-            'tofu -chdir=infra/opentofu init',
+            "python scripts/canonical-render.py",
+            "python scripts/verify-projections.py",
+            "tofu -chdir=infra/opentofu init",
             'plan_tmp="$(mktemp',
             'mv -f "${plan_tmp}" "${INFRA_VALUES_DIR}/tfplan"',
         )
@@ -134,23 +140,36 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions))
         self.assertNotIn('mv "${generated_tmp}" "${generated_dir}"', content)
         self.assertNotIn('mv "${generated_dir}" "${generated_backup}"', content)
-        renderer = (ROOT / "scripts" / "canonical-render.py").read_text(encoding="utf-8")
+        renderer = (ROOT / "scripts" / "canonical-render.py").read_text(
+            encoding="utf-8"
+        )
         self.assertLess(
             renderer.index("verify_manifest("),
             renderer.index("atomic_output_directory(args.output_dir, populate)"),
         )
-        self.assertNotIn('rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"', content)
-        self.assertIn('tofu_vars_file="${generated_dir}/terraform.auto.tfvars.json"', content)
+        self.assertNotIn(
+            'rm -f "${INFRA_VALUES_DIR}/tfplan" "${INFRA_VALUES_DIR}/tfplan.meta.json"',
+            content,
+        )
+        self.assertIn(
+            'tofu_vars_file="${generated_dir}/terraform.auto.tfvars.json"', content
+        )
         self.assertIn('if [[ "${tofu_vars_file}" != /* ]]', content)
         self.assertIn('tofu_vars_file="../../${tofu_vars_file}"', content)
 
-    def test_apply_requires_canonical_proxmox_identity_before_snapshot_or_provider_mutation(self) -> None:
+    def test_apply_requires_canonical_proxmox_identity_before_snapshot_or_provider_mutation(
+        self,
+    ) -> None:
         # Safety category: pre-mutation ordering. The provider path is live, so
         # retain this narrow guard instead of exercising apply in a test fixture.
         source = (ROOT / "scripts" / "apply-infra.sh").read_text(encoding="utf-8")
-        identity_guard = 'Canonical apply requires the SOPS-backed Proxmox management SSH identity'
-        snapshot_create = 'execution_snapshot="$(python scripts/execution-snapshot.py create'
-        provider_apply = 'apply_command=(tofu -chdir=infra/opentofu apply'
+        identity_guard = (
+            "Canonical apply requires the SOPS-backed Proxmox management SSH identity"
+        )
+        snapshot_create = (
+            'execution_snapshot="$(python scripts/execution-snapshot.py create'
+        )
+        provider_apply = "apply_command=(tofu -chdir=infra/opentofu apply"
         self.assertIn(identity_guard, source)
         self.assertIn(
             'printf "Canonical apply requires the SOPS-backed Proxmox management SSH identity.\\n" >&2',
@@ -163,9 +182,11 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
         # Safety category: approval sentinel. Running teardown would require a live
         # provider mutation, so retain the explicit source-level guard.
         source = (ROOT / "scripts" / "teardown-infra.sh").read_text(encoding="utf-8")
-        self.assertIn('Teardown apply requires an explicit --approve argument', source)
-        self.assertIn('tofu -chdir=infra/opentofu plan -destroy', source)
-        self.assertIn('--operation destroy --allow-destroy --allow-stateful-batch', source)
+        self.assertIn("Teardown apply requires an explicit --approve argument", source)
+        self.assertIn("tofu -chdir=infra/opentofu plan -destroy", source)
+        self.assertIn(
+            "--operation destroy --allow-destroy --allow-stateful-batch", source
+        )
         result = subprocess.run(
             ["bash", "-n", str(ROOT / "scripts" / "teardown-infra.sh")],
             capture_output=True,

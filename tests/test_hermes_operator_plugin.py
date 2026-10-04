@@ -208,9 +208,7 @@ class HermesOperatorPluginTests(unittest.TestCase):
         )
         with (
             patch.dict(os.environ, environment, clear=True),
-            patch.object(
-                dashboard.subprocess, "run", return_value=dashboard_completed
-            ),
+            patch.object(dashboard.subprocess, "run", return_value=dashboard_completed),
         ):
             dashboard_result = dashboard._bridge("validate")
         self.assertEqual(dashboard_result["correlation_id"], correlation)

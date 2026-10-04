@@ -9,7 +9,9 @@ REPO = Path(__file__).resolve().parents[1]
 VARIABLES = REPO / "infra" / "opentofu" / "variables.tf"
 ONRAMP_HOST_TF = REPO / "infra" / "opentofu" / "onramp-host.tf"
 CANONICAL_SITE = REPO / "scaffold" / "sites" / "_template" / "site.yaml"
-ONRAMP_HOST_TASKS = REPO / "infra" / "ansible" / "roles" / "onramp_host" / "tasks" / "main.yml"
+ONRAMP_HOST_TASKS = (
+    REPO / "infra" / "ansible" / "roles" / "onramp_host" / "tasks" / "main.yml"
+)
 
 
 class OnrampHostContractTests(unittest.TestCase):
@@ -17,7 +19,9 @@ class OnrampHostContractTests(unittest.TestCase):
         text = ONRAMP_HOST_TF.read_text(encoding="utf-8")
         self.assertIn('resource "proxmox_virtual_environment_vm" "onramp_host"', text)
         self.assertRegex(text, r"count\s*=\s*local\.onramp_host_enabled \? 1 : 0")
-        self.assertIn('resource "proxmox_download_file" "debian_13_onramp_host_image"', text)
+        self.assertIn(
+            'resource "proxmox_download_file" "debian_13_onramp_host_image"', text
+        )
         self.assertIn("import_from", text)
         self.assertIn("onramp_host_image_url", text)
         self.assertNotIn("clone {", text)
@@ -43,13 +47,22 @@ class OnrampHostContractTests(unittest.TestCase):
 
     def test_canonical_fixture_resource_vmids_and_addresses_are_unique(self) -> None:
         data = yaml.safe_load(CANONICAL_SITE.read_text(encoding="utf-8"))
-        resources = {**data["resources"].get("guests", {}), **data["resources"].get("shared_hosts", {})}
+        resources = {
+            **data["resources"].get("guests", {}),
+            **data["resources"].get("shared_hosts", {}),
+        }
         vmids = [resource["identity"]["vmid"] for resource in resources.values()]
         self.assertEqual(len(vmids), len(set(vmids)))
-        addresses = [resource["network"]["address"].split("/", 1)[0] for resource in resources.values() if resource["network"]["address"] != "dhcp"]
+        addresses = [
+            resource["network"]["address"].split("/", 1)[0]
+            for resource in resources.values()
+            if resource["network"]["address"] != "dhcp"
+        ]
         self.assertEqual(len(addresses), len(set(addresses)))
 
-    def test_onramp_host_role_declares_hardening_and_no_host_published_ports_contract(self) -> None:
+    def test_onramp_host_role_declares_hardening_and_no_host_published_ports_contract(
+        self,
+    ) -> None:
         text = ONRAMP_HOST_TASKS.read_text(encoding="utf-8")
         self.assertIn("onramp_host_bootstrap_ssh_public_keys", text)
         self.assertNotIn("onramp_host_ssh_public_keys", text)

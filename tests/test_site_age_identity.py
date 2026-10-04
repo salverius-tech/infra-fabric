@@ -21,6 +21,7 @@ Windows ``python3`` (a broken store alias) skips the whole module; that is not
 evidence of a passing/failing suite. On the Linux runtime, ``just`` may be
 absent and its tests are skipped and reported clearly.
 """
+
 from __future__ import annotations
 
 import json
@@ -362,9 +363,7 @@ def _age_secret(marker: str) -> str:
 
 def _truncated_secret(marker: str) -> str:
     body = (marker.replace("-", "") + "SAMPLEKEYBODY" * 4)[:7]  # short => invalid
-    return (
-        "AGE-SECRET-KEY-1%s\n" % body
-    )
+    return "AGE-SECRET-KEY-1%s\n" % body
 
 
 def _note(title: str, notes: str, include_notes: bool = True) -> dict:
@@ -404,7 +403,11 @@ class SiteAgeIntegrationBase(unittest.TestCase):
         self.vault.mkdir()
         (self.vault / "items").mkdir()
         self.log_file = self.td / "op.calls"
-        for name, src in (("op", MOCK_OP), ("age-keygen", MOCK_AGE_KEYGEN), ("sops", MOCK_SOPS)):
+        for name, src in (
+            ("op", MOCK_OP),
+            ("age-keygen", MOCK_AGE_KEYGEN),
+            ("sops", MOCK_SOPS),
+        ):
             _install(self.bin, name, src)
 
     def tearDown(self) -> None:
@@ -421,7 +424,9 @@ class SiteAgeIntegrationBase(unittest.TestCase):
     def make_site(self, site: str) -> None:
         vals = self.td / "vals" / "sites" / site
         vals.mkdir(parents=True, exist_ok=True)
-        (vals / "site.yaml").write_text(f"schema_version: 1\nname: {site}\n", encoding="utf-8")
+        (vals / "site.yaml").write_text(
+            f"schema_version: 1\nname: {site}\n", encoding="utf-8"
+        )
         (vals / ".sops.yaml").write_text("creation_rules: []\n", encoding="utf-8")
         (vals / "secrets.sops.yaml").write_text("ENC[AGE]--\n", encoding="utf-8")
         self.keys_dir(site).mkdir(parents=True, exist_ok=True)
@@ -440,7 +445,9 @@ class SiteAgeIntegrationBase(unittest.TestCase):
     def seed_vault(self, title: str, notes: str, include_notes: bool = True) -> dict:
         item = _note(title, notes, include_notes)
         item["id"] = "s" + str(len(self.items_json())).zfill(25)
-        with open(self.vault / "items" / f"{item['id']}.json", "w", encoding="utf-8") as fh:
+        with open(
+            self.vault / "items" / f"{item['id']}.json", "w", encoding="utf-8"
+        ) as fh:
             json.dump(item, fh)
         return item
 
@@ -468,7 +475,9 @@ class SiteAgeIntegrationBase(unittest.TestCase):
         return self.log_file.read_text(encoding="utf-8").splitlines()
 
     def delete_issued(self) -> list[str]:
-        return [line for line in self.op_calls() if " delete " in line or " delete" in line]
+        return [
+            line for line in self.op_calls() if " delete " in line or " delete" in line
+        ]
 
     def assert_op_called(self, *parts: str) -> None:
         calls = [c.split()[1:] for c in self.op_calls()]
@@ -510,7 +519,9 @@ class SiteAgeIntegrationBase(unittest.TestCase):
                 env[str(key)] = str(val)
         return env
 
-    def run_helper(self, site, action, *args, cwd=None, extra_env=None) -> subprocess.CompletedProcess[str]:
+    def run_helper(
+        self, site, action, *args, cwd=None, extra_env=None
+    ) -> subprocess.CompletedProcess[str]:
         env = self.base_env(site, extra_env)
         return subprocess.run(
             [str(HELPER), action, *args],
@@ -521,13 +532,17 @@ class SiteAgeIntegrationBase(unittest.TestCase):
             timeout=60,
         )
 
-    def run_just(self, action, *args, site=None, extra_env=None, just_vars=None) -> subprocess.CompletedProcess[str]:
+    def run_just(
+        self, action, *args, site=None, extra_env=None, just_vars=None
+    ) -> subprocess.CompletedProcess[str]:
         base = self.base_env(site, extra_env)
         cmd = ["just"]
         for k, v in (just_vars or {}).items():
             cmd.append(f"{k}={v}")
         cmd += ["site-identity", action, *args]
-        return subprocess.run(cmd, cwd=ROOT, env=base, text=True, capture_output=True, timeout=60)
+        return subprocess.run(
+            cmd, cwd=ROOT, env=base, text=True, capture_output=True, timeout=60
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -547,7 +562,9 @@ class SiteAgeFetchTests(SiteAgeIntegrationBase):
         original = _age_secret(marker)
         self.seed_identity(site, original)
         self.seed_canonical(site, _age_secret("STORED"))
-        result = self.run_helper(site, "fetch", "--force", extra_env={"OP_MOCK_FAIL_GET": "1"})
+        result = self.run_helper(
+            site, "fetch", "--force", extra_env={"OP_MOCK_FAIL_GET": "1"}
+        )
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assert_op_called("item", "get")
         self.assertEqual(self.identity_file(site).read_text(encoding="utf-8"), original)
@@ -558,7 +575,9 @@ class SiteAgeFetchTests(SiteAgeIntegrationBase):
         site = "acme"
         self.make_site(site)
         self.seed_canonical(site, _age_secret("NEW"))
-        r = self.run_helper(site, "fetch", "--force", extra_env={"OP_MOCK_FAIL_GET": "1"})
+        r = self.run_helper(
+            site, "fetch", "--force", extra_env={"OP_MOCK_FAIL_GET": "1"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "get")
         self.assertFalse(self.identity_file(site).exists())
@@ -659,7 +678,9 @@ class SiteAgeFetchTests(SiteAgeIntegrationBase):
         self.make_site(site)
         self.seed_identity(site, _age_secret("S"))
         self.seed_canonical(site, _age_secret("STORED"))
-        r = self.run_helper(site, "fetch", "--force", extra_env={"OP_MOCK_FAIL_GET": "1"})
+        r = self.run_helper(
+            site, "fetch", "--force", extra_env={"OP_MOCK_FAIL_GET": "1"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "get")
         self.assert_no_staging()
@@ -683,15 +704,21 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         self.assertEqual(self.delete_issued(), [], "store must never delete an item")
         self.assertNotIn(SENTINEL, r.stdout + r.stderr)
 
-    def test_store_uses_initial_snapshot_when_identity_rotates_during_list(self) -> None:
+    def test_store_uses_initial_snapshot_when_identity_rotates_during_list(
+        self,
+    ) -> None:
         site = "acme"
         self.make_site(site)
         initial, rotated = _age_secret("INITIAL"), _age_secret("ROTATED")
         identity = self.seed_identity(site, initial)
-        r = self.run_helper(site, "store", extra_env={
-            "OP_MOCK_ROTATE_PATH": str(identity),
-            "OP_MOCK_ROTATE_CONTENT": rotated,
-        })
+        r = self.run_helper(
+            site,
+            "store",
+            extra_env={
+                "OP_MOCK_ROTATE_PATH": str(identity),
+                "OP_MOCK_ROTATE_CONTENT": rotated,
+            },
+        )
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         canonical = self.find_by_title(_canonical_title(site))
         self.assertEqual(len(canonical), 1)
@@ -711,7 +738,9 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         linked = self.run_helper(site, "store")
         self.assertNotEqual(linked.returncode, 0, linked.stdout + linked.stderr)
         self.assertEqual(target.read_text(encoding="utf-8"), _age_secret("TARGET"))
-        self.assertNotIn(SENTINEL, missing.stdout + missing.stderr + linked.stdout + linked.stderr)
+        self.assertNotIn(
+            SENTINEL, missing.stdout + missing.stderr + linked.stdout + linked.stderr
+        )
 
     def test_store_readback_failure_keeps_prior_retains_staged(self) -> None:
         # A failed readback after create must leave the prior canonical item
@@ -722,7 +751,9 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         old = _age_secret("OLD")
         old_item = self.seed_canonical(site, old)
         self.seed_identity(site, _age_secret("NEW"))
-        r = self.run_helper(site, "store", "--force", extra_env={"OP_MOCK_FAIL_ON": "4"})
+        r = self.run_helper(
+            site, "store", "--force", extra_env={"OP_MOCK_FAIL_ON": "4"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "get")
         current = [i for i in self.items_json() if i["title"] == _canonical_title(site)]
@@ -759,8 +790,9 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         old = _age_secret("OLD")
         old_item = self.seed_canonical(site, old)
         self.seed_identity(site, _age_secret("NEW"))
-        r = self.run_helper(site, "store", "--force",
-                            extra_env={"OP_MOCK_CORRUPT_STAGE_GET": "1"})
+        r = self.run_helper(
+            site, "store", "--force", extra_env={"OP_MOCK_CORRUPT_STAGE_GET": "1"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "get")
         current = self.find_by_title(_canonical_title(site))
@@ -775,11 +807,17 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         self.make_site(site)
         old_item = self.seed_canonical(site, _age_secret("OLD"))
         self.seed_identity(site, _age_secret("NEW"))
-        r = self.run_helper(site, "store", "--force", extra_env={"OP_MOCK_FAIL_LIST": "1"})
+        r = self.run_helper(
+            site, "store", "--force", extra_env={"OP_MOCK_FAIL_LIST": "1"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "list")
-        self.assertEqual([i for i in self.items_json() if i.get("title") == _canonical_title(site)][0]["id"],
-                         old_item["id"])
+        self.assertEqual(
+            [i for i in self.items_json() if i.get("title") == _canonical_title(site)][
+                0
+            ]["id"],
+            old_item["id"],
+        )
         self.assertEqual(self.delete_issued(), [])
 
     def test_store_duplicate_canonical_fails_closed(self) -> None:
@@ -827,7 +865,9 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         old_item = self.seed_canonical(site, old)
         new = _age_secret("NEW")
         self.seed_identity(site, new)
-        r = self.run_helper(site, "store", "--force", extra_env={"OP_MOCK_FAIL_ON": "5"})
+        r = self.run_helper(
+            site, "store", "--force", extra_env={"OP_MOCK_FAIL_ON": "5"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "edit")
         target = self.find_by_title(_canonical_title(site))
@@ -835,7 +875,11 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         self.assertEqual(target[0]["id"], old_item["id"])
         self.assertEqual(self.notes_of(target[0]), old)
         self.assertEqual(self.delete_issued(), [])
-        staged = [i for i in self.items_json() if ".stage-" in i["title"] or ".previous-" in i["title"]]
+        staged = [
+            i
+            for i in self.items_json()
+            if ".stage-" in i["title"] or ".previous-" in i["title"]
+        ]
         self.assertTrue(staged, "a staged copy might remain by design; never delete")
 
     def test_store_edit_promotion_failure_preserves_old_under_backup(self) -> None:
@@ -847,7 +891,9 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         old = _age_secret("OLD")
         old_item = self.seed_canonical(site, old)
         self.seed_identity(site, _age_secret("NEW"))
-        r = self.run_helper(site, "store", "--force", extra_env={"OP_MOCK_FAIL_ON": "6"})
+        r = self.run_helper(
+            site, "store", "--force", extra_env={"OP_MOCK_FAIL_ON": "6"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "edit")
         items = self.items_json()
@@ -866,7 +912,9 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         old = _age_secret("OLD")
         old_item = self.seed_canonical(site, old)
         self.seed_identity(site, _age_secret("NEW"))
-        r = self.run_helper(site, "store", "--force", extra_env={"OP_MOCK_FAIL_ON": "7"})
+        r = self.run_helper(
+            site, "store", "--force", extra_env={"OP_MOCK_FAIL_ON": "7"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "get")
         items = self.items_json()
@@ -891,7 +939,9 @@ class SiteAgeStoreTests(SiteAgeIntegrationBase):
         old = _age_secret("OLD")
         old_item = self.seed_canonical(site, old)
         self.seed_identity(site, _age_secret("NEW"))
-        r = self.run_helper(site, "store", "--force", extra_env={"OP_MOCK_FAIL_CREATE": "1"})
+        r = self.run_helper(
+            site, "store", "--force", extra_env={"OP_MOCK_FAIL_CREATE": "1"}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assert_op_called("item", "create")
         target = self.find_by_title(_canonical_title(site))
@@ -913,13 +963,20 @@ class SiteVerifyTests(SiteAgeIntegrationBase):
         # would be caught by stray-new-file assertions below.
         pre = self.identity_file(site).parent / "site.age.backup"
         pre.write_text(_age_secret("BACKUP"), encoding="utf-8")
-        before = {p.name: p.read_bytes() for p in self.identity_file(site).parent.iterdir()}
+        before = {
+            p.name: p.read_bytes() for p in self.identity_file(site).parent.iterdir()
+        }
         r = self.run_helper(site, "verify")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         after = {p.name for p in self.identity_file(site).parent.iterdir()}
         self.assertNotIn(".pre-verify", "".join(after))
-        self.assertEqual(before, {name: self.identity_file(site).parent.joinpath(name).read_bytes()
-                                  for name in after})
+        self.assertEqual(
+            before,
+            {
+                name: self.identity_file(site).parent.joinpath(name).read_bytes()
+                for name in after
+            },
+        )
         self.assertIn("site.age", after)
 
 
@@ -935,10 +992,13 @@ class SiteAgeJustTests(SiteAgeIntegrationBase):
         self.make_site(site)
         self.seed_canonical(site, _age_secret("NEW"))
         self.seed_identity(site, _age_secret("OLD"))
-        r = self.run_just("fetch", "--force", "SITE=%s" % site,
-                          just_vars={"VAULT": OP_VAULT})
+        r = self.run_just(
+            "fetch", "--force", "SITE=%s" % site, just_vars={"VAULT": OP_VAULT}
+        )
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertEqual(self.identity_file(site).read_text(encoding="utf-8"), _age_secret("NEW"))
+        self.assertEqual(
+            self.identity_file(site).read_text(encoding="utf-8"), _age_secret("NEW")
+        )
 
     def test_just_env_only_force_replaces_existing_identity(self) -> None:
         site = "acme"
@@ -947,7 +1007,9 @@ class SiteAgeJustTests(SiteAgeIntegrationBase):
         self.seed_identity(site, _age_secret("OLD"))
         r = self.run_just("fetch", "--force", site=site, just_vars={"VAULT": OP_VAULT})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertEqual(self.identity_file(site).read_text(encoding="utf-8"), _age_secret("NEW"))
+        self.assertEqual(
+            self.identity_file(site).read_text(encoding="utf-8"), _age_secret("NEW")
+        )
 
     def test_just_explicit_site_overrides_env(self) -> None:
         self.make_site("acme")
@@ -955,9 +1017,14 @@ class SiteAgeJustTests(SiteAgeIntegrationBase):
         self.seed_canonical("dev", _age_secret("DEVNEW"))
         self.seed_canonical("acme", _age_secret("ACMENEW"))
         self.seed_identity("acme", _age_secret("acme-old"))
-        r = self.run_just("fetch", "SITE=acme", "--force", site="dev", just_vars={"VAULT": OP_VAULT})
+        r = self.run_just(
+            "fetch", "SITE=acme", "--force", site="dev", just_vars={"VAULT": OP_VAULT}
+        )
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertEqual(self.identity_file("acme").read_text(encoding="utf-8"), _age_secret("ACMENEW"))
+        self.assertEqual(
+            self.identity_file("acme").read_text(encoding="utf-8"),
+            _age_secret("ACMENEW"),
+        )
         self.assertFalse(self.identity_file("dev").exists())
 
     def test_just_unknown_argument_metachars_remain_inert(self) -> None:
@@ -966,25 +1033,39 @@ class SiteAgeJustTests(SiteAgeIntegrationBase):
         self.seed_canonical(site, _age_secret("NEW"))
         self.seed_identity(site, _age_secret("OLD"))
         payload = "$(touch %s)" % (self.td / "pwned")
-        r = self.run_just("fetch", "SITE=%s" % site, payload, "--force", just_vars={"VAULT": OP_VAULT})
+        r = self.run_just(
+            "fetch", "SITE=%s" % site, payload, "--force", just_vars={"VAULT": OP_VAULT}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertFalse((self.td / "pwned").exists(), "shell metachars must not be evaluated")
-        self.assertTrue(self.identity_file(site).exists(), "existing identity must be preserved")
-        self.assertEqual(self.identity_file(site).read_text(encoding="utf-8"), _age_secret("OLD"))
+        self.assertFalse(
+            (self.td / "pwned").exists(), "shell metachars must not be evaluated"
+        )
+        self.assertTrue(
+            self.identity_file(site).exists(), "existing identity must be preserved"
+        )
+        self.assertEqual(
+            self.identity_file(site).read_text(encoding="utf-8"), _age_secret("OLD")
+        )
 
     def test_just_generate_rejects_force(self) -> None:
         site = "acme"
         self.make_site(site)
-        r = self.run_just("generate", "SITE=%s" % site, "--force", just_vars={"VAULT": OP_VAULT})
+        r = self.run_just(
+            "generate", "SITE=%s" % site, "--force", just_vars={"VAULT": OP_VAULT}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertFalse(self.identity_file(site).exists(),
-                         "generate must reject --force and must not create an identity")
+        self.assertFalse(
+            self.identity_file(site).exists(),
+            "generate must reject --force and must not create an identity",
+        )
 
     def test_just_verify_rejects_force(self) -> None:
         site = "acme"
         self.make_site(site)
         self.seed_identity(site, _age_secret("V"))
-        r = self.run_just("verify", "SITE=%s" % site, "--force", just_vars={"VAULT": OP_VAULT})
+        r = self.run_just(
+            "verify", "SITE=%s" % site, "--force", just_vars={"VAULT": OP_VAULT}
+        )
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
 
     def test_just_missing_site_never_implicitly_defaults(self) -> None:
@@ -992,8 +1073,10 @@ class SiteAgeJustTests(SiteAgeIntegrationBase):
         self.seed_canonical("dev", _age_secret("DEV"))
         r = self.run_just("fetch", just_vars={"VAULT": OP_VAULT})
         self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertFalse(self.identity_file("dev").exists(),
-                         "missing SITE must not default to a site")
+        self.assertFalse(
+            self.identity_file("dev").exists(),
+            "missing SITE must not default to a site",
+        )
 
     def test_just_generate_explicit_site_routes_correctly(self) -> None:
         site = "acme"

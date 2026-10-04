@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Provider-neutral access to encrypted canonical site secrets."""
+
 from __future__ import annotations
 
 import hashlib
@@ -49,13 +50,17 @@ class SecretBundle:
     def __post_init__(self) -> None:
         paths = frozenset(_leaf_paths(self.data))
         if self.required_paths - paths:
-            raise SecretProviderError("required secret path is not present in the bundle")
+            raise SecretProviderError(
+                "required secret path is not present in the bundle"
+            )
 
     def discover(self) -> tuple[str, ...]:
         return tuple(sorted(_leaf_paths(self.data)))
 
     def validate_required(self, logical_paths: set[str] | None = None) -> None:
-        required = self.required_paths if logical_paths is None else frozenset(logical_paths)
+        required = (
+            self.required_paths if logical_paths is None else frozenset(logical_paths)
+        )
         for path in sorted(required):
             _resolve(self.data, path)
 
@@ -85,8 +90,16 @@ class SopsAgeProvider:
         self.path = path.resolve()
         self.executable = executable
         self.environment = environment or {}
-        configured_key = key_file or (Path(self.environment["SOPS_AGE_KEY_FILE"]) if "SOPS_AGE_KEY_FILE" in self.environment else None)
-        self.key_file = discover_age_key_file(configured_key, environment=self.environment) if configured_key else None
+        configured_key = key_file or (
+            Path(self.environment["SOPS_AGE_KEY_FILE"])
+            if "SOPS_AGE_KEY_FILE" in self.environment
+            else None
+        )
+        self.key_file = (
+            discover_age_key_file(configured_key, environment=self.environment)
+            if configured_key
+            else None
+        )
         self._bundle = SecretBundle(self._decrypt(), frozenset(required_paths or ()))
         self._data = self._bundle.data
 
@@ -101,7 +114,15 @@ class SopsAgeProvider:
         try:
             # The executable and arguments are passed without a shell; SOPS stdout stays in memory.
             result = subprocess.run(
-                [self.executable, "--decrypt", "--input-type", "yaml", "--output-type", "yaml", str(self.path)],  # noqa: S603
+                [
+                    self.executable,
+                    "--decrypt",
+                    "--input-type",
+                    "yaml",
+                    "--output-type",
+                    "yaml",
+                    str(self.path),
+                ],  # noqa: S603
                 check=False,
                 capture_output=True,
                 text=True,
@@ -110,7 +131,9 @@ class SopsAgeProvider:
         except OSError as error:
             raise SecretProviderError("SOPS executable is unavailable") from error
         if result.returncode != 0:
-            raise SecretProviderError("SOPS could not decrypt the selected secret bundle")
+            raise SecretProviderError(
+                "SOPS could not decrypt the selected secret bundle"
+            )
         try:
             data = _strict_yaml(result.stdout)
         except SecretProviderError as error:
@@ -128,12 +151,18 @@ class SopsAgeProvider:
 
     def describe(self, logical_path: str) -> dict[str, str]:
         self.resolve(logical_path)
-        return {"path": logical_path, "provider": "sops-age", "classification": "logical"}
+        return {
+            "path": logical_path,
+            "provider": "sops-age",
+            "classification": "logical",
+        }
 
     def secret_digest(self, logical_paths: set[str] | None = None) -> str:
         paths = sorted(logical_paths or _leaf_paths(self._data))
         values = {path: self.resolve(path) for path in paths}
-        payload = json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        payload = json.dumps(
+            values, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8")
         return hashlib.sha256(payload).hexdigest()
 
     def identity(self, logical_paths: set[str] | None = None) -> SecretIdentity:
@@ -186,7 +215,9 @@ def sops_policy_recipients(policy_path: Path, *, site: str) -> set[str]:
         raise SecretProviderError("SOPS policy scope is invalid")
     age = rule.get("age")
     recipients = [age] if isinstance(age, str) else age if isinstance(age, list) else []
-    if not recipients or any(not isinstance(item, str) or not item for item in recipients):
+    if not recipients or any(
+        not isinstance(item, str) or not item for item in recipients
+    ):
         raise SecretProviderError("SOPS recipient policy is invalid")
     recipient_set = set(recipients)
     if _PLACEHOLDER_RECIPIENT in recipient_set:
@@ -214,7 +245,9 @@ def inspect_sops_policy(
     scope = rule.get("path_regex")
     age = rule.get("age")
     recipients = [age] if isinstance(age, str) else age if isinstance(age, list) else []
-    if not recipients or any(not isinstance(item, str) or not item for item in recipients):
+    if not recipients or any(
+        not isinstance(item, str) or not item for item in recipients
+    ):
         raise SecretProviderError("SOPS recipient policy is invalid")
     recipient_set = set(recipients)
     if _PLACEHOLDER_RECIPIENT in recipient_set:
@@ -246,17 +279,18 @@ def validate_canonical_secret_path(logical_path: str) -> None:
     """Reject protected paths outside canonical provider, identity, and service roots."""
     parts = _parts(logical_path)
     canonical = (
-        len(parts) >= 3
-        and parts[0] == "secrets"
-        and parts[1] in {"bootstrap", "operator"}
-    ) or (
-        len(parts) >= 4
-        and parts[:2] == ["secrets", "providers"]
-    ) or (
-        len(parts) >= 4
-        and parts[0] == "services"
-        and parts[1] != "providers"
-        and parts[2] == "secrets"
+        (
+            len(parts) >= 3
+            and parts[0] == "secrets"
+            and parts[1] in {"bootstrap", "operator"}
+        )
+        or (len(parts) >= 4 and parts[:2] == ["secrets", "providers"])
+        or (
+            len(parts) >= 4
+            and parts[0] == "services"
+            and parts[1] != "providers"
+            and parts[2] == "secrets"
+        )
     )
     if not canonical:
         raise SecretProviderError("secret path is outside the canonical namespace")
@@ -281,7 +315,9 @@ def discover_age_key_file(
 ) -> Path:
     """Discover an external age key file without reading or logging its contents."""
     env = environment or os.environ
-    candidate = explicit or (Path(env["SOPS_AGE_KEY_FILE"]) if env.get("SOPS_AGE_KEY_FILE") else None)
+    candidate = explicit or (
+        Path(env["SOPS_AGE_KEY_FILE"]) if env.get("SOPS_AGE_KEY_FILE") else None
+    )
     if candidate is None:
         candidate = (home or Path.home()) / ".config" / "sops" / "age" / "keys.txt"
     candidate = candidate.expanduser().resolve()
@@ -307,7 +343,11 @@ def check_sops_age_availability(
     if not bundle.is_file():
         raise SecretProviderError("SOPS secret bundle is unavailable")
     executable_path = Path(executable).expanduser() if "/" in executable else None
-    resolved_executable = executable_path if executable_path is not None else Path(shutil.which(executable) or "")
+    resolved_executable = (
+        executable_path
+        if executable_path is not None
+        else Path(shutil.which(executable) or "")
+    )
     if not resolved_executable.is_file() or not os.access(resolved_executable, os.X_OK):
         raise SecretProviderError("SOPS executable is unavailable")
     discovered_key = discover_age_key_file(key_file, environment=environment)
@@ -357,7 +397,11 @@ def validate_sops_age_recipients(path: Path, expected_recipients: set[str]) -> N
         raise SecretProviderError("SOPS age recipient metadata is invalid")
     actual: set[str] = set()
     for entry in age_entries:
-        if not isinstance(entry, dict) or not isinstance(entry.get("recipient"), str) or not entry["recipient"]:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("recipient"), str)
+            or not entry["recipient"]
+        ):
             raise SecretProviderError("SOPS age recipient metadata is invalid")
         actual.add(entry["recipient"])
     if actual != expected_recipients:
@@ -412,7 +456,9 @@ def _strict_yaml(text: str) -> dict[str, Any]:
     try:
         for token in yaml.scan(text):
             if isinstance(token, (AliasToken, AnchorToken)):
-                raise SecretProviderError("secret YAML anchors and aliases are not permitted")
+                raise SecretProviderError(
+                    "secret YAML anchors and aliases are not permitted"
+                )
         data = yaml.load(text)
     except (DuplicateKeyError, ParserError, ValueError) as error:
         raise SecretProviderError("secret YAML is invalid") from error

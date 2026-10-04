@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Perform a non-mutating, mount-aware service-state restore capacity preflight."""
+
 from __future__ import annotations
 
 import argparse
@@ -41,26 +42,42 @@ def filesystem_key(path: Path) -> tuple[int, Path, int]:
     return device, resolved, stats.f_bavail * stats.f_frsize
 
 
-def preflight(archive_bytes: int, temporary_dir: Path, state_paths: list[Path], reserve_bytes: int = RESERVE_BYTES) -> list[dict[str, int | str | bool]]:
+def preflight(
+    archive_bytes: int,
+    temporary_dir: Path,
+    state_paths: list[Path],
+    reserve_bytes: int = RESERVE_BYTES,
+) -> list[dict[str, int | str | bool]]:
     if archive_bytes < 0 or reserve_bytes < 0:
         raise ValueError("archive and reserve sizes must be non-negative")
     demands: dict[int, dict[str, int | str]] = {}
     for path in [temporary_dir, *state_paths]:
         device, mount_path, available = filesystem_key(path)
-        entry = demands.setdefault(device, {"filesystem": str(mount_path), "available_bytes": available, "state_bytes": 0})
+        entry = demands.setdefault(
+            device,
+            {
+                "filesystem": str(mount_path),
+                "available_bytes": available,
+                "state_bytes": 0,
+            },
+        )
         if path != temporary_dir:
             entry["state_bytes"] = int(entry["state_bytes"]) + allocated_bytes(path)
     results: list[dict[str, int | str | bool]] = []
     for entry in demands.values():
-        required = archive_bytes + STATE_MULTIPLIER * int(entry["state_bytes"]) + reserve_bytes
+        required = (
+            archive_bytes + STATE_MULTIPLIER * int(entry["state_bytes"]) + reserve_bytes
+        )
         available = int(entry["available_bytes"])
-        results.append({
-            "filesystem": str(entry["filesystem"]),
-            "available_bytes": available,
-            "required_bytes": required,
-            "deficit_bytes": max(0, required - available),
-            "ok": available >= required,
-        })
+        results.append(
+            {
+                "filesystem": str(entry["filesystem"]),
+                "available_bytes": available,
+                "required_bytes": required,
+                "deficit_bytes": max(0, required - available),
+                "ok": available >= required,
+            }
+        )
     return results
 
 
@@ -75,11 +92,20 @@ def main(argv: list[str] | None = None) -> int:
     state_paths = args.state_path
     if args.state_paths_json:
         decoded = json.loads(args.state_paths_json)
-        if not isinstance(decoded, list) or not all(isinstance(path, str) for path in decoded):
+        if not isinstance(decoded, list) or not all(
+            isinstance(path, str) for path in decoded
+        ):
             raise ValueError("state paths JSON must be an array of strings")
         state_paths.extend(Path(path) for path in decoded)
-    results = preflight(args.archive_bytes, args.temporary_dir, state_paths, args.reserve_bytes)
-    print(json.dumps({"formula": "archive + 3*state + reserve", "filesystems": results}, sort_keys=True))
+    results = preflight(
+        args.archive_bytes, args.temporary_dir, state_paths, args.reserve_bytes
+    )
+    print(
+        json.dumps(
+            {"formula": "archive + 3*state + reserve", "filesystems": results},
+            sort_keys=True,
+        )
+    )
     return 0 if all(result["ok"] for result in results) else 2
 
 

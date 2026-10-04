@@ -19,7 +19,9 @@ ACQUISITION_PATTERNS = (
     re.compile(r"\bansible\.builtin\.(?:get_url|git|apt_repository)\b"),
     re.compile(r"\bgit clone\b"),
     re.compile(r"\[\s*[\"']git[\"']\s*,\s*[\"']clone[\"']"),
-    re.compile(r"\bcurl\s+-[^\n]*\b(?:https?://|\$\{(?:[A-Za-z_][A-Za-z0-9_]*|[^}]+)\})"),
+    re.compile(
+        r"\bcurl\s+-[^\n]*\b(?:https?://|\$\{(?:[A-Za-z_][A-Za-z0-9_]*|[^}]+)\})"
+    ),
     re.compile(r"^FROM\s+", re.MULTILINE),
     re.compile(r"^\s*image:\s+", re.MULTILINE),
 )
@@ -64,7 +66,9 @@ def tracked_deployment_sources() -> set[str]:
     ).stdout.splitlines()
     candidates: set[str] = set()
     for relative in files:
-        if relative.startswith(EXCLUDED_PREFIXES) or not relative.startswith(DEPLOYMENT_PREFIXES):
+        if relative.startswith(EXCLUDED_PREFIXES) or not relative.startswith(
+            DEPLOYMENT_PREFIXES
+        ):
             continue
         path = ROOT / relative
         if not path.is_file():
@@ -75,7 +79,12 @@ def tracked_deployment_sources() -> set[str]:
             continue
         if any(pattern.search(text) for pattern in ACQUISITION_PATTERNS):
             candidates.add(relative)
-    return candidates | REQUIRED_IMAGE_AUTHORITIES | REQUIRED_REVIEWED_CACHE_AUTHORITIES | ADDITIONAL_NETWORK_CONSUMERS
+    return (
+        candidates
+        | REQUIRED_IMAGE_AUTHORITIES
+        | REQUIRED_REVIEWED_CACHE_AUTHORITIES
+        | ADDITIONAL_NETWORK_CONSUMERS
+    )
 
 
 class ProductionAcquisitionInventoryTests(unittest.TestCase):
@@ -133,26 +142,52 @@ class ProductionAcquisitionInventoryTests(unittest.TestCase):
                         entry["source"],
                     )
 
-
-    def test_nodesource_key_contract_rejects_unpinned_or_wrong_fingerprint_inputs(self) -> None:
-        task = (ROOT / "infra/ansible/roles/sssf/tasks/main.yml").read_text(encoding="utf-8")
-        defaults = (ROOT / "infra/ansible/roles/sssf/defaults/main.yml").read_text(encoding="utf-8")
+    def test_nodesource_key_contract_rejects_unpinned_or_wrong_fingerprint_inputs(
+        self,
+    ) -> None:
+        task = (ROOT / "infra/ansible/roles/sssf/tasks/main.yml").read_text(
+            encoding="utf-8"
+        )
+        defaults = (ROOT / "infra/ansible/roles/sssf/defaults/main.yml").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("sssf_nodesource_key_sha256 is match('^[0-9a-f]{64}$')", task)
-        self.assertIn("sssf_nodesource_key_fingerprint is match('^[0-9A-F]{40}$')", task)
+        self.assertIn(
+            "sssf_nodesource_key_fingerprint is match('^[0-9A-F]{40}$')", task
+        )
         self.assertLess(task.index("sha256sum -c -"), task.index("gpg --dearmor"))
-        self.assertLess(task.index("gpg --show-keys --with-colons"), task.index("gpg --dearmor"))
+        self.assertLess(
+            task.index("gpg --show-keys --with-colons"), task.index("gpg --dearmor")
+        )
         self.assertRegex(defaults, r"sssf_nodesource_key_sha256: [0-9a-f]{64}")
         self.assertRegex(defaults, r"sssf_nodesource_key_fingerprint: [0-9A-F]{40}")
 
-    def test_owned_acquisitions_are_resolved_and_only_private_boundaries_remain(self) -> None:
+    def test_owned_acquisitions_are_resolved_and_only_private_boundaries_remain(
+        self,
+    ) -> None:
         inventory = self.load_inventory()
-        contracts = [a["contract"] for e in inventory["consumers"] for a in e["acquisitions"]]
+        contracts = [
+            a["contract"] for e in inventory["consumers"] for a in e["acquisitions"]
+        ]
         self.assertNotIn("unresolved", contracts)
         self.assertEqual(contracts.count("operator-private-boundary"), 2)
-        for source in REQUIRED_REVIEWED_CACHE_AUTHORITIES | {"infra/ansible/roles/forgejo_runner/tasks/main.yml"}:
-            self.assertIn("reviewed-artifact-cache.yml", (ROOT / source).read_text(encoding="utf-8"))
-        raw_installers = ("curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash", "curl -fsSL -o /usr/local/lib/docker/cli-plugins", "curl -fsSL -o \"${tmp}/just.tar.gz\"")
-        deployment = "\n".join((ROOT / source).read_text(encoding="utf-8") for source in REQUIRED_REVIEWED_CACHE_AUTHORITIES | {"infra/ansible/roles/forgejo_runner/tasks/main.yml"})
+        for source in REQUIRED_REVIEWED_CACHE_AUTHORITIES | {
+            "infra/ansible/roles/forgejo_runner/tasks/main.yml"
+        }:
+            self.assertIn(
+                "reviewed-artifact-cache.yml",
+                (ROOT / source).read_text(encoding="utf-8"),
+            )
+        raw_installers = (
+            "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
+            "curl -fsSL -o /usr/local/lib/docker/cli-plugins",
+            'curl -fsSL -o "${tmp}/just.tar.gz"',
+        )
+        deployment = "\n".join(
+            (ROOT / source).read_text(encoding="utf-8")
+            for source in REQUIRED_REVIEWED_CACHE_AUTHORITIES
+            | {"infra/ansible/roles/forgejo_runner/tasks/main.yml"}
+        )
         for forbidden in raw_installers:
             self.assertNotIn(forbidden, deployment)
 

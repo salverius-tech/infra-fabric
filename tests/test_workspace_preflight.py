@@ -59,15 +59,23 @@ class WorkspacePreflightTests(unittest.TestCase):
     def test_state_lock_fails(self) -> None:
         temp, root = self.make_repo()
         with temp:
-            (root / "values" / ".terraform.tfstate.lock.info").write_text("{}\n", encoding="utf-8")
+            (root / "values" / ".terraform.tfstate.lock.info").write_text(
+                "{}\n", encoding="utf-8"
+            )
             with self.assertRaises(workspace_preflight.PreflightError):
                 workspace_preflight.run(root, require_values=True)
-    def test_canonical_site_preflight_renders_and_cleans_temporary_projections(self) -> None:
+
+    def test_canonical_site_preflight_renders_and_cleans_temporary_projections(
+        self,
+    ) -> None:
         temp, root = self.make_repo()
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(
+            source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml",
+            site / "site.yaml",
+        )
         (root / "infra" / "services.json").write_text(
             (source_root / "infra" / "services.json").read_text(encoding="utf-8"),
             encoding="utf-8",
@@ -91,14 +99,22 @@ class WorkspacePreflightTests(unittest.TestCase):
             clear=True,
         ), self.assertRaises(workspace_preflight.PreflightError):
             workspace_preflight.run(root, require_values=True)
+
     def test_canonical_secret_check_uses_fixed_path_without_decryption(self) -> None:
         temp, root = self.make_repo()
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(
+            source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml",
+            site / "site.yaml",
+        )
         (site / "secrets.sops.yaml").write_text("encrypted\n", encoding="utf-8")
-        with temp, patch.dict(os.environ, {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"}, clear=True), patch.object(
+        with temp, patch.dict(
+            os.environ,
+            {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"},
+            clear=True,
+        ), patch.object(
             workspace_preflight,
             "check_sops_age_availability",
             return_value={"provider": "sops-age"},
@@ -115,7 +131,10 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(
+            source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml",
+            site / "site.yaml",
+        )
         policy = site / ".sops.yaml"
         policy.write_text(
             "creation_rules:\n  - path_regex: '^secrets\\.sops\\.yaml$'\n    age: age1publictestrecipient\n",
@@ -126,7 +145,9 @@ class WorkspacePreflightTests(unittest.TestCase):
             {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"},
             clear=True,
         ):
-            resolved_policy, recipients = workspace_preflight._sops_policy_inputs(root, require_policy=True)
+            resolved_policy, recipients = workspace_preflight._sops_policy_inputs(
+                root, require_policy=True
+            )
         self.assertEqual(resolved_policy, policy)
         self.assertEqual(recipients, {"age1publictestrecipient"})
 
@@ -135,7 +156,9 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        scaffold = (source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8")
+        scaffold = (
+            source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml"
+        ).read_text(encoding="utf-8")
         (site / "site.yaml").write_text(
             scaffold.replace(
                 "bootstrap:\n  ssh:\n",
@@ -147,8 +170,12 @@ class WorkspacePreflightTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-        shutil.copy2(source_root / "infra" / "services.json", root / "infra" / "services.json")
-        (site / "secrets.sops.yaml").write_text("encrypted-metadata-only\n", encoding="utf-8")
+        shutil.copy2(
+            source_root / "infra" / "services.json", root / "infra" / "services.json"
+        )
+        (site / "secrets.sops.yaml").write_text(
+            "encrypted-metadata-only\n", encoding="utf-8"
+        )
         policy = site / ".sops.yaml"
         policy.write_text("policy-metadata-only\n", encoding="utf-8")
         provider = MagicMock()
@@ -160,11 +187,17 @@ class WorkspacePreflightTests(unittest.TestCase):
             workspace_preflight,
             "_sops_policy_inputs",
             return_value=(policy, {"age1publictestrecipient"}),
-        ), patch.object(workspace_preflight, "inspect_sops_policy"), patch.object(
+        ), patch.object(
+            workspace_preflight, "inspect_sops_policy"
+        ), patch.object(
             workspace_preflight,
             "validate_sops_age_recipients",
-        ), patch.object(workspace_preflight, "SopsAgeProvider", return_value=provider):
-            workspace_preflight.check_canonical_required_secrets(root, require_secrets=True)
+        ), patch.object(
+            workspace_preflight, "SopsAgeProvider", return_value=provider
+        ):
+            workspace_preflight.check_canonical_required_secrets(
+                root, require_secrets=True
+            )
 
         required = provider.validate_required.call_args.args[0]
         self.assertIn("secrets.bootstrap.ssh_private_key", required)
@@ -176,12 +209,17 @@ class WorkspacePreflightTests(unittest.TestCase):
         self.assertIn("secrets.bootstrap.hosts.forgejo.root_password", required)
         self.assertIn("services.forgejo.secrets.secret_key", required)
 
-    def test_canonical_secret_check_passes_private_policy_inputs_without_exposing_recipients(self) -> None:
+    def test_canonical_secret_check_passes_private_policy_inputs_without_exposing_recipients(
+        self,
+    ) -> None:
         temp, root = self.make_repo()
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(
+            source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml",
+            site / "site.yaml",
+        )
         (site / "secrets.sops.yaml").write_text("encrypted\n", encoding="utf-8")
         policy = root / "private.sops.yaml"
         policy.write_text("private-policy-metadata\n", encoding="utf-8")
@@ -194,7 +232,11 @@ class WorkspacePreflightTests(unittest.TestCase):
                 "INFRA_SOPS_AGE_RECIPIENTS": "age1example, age1other",
             },
             clear=True,
-        ), patch.object(workspace_preflight, "inspect_sops_policy", return_value={"recipient_policy": "verified"}) as inspect, patch.object(
+        ), patch.object(
+            workspace_preflight,
+            "inspect_sops_policy",
+            return_value={"recipient_policy": "verified"},
+        ) as inspect, patch.object(
             workspace_preflight,
             "check_sops_age_availability",
             return_value={"provider": "sops-age", "recipient_policy": "verified"},
@@ -202,7 +244,9 @@ class WorkspacePreflightTests(unittest.TestCase):
             result = workspace_preflight.check_canonical_secret_availability(root)
 
         self.assertEqual(result["recipient_policy"], "verified")
-        inspect.assert_called_once_with(policy, site="dev", expected_recipients={"age1example", "age1other"})
+        inspect.assert_called_once_with(
+            policy, site="dev", expected_recipients={"age1example", "age1other"}
+        )
         check.assert_called_once_with(
             site / "secrets.sops.yaml",
             environment={"SOPS_AGE_KEY_FILE": "/run/secrets/sops-age-key"},
@@ -214,14 +258,23 @@ class WorkspacePreflightTests(unittest.TestCase):
         source_root = Path(__file__).resolve().parents[1]
         site = root / "values" / "sites" / "dev"
         site.mkdir(parents=True)
-        shutil.copy2(source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", site / "site.yaml")
+        shutil.copy2(
+            source_root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml",
+            site / "site.yaml",
+        )
         (site / "secrets.sops.yaml").write_text("SECRET_SENTINEL\n", encoding="utf-8")
-        with temp, patch.dict(os.environ, {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"}, clear=True), patch.object(
+        with temp, patch.dict(
+            os.environ,
+            {"VALUES_DIR": str(root / "values"), "VALUES_SITE": "dev"},
+            clear=True,
+        ), patch.object(
             workspace_preflight,
             "check_sops_age_availability",
             side_effect=workspace_preflight.SecretProviderError("SECRET_SENTINEL"),
         ):
-            with self.assertRaisesRegex(workspace_preflight.PreflightError, "canonical secret availability") as context:
+            with self.assertRaisesRegex(
+                workspace_preflight.PreflightError, "canonical secret availability"
+            ) as context:
                 workspace_preflight.check_canonical_secret_availability(root)
         self.assertNotIn("SECRET_SENTINEL", str(context.exception))
 

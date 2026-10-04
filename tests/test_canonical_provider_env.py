@@ -46,7 +46,9 @@ class CanonicalProviderEnvironmentTests(unittest.TestCase):
         self.addCleanup(self.delivery.stop)
 
     def test_removes_exported_age_key_from_provider_child_environment(self) -> None:
-        with patch.dict(os.environ, {"SOPS_AGE_KEY": "dummy-not-a-real-key"}, clear=False):
+        with patch.dict(
+            os.environ, {"SOPS_AGE_KEY": "dummy-not-a-real-key"}, clear=False
+        ):
             with patch.object(canonical_provider_env.os, "execvpe") as execvpe:
                 result = canonical_provider_env.main(["--", "tofu", "plan"])
 
@@ -67,8 +69,12 @@ class CanonicalProviderEnvironmentTests(unittest.TestCase):
 
     def test_rejects_missing_canonical_site_before_provider_access(self) -> None:
         context = SimpleNamespace(canonical_site_path=None, values_dir=ROOT / "values")
-        with patch.object(canonical_provider_env, "from_environment", return_value=context):
-            with patch.object(canonical_provider_env, "SopsAgeProvider") as provider_factory:
+        with patch.object(
+            canonical_provider_env, "from_environment", return_value=context
+        ):
+            with patch.object(
+                canonical_provider_env, "SopsAgeProvider"
+            ) as provider_factory:
                 result = canonical_provider_env.main(["--", "tofu", "plan"])
 
         self.assertEqual(result, 2)
@@ -84,7 +90,10 @@ class CanonicalProviderEnvironmentTests(unittest.TestCase):
                 result = canonical_provider_env.main(["--", "tofu", "plan"])
 
         self.assertEqual(result, 1)
-        self.assertIn("safe failure", "".join(call.args[0] for call in stderr.write.call_args_list))
+        self.assertIn(
+            "safe failure",
+            "".join(call.args[0] for call in stderr.write.call_args_list),
+        )
 
     def test_requires_a_provider_command(self) -> None:
         with self.assertRaises(SystemExit) as raised:

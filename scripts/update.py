@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Update pinned tool and service versions after a release-age hold period."""
+
 from __future__ import annotations
 
 import argparse
@@ -112,7 +113,12 @@ TARGETS = (
         pattern=r"(version=\"{{ forgejo_runner_compose_version \| default\(')([^']+)('\) }}\";)",
         replacement=r"\g<1>{version}\g<3>",
         release_url="https://api.github.com/repos/docker/compose/releases/latest",
-        canonical_path=("services", "forgejo_runner", "configuration", "compose_version"),
+        canonical_path=(
+            "services",
+            "forgejo_runner",
+            "configuration",
+            "compose_version",
+        ),
     ),
     Target(
         name="just",
@@ -191,8 +197,15 @@ class HTTPSOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
 
 def fetch_url(url: str, opener: Callable[[str], bytes] | None = None) -> bytes:
     parsed_url = urllib.parse.urlsplit(url)
-    if parsed_url.scheme != "https" or not parsed_url.hostname or parsed_url.username or parsed_url.password:
-        raise UpdateError("release URL must be an HTTPS URL without embedded credentials")
+    if (
+        parsed_url.scheme != "https"
+        or not parsed_url.hostname
+        or parsed_url.username
+        or parsed_url.password
+    ):
+        raise UpdateError(
+            "release URL must be an HTTPS URL without embedded credentials"
+        )
     if opener is not None:
         return opener(url)
     request = urllib.request.Request(
@@ -207,7 +220,9 @@ def fetch_url(url: str, opener: Callable[[str], bytes] | None = None) -> bytes:
         raise UpdateError(f"failed to fetch {url}: {error}") from error
 
 
-def fetch_release(url: str, opener: Callable[[str], bytes] | None = None) -> dict[str, object]:
+def fetch_release(
+    url: str, opener: Callable[[str], bytes] | None = None
+) -> dict[str, object]:
     raw = fetch_url(url, opener)
     try:
         data = json.loads(raw.decode("utf-8"))
@@ -233,7 +248,9 @@ def release_from_payload(target: Target, payload: dict[str, object]) -> Release:
     if tag is None:
         raise UpdateError(f"{target.name}: release payload does not include tag_name")
     if published is None:
-        raise UpdateError(f"{target.name}: release payload does not include published_at")
+        raise UpdateError(
+            f"{target.name}: release payload does not include published_at"
+        )
     return Release(
         version=normalize_version(tag, target.strip_prefix),
         published_at=parse_timestamp(published),
@@ -265,7 +282,9 @@ def replace_once(pattern: str, replacement: str, text: str, target: Target) -> s
 def release_asset_url(release: Release, asset_name: str) -> str:
     assets = release.payload.get("assets")
     if not isinstance(assets, list):
-        raise UpdateError(f"release payload for {release.version} does not include assets")
+        raise UpdateError(
+            f"release payload for {release.version} does not include assets"
+        )
     for asset in assets:
         if not isinstance(asset, dict):
             continue
@@ -295,7 +314,9 @@ def checksum_for_release(
     raise UpdateError(f"{asset_name} does not include checksum for {file_name}")
 
 
-def replace_version(target: Target, text: str, release: Release, checksum: str | None) -> str:
+def replace_version(
+    target: Target, text: str, release: Release, checksum: str | None
+) -> str:
     updated = replace_once(
         target.pattern,
         target.replacement.format(version=release.version),
@@ -324,7 +345,9 @@ def process_target(
 ) -> UpdateResult:
     current, text = read_current(target, root)
     if text is None:
-        return UpdateResult(target.name, target.path, None, None, "skip", "file not present")
+        return UpdateResult(
+            target.name, target.path, None, None, "skip", "file not present"
+        )
     if current is None:
         return UpdateResult(
             target.name,
@@ -383,7 +406,9 @@ def canonical_value(document: dict[str, object], path: tuple[str, ...]) -> objec
     return current
 
 
-def set_canonical_value(document: dict[str, object], path: tuple[str, ...], value: str) -> None:
+def set_canonical_value(
+    document: dict[str, object], path: tuple[str, ...], value: str
+) -> None:
     current: object = document
     for key in path[:-1]:
         if not isinstance(current, dict) or key not in current:
@@ -404,26 +429,78 @@ def process_canonical_target(
     dry_run: bool = False,
 ) -> tuple[UpdateResult, bool]:
     if target.canonical_path is None:
-        return UpdateResult(target.name, Path("values/sites/<site>/site.yaml"), None, None, "skip", "no canonical owner"), False
+        return (
+            UpdateResult(
+                target.name,
+                Path("values/sites/<site>/site.yaml"),
+                None,
+                None,
+                "skip",
+                "no canonical owner",
+            ),
+            False,
+        )
     try:
         current_value = canonical_value(document, target.canonical_path)
     except UpdateError as error:
-        return UpdateResult(target.name, Path("values/sites/<site>/site.yaml"), None, None, "skip", f"{error}; legacy inventory is not authoritative"), False
+        return (
+            UpdateResult(
+                target.name,
+                Path("values/sites/<site>/site.yaml"),
+                None,
+                None,
+                "skip",
+                f"{error}; legacy inventory is not authoritative",
+            ),
+            False,
+        )
     if not isinstance(current_value, str) or not current_value:
-        raise UpdateError(f"{target.name}: canonical release value must be a non-empty string")
+        raise UpdateError(
+            f"{target.name}: canonical release value must be a non-empty string"
+        )
     release = release_from_payload(target, fetch_release(target.release_url, opener))
     age = now - release.published_at
     display_path = Path("values/sites/<site>/site.yaml")
     if release.version == current_value:
-        return UpdateResult(target.name, display_path, current_value, release.version, "current", f"already at latest ({release.url})"), False
+        return (
+            UpdateResult(
+                target.name,
+                display_path,
+                current_value,
+                release.version,
+                "current",
+                f"already at latest ({release.url})",
+            ),
+            False,
+        )
     if age < min_age:
         remaining = min_age - age
         hours = int(remaining.total_seconds() // 3600)
         minutes = int((remaining.total_seconds() % 3600) // 60)
-        return UpdateResult(target.name, display_path, current_value, release.version, "hold", f"published {release.published_at.isoformat()}; wait {hours}h {minutes}m more ({release.url})"), False
+        return (
+            UpdateResult(
+                target.name,
+                display_path,
+                current_value,
+                release.version,
+                "hold",
+                f"published {release.published_at.isoformat()}; wait {hours}h {minutes}m more ({release.url})",
+            ),
+            False,
+        )
     if not dry_run:
         set_canonical_value(document, target.canonical_path, release.version)
-    return UpdateResult(target.name, display_path, current_value, release.version, "updated", f"release age {age}; {release.url}"), not dry_run
+    return (
+        UpdateResult(
+            target.name,
+            display_path,
+            current_value,
+            release.version,
+            "updated",
+            f"release age {age}; {release.url}",
+        ),
+        not dry_run,
+    )
 
 
 def run(
@@ -440,16 +517,22 @@ def run(
         try:
             document = yaml.safe_load(site_path.read_text(encoding="utf-8"))
         except (OSError, yaml.YAMLError) as error:
-            raise UpdateError(f"cannot load canonical site {site_path}: {error}") from error
+            raise UpdateError(
+                f"cannot load canonical site {site_path}: {error}"
+            ) from error
         if not isinstance(document, dict):
             raise UpdateError(f"canonical site {site_path} must contain an object")
         results: list[UpdateResult] = []
         changed = False
         for target in TARGETS:
             if target.canonical_path is None:
-                results.append(process_target(target, root, now, min_age, opener, dry_run))
+                results.append(
+                    process_target(target, root, now, min_age, opener, dry_run)
+                )
                 continue
-            result, target_changed = process_canonical_target(target, document, root, now, min_age, opener, dry_run)
+            result, target_changed = process_canonical_target(
+                target, document, root, now, min_age, opener, dry_run
+            )
             results.append(result)
             changed = changed or target_changed
         if changed:
@@ -470,7 +553,9 @@ def run(
                 load_site(candidate_path, expected_site=site_path.parent.name)
                 candidate_path.replace(site_path)
             except (OSError, CanonicalValuesError) as error:
-                raise UpdateError(f"canonical update failed validation: {error}") from error
+                raise UpdateError(
+                    f"canonical update failed validation: {error}"
+                ) from error
             finally:
                 if candidate_path is not None:
                     candidate_path.unlink(missing_ok=True)
@@ -479,7 +564,11 @@ def run(
     targets = tuple(
         Target(
             name=target.name,
-            path=inventory_path if target.path == Path("values/ansible/inventory/local.yml") else target.path,
+            path=(
+                inventory_path
+                if target.path == Path("values/ansible/inventory/local.yml")
+                else target.path
+            ),
             pattern=target.pattern,
             replacement=target.replacement,
             release_url=target.release_url,
@@ -512,9 +601,13 @@ def run(
 def print_results(results: list[UpdateResult]) -> None:
     for result in results:
         if result.status == "updated":
-            print(f"UPDATED {result.name}: {result.current} -> {result.latest} ({result.path})")
+            print(
+                f"UPDATED {result.name}: {result.current} -> {result.latest} ({result.path})"
+            )
         elif result.status == "hold":
-            print(f"HOLD    {result.name}: {result.current} -> {result.latest}; {result.detail}")
+            print(
+                f"HOLD    {result.name}: {result.current} -> {result.latest}; {result.detail}"
+            )
         elif result.status == "current":
             print(f"CURRENT {result.name}: {result.current}")
         else:
@@ -548,7 +641,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--min-age-hours", type=int, default=DEFAULT_MIN_AGE_HOURS)
-    parser.add_argument("--dry-run", action="store_true", help="report eligible updates without writing pins or canonical values")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="report eligible updates without writing pins or canonical values",
+    )
     args = parser.parse_args(argv)
 
     try:

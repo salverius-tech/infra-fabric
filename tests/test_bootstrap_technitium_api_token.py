@@ -7,7 +7,11 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "bootstrap-technitium-api-token.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[1]
+    / "scripts"
+    / "bootstrap-technitium-api-token.py"
+)
 spec = importlib.util.spec_from_file_location("bootstrap_technitium_api_token", SCRIPT)
 assert spec and spec.loader
 bootstrap_token = importlib.util.module_from_spec(spec)
@@ -25,7 +29,9 @@ class FakeClient:
         FakeClient.last = self
 
     def wait_for_status(self, retries: int, delay: int) -> dict[str, object]:
-        self.calls.append(("/status", {"retries": str(retries), "delay": str(delay)}, None))
+        self.calls.append(
+            ("/status", {"retries": str(retries), "delay": str(delay)}, None)
+        )
         return {"status": "ok", "hasDefaultCredentials": True}
 
     def call(
@@ -69,7 +75,11 @@ class DefaultCredentialsFakeClient(FakeClient):
         timeout: int = 30,
         method: str = "POST",
     ) -> dict[str, object]:
-        if path == "/user/login" and (params or {}).get("pass") == "REPLACE_ADMIN_PASSWORD" and not self.password_changed:
+        if (
+            path == "/user/login"
+            and (params or {}).get("pass") == "REPLACE_ADMIN_PASSWORD"
+            and not self.password_changed
+        ):
             raise bootstrap_token.BootstrapError("invalid administrator password")
         if path == "/user/changePassword":
             self.password_changed = True
@@ -79,7 +89,9 @@ class DefaultCredentialsFakeClient(FakeClient):
 class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
     def test_status_invalid_token_marks_api_ready(self) -> None:
         client = bootstrap_token.TechnitiumBootstrapClient("http://example.invalid/api")
-        with mock.patch.object(client, "call", side_effect=bootstrap_token.BootstrapError("invalid-token")):
+        with mock.patch.object(
+            client, "call", side_effect=bootstrap_token.BootstrapError("invalid-token")
+        ):
             status = client.wait_for_status(retries=1, delay=0)
 
         self.assertEqual(status, {"status": "ok", "hasDefaultCredentials": False})
@@ -108,8 +120,12 @@ class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
                 return "updated"
 
             with (
-                mock.patch.object(bootstrap_token, "TechnitiumBootstrapClient", FakeClient),
-                mock.patch.object(bootstrap_token, "set_canonical_secret", side_effect=set_secret),
+                mock.patch.object(
+                    bootstrap_token, "TechnitiumBootstrapClient", FakeClient
+                ),
+                mock.patch.object(
+                    bootstrap_token, "set_canonical_secret", side_effect=set_secret
+                ),
             ):
                 changed = bootstrap_token.bootstrap_canonical(
                     api_url="http://example.invalid/api",
@@ -123,11 +139,30 @@ class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
                 )
 
         self.assertTrue(changed)
-        self.assertEqual(stored, [(bundle, "services.technitium.secrets.api_token", "REPLACE_API_TOKEN_VALUE", key_file)])
+        self.assertEqual(
+            stored,
+            [
+                (
+                    bundle,
+                    "services.technitium.secrets.api_token",
+                    "REPLACE_API_TOKEN_VALUE",
+                    key_file,
+                )
+            ],
+        )
         assert FakeClient.last is not None
-        self.assertIn(("/user/createToken", {"tokenName": "infra-fabric"}, "REPLACE_SESSION_TOKEN"), FakeClient.last.calls)
+        self.assertIn(
+            (
+                "/user/createToken",
+                {"tokenName": "infra-fabric"},
+                "REPLACE_SESSION_TOKEN",
+            ),
+            FakeClient.last.calls,
+        )
 
-    def test_canonical_bootstrap_replaces_default_admin_password_before_token_rotation(self) -> None:
+    def test_canonical_bootstrap_replaces_default_admin_password_before_token_rotation(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             bundle = root / "secrets.sops.yaml"
@@ -135,8 +170,14 @@ class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
             bundle.write_text("ciphertext\n", encoding="utf-8")
             key_file.write_text("identity\n", encoding="utf-8")
             with (
-                mock.patch.object(bootstrap_token, "TechnitiumBootstrapClient", DefaultCredentialsFakeClient),
-                mock.patch.object(bootstrap_token, "set_canonical_secret", return_value="updated"),
+                mock.patch.object(
+                    bootstrap_token,
+                    "TechnitiumBootstrapClient",
+                    DefaultCredentialsFakeClient,
+                ),
+                mock.patch.object(
+                    bootstrap_token, "set_canonical_secret", return_value="updated"
+                ),
             ):
                 changed = bootstrap_token.bootstrap_canonical(
                     api_url="http://example.invalid/api",
@@ -152,7 +193,11 @@ class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
         self.assertTrue(changed)
         assert FakeClient.last is not None
         self.assertIn(
-            ("/user/changePassword", {"pass": "admin", "newPass": "REPLACE_ADMIN_PASSWORD"}, "REPLACE_SESSION_TOKEN"),
+            (
+                "/user/changePassword",
+                {"pass": "admin", "newPass": "REPLACE_ADMIN_PASSWORD"},
+                "REPLACE_SESSION_TOKEN",
+            ),
             FakeClient.last.calls,
         )
 
@@ -164,8 +209,12 @@ class BootstrapTechnitiumApiTokenTests(unittest.TestCase):
             bundle.write_text("ciphertext\n", encoding="utf-8")
             key_file.write_text("identity\n", encoding="utf-8")
             with (
-                mock.patch.object(bootstrap_token, "TechnitiumBootstrapClient", ValidTokenFakeClient),
-                mock.patch.object(bootstrap_token, "set_canonical_secret") as set_secret,
+                mock.patch.object(
+                    bootstrap_token, "TechnitiumBootstrapClient", ValidTokenFakeClient
+                ),
+                mock.patch.object(
+                    bootstrap_token, "set_canonical_secret"
+                ) as set_secret,
             ):
                 changed = bootstrap_token.bootstrap_canonical(
                     api_url="http://example.invalid/api",

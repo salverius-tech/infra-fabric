@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Stable identity manifests for canonical consumer projections."""
+
 from __future__ import annotations
 
 import hashlib
@@ -15,7 +16,9 @@ class ManifestError(ValueError):
 
 def _canonical_json(value: Any) -> bytes:
     try:
-        return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+        return json.dumps(
+            value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8")
     except (TypeError, ValueError) as error:
         raise ManifestError("projection data is not JSON-compatible") from error
 
@@ -35,9 +38,14 @@ def build_manifest(
     source_commit: str,
 ) -> dict[str, Any]:
     if not site or not model_digest or not renderer_version or not source_commit:
-        raise ManifestError("site, model digest, renderer version, and source commit are required")
+        raise ManifestError(
+            "site, model digest, renderer version, and source commit are required"
+        )
     projection_entries = {
-        name: {"digest": content_digest(value), "secret_bearing": name in {"runtime.env"}}
+        name: {
+            "digest": content_digest(value),
+            "secret_bearing": name in {"runtime.env"},
+        }
         for name, value in sorted(projections.items())
     }
     manifest = {
@@ -50,7 +58,9 @@ def build_manifest(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "projections": projection_entries,
     }
-    manifest["projection_digest"] = content_digest({key: value for key, value in manifest.items() if key != "created_at"})
+    manifest["projection_digest"] = content_digest(
+        {key: value for key, value in manifest.items() if key != "created_at"}
+    )
     return manifest
 
 
@@ -71,9 +81,19 @@ def verify_manifest(
     recorded_digest = manifest.get("projection_digest")
     if not isinstance(recorded_digest, str):
         raise ManifestError("projection manifest has no projection digest")
-    unsigned_manifest = {key: value for key, value in manifest.items() if key not in {"created_at", "projection_digest"}}
+    unsigned_manifest = {
+        key: value
+        for key, value in manifest.items()
+        if key not in {"created_at", "projection_digest"}
+    }
     unsigned_manifest["projection_digest"] = recorded_digest
-    expected_digest = content_digest({key: value for key, value in unsigned_manifest.items() if key != "projection_digest"})
+    expected_digest = content_digest(
+        {
+            key: value
+            for key, value in unsigned_manifest.items()
+            if key != "projection_digest"
+        }
+    )
     if expected_digest != recorded_digest:
         raise ManifestError("projection manifest identity is altered")
     entries = manifest.get("projections")
@@ -91,8 +111,20 @@ def verify_projection_permissions(directory: Any) -> None:
     if directory.is_symlink() or stat.S_IMODE(directory.stat().st_mode) != 0o700:
         raise ManifestError("generated projection directory must be mode 0700")
     for path in directory.iterdir():
-        if path.is_symlink() or not path.is_file() or stat.S_IMODE(path.stat().st_mode) != 0o600:
-            raise ManifestError(f"generated projection file must be a regular mode-0600 file: {path.name}")
+        if (
+            path.is_symlink()
+            or not path.is_file()
+            or stat.S_IMODE(path.stat().st_mode) != 0o600
+        ):
+            raise ManifestError(
+                f"generated projection file must be a regular mode-0600 file: {path.name}"
+            )
 
 
-__all__ = ["ManifestError", "build_manifest", "content_digest", "verify_manifest", "verify_projection_permissions"]
+__all__ = [
+    "ManifestError",
+    "build_manifest",
+    "content_digest",
+    "verify_manifest",
+    "verify_projection_permissions",
+]

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate a Hermes dashboard basic-auth scrypt password hash."""
+
 from __future__ import annotations
 
 import argparse
@@ -35,7 +36,9 @@ def hash_password(password: str) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--password-stdin", action="store_true", help="read the password from stdin")
+    parser.add_argument(
+        "--password-stdin", action="store_true", help="read the password from stdin"
+    )
     args = parser.parse_args(argv)
 
     if args.password_stdin:

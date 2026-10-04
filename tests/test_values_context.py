@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
 def load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader
@@ -33,7 +34,9 @@ class ValuesContextTests(unittest.TestCase):
                 context = values_context.from_environment(repo)
             self.assertEqual(context.values_dir, repo / "values")
             self.assertIsNone(context.site)
-            self.assertEqual(context.path("terraform.tfvars"), repo / "values" / "terraform.tfvars")
+            self.assertEqual(
+                context.path("terraform.tfvars"), repo / "values" / "terraform.tfvars"
+            )
 
     def test_selected_site_resolves_under_sites_without_path_traversal(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -46,7 +49,9 @@ class ValuesContextTests(unittest.TestCase):
             with self.assertRaises(values_context.ValuesContextError):
                 context.path("../prod/terraform.tfvars")
 
-    def test_selected_site_exposes_canonical_site_yaml_without_changing_metadata(self) -> None:
+    def test_selected_site_exposes_canonical_site_yaml_without_changing_metadata(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp)
             site = repo / "values" / "sites" / "dev"
@@ -57,8 +62,13 @@ class ValuesContextTests(unittest.TestCase):
                 context = values_context.from_environment(repo)
             self.assertEqual(context.canonical_site_path, canonical)
             self.assertEqual(context.generated_dir, site / "generated")
-            self.assertEqual(context.projection_manifest_path, site / "generated" / "manifest.json")
-            self.assertEqual(context.generated_path("terraform.auto.tfvars.json"), site / "generated" / "terraform.auto.tfvars.json")
+            self.assertEqual(
+                context.projection_manifest_path, site / "generated" / "manifest.json"
+            )
+            self.assertEqual(
+                context.generated_path("terraform.auto.tfvars.json"),
+                site / "generated" / "terraform.auto.tfvars.json",
+            )
             self.assertIsNone(context.metadata_path)
             with self.assertRaises(values_context.ValuesContextError):
                 context.generated_path("../outside.json")
@@ -74,7 +84,9 @@ class ValuesContextTests(unittest.TestCase):
             repo = Path(temp)
             site = repo / "values" / "sites" / "dev"
             site.mkdir(parents=True)
-            (site / "site.json").write_text(json.dumps({"name": "prod"}), encoding="utf-8")
+            (site / "site.json").write_text(
+                json.dumps({"name": "prod"}), encoding="utf-8"
+            )
             with patch.dict(os.environ, {"VALUES_SITE": "dev"}, clear=True):
                 context = values_context.from_environment(repo)
                 with self.assertRaises(values_context.ValuesContextError):
@@ -100,10 +112,23 @@ class SiteSettingsTests(unittest.TestCase):
             site.mkdir(parents=True)
             site_settings = site / "site.json"
             site_settings.write_text(
-                json.dumps({"name": "dev", "class": "production", "lifecycle": "persistent", "allow_apply": True, "allow_destroy": False, "services": ["hermes"]}),
+                json.dumps(
+                    {
+                        "name": "dev",
+                        "class": "production",
+                        "lifecycle": "persistent",
+                        "allow_apply": True,
+                        "allow_destroy": False,
+                        "services": ["hermes"],
+                    }
+                ),
                 encoding="utf-8",
             )
-            with patch.dict(os.environ, {"VALUES_DIR": str(repo / "values"), "VALUES_SITE": "dev"}, clear=True):
+            with patch.dict(
+                os.environ,
+                {"VALUES_DIR": str(repo / "values"), "VALUES_SITE": "dev"},
+                clear=True,
+            ):
                 with self.assertRaises(settings.SettingsError):
                     settings.load_settings(site_settings)
 
@@ -118,14 +143,31 @@ class SiteSettingsTests(unittest.TestCase):
             )
             site_settings = site / "site.json"
             site_settings.write_text(
-                json.dumps({"name": "dev", "class": "development", "lifecycle": "disposable", "allow_apply": True, "allow_destroy": True, "services": ["hermes"]}),
+                json.dumps(
+                    {
+                        "name": "dev",
+                        "class": "development",
+                        "lifecycle": "disposable",
+                        "allow_apply": True,
+                        "allow_destroy": True,
+                        "services": ["hermes"],
+                    }
+                ),
                 encoding="utf-8",
             )
-            with patch.dict(os.environ, {"VALUES_DIR": str(repo / "values"), "VALUES_SITE": "dev"}, clear=True):
-                with patch.object(settings, "DEFAULT_SETTINGS", repo / "settings.local.json"):
+            with patch.dict(
+                os.environ,
+                {"VALUES_DIR": str(repo / "values"), "VALUES_SITE": "dev"},
+                clear=True,
+            ):
+                with patch.object(
+                    settings, "DEFAULT_SETTINGS", repo / "settings.local.json"
+                ):
                     loaded = settings.load_settings(site_settings)
             self.assertEqual(loaded["services"], ["hermes"])
-            self.assertEqual(loaded["values_repo"]["remote"], "ssh://private.example/values")
+            self.assertEqual(
+                loaded["values_repo"]["remote"], "ssh://private.example/values"
+            )
             self.assertEqual(loaded["site_metadata"]["class"], "development")
 
 

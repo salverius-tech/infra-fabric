@@ -1,4 +1,5 @@
 """Compare OpenTofu/Terraform JSON plans for semantic equivalence."""
+
 from __future__ import annotations
 
 import json
@@ -37,10 +38,16 @@ def _resource_identity(change: Mapping[str, Any]) -> str:
 def _semantic_resource_change(change: Mapping[str, Any]) -> dict[str, Any] | None:
     details = change.get("change")
     if not isinstance(details, Mapping):
-        raise PlanEquivalenceError(f"plan resource change is malformed: {_resource_identity(change)}")
+        raise PlanEquivalenceError(
+            f"plan resource change is malformed: {_resource_identity(change)}"
+        )
     actions = details.get("actions")
-    if not isinstance(actions, list) or not all(isinstance(action, str) for action in actions):
-        raise PlanEquivalenceError(f"plan resource actions are malformed: {_resource_identity(change)}")
+    if not isinstance(actions, list) or not all(
+        isinstance(action, str) for action in actions
+    ):
+        raise PlanEquivalenceError(
+            f"plan resource actions are malformed: {_resource_identity(change)}"
+        )
     if actions == ["no-op"] or actions == ["read"]:
         return None
     return {
@@ -78,29 +85,48 @@ def _semantic_changes(plan: Mapping[str, Any]) -> dict[str, Any]:
             raise PlanEquivalenceError("plan resource change must be an object")
         address = _resource_identity(raw_change)
         if address in resources:
-            raise PlanEquivalenceError(f"plan contains duplicate resource address: {address}")
+            raise PlanEquivalenceError(
+                f"plan contains duplicate resource address: {address}"
+            )
         if "change" in raw_change:
             semantic = _semantic_resource_change(raw_change)
         else:
             actions = raw_change.get("actions")
-            if not isinstance(actions, list) or not all(isinstance(action, str) for action in actions):
-                raise PlanEquivalenceError(f"plan resource actions are malformed: {address}")
-            if not actions or any(action not in {"create", "read", "update", "delete", "no-op"} for action in actions):
-                raise PlanEquivalenceError(f"plan resource actions are invalid: {address}")
+            if not isinstance(actions, list) or not all(
+                isinstance(action, str) for action in actions
+            ):
+                raise PlanEquivalenceError(
+                    f"plan resource actions are malformed: {address}"
+                )
+            if not actions or any(
+                action not in {"create", "read", "update", "delete", "no-op"}
+                for action in actions
+            ):
+                raise PlanEquivalenceError(
+                    f"plan resource actions are invalid: {address}"
+                )
             if "values" not in raw_change:
-                raise PlanEquivalenceError(f"plan resource values are missing: {address}")
-            semantic = None if actions in (["no-op"], ["read"]) else {
-                "actions": actions,
-                "before": None,
-                "after": raw_change.get("values"),
-                "replace_paths": [],
-            }
+                raise PlanEquivalenceError(
+                    f"plan resource values are missing: {address}"
+                )
+            semantic = (
+                None
+                if actions in (["no-op"], ["read"])
+                else {
+                    "actions": actions,
+                    "before": None,
+                    "after": raw_change.get("values"),
+                    "replace_paths": [],
+                }
+            )
         if semantic is not None:
             resources[address] = semantic
     return {"resources": resources, "outputs": _semantic_output_changes(plan)}
 
 
-def compare_plans(before: Mapping[str, Any] | Path, after: Mapping[str, Any] | Path) -> dict[str, Any]:
+def compare_plans(
+    before: Mapping[str, Any] | Path, after: Mapping[str, Any] | Path
+) -> dict[str, Any]:
     """Return a stable semantic comparison of two plan JSON documents."""
     before_semantic = _semantic_changes(_load_document(before))
     after_semantic = _semantic_changes(_load_document(after))
@@ -125,7 +151,14 @@ def compare_plans(before: Mapping[str, Any] | Path, after: Mapping[str, Any] | P
     after_outputs = after_semantic["outputs"]
     for name in sorted(set(before_outputs) | set(after_outputs)):
         if before_outputs.get(name) != after_outputs.get(name):
-            differences.append({"kind": "output-change", "address": name, "before": before_outputs.get(name), "after": after_outputs.get(name)})
+            differences.append(
+                {
+                    "kind": "output-change",
+                    "address": name,
+                    "before": before_outputs.get(name),
+                    "after": after_outputs.get(name),
+                }
+            )
     return {"equivalent": False, "differences": differences}
 
 

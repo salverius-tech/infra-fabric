@@ -6,7 +6,9 @@ from pathlib import Path
 
 class OpenTofuOutputBindingsTests(unittest.TestCase):
     def test_static_lan_outputs_derive_from_resource_address_variables(self) -> None:
-        outputs = (Path(__file__).resolve().parents[1] / "infra" / "opentofu" / "outputs.tf").read_text()
+        outputs = (
+            Path(__file__).resolve().parents[1] / "infra" / "opentofu" / "outputs.tf"
+        ).read_text()
 
         self.assertIn(
             'var.infisical_container_ipv4_address == "dhcp" ? var.infisical_lan_ip : split("/", var.infisical_container_ipv4_address)[0]',

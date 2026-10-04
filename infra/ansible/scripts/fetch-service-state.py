@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Stream a service-state archive over direct SSH into an atomic private file."""
+
 from __future__ import annotations
 
 import argparse
@@ -31,13 +32,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def validate_paths(remote_archive: str, output: Path, backup_root: Path) -> tuple[Path, Path]:
-    if not remote_archive.startswith("/tmp/") or not remote_archive.endswith(".tar.gz") or "/../" in remote_archive:
+def validate_paths(
+    remote_archive: str, output: Path, backup_root: Path
+) -> tuple[Path, Path]:
+    if (
+        not remote_archive.startswith("/tmp/")
+        or not remote_archive.endswith(".tar.gz")
+        or "/../" in remote_archive
+    ):
         raise TransferError("remote archive must be a generated /tmp/*.tar.gz path")
     root = backup_root.resolve()
     destination = output.resolve(strict=False)
-    if destination.parent != root or destination.name.startswith(".") or destination.suffix != ".gz":
-        raise TransferError("output must be a non-hidden .gz file directly inside the backup directory")
+    if (
+        destination.parent != root
+        or destination.name.startswith(".")
+        or destination.suffix != ".gz"
+    ):
+        raise TransferError(
+            "output must be a non-hidden .gz file directly inside the backup directory"
+        )
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     return destination, root
 
@@ -48,7 +61,11 @@ def ssh_command(args: argparse.Namespace) -> list[str]:
     if args.ssh_common_args:
         command.extend(shlex.split(args.ssh_common_args))
     command.append(f"{args.user}@{args.host}")
-    command.extend(["sudo", "-n", "cat", args.remote_archive] if args.become else ["cat", args.remote_archive])
+    command.extend(
+        ["sudo", "-n", "cat", args.remote_archive]
+        if args.become
+        else ["cat", args.remote_archive]
+    )
     return command
 
 
@@ -61,7 +78,9 @@ def stream_archive(args: argparse.Namespace) -> dict[str, int | str]:
     process: subprocess.Popen[bytes] | None = None
     try:
         os.fchmod(fd, 0o600)
-        process = subprocess.Popen(ssh_command(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(
+            ssh_command(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         assert process.stdout is not None
         with os.fdopen(fd, "wb", closefd=True) as handle:
             fd = -1

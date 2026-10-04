@@ -33,7 +33,10 @@ def evaluate_when(expression: str, fixtures: dict[str, dict[str, Any]]) -> bool:
             return getattr(value, node.attr)
         if isinstance(node, ast.Constant) and isinstance(node.value, (bool, int)):
             return node.value
-        if isinstance(node, ast.Compare) and len(node.ops) == len(node.comparators) == 1:
+        if (
+            isinstance(node, ast.Compare)
+            and len(node.ops) == len(node.comparators) == 1
+        ):
             left, right = resolve(node.left), resolve(node.comparators[0])
             if isinstance(node.ops[0], ast.Eq):
                 return left == right
@@ -47,7 +50,11 @@ def evaluate_when(expression: str, fixtures: dict[str, dict[str, Any]]) -> bool:
 class StorageOwnershipTests(unittest.TestCase):
     def ownership_task(self, backend: str) -> dict[str, Any]:
         tasks = yaml.safe_load(STORAGE_TASKS[backend].read_text(encoding="utf-8"))
-        ownership_tasks = [task for task in tasks if str(task.get("name", "")).startswith("Set initial host")]
+        ownership_tasks = [
+            task
+            for task in tasks
+            if str(task.get("name", "")).startswith("Set initial host")
+        ]
         self.assertEqual(len(ownership_tasks), 1, backend)
         return ownership_tasks[0]
 
@@ -66,9 +73,15 @@ class StorageOwnershipTests(unittest.TestCase):
             self.assertIn("group", file_task, backend)
             self.assertIn("mode", file_task, backend)
 
-    def test_loaded_ownership_guards_apply_only_on_first_run_behavior_model(self) -> None:
+    def test_loaded_ownership_guards_apply_only_on_first_run_behavior_model(
+        self,
+    ) -> None:
         fixtures = {
-            "directory": ("storage_host_directory", {"changed": True}, {"changed": False}),
+            "directory": (
+                "storage_host_directory",
+                {"changed": True},
+                {"changed": False},
+            ),
             "zfs": ("storage_zfs_list", {"rc": 1}, {"rc": 0}),
             "nfs": ("storage_host_nfs_mount", {"rc": 0}, {"rc": 32}),
             "cifs": ("storage_host_cifs_mount", {"rc": 0}, {"rc": 32}),

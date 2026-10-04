@@ -27,12 +27,16 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings["services"], ["technitium", "forgejo"])
 
     def test_values_remote_is_loaded(self) -> None:
-        path = self.write_settings({"values_repo": {"remote": "git@example.invalid:repo.git"}})
+        path = self.write_settings(
+            {"values_repo": {"remote": "git@example.invalid:repo.git"}}
+        )
         try:
             settings = settings_script.load_settings(path)
         finally:
             path.unlink()
-        self.assertEqual(settings["values_repo"]["remote"], "git@example.invalid:repo.git")
+        self.assertEqual(
+            settings["values_repo"]["remote"], "git@example.invalid:repo.git"
+        )
 
     def test_unknown_service_fails(self) -> None:
         path = self.write_settings({"services": ["unknown"]})
@@ -147,7 +151,9 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings["services"], ["hermes"])
 
     def test_playbooks_follow_service_order(self) -> None:
-        path = self.write_settings({"services": ["technitium", "forgejo", "tailscale_client"]})
+        path = self.write_settings(
+            {"services": ["technitium", "forgejo", "tailscale_client"]}
+        )
         try:
             settings = settings_script.load_settings(path)
         finally:
@@ -177,10 +183,16 @@ class SettingsTests(unittest.TestCase):
 
         self.assertEqual(
             settings_script.tofu_targets("forgejo", loaded["services"]),
-            ["module.forgejo", "module.forgejo_vm", "terraform_data.forgejo_storage_validation"],
+            [
+                "module.forgejo",
+                "module.forgejo_vm",
+                "terraform_data.forgejo_storage_validation",
+            ],
         )
 
-    def test_tofu_replace_targets_are_derived_from_enabled_service_registry(self) -> None:
+    def test_tofu_replace_targets_are_derived_from_enabled_service_registry(
+        self,
+    ) -> None:
         path = self.write_settings({"services": ["hermes"]})
         try:
             loaded = settings_script.load_settings(path)
@@ -211,8 +223,14 @@ class SettingsTests(unittest.TestCase):
         try:
             self.assertEqual(settings_script.projection_services(path), ["forgejo"])
             self.assertEqual(
-                settings_script.tofu_targets("forgejo", settings_script.projection_services(path)),
-                ["module.forgejo", "module.forgejo_vm", "terraform_data.forgejo_storage_validation"],
+                settings_script.tofu_targets(
+                    "forgejo", settings_script.projection_services(path)
+                ),
+                [
+                    "module.forgejo",
+                    "module.forgejo_vm",
+                    "terraform_data.forgejo_storage_validation",
+                ],
             )
         finally:
             path.unlink()

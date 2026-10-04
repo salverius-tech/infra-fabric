@@ -17,26 +17,55 @@ class ValuesScriptTests(unittest.TestCase):
             fake_bin = workspace / "bin"
             fake_bin.mkdir()
             fake_git = fake_bin / "git"
-            fake_git.write_text("#!/bin/sh\nif [ \"$1\" = \"-C\" ] && [ \"$3\" = \"init\" ]; then mkdir -p \"$2/.git\"; fi\nexit 0\n", encoding="utf-8")
+            fake_git.write_text(
+                '#!/bin/sh\nif [ "$1" = "-C" ] && [ "$3" = "init" ]; then mkdir -p "$2/.git"; fi\nexit 0\n',
+                encoding="utf-8",
+            )
             fake_git.chmod(0o755)
             (template / "sites" / "_template").mkdir(parents=True)
-            (template / "sites" / "_template" / "site.yaml").write_text("site:\n  name: example\n", encoding="utf-8")
+            (template / "sites" / "_template" / "site.yaml").write_text(
+                "site:\n  name: example\n", encoding="utf-8"
+            )
             for source in ("README.md", ".env.example"):
                 (template / source).write_text("placeholder\n", encoding="utf-8")
             environment = os.environ.copy()
-            environment.update({"VALUES_DIR": str(workspace / "values"), "VALUES_SITE": "qa", "VALUES_TEMPLATE_DIR": str(template), "PATH": f"{fake_bin}{os.pathsep}{environment['PATH']}"})
-            result = subprocess.run([str(ROOT / "scripts" / "values.sh"), "init"], cwd=ROOT, env=environment, text=True, capture_output=True, check=False)
+            environment.update(
+                {
+                    "VALUES_DIR": str(workspace / "values"),
+                    "VALUES_SITE": "qa",
+                    "VALUES_TEMPLATE_DIR": str(template),
+                    "PATH": f"{fake_bin}{os.pathsep}{environment['PATH']}",
+                }
+            )
+            result = subprocess.run(
+                [str(ROOT / "scripts" / "values.sh"), "init"],
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("name: qa", (workspace / "values" / "sites" / "qa" / "site.yaml").read_text(encoding="utf-8"))
+            self.assertIn(
+                "name: qa",
+                (workspace / "values" / "sites" / "qa" / "site.yaml").read_text(
+                    encoding="utf-8"
+                ),
+            )
 
-    def test_site_init_seeds_canonical_yaml_without_overwriting_existing_files(self) -> None:
+    def test_site_init_seeds_canonical_yaml_without_overwriting_existing_files(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary)
             values = workspace / "values"
             fake_bin = workspace / "bin"
             fake_bin.mkdir()
             fake_git = fake_bin / "git"
-            fake_git.write_text("#!/bin/sh\nif [ \"$1\" = \"-C\" ] && [ \"$3\" = \"init\" ]; then mkdir -p \"$2/.git\"; fi\nexit 0\n", encoding="utf-8")
+            fake_git.write_text(
+                '#!/bin/sh\nif [ "$1" = "-C" ] && [ "$3" = "init" ]; then mkdir -p "$2/.git"; fi\nexit 0\n',
+                encoding="utf-8",
+            )
             fake_git.chmod(0o755)
             environment = os.environ.copy()
             environment.update(
@@ -58,8 +87,12 @@ class ValuesScriptTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             site = values / "sites" / "dev"
             self.assertTrue((site / "site.yaml").is_file())
-            self.assertIn("allow_apply: false", (site / "site.yaml").read_text(encoding="utf-8"))
-            self.assertIn("allow_destroy: false", (site / "site.yaml").read_text(encoding="utf-8"))
+            self.assertIn(
+                "allow_apply: false", (site / "site.yaml").read_text(encoding="utf-8")
+            )
+            self.assertIn(
+                "allow_destroy: false", (site / "site.yaml").read_text(encoding="utf-8")
+            )
             self.assertFalse((site / "site.json").exists())
             self.assertFalse((site / "terraform.tfvars").exists())
             self.assertFalse((site / "dns-records.local.json").exists())
@@ -86,7 +119,10 @@ class ValuesScriptTests(unittest.TestCase):
             fake_bin = workspace / "bin"
             fake_bin.mkdir()
             fake_git = fake_bin / "git"
-            fake_git.write_text("#!/bin/sh\nif [ \"$1\" = \"-C\" ] && [ \"$3\" = \"init\" ]; then mkdir -p \"$2/.git\"; fi\nexit 0\n", encoding="utf-8")
+            fake_git.write_text(
+                '#!/bin/sh\nif [ "$1" = "-C" ] && [ "$3" = "init" ]; then mkdir -p "$2/.git"; fi\nexit 0\n',
+                encoding="utf-8",
+            )
             fake_git.chmod(0o755)
             (template / "sites" / "_template").mkdir(parents=True)
             (template / "sites" / "_template" / "site.yaml").write_text(
@@ -100,18 +136,26 @@ class ValuesScriptTests(unittest.TestCase):
             )
             (template / "README.md").write_text("placeholder\n", encoding="utf-8")
             environment = os.environ.copy()
-            environment.update({
-                "VALUES_DIR": str(workspace / "values"),
-                "VALUES_SITE": "dev",
-                "VALUES_TEMPLATE_DIR": str(template),
-                "PATH": f"{fake_bin}{os.pathsep}{environment['PATH']}",
-            })
+            environment.update(
+                {
+                    "VALUES_DIR": str(workspace / "values"),
+                    "VALUES_SITE": "dev",
+                    "VALUES_TEMPLATE_DIR": str(template),
+                    "PATH": f"{fake_bin}{os.pathsep}{environment['PATH']}",
+                }
+            )
             result = subprocess.run(
                 [str(ROOT / "scripts" / "values.sh"), "init"],
-                cwd=ROOT, env=environment, text=True, capture_output=True, check=False,
+                cwd=ROOT,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            site = (workspace / "values" / "sites" / "dev" / "site.yaml").read_text(encoding="utf-8")
+            site = (workspace / "values" / "sites" / "dev" / "site.yaml").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("allow_apply: false", site)
             self.assertIn("allow_destroy: false", site)
 
@@ -122,17 +166,27 @@ class ValuesScriptTests(unittest.TestCase):
             fake_bin = workspace / "bin"
             fake_bin.mkdir()
             fake_git = fake_bin / "git"
-            fake_git.write_text("#!/bin/sh\nif [ \"$1\" = \"-C\" ] && [ \"$3\" = \"init\" ]; then mkdir -p \"$2/.git\"; fi\nexit 0\n", encoding="utf-8")
+            fake_git.write_text(
+                '#!/bin/sh\nif [ "$1" = "-C" ] && [ "$3" = "init" ]; then mkdir -p "$2/.git"; fi\nexit 0\n',
+                encoding="utf-8",
+            )
             fake_git.chmod(0o755)
             (template / "sites" / "dev").mkdir(parents=True)
-            for source in ("README.md", ".env.example", "terraform.tfvars", "dns-records.local.json"):
+            for source in (
+                "README.md",
+                ".env.example",
+                "terraform.tfvars",
+                "dns-records.local.json",
+            ):
                 destination = template / source
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_text("placeholder\n", encoding="utf-8")
             inventory = template / "ansible" / "inventory" / "local.yml"
             inventory.parent.mkdir(parents=True)
             inventory.write_text("all: {}\n", encoding="utf-8")
-            (template / "sites" / "dev" / "site.json").write_text("{}\n", encoding="utf-8")
+            (template / "sites" / "dev" / "site.json").write_text(
+                "{}\n", encoding="utf-8"
+            )
             environment = os.environ.copy()
             environment.update(
                 {

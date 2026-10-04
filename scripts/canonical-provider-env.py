@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run one canonical provider command with transient SOPS-backed credentials."""
+
 from __future__ import annotations
 
 import argparse
@@ -31,7 +32,10 @@ def main(argv: list[str] | None = None) -> int:
 
     context = from_environment(Path.cwd())
     if context.canonical_site_path is None:
-        print("canonical provider environment requires a selected canonical site", file=sys.stderr)
+        print(
+            "canonical provider environment requires a selected canonical site",
+            file=sys.stderr,
+        )
         return 2
     bundle = context.values_dir / "secrets.sops.yaml"
     try:
@@ -39,7 +43,11 @@ def main(argv: list[str] | None = None) -> int:
         environment = dict(os.environ)
         environment.pop("SOPS_AGE_KEY", None)
         environment.update(
-            deliver_environment(provider, consumer="opentofu-provider", requirements=provider_requirements(args.provider))
+            deliver_environment(
+                provider,
+                consumer="opentofu-provider",
+                requirements=provider_requirements(args.provider),
+            )
         )
         os.execvpe(command[0], command, environment)
     except (OSError, SecretProviderError, ValueError) as error:

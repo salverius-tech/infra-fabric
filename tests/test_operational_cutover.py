@@ -30,7 +30,9 @@ def snapshot_tree(root: Path) -> dict[str, tuple[int, int, int, bytes | str | No
         if stat.S_ISDIR(metadata.st_mode):
             for entry in sorted(os.scandir(path), key=lambda item: item.name):
                 child = Path(entry.path)
-                child_relative = entry.name if relative == "." else f"{relative}/{entry.name}"
+                child_relative = (
+                    entry.name if relative == "." else f"{relative}/{entry.name}"
+                )
                 visit(child, child_relative)
 
     visit(root, ".")
@@ -47,7 +49,11 @@ class OperationalCutoverTests(unittest.TestCase):
             "edit-secrets.sh",
             "ssh-initialize.sh",
         ):
-            result = subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], capture_output=True, text=True)
+            result = subprocess.run(
+                ["bash", "-n", str(ROOT / "scripts" / name)],
+                capture_output=True,
+                text=True,
+            )
             self.assertEqual(result.returncode, 0, msg=f"{name}: {result.stderr}")
 
     def test_protected_just_recipes_delegate_to_linted_scripts(self) -> None:
@@ -55,13 +61,12 @@ class OperationalCutoverTests(unittest.TestCase):
             ["just", "--dump"], cwd=ROOT, capture_output=True, text=True, check=True
         ).stdout
         for recipe, script in (
-            ("edit-secrets SITE=\"dev\":", "scripts/edit-secrets.sh"),
-            ("ssh-initialize SITE=\"dev\":", "scripts/ssh-initialize.sh"),
+            ('edit-secrets SITE="dev":', "scripts/edit-secrets.sh"),
+            ('ssh-initialize SITE="dev":', "scripts/ssh-initialize.sh"),
         ):
             with self.subTest(recipe=recipe):
                 self.assertRegex(
-                    dumped,
-                    rf"(?m)^{re.escape(recipe)}\n\s+@{re.escape(script)} "
+                    dumped, rf"(?m)^{re.escape(recipe)}\n\s+@{re.escape(script)} "
                 )
 
     def test_canonical_lifecycle_wrappers_are_executable(self) -> None:
@@ -80,7 +85,10 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertIn('"${VALUES_SITE}" != "dev"', script)
         self.assertIn("StrictHostKeyChecking=yes", script)
         self.assertIn("hermes_rollback_rehearsal_approved", script)
-        self.assertIn('generated_dir=\\"\\${INFRA_GENERATED_DIR:-/workspace/${values_dir}/generated}\\"', script)
+        self.assertIn(
+            'generated_dir=\\"\\${INFRA_GENERATED_DIR:-/workspace/${values_dir}/generated}\\"',
+            script,
+        )
         self.assertIn("verify-projections.py", script)
         self.assertIn('--generated-dir \\"\\${generated_dir}\\"', script)
         self.assertNotIn('inventory="/workspace/${values_dir}/generated/', script)
@@ -88,9 +96,14 @@ class OperationalCutoverTests(unittest.TestCase):
             justfile,
             r'(?m)^rehearse-development-rollback approval=""\s*:',
         )
-        rollback = (ROOT / "infra/ansible/playbooks/hermes-rollback-rehearsal.yml").read_text(encoding="utf-8")
+        rollback = (
+            ROOT / "infra/ansible/playbooks/hermes-rollback-rehearsal.yml"
+        ).read_text(encoding="utf-8")
         self.assertIn("hermes_rollback_dashboard_ready", rollback)
-        self.assertIn("until: hermes_rollback_dashboard_ready.status | default(0) == 200", rollback)
+        self.assertIn(
+            "until: hermes_rollback_dashboard_ready.status | default(0) == 200",
+            rollback,
+        )
 
     def test_no_legacy_recovery_entrypoint_remains(self) -> None:
         justfile = (ROOT / "justfile").read_text(encoding="utf-8")
@@ -98,11 +111,18 @@ class OperationalCutoverTests(unittest.TestCase):
         compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
         self.assertNotIn("legacy-values-forensics", compose)
         for path in (
-            "ansible_semantic_discovery.py", "discover-values-remote.sh",
-            "legacy-values-discovery.py", "legacy-values-forensics.sh",
-            "legacy_values_discovery.py", "migrate-secret-bundle.py",
-            "migrate-site-values.py", "migrate-values.py", "migration_backup.py",
-            "bootstrap-domain.py", "parse-env.py", "bootstrap-pve-token.sh",
+            "ansible_semantic_discovery.py",
+            "discover-values-remote.sh",
+            "legacy-values-discovery.py",
+            "legacy-values-forensics.sh",
+            "legacy_values_discovery.py",
+            "migrate-secret-bundle.py",
+            "migrate-site-values.py",
+            "migrate-values.py",
+            "migration_backup.py",
+            "bootstrap-domain.py",
+            "parse-env.py",
+            "bootstrap-pve-token.sh",
         ):
             self.assertFalse((ROOT / "scripts" / path).exists(), path)
         self.assertFalse((ROOT / "infra/ansible/inventory/tfvars.py").exists())
@@ -127,6 +147,7 @@ class OperationalCutoverTests(unittest.TestCase):
             self.assertNotIn("--settings", source, relative)
             self.assertNotIn("load_tfvars", source, relative)
             self.assertNotIn("import hcl2", source, relative)
+
 
 if __name__ == "__main__":
     unittest.main()

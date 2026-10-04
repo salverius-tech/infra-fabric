@@ -28,7 +28,9 @@ HEALTH = ROLE / "templates/sssf-health"
 class SssfSupplyChainTests(unittest.TestCase):
     def test_runtime_pins_are_complete_and_checksum_shaped(self) -> None:
         defaults = yaml.safe_load(DEFAULTS.read_text(encoding="utf-8"))
-        self.assertEqual(defaults["sssf_artifact_path"], "/var/lib/infra-fabric/artifacts/sssf")
+        self.assertEqual(
+            defaults["sssf_artifact_path"], "/var/lib/infra-fabric/artifacts/sssf"
+        )
         for tool in ("uv", "pi", "bun", "just"):
             self.assertRegex(defaults[f"sssf_{tool}_version"], r"^\d+\.\d+\.\d+$")
             self.assertRegex(defaults[f"sssf_{tool}_sha256"], r"^[0-9a-f]{64}$")
@@ -51,19 +53,36 @@ class SssfSupplyChainTests(unittest.TestCase):
         self.assertIn("ansible_architecture == 'x86_64'", text)
         self.assertIn("item.tool != 'bun' or sssf_visualizer_enabled | bool", text)
         self.assertIn("not item.skipped | default(false)", text)
-        self.assertTrue(any(task.get("name") == "Extract checksum-verified Bun runtime" for task in tasks))
+        self.assertTrue(
+            any(
+                task.get("name") == "Extract checksum-verified Bun runtime"
+                for task in tasks
+            )
+        )
 
     def test_reviewed_upstream_checkout_is_immutable_to_runtime_user(self) -> None:
         tasks = yaml.safe_load(TASKS.read_text(encoding="utf-8"))
-        directories = next(task for task in tasks if task.get("name") == "Ensure SSSF directories exist")
+        directories = next(
+            task
+            for task in tasks
+            if task.get("name") == "Ensure SSSF directories exist"
+        )
         by_path = {item["path"]: item for item in directories["loop"]}
         for path in ("{{ sssf_data_dir }}", "{{ sssf_data_dir }}/upstream"):
             self.assertEqual(by_path[path]["owner"], "root")
             self.assertEqual(by_path[path]["group"], "root")
-        self.assertEqual(by_path["{{ sssf_data_dir }}/factory"]["owner"], "{{ sssf_runtime_user }}")
-        checkout = next(task for task in tasks if task.get("name") == "Initialize SSSF upstream checkout")
+        self.assertEqual(
+            by_path["{{ sssf_data_dir }}/factory"]["owner"], "{{ sssf_runtime_user }}"
+        )
+        checkout = next(
+            task
+            for task in tasks
+            if task.get("name") == "Initialize SSSF upstream checkout"
+        )
         command = checkout["ansible.builtin.shell"]
-        self.assertIn("git -c safe.directory=\"${upstream}\" -C \"${upstream}\" clean -ffdx", command)
+        self.assertIn(
+            'git -c safe.directory="${upstream}" -C "${upstream}" clean -ffdx', command
+        )
         self.assertIn("chown -R root:root", command)
         self.assertNotIn("chown -R {{ sssf_runtime_user", command)
         self.assertIn("status --porcelain", command)
@@ -86,9 +105,15 @@ class SssfSupplyChainTests(unittest.TestCase):
         self.assertNotIn("Refresh Pi model catalog for SSSF runtime", names)
         self.assertNotIn("Generate the model registry expected by SSSF ADWs", names)
         self.assertNotIn(". /etc/sssf/env", TASKS.read_text(encoding="utf-8"))
-        registry = next(task for task in tasks if task.get("name") == "Install empty Pi custom model registry")
+        registry = next(
+            task
+            for task in tasks
+            if task.get("name") == "Install empty Pi custom model registry"
+        )
         copy = registry["ansible.builtin.copy"]
-        self.assertEqual(copy["dest"], "/home/{{ sssf_runtime_user }}/.pi/agent/models.json")
+        self.assertEqual(
+            copy["dest"], "/home/{{ sssf_runtime_user }}/.pi/agent/models.json"
+        )
         self.assertEqual(copy["content"], '{"providers": {}}\n')
         self.assertEqual(copy["owner"], "{{ sssf_runtime_user }}")
         self.assertEqual(copy["mode"], "0600")
@@ -100,50 +125,118 @@ class SssfSupplyChainTests(unittest.TestCase):
             "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1",
         )
         tasks = yaml.safe_load(TASKS.read_text(encoding="utf-8"))
-        source_task = next(task for task in tasks if task.get("name") == "Detect existing SSSF data mount source")
+        source_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Detect existing SSSF data mount source"
+        )
         self.assertEqual(
             source_task["ansible.builtin.command"]["argv"],
             ["findmnt", "-no", "SOURCE", "--mountpoint", "{{ sssf_data_dir }}"],
         )
-        normalize_task = next(task for task in tasks if task.get("name") == "Normalize existing SSSF data mount sources")
-        normalized = normalize_task["ansible.builtin.set_fact"]["sssf_existing_data_mount_sources"]
+        normalize_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Normalize existing SSSF data mount sources"
+        )
+        normalized = normalize_task["ansible.builtin.set_fact"][
+            "sssf_existing_data_mount_sources"
+        ]
         self.assertIn("unique", normalized)
-        source_guard = next(task for task in tasks if task.get("name") == "Require at most one SSSF data mount source")
-        self.assertIn("length <= 1", "\n".join(source_guard["ansible.builtin.assert"]["that"]))
-        effective_task = next(task for task in tasks if task.get("name") == "Select effective SSSF data device")
-        self.assertIn("sssf_existing_data_mount_sources", effective_task["ansible.builtin.set_fact"]["sssf_effective_data_device"])
-        resolve_task = next(task for task in tasks if task.get("name") == "Resolve effective SSSF data device")
+        source_guard = next(
+            task
+            for task in tasks
+            if task.get("name") == "Require at most one SSSF data mount source"
+        )
+        self.assertIn(
+            "length <= 1", "\n".join(source_guard["ansible.builtin.assert"]["that"])
+        )
+        effective_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Select effective SSSF data device"
+        )
+        self.assertIn(
+            "sssf_existing_data_mount_sources",
+            effective_task["ansible.builtin.set_fact"]["sssf_effective_data_device"],
+        )
+        resolve_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Resolve effective SSSF data device"
+        )
         self.assertEqual(
             resolve_task["ansible.builtin.command"]["argv"],
             ["readlink", "-e", "{{ sssf_effective_data_device }}"],
         )
-        guard_task = next(task for task in tasks if task.get("name") == "Reject the root filesystem as SSSF data storage")
-        self.assertIn("'/' not in", "\n".join(guard_task["ansible.builtin.assert"]["that"]))
-        mkfs_task = next(task for task in tasks if task.get("name") == "Create SSSF data disk filesystem when absent")
-        self.assertIn("sssf_existing_data_mount_sources | length == 0", mkfs_task["when"])
-        uuid_task = next(task for task in tasks if task.get("name") == "Resolve SSSF data disk UUID")
+        guard_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Reject the root filesystem as SSSF data storage"
+        )
+        self.assertIn(
+            "'/' not in", "\n".join(guard_task["ansible.builtin.assert"]["that"])
+        )
+        mkfs_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Create SSSF data disk filesystem when absent"
+        )
+        self.assertIn(
+            "sssf_existing_data_mount_sources | length == 0", mkfs_task["when"]
+        )
+        uuid_task = next(
+            task for task in tasks if task.get("name") == "Resolve SSSF data disk UUID"
+        )
         self.assertEqual(
             uuid_task["ansible.builtin.command"]["argv"],
-            ["blkid", "-s", "UUID", "-o", "value", "{{ sssf_effective_data_device_path.stdout | trim }}"],
+            [
+                "blkid",
+                "-s",
+                "UUID",
+                "-o",
+                "value",
+                "{{ sssf_effective_data_device_path.stdout | trim }}",
+            ],
         )
-        remove_task = next(task for task in tasks if task.get("name") == "Remove stale SSSF data mount entries")
+        remove_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Remove stale SSSF data mount entries"
+        )
         remove_line = remove_task["ansible.builtin.lineinfile"]
         self.assertEqual(remove_line["state"], "absent")
         self.assertIn("{{ sssf_data_dir | regex_escape }}", remove_line["regexp"])
-        self.assertEqual(remove_task["when"], "sssf_existing_data_mount_sources | length == 0")
-        persist_task = next(task for task in tasks if task.get("name") == "Persist SSSF data disk mount")
+        self.assertEqual(
+            remove_task["when"], "sssf_existing_data_mount_sources | length == 0"
+        )
+        persist_task = next(
+            task for task in tasks if task.get("name") == "Persist SSSF data disk mount"
+        )
         mount_line = persist_task["ansible.builtin.lineinfile"]
-        self.assertTrue(mount_line["line"].startswith("UUID={{ sssf_data_uuid.stdout | trim }} "))
+        self.assertTrue(
+            mount_line["line"].startswith("UUID={{ sssf_data_uuid.stdout | trim }} ")
+        )
         self.assertEqual(mount_line["insertafter"], "EOF")
         self.assertNotIn("regexp", mount_line)
-        self.assertEqual(persist_task["when"], "sssf_existing_data_mount_sources | length == 0")
-        mount_task = next(task for task in tasks if task.get("name") == "Mount SSSF data disk")
+        self.assertEqual(
+            persist_task["when"], "sssf_existing_data_mount_sources | length == 0"
+        )
+        mount_task = next(
+            task for task in tasks if task.get("name") == "Mount SSSF data disk"
+        )
         self.assertNotEqual(mount_task.get("failed_when"), False)
-        self.assertEqual(mount_task["when"], "sssf_existing_data_mount_sources | length == 0")
+        self.assertEqual(
+            mount_task["when"], "sssf_existing_data_mount_sources | length == 0"
+        )
 
-    def test_init_stamps_factory_then_installs_managed_config_in_upstream_location(self) -> None:
+    def test_init_stamps_factory_then_installs_managed_config_in_upstream_location(
+        self,
+    ) -> None:
         text = INIT.read_text(encoding="utf-8")
-        pinned_skill = "{{ (sssf_data_dir ~ '/upstream/.claude/skills/sssf') | tojson }}"
+        pinned_skill = (
+            "{{ (sssf_data_dir ~ '/upstream/.claude/skills/sssf') | tojson }}"
+        )
         installer = "{{ (sssf_data_dir ~ '/upstream/.claude/skills/sssf/scripts/install.py') | tojson }}"
         managed_config = 'workspace / "adws/adw_sssf_config/sssf.config.yaml"'
         self.assertIn(pinned_skill, text)
@@ -155,7 +248,9 @@ class SssfSupplyChainTests(unittest.TestCase):
         self.assertNotIn("--force", text)
         self.assertNotIn('workspace / "sssf.config.yaml"', text)
 
-    def test_init_requires_the_non_root_runtime_user_without_privileged_reownership(self) -> None:
+    def test_init_requires_the_non_root_runtime_user_without_privileged_reownership(
+        self,
+    ) -> None:
         text = INIT.read_text(encoding="utf-8")
         self.assertIn("pwd.getpwuid(os.geteuid()).pw_name != RUNTIME_USER", text)
         self.assertIn("sssf-init must be run as", text)
@@ -170,9 +265,15 @@ class SssfSupplyChainTests(unittest.TestCase):
         env = ENV.read_text(encoding="utf-8")
         tasks = yaml.safe_load(TASKS.read_text(encoding="utf-8"))
         self.assertIn('environment_link.symlink_to("/etc/sssf/env")', init)
-        self.assertIn("workspace .env exists and is not the managed SSSF environment link", init)
+        self.assertIn(
+            "workspace .env exists and is not the managed SSSF environment link", init
+        )
         self.assertNotIn("SSSF_CONFIG=", env)
-        environment_task = next(task for task in tasks if task.get("name") == "Install SSSF environment file")
+        environment_task = next(
+            task
+            for task in tasks
+            if task.get("name") == "Install SSSF environment file"
+        )
         environment_template = environment_task["ansible.builtin.template"]
         self.assertEqual(environment_template["dest"], "/etc/sssf/env")
         self.assertEqual(environment_template["owner"], "root")
@@ -184,15 +285,29 @@ class SssfSupplyChainTests(unittest.TestCase):
         self.assertEqual(env.count("| tojson"), 4)
 
     def test_managed_config_db_matches_visualizer_db(self) -> None:
-        template = Environment(undefined=StrictUndefined).from_string(CONFIG.read_text(encoding="utf-8"))
-        config = yaml.safe_load(template.render(sssf_provider="openrouter", sssf_data_dir="/var/lib/sssf"))
-        self.assertEqual(config["defaults"]["data_dir"], "/var/lib/sssf/factory/adw_data")
-        self.assertEqual(config["observability"]["db"], "/var/lib/sssf/factory/adw_data/sssf.db")
-        self.assertIn("SSSF_DB={{ sssf_data_dir }}/factory/adw_data/sssf.db", UNIT.read_text(encoding="utf-8"))
+        template = Environment(undefined=StrictUndefined).from_string(
+            CONFIG.read_text(encoding="utf-8")
+        )
+        config = yaml.safe_load(
+            template.render(sssf_provider="openrouter", sssf_data_dir="/var/lib/sssf")
+        )
+        self.assertEqual(
+            config["defaults"]["data_dir"], "/var/lib/sssf/factory/adw_data"
+        )
+        self.assertEqual(
+            config["observability"]["db"], "/var/lib/sssf/factory/adw_data/sssf.db"
+        )
+        self.assertIn(
+            "SSSF_DB={{ sssf_data_dir }}/factory/adw_data/sssf.db",
+            UNIT.read_text(encoding="utf-8"),
+        )
 
     def test_init_workspace_is_single_safe_name_and_blocks_symlink_escape(self) -> None:
         text = INIT.read_text(encoding="utf-8")
-        self.assertIn('workspace_name = sys.argv[2] if len(sys.argv) == 3 else normalized.rsplit("/", 1)[-1]', text)
+        self.assertIn(
+            'workspace_name = sys.argv[2] if len(sys.argv) == 3 else normalized.rsplit("/", 1)[-1]',
+            text,
+        )
         self.assertIn("workspace name must be a single safe name", text)
         self.assertIn("os.O_NOFOLLOW | os.O_DIRECTORY", text)
         self.assertIn("dir_fd=workspace_root_fd", text)
@@ -200,16 +315,22 @@ class SssfSupplyChainTests(unittest.TestCase):
         self.assertIn("existing workspace origin does not match", text)
         self.assertNotIn("realpath", text)
 
-    def test_init_rejects_symlinks_in_every_upstream_installer_managed_path(self) -> None:
+    def test_init_rejects_symlinks_in_every_upstream_installer_managed_path(
+        self,
+    ) -> None:
         text = INIT.read_text(encoding="utf-8")
         self.assertNotIn("rmtree", text)
         self.assertIn("os.walk(adws, followlinks=False)", text)
         for path in (".gitignore", ".env.sample", "justfile"):
             self.assertIn(f'"{path}"', text)
-        self.assertIn("installer-managed workspace paths must not contain symlinks", text)
+        self.assertIn(
+            "installer-managed workspace paths must not contain symlinks", text
+        )
         self.assertIn("existing SSSF skill differs from the reviewed pin", text)
 
-    def test_init_pins_workspace_descriptors_and_landlock_confines_mutations(self) -> None:
+    def test_init_pins_workspace_descriptors_and_landlock_confines_mutations(
+        self,
+    ) -> None:
         text = INIT.read_text(encoding="utf-8")
         self.assertTrue(text.startswith("#!/usr/bin/env python3\n"))
         self.assertIn("os.O_NOFOLLOW | os.O_DIRECTORY", text)
@@ -233,24 +354,32 @@ class SssfSupplyChainTests(unittest.TestCase):
             safe_workspace_root.mkdir(parents=True)
             external_workspace_root.mkdir(parents=True)
             safe_inode = safe_workspace_root.stat().st_ino
-            rendered = Environment(undefined=StrictUndefined).from_string(INIT.read_text(encoding="utf-8")).render(
-                sssf_runtime_user=pwd.getpwuid(os.geteuid()).pw_name,
-                sssf_workspace_root=str(safe_workspace_root),
-                sssf_data_dir=str(root),
-                sssf_uv_path="/bin/false",
-                sssf_config_path=str(root / "config"),
-                sssf_allowed_repositories=[],
+            rendered = (
+                Environment(undefined=StrictUndefined)
+                .from_string(INIT.read_text(encoding="utf-8"))
+                .render(
+                    sssf_runtime_user=pwd.getpwuid(os.geteuid()).pw_name,
+                    sssf_workspace_root=str(safe_workspace_root),
+                    sssf_data_dir=str(root),
+                    sssf_uv_path="/bin/false",
+                    sssf_config_path=str(root / "config"),
+                    sssf_allowed_repositories=[],
+                )
             )
             namespace = {"__name__": "sssf_init_test"}
             exec(compile(rendered, "sssf-init", "exec"), namespace)
-            open_root = cast(Callable[[str], int], namespace["open_absolute_directory_nofollow"])
+            open_root = cast(
+                Callable[[str], int], namespace["open_absolute_directory_nofollow"]
+            )
             stop = threading.Event()
 
             def swap_ancestor() -> None:
                 while not stop.is_set():
                     try:
                         safe_parent.rename(parked_parent)
-                        safe_parent.symlink_to(external_parent, target_is_directory=True)
+                        safe_parent.symlink_to(
+                            external_parent, target_is_directory=True
+                        )
                         safe_parent.unlink()
                         parked_parent.rename(safe_parent)
                     except FileNotFoundError:
@@ -288,7 +417,9 @@ class SssfSupplyChainTests(unittest.TestCase):
             reviewed_skill.mkdir()
             sentinel = external / "sentinel"
             sentinel.write_text("unchanged", encoding="utf-8")
-            subprocess.run(["git", "init", "--bare", str(source)], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "init", "--bare", str(source)], check=True, capture_output=True
+            )
             installer = reviewed_skill / "scripts/install.py"
             installer.parent.mkdir()
             installer.write_text(
@@ -298,18 +429,25 @@ class SssfSupplyChainTests(unittest.TestCase):
                 encoding="utf-8",
             )
             uv = root / "uv"
-            uv.write_text("#!/bin/sh\n[ \"$1\" = run ] || exit 2\nshift\nexec python3 \"$@\"\n", encoding="utf-8")
+            uv.write_text(
+                '#!/bin/sh\n[ "$1" = run ] || exit 2\nshift\nexec python3 "$@"\n',
+                encoding="utf-8",
+            )
             uv.chmod(0o755)
             managed_config = root / "sssf.config.yaml"
             managed_config.write_text("defaults: {}\n", encoding="utf-8")
             runtime_user = pwd.getpwuid(os.geteuid()).pw_name
-            rendered = Environment(undefined=StrictUndefined).from_string(INIT.read_text(encoding="utf-8")).render(
-                sssf_runtime_user=runtime_user,
-                sssf_workspace_root=str(workspaces),
-                sssf_data_dir=str(root),
-                sssf_uv_path=str(uv),
-                sssf_config_path=str(managed_config),
-                sssf_allowed_repositories=[str(source)],
+            rendered = (
+                Environment(undefined=StrictUndefined)
+                .from_string(INIT.read_text(encoding="utf-8"))
+                .render(
+                    sssf_runtime_user=runtime_user,
+                    sssf_workspace_root=str(workspaces),
+                    sssf_data_dir=str(root),
+                    sssf_uv_path=str(uv),
+                    sssf_config_path=str(managed_config),
+                    sssf_allowed_repositories=[str(source)],
+                )
             )
             # The reviewed skill is addressed through sssf_data_dir in production.
             expected_skill = root / "upstream/.claude/skills/sssf"
@@ -336,7 +474,11 @@ class SssfSupplyChainTests(unittest.TestCase):
                 [str(script), str(source), "race"],
                 text=True,
                 capture_output=True,
-                env={**os.environ, "USER": runtime_user, "PYTHONDONTWRITEBYTECODE": "1"},
+                env={
+                    **os.environ,
+                    "USER": runtime_user,
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                },
                 check=False,
             )
             racer.join(timeout=6)
@@ -346,17 +488,25 @@ class SssfSupplyChainTests(unittest.TestCase):
             self.assertFalse((external / ".git").exists())
             self.assertIn(result.returncode, {0, 1})
             if result.returncode == 0:
-                self.assertTrue((parked / "adws/adw_sssf_config/sssf.config.yaml").is_file())
+                self.assertTrue(
+                    (parked / "adws/adw_sssf_config/sssf.config.yaml").is_file()
+                )
 
-    def test_managed_roster_is_complete_provider_qualified_and_has_boundaries(self) -> None:
-        template = Environment(undefined=StrictUndefined).from_string(CONFIG.read_text(encoding="utf-8"))
+    def test_managed_roster_is_complete_provider_qualified_and_has_boundaries(
+        self,
+    ) -> None:
+        template = Environment(undefined=StrictUndefined).from_string(
+            CONFIG.read_text(encoding="utf-8")
+        )
         expected_models = {
             "openrouter": "openrouter/google/gemini-3.6-flash",
             "openai": "openai/gpt-5.6-terra",
             "fireworks": "fireworks/accounts/fireworks/models/kimi-k3",
         }
         for provider, model in expected_models.items():
-            config = yaml.safe_load(template.render(sssf_provider=provider, sssf_data_dir="/var/lib/sssf"))
+            config = yaml.safe_load(
+                template.render(sssf_provider=provider, sssf_data_dir="/var/lib/sssf")
+            )
             defaults = config["defaults"]
             self.assertEqual(defaults["model"], model)
             self.assertTrue(defaults["model"].startswith(f"{provider}/"))
@@ -368,14 +518,19 @@ class SssfSupplyChainTests(unittest.TestCase):
             by_name = {agent["name"]: agent for agent in config["agents"]}
             self.assertEqual(by_name["scout"]["writes"], [])
             self.assertEqual(by_name["reviewer"]["writes"], [])
-            self.assertEqual(by_name["documenter"]["writes"], ["app_docs/", "docs/", "**/*.md", "*.md"])
+            self.assertEqual(
+                by_name["documenter"]["writes"],
+                ["app_docs/", "docs/", "**/*.md", "*.md"],
+            )
             self.assertNotIn("writes", by_name["builder"])
             self.assertNotIn("edit", by_name["reviewer"]["tools"])
             self.assertIn("write", by_name["scout"]["tools"])
             self.assertIn("subagent_create", by_name["planner"]["tools"])
             self.assertIn("subagent_create", by_name["scout"]["tools"])
 
-    def test_visualizer_builds_ui_and_runs_upstream_server_with_db_and_port(self) -> None:
+    def test_visualizer_builds_ui_and_runs_upstream_server_with_db_and_port(
+        self,
+    ) -> None:
         tasks = TASKS.read_text(encoding="utf-8")
         unit = UNIT.read_text(encoding="utf-8")
         self.assertIn("Build SSSF visualizer UI", tasks)
@@ -400,7 +555,9 @@ class SssfSupplyChainTests(unittest.TestCase):
 
     def test_role_has_no_unsupported_concurrency_or_command_knobs(self) -> None:
         defaults = yaml.safe_load(DEFAULTS.read_text(encoding="utf-8"))
-        specs = yaml.safe_load((ROLE / "meta/argument_specs.yml").read_text(encoding="utf-8"))
+        specs = yaml.safe_load(
+            (ROLE / "meta/argument_specs.yml").read_text(encoding="utf-8")
+        )
         options = specs["argument_specs"]["main"]["options"]
         for key in ("sssf_max_concurrent_runs", "sssf_visualizer_command"):
             self.assertNotIn(key, defaults)

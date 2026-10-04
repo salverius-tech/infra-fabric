@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate direct-service Ansible structure without exposing private inventory."""
+
 from __future__ import annotations
 
 import argparse
@@ -22,6 +23,8 @@ def service_groups() -> dict[str, str]:
         name: str(config["inventory"]["group"])
         for name, config in settings_lib.SERVICE_REGISTRY_DATA["services"].items()
     }
+
+
 SPECIAL_PLAYBOOK_GROUPS = {
     "infra/ansible/playbooks/caddy-proxy.yml": "technitium",
     "infra/ansible/playbooks/technitium-dns.yml": "localhost",
@@ -108,7 +111,9 @@ def emit(lines: list[str], redacted: bool) -> None:
 
 
 def assert_redacted(text: str) -> None:
-    scrubbed = text.replace("192.0.2.", "198.51.100.").replace("example.internal", "example.invalid")
+    scrubbed = text.replace("192.0.2.", "198.51.100.").replace(
+        "example.internal", "example.invalid"
+    )
     for pattern in PRIVATE_PATTERNS:
         if pattern.search(scrubbed):
             raise RedactionError("redaction-fail: output contains private-looking data")
@@ -164,7 +169,9 @@ def check_policy(role_names: list[str] | None) -> list[str]:
             continue
         for task in tasks_in_path(path):
             if task_uses_pct(task):
-                failures.append(f"forbidden-pct path={path.relative_to(REPO)} task={task.get('name', '<unnamed>')}")
+                failures.append(
+                    f"forbidden-pct path={path.relative_to(REPO)} task={task.get('name', '<unnamed>')}"
+                )
     if failures:
         raise CheckError("\n".join(failures))
     return ["policy status=pass forbidden_pct=0"]
@@ -190,7 +197,9 @@ def check_playbooks(settings_path: Path, include_disabled: bool) -> list[str]:
         plays = tasks_in_path(playbook)
         direct_group = row["group"]
         if direct_group == "localhost":
-            lines.append(f"playbook={row['playbook']} target=localhost status={row['status']}")
+            lines.append(
+                f"playbook={row['playbook']} target=localhost status={row['status']}"
+            )
             continue
         found_direct = False
         found_handoff = False
@@ -202,14 +211,24 @@ def check_playbooks(settings_path: Path, include_disabled: bool) -> list[str]:
             if hosts == "pve":
                 forbidden = sorted(set(roles) - PVE_ALLOWED_ROLES)
                 if forbidden:
-                    raise CheckError(f"pve-steady-state-role playbook={row['playbook']} roles={','.join(forbidden)}")
+                    raise CheckError(
+                        f"pve-steady-state-role playbook={row['playbook']} roles={','.join(forbidden)}"
+                    )
             if hosts == direct_group:
                 found_direct = True
         if not found_direct and row["status"] == "checked":
-            raise CheckError(f"missing-direct-play playbook={row['playbook']} group={direct_group}")
-        if not found_handoff and row["status"] == "checked" and row["service"] != "onramp_host":
+            raise CheckError(
+                f"missing-direct-play playbook={row['playbook']} group={direct_group}"
+            )
+        if (
+            not found_handoff
+            and row["status"] == "checked"
+            and row["service"] != "onramp_host"
+        ):
             raise CheckError(f"missing-handoff playbook={row['playbook']}")
-        lines.append(f"playbook={row['playbook']} target={direct_group} status={row['status']} handoff={found_handoff}")
+        lines.append(
+            f"playbook={row['playbook']} target={direct_group} status={row['status']} handoff={found_handoff}"
+        )
     return lines
 
 
@@ -220,9 +239,13 @@ def check_structure(checks: list[str]) -> list[str]:
         if not path.is_file():
             raise CheckError("missing direct-access-ready.yml")
         check_playbooks(REPO / "settings.example.json", include_disabled=False)
-        lines.append("structure check=handoff status=pass wrapper=infra/ansible/playbooks/direct-access-ready.yml")
+        lines.append(
+            "structure check=handoff status=pass wrapper=infra/ansible/playbooks/direct-access-ready.yml"
+        )
     if "shared-primitives" in checks:
-        lines.append("structure check=shared-primitives status=pass primitive=direct-template-copy exceptions=app-specific-config")
+        lines.append(
+            "structure check=shared-primitives status=pass primitive=direct-template-copy exceptions=app-specific-config"
+        )
     return lines or ["structure status=pass"]
 
 
@@ -233,22 +256,42 @@ def run_static_syntax(settings_path: Path, include_disabled: bool) -> list[str]:
     return ["syntax status=pass mode=source-only parser=yaml"]
 
 
-STANDARD_TAGS = {"validation", "packages", "config", "service", "health", "backup", "restore"}
-COMMAND_MODULES = ("ansible.builtin.command", "command", "ansible.builtin.shell", "shell")
+STANDARD_TAGS = {
+    "validation",
+    "packages",
+    "config",
+    "service",
+    "health",
+    "backup",
+    "restore",
+}
+COMMAND_MODULES = (
+    "ansible.builtin.command",
+    "command",
+    "ansible.builtin.shell",
+    "shell",
+)
 
 
 PLAY_TASK_SECTIONS = ("pre_tasks", "tasks", "post_tasks", "handlers")
 TASK_CHILD_SECTIONS = ("block", "rescue", "always")
 IMPORT_KEYS = {
-    "ansible.builtin.import_playbook", "import_playbook",
-    "ansible.builtin.import_tasks", "import_tasks",
-    "ansible.builtin.include_tasks", "include_tasks",
-    "ansible.builtin.import_role", "import_role",
-    "ansible.builtin.include_role", "include_role",
+    "ansible.builtin.import_playbook",
+    "import_playbook",
+    "ansible.builtin.import_tasks",
+    "import_tasks",
+    "ansible.builtin.include_tasks",
+    "include_tasks",
+    "ansible.builtin.import_role",
+    "import_role",
+    "ansible.builtin.include_role",
+    "include_role",
 }
 DYNAMIC_TRANSPORT_KEYS = {
-    "ansible.builtin.include_tasks", "include_tasks",
-    "ansible.builtin.include_role", "include_role",
+    "ansible.builtin.include_tasks",
+    "include_tasks",
+    "ansible.builtin.include_role",
+    "include_role",
 }
 
 
@@ -257,7 +300,9 @@ def is_play(item: dict[str, Any]) -> bool:
 
 
 def is_task_container(item: dict[str, Any]) -> bool:
-    return any(section in item for section in TASK_CHILD_SECTIONS) or any(key in item for key in IMPORT_KEYS)
+    return any(section in item for section in TASK_CHILD_SECTIONS) or any(
+        key in item for key in IMPORT_KEYS
+    )
 
 
 def is_dynamic_transport(item: dict[str, Any]) -> bool:
@@ -267,7 +312,11 @@ def is_dynamic_transport(item: dict[str, Any]) -> bool:
 
 def is_executable_task(item: dict[str, Any]) -> bool:
     """A task action, not a play, import/include, or block wrapper."""
-    return not is_play(item) and not is_task_container(item) and isinstance(item.get("name"), str)
+    return (
+        not is_play(item)
+        and not is_task_container(item)
+        and isinstance(item.get("name"), str)
+    )
 
 
 def nested_tasks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -279,7 +328,11 @@ def nested_tasks(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for section in sections:
             children = item.get(section)
             if isinstance(children, list):
-                flattened.extend(nested_tasks([child for child in children if isinstance(child, dict)]))
+                flattened.extend(
+                    nested_tasks(
+                        [child for child in children if isinstance(child, dict)]
+                    )
+                )
     return flattened
 
 
@@ -289,11 +342,15 @@ def command_task_has_idempotence(task: dict[str, Any]) -> bool:
     if "changed_when" in task:
         return True
     task_args = task.get("args")
-    if isinstance(task_args, dict) and any(key in task_args for key in ("creates", "removes")):
+    if isinstance(task_args, dict) and any(
+        key in task_args for key in ("creates", "removes")
+    ):
         return True
     for module_name in COMMAND_MODULES:
         module_args = task.get(module_name)
-        if isinstance(module_args, dict) and any(key in module_args for key in ("creates", "removes")):
+        if isinstance(module_args, dict) and any(
+            key in module_args for key in ("creates", "removes")
+        ):
             return True
     return False
 
@@ -314,35 +371,65 @@ def check_mode_static() -> list[str]:
             if not is_executable_task(task):
                 if is_dynamic_transport(task):
                     if tags != {"always"}:
-                        offenders.append(f"dynamic-transport-tags path={path.relative_to(REPO)} task={name} tags={','.join(sorted(tags))}")
+                        offenders.append(
+                            f"dynamic-transport-tags path={path.relative_to(REPO)} task={name} tags={','.join(sorted(tags))}"
+                        )
                 elif tags:
-                    offenders.append(f"non-executable-tag path={path.relative_to(REPO)} task={name}")
+                    offenders.append(
+                        f"non-executable-tag path={path.relative_to(REPO)} task={name}"
+                    )
                 continue
             observed_tags.update(tags)
             unsupported_tags = tags - STANDARD_TAGS
             if unsupported_tags:
-                offenders.append(f"unsupported-tag path={path.relative_to(REPO)} task={name} tags={','.join(sorted(unsupported_tags))}")
+                offenders.append(
+                    f"unsupported-tag path={path.relative_to(REPO)} task={name} tags={','.join(sorted(unsupported_tags))}"
+                )
             standard_tags = tags & STANDARD_TAGS
             if not standard_tags:
-                offenders.append(f"untagged-task path={path.relative_to(REPO)} task={name}")
+                offenders.append(
+                    f"untagged-task path={path.relative_to(REPO)} task={name}"
+                )
             elif len(standard_tags) != 1:
-                offenders.append(f"multiple-standard-tags path={path.relative_to(REPO)} task={name} tags={','.join(sorted(standard_tags))}")
-            if any(key in task for key in COMMAND_MODULES) and not command_task_has_idempotence(task):
-                offenders.append(f"command-no-idempotence path={path.relative_to(REPO)} task={name}")
+                offenders.append(
+                    f"multiple-standard-tags path={path.relative_to(REPO)} task={name} tags={','.join(sorted(standard_tags))}"
+                )
+            if any(
+                key in task for key in COMMAND_MODULES
+            ) and not command_task_has_idempotence(task):
+                offenders.append(
+                    f"command-no-idempotence path={path.relative_to(REPO)} task={name}"
+                )
     missing_tags = STANDARD_TAGS - observed_tags
     if missing_tags:
         offenders.append(f"missing-standard-tags tags={','.join(sorted(missing_tags))}")
     if offenders:
         raise CheckError("\n".join(offenders))
-    return ["check-mode status=pass mode=source-only command_policy=explicit-change-or-creates-removes tags=validation,packages,config,service,health,backup,restore"]
+    return [
+        "check-mode status=pass mode=source-only command_policy=explicit-change-or-creates-removes tags=validation,packages,config,service,health,backup,restore"
+    ]
 
 
 def run_live_probe(kind: str, args: argparse.Namespace) -> list[str]:
     if kind == "known-hosts" and args.check:
         return ["known-hosts status=pass mode=source-only state=unchanged-verified"]
-    if args.inventory and args.settings and str(args.settings) != "settings.example.json":
-        command = ["ansible", "all", "-m", "ping", "--list-hosts"] if kind == "connectivity" else ["true"]
-        result = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    if (
+        args.inventory
+        and args.settings
+        and str(args.settings) != "settings.example.json"
+    ):
+        command = (
+            ["ansible", "all", "-m", "ping", "--list-hosts"]
+            if kind == "connectivity"
+            else ["true"]
+        )
+        result = subprocess.run(
+            command,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
         if result.returncode != 0:
             raise CheckError(f"{kind} status=fail error_class=probe-command-failed")
     return [f"{kind} status=pass checked=enabled-services skipped=disabled-services"]
@@ -356,7 +443,11 @@ def cmd_inventory(args: argparse.Namespace) -> list[str]:
 
 
 def cmd_execution_mode(args: argparse.Namespace) -> list[str]:
-    mode = "source-only" if args.settings.name == "settings.example.json" else "existing-live"
+    mode = (
+        "source-only"
+        if args.settings.name == "settings.example.json"
+        else "existing-live"
+    )
     return [f"execution_mode={mode} status=pass"]
 
 
@@ -368,7 +459,9 @@ def cmd_bootstrap_plan(args: argparse.Namespace) -> list[str]:
             continue
         seen.add(row["service"])
         lines.append(
-            "service={service} group={group} sequence=lxc_ready,direct_access_ready,known_hosts,direct_ssh_python_probe,direct_service_role".format(**row)
+            "service={service} group={group} sequence=lxc_ready,direct_access_ready,known_hosts,direct_ssh_python_probe,direct_service_role".format(
+                **row
+            )
         )
     return lines
 
@@ -384,7 +477,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--redacted", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("inventory", "execution-mode", "bootstrap-plan", "playbooks", "syntax", "check-mode", "structure", "policy", "pve-boundary", "known-hosts", "connectivity", "become-probe"):
+    for name in (
+        "inventory",
+        "execution-mode",
+        "bootstrap-plan",
+        "playbooks",
+        "syntax",
+        "check-mode",
+        "structure",
+        "policy",
+        "pve-boundary",
+        "known-hosts",
+        "connectivity",
+        "become-probe",
+    ):
         p = sub.add_parser(name)
         p.add_argument("--settings", type=Path, default=Path("settings.example.json"))
         p.add_argument("--redacted", action="store_true")
@@ -392,7 +498,9 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--known-hosts-file", type=Path)
         p.add_argument("--fixture-public", action="store_true")
         p.add_argument("--include-disabled", action="store_true")
-        p.add_argument("--check", action="append", nargs="?", const="default", default=[])
+        p.add_argument(
+            "--check", action="append", nargs="?", const="default", default=[]
+        )
         p.add_argument("--roles", nargs="*")
     args = parser.parse_args(argv)
     try:

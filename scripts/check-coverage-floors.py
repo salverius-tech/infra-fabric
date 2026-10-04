@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Enforce explicit minimum coverage for mutation-critical modules."""
+
 from __future__ import annotations
 
 import argparse
@@ -22,14 +23,20 @@ def check_floors(report: dict[str, Any], policy: dict[str, Any]) -> list[str]:
 
     failures: list[str] = []
     for path, floor in sorted(policy["floors"].items()):
-        if not isinstance(path, str) or not isinstance(floor, int) or isinstance(floor, bool):
+        if (
+            not isinstance(path, str)
+            or not isinstance(floor, int)
+            or isinstance(floor, bool)
+        ):
             raise CoverageFloorError("coverage floor entry is invalid")
         result = report_files.get(path)
         if not isinstance(result, dict):
             failures.append(f"{path}: missing from coverage report")
             continue
         summary = result.get("summary")
-        percentage = summary.get("percent_covered") if isinstance(summary, dict) else None
+        percentage = (
+            summary.get("percent_covered") if isinstance(summary, dict) else None
+        )
         if not isinstance(percentage, (int, float)) or isinstance(percentage, bool):
             failures.append(f"{path}: coverage percentage is missing")
         elif percentage < floor:

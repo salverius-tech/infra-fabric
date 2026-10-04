@@ -8,7 +8,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("canonical_secret_set", ROOT / "scripts" / "canonical-secret-set.py")
+spec = importlib.util.spec_from_file_location(
+    "canonical_secret_set", ROOT / "scripts" / "canonical-secret-set.py"
+)
 assert spec and spec.loader
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -32,7 +34,9 @@ class CanonicalSecretSetTests(unittest.TestCase):
         with self.assertRaises(module.SecretSetError):
             module.set_path({}, "secrets..provider", "VALUE")
 
-    def test_set_secret_rejects_noncanonical_target_before_provider_access(self) -> None:
+    def test_set_secret_rejects_noncanonical_target_before_provider_access(
+        self,
+    ) -> None:
         with self.assertRaisesRegex(module.SecretSetError, "canonical namespace"):
             module.set_secret(
                 Path("missing-bundle"),
@@ -53,9 +57,13 @@ class CanonicalSecretSetTests(unittest.TestCase):
                 "run",
                 return_value=SimpleNamespace(returncode=0, stdout="ciphertext"),
             ) as run:
-                module.encrypt("sops", bundle, {"secret": "synthetic"}, Path(temporary) / "key")
+                module.encrypt(
+                    "sops", bundle, {"secret": "synthetic"}, Path(temporary) / "key"
+                )
         command = run.call_args.args[0]
-        self.assertEqual(command[command.index("--filename-override") + 1], "secrets.sops.yaml")
+        self.assertEqual(
+            command[command.index("--filename-override") + 1], "secrets.sops.yaml"
+        )
         self.assertEqual(command[command.index("--config") + 1], str(policy))
 
 

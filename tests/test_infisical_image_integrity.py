@@ -18,8 +18,12 @@ class InfisicalImageIntegrityTests(unittest.TestCase):
             text = template.read_text(encoding="utf-8")
             images = DIGEST_IMAGE.findall(text)
             self.assertGreaterEqual(len(images), 2, template)
-            self.assertTrue(any("postgres:16-alpine@sha256:" in image for image in images), template)
-            self.assertTrue(any("redis:7-alpine@sha256:" in image for image in images), template)
+            self.assertTrue(
+                any("postgres:16-alpine@sha256:" in image for image in images), template
+            )
+            self.assertTrue(
+                any("redis:7-alpine@sha256:" in image for image in images), template
+            )
 
 
 if __name__ == "__main__":

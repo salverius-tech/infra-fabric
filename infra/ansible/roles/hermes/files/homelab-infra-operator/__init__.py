@@ -1,4 +1,5 @@
 """Hermes plugin for the reviewed homelab-infra operator workflow."""
+
 from __future__ import annotations
 
 import json

@@ -7,7 +7,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location("service_author", ROOT / "scripts" / "service-author.py")
+SPEC = importlib.util.spec_from_file_location(
+    "service_author", ROOT / "scripts" / "service-author.py"
+)
 service_author = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(service_author)
@@ -20,7 +22,9 @@ class ServiceAuthorTests(unittest.TestCase):
             (repo / "infra").mkdir()
             (repo / "scripts").mkdir()
             (repo / "tests").mkdir()
-            (repo / "infra" / "services.json").write_text('{"services": {}}', encoding="utf-8")
+            (repo / "infra" / "services.json").write_text(
+                '{"services": {}}', encoding="utf-8"
+            )
             errors = service_author.validate_repository_surfaces(repo, "metrics")
             self.assertIn("catalog registration", errors[0])
 
@@ -40,22 +44,30 @@ class ServiceAuthorTests(unittest.TestCase):
             ):
                 path = repo / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
-                content = "metrics\nMetricsConfiguration\n" if relative.endswith("canonical_values.py") else "metrics\n"
+                content = (
+                    "metrics\nMetricsConfiguration\n"
+                    if relative.endswith("canonical_values.py")
+                    else "metrics\n"
+                )
                 path.write_text(content, encoding="utf-8")
             (repo / "infra/services.json").write_text(
-                json.dumps({
-                    "services": {
-                        "metrics": {
-                            "configuration_schema": "MetricsConfiguration",
-                            "release_sources": ["binary"],
-                            "required_fields": ["resource"],
-                            "runtime_owner": "guest",
+                json.dumps(
+                    {
+                        "services": {
+                            "metrics": {
+                                "configuration_schema": "MetricsConfiguration",
+                                "release_sources": ["binary"],
+                                "required_fields": ["resource"],
+                                "runtime_owner": "guest",
+                            }
                         }
                     }
-                }),
+                ),
                 encoding="utf-8",
             )
-            self.assertEqual(service_author.validate_repository_surfaces(repo, "metrics"), [])
+            self.assertEqual(
+                service_author.validate_repository_surfaces(repo, "metrics"), []
+            )
 
     def test_repository_surface_check_rejects_incomplete_catalog_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -66,21 +78,31 @@ class ServiceAuthorTests(unittest.TestCase):
             errors = service_author.validate_repository_surfaces(repo, "metrics")
             self.assertTrue(any("catalog metadata" in error for error in errors))
 
-    def test_repository_surface_check_rejects_missing_configuration_schema(self) -> None:
+    def test_repository_surface_check_rejects_missing_configuration_schema(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory)
             (repo / "infra").mkdir()
             (repo / "scripts").mkdir()
             (repo / "infra" / "services.json").write_text(
-                json.dumps({"services": {"metrics": {
-                    "configuration_schema": "MetricsConfiguration",
-                    "release_sources": ["binary"],
-                    "required_fields": ["resource"],
-                    "runtime_owner": "guest",
-                }}}),
+                json.dumps(
+                    {
+                        "services": {
+                            "metrics": {
+                                "configuration_schema": "MetricsConfiguration",
+                                "release_sources": ["binary"],
+                                "required_fields": ["resource"],
+                                "runtime_owner": "guest",
+                            }
+                        }
+                    }
+                ),
                 encoding="utf-8",
             )
-            (repo / "scripts" / "canonical_values.py").write_text("metrics\n", encoding="utf-8")
+            (repo / "scripts" / "canonical_values.py").write_text(
+                "metrics\n", encoding="utf-8"
+            )
             errors = service_author.validate_repository_surfaces(repo, "metrics")
             self.assertTrue(any("configuration schema" in error for error in errors))
 
@@ -90,18 +112,20 @@ class ServiceAuthorTests(unittest.TestCase):
             catalog = repo / "infra" / "services.json"
             catalog.parent.mkdir(parents=True)
             catalog.write_text(
-                json.dumps({
-                    "services": {
-                        "metrics": {
-                            "configuration_schema": "MetricsConfiguration",
-                            "release_sources": ["binary"],
-                            "required_fields": ["resource"],
-                            "runtime_owner": "guest",
-                            "playbooks": ["infra/ansible/playbooks/metrics.yml"],
-                            "terraform_addresses": ["module.metrics["],
+                json.dumps(
+                    {
+                        "services": {
+                            "metrics": {
+                                "configuration_schema": "MetricsConfiguration",
+                                "release_sources": ["binary"],
+                                "required_fields": ["resource"],
+                                "runtime_owner": "guest",
+                                "playbooks": ["infra/ansible/playbooks/metrics.yml"],
+                                "terraform_addresses": ["module.metrics["],
+                            }
                         }
                     }
-                }),
+                ),
                 encoding="utf-8",
             )
             errors = service_author.validate_repository_surfaces(repo, "metrics")
@@ -134,19 +158,33 @@ class ServiceAuthorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "report.json"
             result = subprocess.run(
-                [sys.executable, str(ROOT / "scripts" / "validate-service-contracts.py"), "--repo", str(ROOT), "--report", str(output)],
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "validate-service-contracts.py"),
+                    "--repo",
+                    str(ROOT),
+                    "--report",
+                    str(output),
+                ],
                 cwd=ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["summary"]["failed"], 0)
+            self.assertEqual(
+                json.loads(output.read_text(encoding="utf-8"))["summary"]["failed"], 0
+            )
             self.assertEqual(list(Path(directory).iterdir()), [output])
 
     def test_rejects_guest_without_provisioning_contract(self) -> None:
         with self.assertRaisesRegex(ValueError, "provisioning contract"):
-            service_author.build_manifest("metrics", "dedicated-lxc", config_model="MetricsConfig", projection_contract="metrics")
+            service_author.build_manifest(
+                "metrics",
+                "dedicated-lxc",
+                config_model="MetricsConfig",
+                projection_contract="metrics",
+            )
 
     def test_rejects_stateful_without_state_contract(self) -> None:
         with self.assertRaisesRegex(ValueError, "state contract"):
@@ -177,11 +215,15 @@ class ServiceAuthorTests(unittest.TestCase):
             config_model="MetricsConfig",
             projection_contract="metrics",
             provisioning_contract="metrics-guest",
-            secret_metadata=["services.metrics.secrets.api_key:credential:METRICS_API_KEY"],
+            secret_metadata=[
+                "services.metrics.secrets.api_key:credential:METRICS_API_KEY"
+            ],
         )
         self.assertEqual(manifest["service_id"], "metrics")
         self.assertEqual(manifest["archetype"], "dedicated-lxc")
-        self.assertEqual(manifest["secrets"][0]["logical_path"], "services.metrics.secrets.api_key")
+        self.assertEqual(
+            manifest["secrets"][0]["logical_path"], "services.metrics.secrets.api_key"
+        )
         encoded = json.dumps(manifest, sort_keys=True)
         self.assertNotIn("password", encoded.lower())
 

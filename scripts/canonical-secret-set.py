@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Safely check or atomically set one logical value in a SOPS YAML bundle."""
+
 from __future__ import annotations
 
 import argparse
@@ -82,7 +83,9 @@ def encrypt(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) -> by
     return result.stdout.encode("utf-8")
 
 
-def set_secret(bundle: Path, path: str, value: str, key_file: Path, *, replace: bool, sops: str) -> str:
+def set_secret(
+    bundle: Path, path: str, value: str, key_file: Path, *, replace: bool, sops: str
+) -> str:
     bundle = bundle.resolve()
     key_file = key_file.resolve()
     if not value or "\n" in value or "\r" in value:
@@ -90,9 +93,13 @@ def set_secret(bundle: Path, path: str, value: str, key_file: Path, *, replace: 
     try:
         validate_canonical_secret_path(path)
     except SecretProviderError as error:
-        raise SecretSetError("logical secret path is outside the canonical namespace") from error
+        raise SecretSetError(
+            "logical secret path is outside the canonical namespace"
+        ) from error
     if not bundle.is_file() or not key_file.is_file():
-        raise SecretSetError("canonical SOPS bundle or external age identity is unavailable")
+        raise SecretSetError(
+            "canonical SOPS bundle or external age identity is unavailable"
+        )
     try:
         provider = SopsAgeProvider(bundle, key_file=key_file)
         existing = provider.resolve(path) if path in provider.discover() else None
@@ -107,7 +114,9 @@ def set_secret(bundle: Path, path: str, value: str, key_file: Path, *, replace: 
     ciphertext = encrypt(sops, bundle, data, key_file)
     temporary: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(dir=bundle.parent, prefix=f".{bundle.name}.", delete=False) as handle:
+        with tempfile.NamedTemporaryFile(
+            dir=bundle.parent, prefix=f".{bundle.name}.", delete=False
+        ) as handle:
             temporary = Path(handle.name)
             handle.write(ciphertext)
         os.chmod(temporary, 0o600)
@@ -122,7 +131,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", type=Path, required=True)
     parser.add_argument("--path", required=True)
-    parser.add_argument("--key-file", type=Path, default=Path(os.environ.get("SOPS_AGE_KEY_FILE", "")))
+    parser.add_argument(
+        "--key-file", type=Path, default=Path(os.environ.get("SOPS_AGE_KEY_FILE", ""))
+    )
     parser.add_argument("--value-env")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--replace", action="store_true")
@@ -137,7 +148,16 @@ def main(argv: list[str] | None = None) -> int:
         if not args.value_env:
             parser.error("--value-env is required unless --check is used")
         value = os.environ.get(args.value_env, "")
-        print(set_secret(args.bundle, args.path, value, args.key_file, replace=args.replace, sops=args.sops))
+        print(
+            set_secret(
+                args.bundle,
+                args.path,
+                value,
+                args.key_file,
+                replace=args.replace,
+                sops=args.sops,
+            )
+        )
     except (SecretProviderError, SecretSetError, OSError, ValueError) as error:
         print(f"canonical secret update failed: {error}", file=sys.stderr)
         return 2

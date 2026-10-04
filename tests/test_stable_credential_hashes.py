@@ -36,10 +36,13 @@ class StableCredentialHashTests(unittest.TestCase):
 
     def test_host_identity_root_recovery_hash_uses_host_specific_salt(self) -> None:
         text = HOST_TASKS.read_text(encoding="utf-8")
-        recovery = text.split("- name: Set the protected root console recovery password", 1)[1].split(
-            "- name: Remove temporary root SSH keys", 1
-        )[0]
-        self.assertIn("host_identity_root_password_hash_salt ~ ':' ~ canonical_site ~ ':' ~ canonical_resource", recovery)
+        recovery = text.split(
+            "- name: Set the protected root console recovery password", 1
+        )[1].split("- name: Remove temporary root SSH keys", 1)[0]
+        self.assertIn(
+            "host_identity_root_password_hash_salt ~ ':' ~ canonical_site ~ ':' ~ canonical_resource",
+            recovery,
+        )
         self.assertIn("hash('sha256')", recovery)
         self.assertIn("[:16]", recovery)
         self.assertIn("no_log: true", recovery)

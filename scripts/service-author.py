@@ -16,7 +16,18 @@ from typing import Any
 
 SERVICE_ID = re.compile(r"^[a-z][a-z0-9_]{1,63}$")
 ARCHETYPES = {"dedicated-lxc", "dedicated-vm", "shared-host", "no-runtime"}
-SECRET_CLASSES = {"bootstrap", "credential", "generated", "key", "password", "provider", "recovery", "runtime", "token", "certificate"}  # public-safety: allow-secret
+SECRET_CLASSES = {
+    "bootstrap",
+    "credential",
+    "generated",
+    "key",
+    "password",
+    "provider",
+    "recovery",
+    "runtime",
+    "token",
+    "certificate",
+}  # public-safety: allow-secret
 
 
 def _required(value: str | None, label: str) -> str:
@@ -33,7 +44,9 @@ def _secret_metadata(entries: list[str]) -> list[dict[str, str]]:
             raise ValueError("secret metadata must be logical_path:class:environment")
         logical_path, classification, environment = (part.strip() for part in parts)
         if not logical_path.startswith("services.") or ".secrets." not in logical_path:
-            raise ValueError("secret metadata logical path must use services.<service>.secrets.<key>")
+            raise ValueError(
+                "secret metadata logical path must use services.<service>.secrets.<key>"
+            )
         if classification not in SECRET_CLASSES:
             raise ValueError(f"unsupported secret metadata class: {classification}")
         _required(environment, "secret metadata environment")
@@ -67,7 +80,9 @@ def build_manifest(
     config_model = _required(config_model, "configuration model")
     projection_contract = _required(projection_contract, "projection contract")
     if archetype in {"dedicated-lxc", "dedicated-vm", "shared-host"}:
-        provisioning_contract = _required(provisioning_contract, "provisioning contract")
+        provisioning_contract = _required(
+            provisioning_contract, "provisioning contract"
+        )
     if stateful:
         state_contract = _required(state_contract, "state contract")
 
@@ -88,10 +103,22 @@ def build_manifest(
             "catalog registration in infra/services.json",
             "canonical configuration model or explicit exemption",
             "canonical projection mappings",
-            "OpenTofu resource/module contract" if provisioning_contract else "no OpenTofu resource ownership",
-            "Ansible playbook and role contract" if provisioning_contract else "runtime integration contract",
+            (
+                "OpenTofu resource/module contract"
+                if provisioning_contract
+                else "no OpenTofu resource ownership"
+            ),
+            (
+                "Ansible playbook and role contract"
+                if provisioning_contract
+                else "runtime integration contract"
+            ),
             "secret delivery tests" if secrets else "secret-free service review",
-            "state backup and restore contract" if stateful else "stateless lifecycle contract",
+            (
+                "state backup and restore contract"
+                if stateful
+                else "stateless lifecycle contract"
+            ),
             "public-safe test fixtures",
             "service-specific tests and operator documentation",
         ],
@@ -121,12 +148,21 @@ def validate_repository_surfaces(
         try:
             payload = json.loads(catalog.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            errors.append(f"catalog registration: cannot parse infra/services.json ({exc})")
+            errors.append(
+                f"catalog registration: cannot parse infra/services.json ({exc})"
+            )
         else:
-            services = payload.get("services", payload) if isinstance(payload, dict) else {}
-            registered = service_id in services if isinstance(services, dict) else any(
-                isinstance(item, dict) and item.get("id", item.get("name")) == service_id
-                for item in services
+            services = (
+                payload.get("services", payload) if isinstance(payload, dict) else {}
+            )
+            registered = (
+                service_id in services
+                if isinstance(services, dict)
+                else any(
+                    isinstance(item, dict)
+                    and item.get("id", item.get("name")) == service_id
+                    for item in services
+                )
             )
             if not registered:
                 errors.append(f"catalog registration: service {service_id!r} is absent")
@@ -139,7 +175,9 @@ def validate_repository_surfaces(
                     "runtime_owner",
                 }
                 if not isinstance(entry, dict):
-                    errors.append(f"catalog metadata: service {service_id!r} must be an object")
+                    errors.append(
+                        f"catalog metadata: service {service_id!r} must be an object"
+                    )
                 else:
                     catalog_entry = entry
                     missing_metadata = sorted(required_metadata - entry.keys())
@@ -147,8 +185,12 @@ def validate_repository_surfaces(
                         errors.append(
                             f"catalog metadata: service {service_id!r} is missing {', '.join(missing_metadata)}"
                         )
-                    if not isinstance(entry.get("required_fields"), list) or not entry.get("required_fields"):
-                        errors.append(f"catalog metadata: service {service_id!r} must declare required_fields")
+                    if not isinstance(
+                        entry.get("required_fields"), list
+                    ) or not entry.get("required_fields"):
+                        errors.append(
+                            f"catalog metadata: service {service_id!r} must declare required_fields"
+                        )
 
     if catalog_entry is not None:
         for declared_playbook in catalog_entry.get("playbooks", []):
@@ -156,11 +198,18 @@ def validate_repository_surfaces(
             if not playbook.is_file() or repo not in playbook.resolve().parents:
                 errors.append(f"declared playbook: {declared_playbook} is missing")
         terraform_files = list((repo / "infra" / "opentofu").rglob("*.tf"))
-        terraform_text = "\n".join(path.read_text(encoding="utf-8", errors="ignore") for path in terraform_files)
+        terraform_text = "\n".join(
+            path.read_text(encoding="utf-8", errors="ignore")
+            for path in terraform_files
+        )
         for address in catalog_entry.get("terraform_addresses", []):
             address_text = str(address)
             address_stem = address_text.removesuffix("[")
-            module_name = address_stem.removeprefix("module.") if address_stem.startswith("module.") else ""
+            module_name = (
+                address_stem.removeprefix("module.")
+                if address_stem.startswith("module.")
+                else ""
+            )
             module_declaration = f'module "{module_name}"' if module_name else ""
             if (
                 address_text not in terraform_text
@@ -169,15 +218,23 @@ def validate_repository_surfaces(
             ):
                 errors.append(f"Terraform address: {address} is not represented")
         fixture_directory = repo / "tests" / "fixtures"
-        fixture_matches = [
-            path for path in fixture_directory.rglob("*")
-            if path.is_file() and service_id in path.read_text(encoding="utf-8", errors="ignore")
-        ] if fixture_directory.is_dir() else []
+        fixture_matches = (
+            [
+                path
+                for path in fixture_directory.rglob("*")
+                if path.is_file()
+                and service_id in path.read_text(encoding="utf-8", errors="ignore")
+            ]
+            if fixture_directory.is_dir()
+            else []
+        )
         if not fixture_matches:
             errors.append(f"test fixture: no fixture mentions {service_id!r}")
         if catalog_entry.get("state_capable") is True:
             state_policy = repo / "infra" / "ansible" / "vars" / "service-state.yml"
-            if not state_policy.is_file() or service_id not in state_policy.read_text(encoding="utf-8", errors="ignore"):
+            if not state_policy.is_file() or service_id not in state_policy.read_text(
+                encoding="utf-8", errors="ignore"
+            ):
                 errors.append(f"state policy: {service_id!r} is not registered")
         required_secrets = catalog_entry.get("required_secrets", [])
         if manifest is not None and required_secrets:
@@ -194,38 +251,65 @@ def validate_repository_surfaces(
             classifications = catalog_entry.get("secret_classifications", {})
             environments = catalog_entry.get("secret_environment", {})
             for logical_path in required_secrets:
-                if logical_path not in classifications or logical_path not in environments:
-                    errors.append(f"secret contract: catalog metadata is incomplete for {logical_path}")
+                if (
+                    logical_path not in classifications
+                    or logical_path not in environments
+                ):
+                    errors.append(
+                        f"secret contract: catalog metadata is incomplete for {logical_path}"
+                    )
 
-    requires_independent_runtime = catalog_entry is None or catalog_entry.get("runtime_owner") != "none"
+    requires_independent_runtime = (
+        catalog_entry is None or catalog_entry.get("runtime_owner") != "none"
+    )
     required_files = (
-        ("canonical configuration model", repo / "scripts" / "canonical_values.py"),
-        ("canonical projection mapping", repo / "scripts" / "canonical_projections.py"),
-    ) if requires_independent_runtime else ()
-    configuration_schema = str(catalog_entry.get("configuration_schema", "")) if catalog_entry else ""
+        (
+            ("canonical configuration model", repo / "scripts" / "canonical_values.py"),
+            (
+                "canonical projection mapping",
+                repo / "scripts" / "canonical_projections.py",
+            ),
+        )
+        if requires_independent_runtime
+        else ()
+    )
+    configuration_schema = (
+        str(catalog_entry.get("configuration_schema", "")) if catalog_entry else ""
+    )
     canonical_model = repo / "scripts" / "canonical_values.py"
     if configuration_schema and (
         not canonical_model.is_file()
-        or configuration_schema not in canonical_model.read_text(encoding="utf-8", errors="ignore")
+        or configuration_schema
+        not in canonical_model.read_text(encoding="utf-8", errors="ignore")
     ):
-        errors.append(f"configuration schema: {configuration_schema!r} is not represented")
+        errors.append(
+            f"configuration schema: {configuration_schema!r} is not represented"
+        )
     for label, path in required_files:
         if not path.is_file() or service_id not in path.read_text(encoding="utf-8"):
             errors.append(f"{label}: {service_id!r} is not represented")
 
     searched_surfaces = (
-        (("OpenTofu resource/module", repo / "infra" / "opentofu"),) if requires_independent_runtime else ()
+        (("OpenTofu resource/module", repo / "infra" / "opentofu"),)
+        if requires_independent_runtime
+        else ()
     ) + (
         ("Ansible playbook/role", repo / "infra" / "ansible"),
         ("service tests", repo / "tests"),
         ("operator documentation", repo / "docs"),
     )
     for label, directory in searched_surfaces:
-        matches = [
-            path for path in directory.rglob("*")
-            if path.is_file() and path.suffix in {".py", ".tf", ".yml", ".yaml", ".md", ".json"}
-            and service_id in path.read_text(encoding="utf-8", errors="ignore")
-        ] if directory.is_dir() else []
+        matches = (
+            [
+                path
+                for path in directory.rglob("*")
+                if path.is_file()
+                and path.suffix in {".py", ".tf", ".yml", ".yaml", ".md", ".json"}
+                and service_id in path.read_text(encoding="utf-8", errors="ignore")
+            ]
+            if directory.is_dir()
+            else []
+        )
         if not matches:
             errors.append(f"{label}: no repository surface mentions {service_id!r}")
     return errors
@@ -250,30 +334,51 @@ def validate_catalog_repository(repo: Path) -> dict[str, list[str]]:
     return failures
 
 
-def _validate_catalog_entry(service_id: str, entry: Any, service_ids: set[str]) -> list[str]:
+def _validate_catalog_entry(
+    service_id: str, entry: Any, service_ids: set[str]
+) -> list[str]:
     if not isinstance(entry, dict):
         return ["catalog entry must be an object"]
     errors: list[str] = []
     owner = entry.get("runtime_owner")
     independent_runtime = owner not in {"none", "shared_host"}
-    if not isinstance(entry.get("configuration_schema"), str) or not entry["configuration_schema"]:
+    if (
+        not isinstance(entry.get("configuration_schema"), str)
+        or not entry["configuration_schema"]
+    ):
         errors.append("catalog metadata: configuration_schema is required")
     for field in ("required_fields", "dependencies"):
         if not isinstance(entry.get(field), list):
             errors.append(f"catalog metadata: {field} must be a list")
     release_sources = entry.get("release_sources")
-    if independent_runtime and (not isinstance(release_sources, list) or not release_sources):
-        errors.append("catalog metadata: release_sources is required for runtime services")
+    if independent_runtime and (
+        not isinstance(release_sources, list) or not release_sources
+    ):
+        errors.append(
+            "catalog metadata: release_sources is required for runtime services"
+        )
     terraform_addresses = entry.get("terraform_addresses")
-    if independent_runtime and (not isinstance(terraform_addresses, list) or not terraform_addresses):
-        errors.append("catalog metadata: terraform_addresses is required for runtime services")
+    if independent_runtime and (
+        not isinstance(terraform_addresses, list) or not terraform_addresses
+    ):
+        errors.append(
+            "catalog metadata: terraform_addresses is required for runtime services"
+        )
     replacements = entry.get("terraform_replace_addresses")
-    if independent_runtime and (not isinstance(replacements, dict) or not replacements.get("lxc") or not replacements.get("vm")):
-        errors.append("catalog metadata: terraform_replace_addresses must define lxc and vm")
+    if independent_runtime and (
+        not isinstance(replacements, dict)
+        or not replacements.get("lxc")
+        or not replacements.get("vm")
+    ):
+        errors.append(
+            "catalog metadata: terraform_replace_addresses must define lxc and vm"
+        )
     inventory = entry.get("inventory")
     if independent_runtime:
         if not isinstance(inventory, dict):
-            errors.append("catalog metadata: inventory is required for runtime services")
+            errors.append(
+                "catalog metadata: inventory is required for runtime services"
+            )
         else:
             for key in ("host", "group", "ansible_var_mappings"):
                 if not inventory.get(key):
@@ -286,14 +391,25 @@ def _validate_catalog_entry(service_id: str, entry: Any, service_ids: set[str]) 
     required_secrets = entry.get("required_secrets", [])
     classifications = entry.get("secret_classifications", {})
     environments = entry.get("secret_environment", {})
-    if not isinstance(required_secrets, list) or not isinstance(classifications, dict) or not isinstance(environments, dict):
+    if (
+        not isinstance(required_secrets, list)
+        or not isinstance(classifications, dict)
+        or not isinstance(environments, dict)
+    ):
         errors.append("catalog metadata: secret contract fields have invalid types")
     else:
         for logical_path in required_secrets:
             if classifications.get(logical_path) not in SECRET_CLASSES:
-                errors.append(f"catalog metadata: unsupported secret classification for {logical_path}")
-            if not isinstance(environments.get(logical_path), str) or not environments[logical_path]:
-                errors.append(f"catalog metadata: missing secret environment for {logical_path}")
+                errors.append(
+                    f"catalog metadata: unsupported secret classification for {logical_path}"
+                )
+            if (
+                not isinstance(environments.get(logical_path), str)
+                or not environments[logical_path]
+            ):
+                errors.append(
+                    f"catalog metadata: missing secret environment for {logical_path}"
+                )
     if entry.get("state_capable") and not isinstance(entry.get("state_order"), int):
         errors.append("catalog metadata: state_order is required for stateful services")
     return errors
@@ -340,7 +456,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--state-contract")
     parser.add_argument("--secret", dest="secret_metadata", action="append", default=[])
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--check-repository", type=Path, help="validate implementation surfaces without modifying them")
+    parser.add_argument(
+        "--check-repository",
+        type=Path,
+        help="validate implementation surfaces without modifying them",
+    )
     return parser
 
 
@@ -361,13 +481,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"service-author: {exc}", file=sys.stderr)
         return 2
     if args.check_repository:
-        errors = validate_repository_surfaces(args.check_repository, args.service_id, manifest)
+        errors = validate_repository_surfaces(
+            args.check_repository, args.service_id, manifest
+        )
         if errors:
             for error in errors:
                 print(f"service-author: {error}", file=sys.stderr)
             return 2
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     print(f"wrote public-safe authoring manifest: {args.output}")
     return 0
 

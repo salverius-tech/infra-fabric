@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Emit Ansible vars for host storage that must exist before OpenTofu apply."""
+
 from __future__ import annotations
 
 import argparse
@@ -17,13 +18,17 @@ def load_projection(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise StorageVarsError(f"cannot read canonical projection {path}: {error}") from error
+        raise StorageVarsError(
+            f"cannot read canonical projection {path}: {error}"
+        ) from error
     if not isinstance(data, dict):
         raise StorageVarsError(f"canonical projection {path} must contain an object")
     return data
 
 
-def storage_definitions(tfvars: dict[str, Any], service: str) -> dict[str, dict[str, Any]]:
+def storage_definitions(
+    tfvars: dict[str, Any], service: str
+) -> dict[str, dict[str, Any]]:
     storage = tfvars.get("service_storage", {})
     if isinstance(storage, dict) and isinstance(storage.get(service), dict):
         return {
@@ -34,7 +39,9 @@ def storage_definitions(tfvars: dict[str, Any], service: str) -> dict[str, dict[
     return {}
 
 
-def build_storage_mounts(enabled_services: list[str], tfvars: dict[str, Any]) -> list[dict[str, Any]]:
+def build_storage_mounts(
+    enabled_services: list[str], tfvars: dict[str, Any]
+) -> list[dict[str, Any]]:
     mounts: list[dict[str, Any]] = []
     for service in enabled_services:
         for mount_name, definition in storage_definitions(tfvars, service).items():
@@ -42,10 +49,16 @@ def build_storage_mounts(enabled_services: list[str], tfvars: dict[str, Any]) ->
                 continue
             source = definition.get("source")
             if not source:
-                raise StorageVarsError(f"missing bind source for {service}.{mount_name}")
+                raise StorageVarsError(
+                    f"missing bind source for {service}.{mount_name}"
+                )
             host_prepare = definition.get("host_prepare")
             if not isinstance(host_prepare, dict):
-                host_prepare = {"type": "directory" if definition.get("create_source", True) else "none"}
+                host_prepare = {
+                    "type": (
+                        "directory" if definition.get("create_source", True) else "none"
+                    )
+                }
             if host_prepare.get("type", "directory") == "none":
                 continue
             mounts.append(
@@ -86,7 +99,12 @@ def format_storage_summary(mounts: list[dict[str, Any]]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--projection", type=Path, required=True, help="generated canonical OpenTofu JSON projection")
+    parser.add_argument(
+        "--projection",
+        type=Path,
+        required=True,
+        help="generated canonical OpenTofu JSON projection",
+    )
     parser.add_argument("--service", default="")
     parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
@@ -94,13 +112,24 @@ def main(argv: list[str] | None = None) -> int:
     try:
         projection = load_projection(args.projection)
         enabled_services = projection.get("enabled_services")
-        if not isinstance(enabled_services, list) or not all(isinstance(service, str) for service in enabled_services):
-            raise StorageVarsError("canonical projection enabled_services must be a string list")
+        if not isinstance(enabled_services, list) or not all(
+            isinstance(service, str) for service in enabled_services
+        ):
+            raise StorageVarsError(
+                "canonical projection enabled_services must be a string list"
+            )
         storage = projection.get("service_storage")
         if not isinstance(storage, dict):
-            raise StorageVarsError("canonical projection service_storage must be an object")
-        if any(service in storage and not isinstance(storage[service], dict) for service in enabled_services):
-            raise StorageVarsError("canonical projection service_storage entries must be objects")
+            raise StorageVarsError(
+                "canonical projection service_storage must be an object"
+            )
+        if any(
+            service in storage and not isinstance(storage[service], dict)
+            for service in enabled_services
+        ):
+            raise StorageVarsError(
+                "canonical projection service_storage entries must be objects"
+            )
         tfvars = projection
         if args.service:
             if args.service not in enabled_services:

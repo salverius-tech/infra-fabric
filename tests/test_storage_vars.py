@@ -42,7 +42,9 @@ class StorageVarsTests(unittest.TestCase):
             }
         }
 
-        mounts = storage_vars.build_storage_mounts(["technitium", "forgejo", "infisical"], tfvars)
+        mounts = storage_vars.build_storage_mounts(
+            ["technitium", "forgejo", "infisical"], tfvars
+        )
 
         self.assertEqual(
             mounts,
@@ -72,7 +74,9 @@ class StorageVarsTests(unittest.TestCase):
         self.assertEqual(mounts, [])
 
     def test_format_storage_summary_outputs_none(self) -> None:
-        self.assertEqual(storage_vars.format_storage_summary([]), "Storage prep summary:\n  none")
+        self.assertEqual(
+            storage_vars.format_storage_summary([]), "Storage prep summary:\n  none"
+        )
 
     def test_format_storage_summary_outputs_mounts(self) -> None:
         text = storage_vars.format_storage_summary(
@@ -97,14 +101,20 @@ class StorageVarsTests(unittest.TestCase):
             root = Path(temp)
             projection = root / "terraform.auto.tfvars.json"
             projection.write_text(
-                json.dumps({
-                    "enabled_services": ["forgejo"],
-                    "service_storage": {"forgejo": {"data": {
-                        "type": "bind",
-                        "source": "/srv/homelab/forgejo",
-                        "target": "/var/lib/forgejo",
-                    }}},
-                }),
+                json.dumps(
+                    {
+                        "enabled_services": ["forgejo"],
+                        "service_storage": {
+                            "forgejo": {
+                                "data": {
+                                    "type": "bind",
+                                    "source": "/srv/homelab/forgejo",
+                                    "target": "/var/lib/forgejo",
+                                }
+                            }
+                        },
+                    }
+                ),
                 encoding="utf-8",
             )
 
@@ -119,8 +129,12 @@ class StorageVarsTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             output.append(buffer.getvalue())
             payload = json.loads(output[0])
-            self.assertEqual(payload["storage_bind_mounts"][0]["source"], "/srv/homelab/forgejo")
-            self.assertEqual(payload["storage_bind_mounts"][0]["host_prepare"]["type"], "directory")
+            self.assertEqual(
+                payload["storage_bind_mounts"][0]["source"], "/srv/homelab/forgejo"
+            )
+            self.assertEqual(
+                payload["storage_bind_mounts"][0]["host_prepare"]["type"], "directory"
+            )
 
     def test_main_accepts_generated_canonical_projection(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -152,20 +166,36 @@ class StorageVarsTests(unittest.TestCase):
 
             self.assertEqual(rc, 0)
             payload = json.loads(buffer.getvalue())
-            self.assertEqual(payload["storage_bind_mounts"][0]["source"], "/srv/canonical/forgejo")
+            self.assertEqual(
+                payload["storage_bind_mounts"][0]["source"], "/srv/canonical/forgejo"
+            )
 
     def test_main_filters_to_requested_service(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             projection = root / "terraform.auto.tfvars.json"
             projection.write_text(
-                json.dumps({
-                    "enabled_services": ["forgejo", "hermes"],
-                    "service_storage": {
-                        "forgejo": {"data": {"type": "bind", "source": "/srv/forgejo", "target": "/var/lib/forgejo"}},
-                        "hermes": {"data": {"type": "bind", "source": "/srv/hermes", "target": "/var/lib/hermes"}},
-                    },
-                }),
+                json.dumps(
+                    {
+                        "enabled_services": ["forgejo", "hermes"],
+                        "service_storage": {
+                            "forgejo": {
+                                "data": {
+                                    "type": "bind",
+                                    "source": "/srv/forgejo",
+                                    "target": "/var/lib/forgejo",
+                                }
+                            },
+                            "hermes": {
+                                "data": {
+                                    "type": "bind",
+                                    "source": "/srv/hermes",
+                                    "target": "/var/lib/hermes",
+                                }
+                            },
+                        },
+                    }
+                ),
                 encoding="utf-8",
             )
 
@@ -174,16 +204,20 @@ class StorageVarsTests(unittest.TestCase):
 
             buffer = io.StringIO()
             with contextlib.redirect_stdout(buffer):
-                rc = storage_vars.main([
-                    "--projection",
-                    str(projection),
-                    "--service",
-                    "hermes",
-                ])
+                rc = storage_vars.main(
+                    [
+                        "--projection",
+                        str(projection),
+                        "--service",
+                        "hermes",
+                    ]
+                )
 
             self.assertEqual(rc, 0)
             payload = json.loads(buffer.getvalue())
-            self.assertEqual([mount["name"] for mount in payload["storage_bind_mounts"]], ["hermes"])
+            self.assertEqual(
+                [mount["name"] for mount in payload["storage_bind_mounts"]], ["hermes"]
+            )
 
     def test_main_outputs_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

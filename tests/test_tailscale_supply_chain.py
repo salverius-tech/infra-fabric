@@ -15,15 +15,32 @@ class TailscaleSupplyChainTests(unittest.TestCase):
         tasks = yaml.safe_load(text)
 
         self.assertNotIn("tailscale.com/install.sh", text)
-        key = next(task for task in tasks if task.get("name") == "Install checksum-verified Tailscale repository key")
-        repository = next(task for task in tasks if task.get("name") == "Configure signed Tailscale apt repository")
-        package = next(task for task in tasks if task.get("name") == "Install Tailscale package")
+        key = next(
+            task
+            for task in tasks
+            if task.get("name") == "Install checksum-verified Tailscale repository key"
+        )
+        repository = next(
+            task
+            for task in tasks
+            if task.get("name") == "Configure signed Tailscale apt repository"
+        )
+        package = next(
+            task for task in tasks if task.get("name") == "Install Tailscale package"
+        )
 
-        self.assertRegex(key["ansible.builtin.get_url"]["checksum"], r"^sha256:[0-9a-f]{64}$")
+        self.assertRegex(
+            key["ansible.builtin.get_url"]["checksum"], r"^sha256:[0-9a-f]{64}$"
+        )
         self.assertEqual(key["ansible.builtin.get_url"]["mode"], "0644")
-        self.assertIn("signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg", repository["ansible.builtin.apt_repository"]["repo"])
+        self.assertIn(
+            "signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg",
+            repository["ansible.builtin.apt_repository"]["repo"],
+        )
         self.assertTrue(repository["ansible.builtin.apt_repository"]["update_cache"])
-        self.assertEqual(package["ansible.builtin.apt"], {"name": "tailscale", "state": "present"})
+        self.assertEqual(
+            package["ansible.builtin.apt"], {"name": "tailscale", "state": "present"}
+        )
 
 
 if __name__ == "__main__":

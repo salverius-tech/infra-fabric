@@ -156,12 +156,20 @@ class CanonicalValuesTests(unittest.TestCase):
         site_data["resources"]["guests"]["forgejo"]["runtime"].pop("unprivileged")
         site_model = canonical_values.CanonicalSite.model_validate(site_data)
         self.assertEqual(
-            render_opentofu_variables(site_model).get("vm_cpu_types", {}).get("forgejo"),
+            render_opentofu_variables(site_model)
+            .get("vm_cpu_types", {})
+            .get("forgejo"),
             "x86-64-v2-AES",
         )
-        template_path = Path(__file__).resolve().parents[1] / "scaffold/sites/_template/site.yaml"
-        template = canonical_values.CanonicalSite.model_validate(yaml.safe_load(template_path.read_text(encoding="utf-8")))
-        self.assertEqual(render_opentofu_variables(template)["vm_cpu_types"]["sssf"], "x86-64-v3")
+        template_path = (
+            Path(__file__).resolve().parents[1] / "scaffold/sites/_template/site.yaml"
+        )
+        template = canonical_values.CanonicalSite.model_validate(
+            yaml.safe_load(template_path.read_text(encoding="utf-8"))
+        )
+        self.assertEqual(
+            render_opentofu_variables(template)["vm_cpu_types"]["sssf"], "x86-64-v3"
+        )
 
     def test_lxc_rejects_explicit_vm_cpu_type(self) -> None:
         data = yaml.safe_load(VALID_SITE)
@@ -177,7 +185,9 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             canonical_values.CanonicalSite.model_validate(data)
 
-    def test_sssf_configuration_is_strict_and_loopback_visualizer_is_default(self) -> None:
+    def test_sssf_configuration_is_strict_and_loopback_visualizer_is_default(
+        self,
+    ) -> None:
         configuration = SssfConfiguration.model_validate({})
         self.assertEqual(configuration.runtime_user, "sssf")
         self.assertFalse(configuration.visualizer_enabled)
@@ -189,13 +199,18 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             SssfConfiguration.model_validate({"visualizer_host": "0.0.0.0"})
         with self.assertRaises(ValueError):
-            SssfConfiguration.model_validate({"allowed_repositories": ["https://user:pass@example.invalid/repo.git"]})
+            SssfConfiguration.model_validate(
+                {"allowed_repositories": ["https://user:pass@example.invalid/repo.git"]}
+            )
         with self.assertRaises(ValueError):
             SssfConfiguration.model_validate({"provider": "unsupported"})
 
     def test_runtime_env_is_allow_listed_and_escaped(self) -> None:
         rendered = render_runtime_env(
-            {"PUBLIC_URL": "https://example.internal/$service", "TOKEN": "synthetic-secret"},
+            {
+                "PUBLIC_URL": "https://example.internal/$service",
+                "TOKEN": "synthetic-secret",
+            },
             allowed_keys={"PUBLIC_URL", "TOKEN"},
             secret_keys={"TOKEN"},
         )
@@ -208,7 +223,9 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ProjectionError):
             render_runtime_env({"UNKNOWN": "value"}, allowed_keys=set())
         with self.assertRaises(ProjectionError):
-            render_runtime_env({"TOKEN": "value"}, allowed_keys={"TOKEN"}, secret_keys={"MISSING"})
+            render_runtime_env(
+                {"TOKEN": "value"}, allowed_keys={"TOKEN"}, secret_keys={"MISSING"}
+            )
         with self.assertRaises(ProjectionError):
             render_runtime_env({"TOKEN": "line1\nline2"}, allowed_keys={"TOKEN"})
 
@@ -217,9 +234,13 @@ class CanonicalValuesTests(unittest.TestCase):
         site["bootstrap"] = {
             "ssh": {
                 "user": "infra",
-                "public_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsite site@example"],
+                "public_keys": [
+                    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsite site@example"
+                ],
                 "host_additional_keys": {
-                    "forgejo": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIhost host@example"],
+                    "forgejo": [
+                        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIhost host@example"
+                    ],
                 },
             }
         }
@@ -230,7 +251,9 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(model.bootstrap.ssh.public_keys[0].split()[0], "ssh-ed25519")
         self.assertIn("forgejo", model.bootstrap.ssh.host_additional_keys)
 
-    def test_proxmox_management_identity_requires_a_valid_distinct_public_key(self) -> None:
+    def test_proxmox_management_identity_requires_a_valid_distinct_public_key(
+        self,
+    ) -> None:
         site = canonical_values.YAML(typ="safe").load(VALID_SITE)
         site["platform"]["proxmox"]["management"] = {
             "host": "pve.example.internal",
@@ -239,12 +262,17 @@ class CanonicalValuesTests(unittest.TestCase):
         model = canonical_values.CanonicalSite.model_validate(site)
         management = model.platform.proxmox.management
         assert management is not None
-        self.assertEqual(management.ssh_private_key_secret_ref, "secrets.providers.proxmox.ssh_private_key")
+        self.assertEqual(
+            management.ssh_private_key_secret_ref,
+            "secrets.providers.proxmox.ssh_private_key",
+        )
         site["platform"]["proxmox"]["management"]["ssh_public_key"] = "not-a-key"
         with self.assertRaises(ValueError):
             canonical_values.CanonicalSite.model_validate(site)
 
-    def test_proxmox_management_identity_requires_a_public_key_and_fixed_secret_path(self) -> None:
+    def test_proxmox_management_identity_requires_a_public_key_and_fixed_secret_path(
+        self,
+    ) -> None:
         site = canonical_values.YAML(typ="safe").load(VALID_SITE)
         site["platform"]["proxmox"]["management"] = {"host": "pve.example.internal"}
         with self.assertRaises(ValueError):
@@ -259,7 +287,9 @@ class CanonicalValuesTests(unittest.TestCase):
 
     def test_proxmox_management_identity_rejects_bootstrap_key_reuse(self) -> None:
         site = canonical_values.YAML(typ="safe").load(VALID_SITE)
-        bootstrap_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIbootstrap bootstrap@example.invalid"
+        bootstrap_key = (
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIbootstrap bootstrap@example.invalid"
+        )
         site["bootstrap"] = {"ssh": {"public_keys": [bootstrap_key]}}
         site["platform"]["proxmox"]["management"] = {
             "host": "pve.example.internal",
@@ -273,32 +303,47 @@ class CanonicalValuesTests(unittest.TestCase):
         site["bootstrap"] = {
             "ssh": {
                 "user": "infra",
-                "public_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsite site@example"],
+                "public_keys": [
+                    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIsite site@example"
+                ],
                 "host_additional_keys": {
-                    "forgejo": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIhost host@example"],
+                    "forgejo": [
+                        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIhost host@example"
+                    ],
                 },
             }
         }
         model = canonical_values.CanonicalSite.model_validate(site)
-        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        catalog = load_catalog(
+            Path(__file__).resolve().parents[1] / "infra" / "services.json"
+        )
 
         tofu = render_opentofu_variables(model)
         inventory = render_ansible_inventory(model, catalog)
 
         self.assertEqual(tofu["bootstrap_ssh_user"], "infra")
         self.assertEqual(len(tofu["bootstrap_ssh_public_keys"]["forgejo"]), 2)
-        hostvars = inventory[catalog.get("forgejo").inventory["group"]]["hosts"][catalog.get("forgejo").inventory["host"]]
+        hostvars = inventory[catalog.get("forgejo").inventory["group"]]["hosts"][
+            catalog.get("forgejo").inventory["host"]
+        ]
         self.assertEqual(hostvars["ansible_user"], "infra")
-        self.assertEqual(hostvars["bootstrap_ssh_public_keys"], tofu["bootstrap_ssh_public_keys"]["forgejo"])
+        self.assertEqual(
+            hostvars["bootstrap_ssh_public_keys"],
+            tofu["bootstrap_ssh_public_keys"]["forgejo"],
+        )
 
     def test_operator_policy_projects_separate_keys_and_pinned_dotfiles(self) -> None:
         site = canonical_values.YAML(typ="safe").load(VALID_SITE)
         site["operator"] = {
             "user": "systemboss",
             "ssh": {
-                "public_keys": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIoperator operator@example"],
+                "public_keys": [
+                    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIoperator operator@example"
+                ],
                 "host_additional_keys": {
-                    "forgejo": ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIoperatorhost host@example"],
+                    "forgejo": [
+                        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIoperatorhost host@example"
+                    ],
                 },
             },
             "dotfiles": {
@@ -314,7 +359,10 @@ class CanonicalValuesTests(unittest.TestCase):
         tofu = render_opentofu_variables(model)
         self.assertEqual(tofu["operator_user"], "systemboss")
         self.assertEqual(len(tofu["operator_ssh_public_keys"]["forgejo"]), 2)
-        self.assertEqual(tofu["operator_dotfiles_revision"], "4aeeadd928b0d03090e5aa973d10d989e846cf15")
+        self.assertEqual(
+            tofu["operator_dotfiles_revision"],
+            "4aeeadd928b0d03090e5aa973d10d989e846cf15",
+        )
         self.assertEqual(tofu["operator_chezmoi_version"], "v2.71.1")
 
     def test_host_identity_names_are_site_owned_and_projected(self) -> None:
@@ -325,7 +373,9 @@ class CanonicalValuesTests(unittest.TestCase):
         tofu = render_opentofu_variables(model)
         self.assertEqual(tofu["bootstrap_ssh_user"], "infra-dev")
         self.assertEqual(tofu["operator_user"], "anviluser")
-        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        catalog = load_catalog(
+            Path(__file__).resolve().parents[1] / "infra" / "services.json"
+        )
         inventory = render_ansible_inventory(model, catalog)
         group = catalog.get("forgejo").inventory["group"]
         host_name = catalog.get("forgejo").inventory["host"]
@@ -335,11 +385,18 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(host["operator_user"], "anviluser")
 
     def test_host_identity_names_must_be_valid_and_distinct(self) -> None:
-        for bootstrap_user, operator_user in (("root", "anviluser"), ("infra-dev", "infra-dev")):
+        for bootstrap_user, operator_user in (
+            ("root", "anviluser"),
+            ("infra-dev", "infra-dev"),
+        ):
             site = canonical_values.YAML(typ="safe").load(VALID_SITE)
-            site.setdefault("bootstrap", {}).setdefault("ssh", {})["user"] = bootstrap_user
+            site.setdefault("bootstrap", {}).setdefault("ssh", {})[
+                "user"
+            ] = bootstrap_user
             site.setdefault("operator", {})["user"] = operator_user
-            with self.subTest(bootstrap_user=bootstrap_user, operator_user=operator_user):
+            with self.subTest(
+                bootstrap_user=bootstrap_user, operator_user=operator_user
+            ):
                 with self.assertRaises((CanonicalValuesError, ValidationError)):
                     canonical_values.CanonicalSite.model_validate(site)
 
@@ -349,9 +406,18 @@ class CanonicalValuesTests(unittest.TestCase):
             site_dir.mkdir()
             path = site_dir / "site.yaml"
             path.write_text(VALID_SITE, encoding="utf-8")
-            model = load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+            model = load_site(
+                path,
+                expected_site="dev",
+                catalog_path=Path(__file__).resolve().parents[1]
+                / "infra"
+                / "services.json",
+            )
         self.assertEqual(model.bootstrap.root_password.inheritance, "automatic")
-        self.assertEqual(model.bootstrap.root_password.default_secret, "secrets.bootstrap.root_password")
+        self.assertEqual(
+            model.bootstrap.root_password.default_secret,
+            "secrets.bootstrap.root_password",
+        )
         self.assertEqual(model.bootstrap.root_password.host_overrides, {})
 
     def test_root_password_policy_accepts_existing_resource_override(self) -> None:
@@ -364,7 +430,13 @@ class CanonicalValuesTests(unittest.TestCase):
             site_dir.mkdir()
             path = site_dir / "site.yaml"
             path.write_text(document, encoding="utf-8")
-            model = load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+            model = load_site(
+                path,
+                expected_site="dev",
+                catalog_path=Path(__file__).resolve().parents[1]
+                / "infra"
+                / "services.json",
+            )
         self.assertEqual(
             model.bootstrap.root_password.host_overrides["forgejo"],
             "secrets.bootstrap.hosts.forgejo.root_password",
@@ -381,12 +453,28 @@ class CanonicalValuesTests(unittest.TestCase):
             path = site_dir / "site.yaml"
             path.write_text(document, encoding="utf-8")
             with self.assertRaises(CanonicalValuesError):
-                load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+                load_site(
+                    path,
+                    expected_site="dev",
+                    catalog_path=Path(__file__).resolve().parents[1]
+                    / "infra"
+                    / "services.json",
+                )
 
     def test_service_configuration_registry_covers_typed_services(self) -> None:
         self.assertEqual(
             set(canonical_values.SERVICE_CONFIGURATION_MODELS),
-            {"forgejo", "forgejo_runner", "hermes", "infisical", "infisical_onramp", "searxng_onramp", "sssf", "tailscale_client", "technitium"},
+            {
+                "forgejo",
+                "forgejo_runner",
+                "hermes",
+                "infisical",
+                "infisical_onramp",
+                "searxng_onramp",
+                "sssf",
+                "tailscale_client",
+                "technitium",
+            },
         )
         for name, model in canonical_values.SERVICE_CONFIGURATION_MODELS.items():
             with self.subTest(service=name):
@@ -418,29 +506,46 @@ class CanonicalValuesTests(unittest.TestCase):
                 with self.assertRaises(ValidationError):
                     InfisicalOnrampConfiguration.model_validate({field: value})
 
-        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        catalog = load_catalog(
+            Path(__file__).resolve().parents[1] / "infra" / "services.json"
+        )
         contract = canonical_values.service_configuration_contract(
             set(catalog.names),
             {name: catalog.get(name).configuration_schema for name in catalog.names},
         )
         self.assertEqual(set(contract), set(catalog.names))
         self.assertEqual(contract["infisical_onramp"]["kind"], "typed-model")
-        self.assertEqual(contract["infisical_onramp"]["model"], "InfisicalOnrampConfiguration")
+        self.assertEqual(
+            contract["infisical_onramp"]["model"], "InfisicalOnrampConfiguration"
+        )
         self.assertEqual(contract["onramp_host"]["kind"], "resource-owned")
-        self.assertEqual(contract["onramp_host"]["schema"], "ResourceOwnedConfiguration")
+        self.assertEqual(
+            contract["onramp_host"]["schema"], "ResourceOwnedConfiguration"
+        )
         self.assertEqual(contract["forgejo"]["kind"], "typed-model")
         with self.assertRaises(CanonicalValuesError):
-            canonical_values.service_configuration_contract(set(catalog.names) | {"new_service"})
+            canonical_values.service_configuration_contract(
+                set(catalog.names) | {"new_service"}
+            )
         with self.assertRaises(CanonicalValuesError):
-            canonical_values.service_configuration_contract(set(catalog.names) - {"technitium"})
+            canonical_values.service_configuration_contract(
+                set(catalog.names) - {"technitium"}
+            )
 
     def test_public_service_configuration_fixture_matches_registry(self) -> None:
-        fixture = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "service-configurations.yaml"
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "tests"
+            / "fixtures"
+            / "service-configurations.yaml"
+        )
         yaml = canonical_values.YAML(typ="safe")
         document = yaml.load(fixture.read_text(encoding="utf-8"))
         self.assertIsInstance(document, dict)
         services = document["services"]
-        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        catalog = load_catalog(
+            Path(__file__).resolve().parents[1] / "infra" / "services.json"
+        )
         contract = canonical_values.service_configuration_contract(set(catalog.names))
         self.assertEqual(set(services), set(contract))
         for name, entry in services.items():
@@ -451,16 +556,30 @@ class CanonicalValuesTests(unittest.TestCase):
                     model = canonical_values.SERVICE_CONFIGURATION_MODELS[name]
                     model.model_validate(entry["configuration"])
                 else:
-                    self.assertEqual(entry["resource_owned"]["owner"], contract[name]["owner"])
+                    self.assertEqual(
+                        entry["resource_owned"]["owner"], contract[name]["owner"]
+                    )
 
     def test_public_scaffold_declares_every_catalog_service(self) -> None:
         root = Path(__file__).resolve().parents[1]
         catalog = load_catalog(root / "infra" / "services.json")
-        site = load_site(root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml", expected_site="dev", catalog_path=root / "infra" / "services.json")
+        site = load_site(
+            root / "tests" / "fixtures" / "sites" / "dev" / "site.yaml",
+            expected_site="dev",
+            catalog_path=root / "infra" / "services.json",
+        )
         self.assertEqual(set(site.services), set(catalog.names))
-        self.assertEqual({name for name, service in site.services.items() if service.enabled}, {"forgejo", "technitium"})
+        self.assertEqual(
+            {name for name, service in site.services.items() if service.enabled},
+            {"forgejo", "technitium"},
+        )
 
-        fixture = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "resource-runtime.yaml"
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "tests"
+            / "fixtures"
+            / "resource-runtime.yaml"
+        )
         yaml = canonical_values.YAML(typ="safe")
         document = yaml.load(fixture.read_text(encoding="utf-8"))
         resources = canonical_values.Resources.model_validate(document)
@@ -470,7 +589,9 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertTrue(resources.guests["example-lxc"].runtime.unprivileged)
         self.assertEqual(resources.guests["example-vm"].type, "vm")
         self.assertEqual(resources.guests["example-vm"].runtime.firmware, "uefi")
-        self.assertEqual(resources.shared_hosts["onramp-host"].security.deploy_user, "operator")
+        self.assertEqual(
+            resources.shared_hosts["onramp-host"].security.deploy_user, "operator"
+        )
 
         invalid_vm = document["guests"]["example-vm"].copy()
         invalid_vm["runtime"] = {"unprivileged": True}
@@ -478,22 +599,38 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             canonical_values.Resources.model_validate(invalid)
 
-    def test_service_state_policy_is_explicit_for_stateful_and_stateless_services(self) -> None:
-        stateful = canonical_values.ServiceState.model_validate({"capable": True, "disable_policy": "retain"})
+    def test_service_state_policy_is_explicit_for_stateful_and_stateless_services(
+        self,
+    ) -> None:
+        stateful = canonical_values.ServiceState.model_validate(
+            {"capable": True, "disable_policy": "retain"}
+        )
         self.assertTrue(stateful.capable)
         with self.assertRaises(ValidationError):
             canonical_values.ServiceState.model_validate({"capable": True})
         with self.assertRaises(ValidationError):
-            canonical_values.ServiceState.model_validate({"capable": False, "disable_policy": "retain"})
+            canonical_values.ServiceState.model_validate(
+                {"capable": False, "disable_policy": "retain"}
+            )
         with self.assertRaises(ValidationError):
-            canonical_values.ServiceState.model_validate({"capable": False, "backup": {"retention_days": 7}})
+            canonical_values.ServiceState.model_validate(
+                {"capable": False, "backup": {"retention_days": 7}}
+            )
 
     def _full_catalog_site_document(self) -> dict:
         root = Path(__file__).resolve().parents[1]
         yaml = canonical_values.YAML(typ="safe")
-        site = yaml.load((root / "tests/fixtures/sites/dev/site.yaml").read_text(encoding="utf-8"))
-        site["resources"] = yaml.load((root / "tests/fixtures/resource-runtime.yaml").read_text(encoding="utf-8"))
-        site["services"] = yaml.load((root / "tests/fixtures/full-catalog-services.yaml").read_text(encoding="utf-8"))["services"]
+        site = yaml.load(
+            (root / "tests/fixtures/sites/dev/site.yaml").read_text(encoding="utf-8")
+        )
+        site["resources"] = yaml.load(
+            (root / "tests/fixtures/resource-runtime.yaml").read_text(encoding="utf-8")
+        )
+        site["services"] = yaml.load(
+            (root / "tests/fixtures/full-catalog-services.yaml").read_text(
+                encoding="utf-8"
+            )
+        )["services"]
         return site
 
     def test_full_catalog_fixture_loads_as_one_valid_canonical_site(self) -> None:
@@ -508,32 +645,55 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(enabled, set(catalog.names))
         self.assertEqual(canonical.services["forgejo_runner"].dependencies, ["forgejo"])
         self.assertEqual(canonical.services["forgejo"].release.source, "package")
-        self.assertEqual(catalog.get("forgejo").required_fields, ("resource", "state.capable", "release.version"))
-        self.assertEqual(catalog.get("technitium").required_fields, ("resource", "state.capable", "release.version", "release.checksum"))
+        self.assertEqual(
+            catalog.get("forgejo").required_fields,
+            ("resource", "state.capable", "release.version"),
+        )
+        self.assertEqual(
+            catalog.get("technitium").required_fields,
+            ("resource", "state.capable", "release.version", "release.checksum"),
+        )
         self.assertIn("release.version", catalog.get("forgejo_runner").required_fields)
-        self.assertIn("configuration.compose_artifact.version", catalog.get("forgejo_runner").required_fields)
+        self.assertIn(
+            "configuration.compose_artifact.version",
+            catalog.get("forgejo_runner").required_fields,
+        )
         self.assertEqual(canonical.services["searxng_onramp"].resource, "onramp-host")
 
     def test_full_catalog_cross_field_failure_matrix(self) -> None:
         root = Path(__file__).resolve().parents[1]
         catalog = load_catalog(root / "infra/services.json")
         cases = {
-            "stateful_missing_disable_policy": lambda site: site["services"]["forgejo"]["state"].update(
-                {"capable": True, "disable_policy": None}
+            "stateful_missing_disable_policy": lambda site: site["services"]["forgejo"][
+                "state"
+            ].update({"capable": True, "disable_policy": None}),
+            "enabled_service_missing_resource": lambda site: site["services"][
+                "forgejo"
+            ].update({"resource": None}),
+            "stateful_service_missing_state_capability": lambda site: site["services"][
+                "forgejo"
+            ].update({"state": {"capable": False}}),
+            "service_missing_release_version": lambda site: site["services"]["forgejo"][
+                "release"
+            ].update({"version": None}),
+            "runner_missing_registration_url": lambda site: site["services"][
+                "forgejo_runner"
+            ]["configuration"].update({"url": None}),
+            "unknown_service_resource": lambda site: site["services"]["forgejo"].update(
+                {"resource": "missing"}
             ),
-            "enabled_service_missing_resource": lambda site: site["services"]["forgejo"].update({"resource": None}),
-            "stateful_service_missing_state_capability": lambda site: site["services"]["forgejo"].update({"state": {"capable": False}}),
-            "service_missing_release_version": lambda site: site["services"]["forgejo"]["release"].update({"version": None}),
-            "runner_missing_registration_url": lambda site: site["services"]["forgejo_runner"]["configuration"].update({"url": None}),
-            "unknown_service_resource": lambda site: site["services"]["forgejo"].update({"resource": "missing"}),
-            "stateless_service_claims_state": lambda site: site["services"]["tailscale_client"].update(
-                {"state": {"capable": True, "disable_policy": "retain"}}
-            ),
-            "resource_owned_release": lambda site: site["services"]["onramp_host"].update(
-                {"release": {"source": "package", "version": "1.0.0"}}
-            ),
+            "stateless_service_claims_state": lambda site: site["services"][
+                "tailscale_client"
+            ].update({"state": {"capable": True, "disable_policy": "retain"}}),
+            "resource_owned_release": lambda site: site["services"][
+                "onramp_host"
+            ].update({"release": {"source": "package", "version": "1.0.0"}}),
             "opaque_service_override": lambda site: site["services"]["forgejo"].update(
-                {"overrides": {"ansible": {"forgejo_domain": "credential-under-innocuous-key"}}}
+                {
+                    "overrides": {
+                        "ansible": {"forgejo_domain": "credential-under-innocuous-key"}
+                    }
+                }
             ),
         }
         for name, mutate in cases.items():
@@ -542,25 +702,44 @@ class CanonicalValuesTests(unittest.TestCase):
                 mutate(site)
                 with self.assertRaises((ValidationError, ServiceCatalogError)):
                     canonical = canonical_values.CanonicalSite.model_validate(site)
-                    catalog.validate_model_services(canonical.services, canonical.resources)
+                    catalog.validate_model_services(
+                        canonical.services, canonical.resources
+                    )
 
         missing_dependency = self._full_catalog_site_document()
         missing_dependency["services"]["forgejo"]["enabled"] = False
         with self.assertRaises(ServiceCatalogError):
-            catalog.validate_selection({name for name, service in missing_dependency["services"].items() if service["enabled"]})
+            catalog.validate_selection(
+                {
+                    name
+                    for name, service in missing_dependency["services"].items()
+                    if service["enabled"]
+                }
+            )
 
-        canonical = canonical_values.CanonicalSite.model_validate(self._full_catalog_site_document())
+        canonical = canonical_values.CanonicalSite.model_validate(
+            self._full_catalog_site_document()
+        )
         canonical.services["forgejo"].resource = None
         with self.assertRaises(ServiceCatalogError):
             catalog.validate_model_services(canonical.services, canonical.resources)
 
     def test_mapping_matrix_required_paths_fail_closed(self) -> None:
-        canonical = canonical_values.CanonicalSite.model_validate(self._full_catalog_site_document())
+        canonical = canonical_values.CanonicalSite.model_validate(
+            self._full_catalog_site_document()
+        )
         canonical.services["forgejo"].resource = None
         with self.assertRaises(MappingContractError):
             validate_mapping_matrix(
                 canonical,
-                (MappingEntry("services.forgejo.resource", ("opentofu",), "derived", required=True),),
+                (
+                    MappingEntry(
+                        "services.forgejo.resource",
+                        ("opentofu",),
+                        "derived",
+                        required=True,
+                    ),
+                ),
             )
 
     def test_ssh_port_requires_ssh_protocol(self) -> None:
@@ -597,7 +776,11 @@ class CanonicalValuesTests(unittest.TestCase):
                     "version": "22.23.1",
                     "checksums": {"amd64": "a" * 64, "arm64": "b" * 64},
                 },
-                "dashboard": {"enabled": True, "host": "127.0.0.1", "auth_username": "admin"},
+                "dashboard": {
+                    "enabled": True,
+                    "host": "127.0.0.1",
+                    "auth_username": "admin",
+                },
                 "web": {"searxng_url": "https://searxng.example.internal"},
                 "control": {
                     "enabled": True,
@@ -613,16 +796,18 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(configuration.repository_path, "/srv/homelab-infra")
         self.assertEqual(configuration.node.checksums["arm64"], "b" * 64)
         self.assertTrue(configuration.control.enabled)
-        self.assertEqual(configuration.control.domain, "control.hermes.example.internal")
+        self.assertEqual(
+            configuration.control.domain, "control.hermes.example.internal"
+        )
         self.assertEqual(configuration.control.api_host, "127.0.0.1")
         self.assertEqual(configuration.control.api_port, 8787)
         self.assertEqual(configuration.control.workspace_root, "/srv/hermes")
-        self.assertEqual(configuration.control.project_roots, ["/srv/hermes/projects", "/opt/shared"])
+        self.assertEqual(
+            configuration.control.project_roots, ["/srv/hermes/projects", "/opt/shared"]
+        )
         self.assertEqual(configuration.operator_audit_path, "")
         self.assertEqual(configuration.operator_audit_backup_dir, "")
-        with self.assertRaisesRegex(
-            ValueError, "hard read-only pilot"
-        ):
+        with self.assertRaisesRegex(ValueError, "hard read-only pilot"):
             HermesConfiguration.model_validate(
                 {
                     "operator_mutation_enabled": True,
@@ -632,7 +817,9 @@ class CanonicalValuesTests(unittest.TestCase):
             )
         self.assertFalse(HermesConfiguration().operator_mutation_enabled)
         with self.assertRaises(ValueError):
-            HermesConfiguration.model_validate({"operator_audit_path": "relative/audit.jsonl"})
+            HermesConfiguration.model_validate(
+                {"operator_audit_path": "relative/audit.jsonl"}
+            )
         with self.assertRaises(ValueError):
             HermesConfiguration.model_validate(
                 {"operator_audit_path": "/var/lib/hermes/audit.jsonl\nINJECTED=1"}
@@ -652,18 +839,30 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             HermesConfiguration.model_validate({"control": {"api_host": "0.0.0.0"}})
         with self.assertRaises(ValueError):
-            HermesConfiguration.model_validate({"control": {"require_task_approval": False}})
+            HermesConfiguration.model_validate(
+                {"control": {"require_task_approval": False}}
+            )
         with self.assertRaises(ValueError):
-            HermesConfiguration.model_validate({"control": {"source_url": "http://example.internal/control"}})
+            HermesConfiguration.model_validate(
+                {"control": {"source_url": "http://example.internal/control"}}
+            )
         with self.assertRaises(ValueError):
-            HermesConfiguration.model_validate({"control": {"plugin_socket": "/run/../tmp.sock"}})
+            HermesConfiguration.model_validate(
+                {"control": {"plugin_socket": "/run/../tmp.sock"}}
+            )
         with self.assertRaises(ValueError):
-            HermesConfiguration.model_validate({"control": {"workspace_root": "/srv/../tmp"}})
+            HermesConfiguration.model_validate(
+                {"control": {"workspace_root": "/srv/../tmp"}}
+            )
         with self.assertRaises(ValueError):
-            HermesConfiguration.model_validate({"control": {"project_roots": ["/srv/project", "/srv/project"]}})
+            HermesConfiguration.model_validate(
+                {"control": {"project_roots": ["/srv/project", "/srv/project"]}}
+            )
 
     def test_hermes_compose_version_is_a_managed_semantic_version(self) -> None:
-        configuration = HermesConfiguration.model_validate({"compose_version": "2.40.3"})
+        configuration = HermesConfiguration.model_validate(
+            {"compose_version": "2.40.3"}
+        )
         self.assertEqual(configuration.compose_version, "2.40.3")
         with self.assertRaises(ValueError):
             HermesConfiguration.model_validate({"compose_version": "latest"})
@@ -713,13 +912,21 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(configuration.upstream.port, 5380)
         with self.assertRaises(ValueError):
             CaddyConfiguration.model_validate(
-                {"server_names": ["dns.example.internal", "DNS.example.internal"], "upstream": {"host": "127.0.0.1", "port": 5380}, "tls": {"dns_provider": "cloudflare"}}
+                {
+                    "server_names": ["dns.example.internal", "DNS.example.internal"],
+                    "upstream": {"host": "127.0.0.1", "port": 5380},
+                    "tls": {"dns_provider": "cloudflare"},
+                }
             )
-
 
     def test_searxng_non_secret_configuration_is_typed(self) -> None:
         configuration = SearxngConfiguration.model_validate(
-            {"container_port": 8080, "bind_address": "127.0.0.1", "instance_name": "Search", "enable_public_url": True}
+            {
+                "container_port": 8080,
+                "bind_address": "127.0.0.1",
+                "instance_name": "Search",
+                "enable_public_url": True,
+            }
         )
         self.assertEqual(configuration.container_port, 8080)
         with self.assertRaises(ValueError):
@@ -741,14 +948,23 @@ class CanonicalValuesTests(unittest.TestCase):
 
     def test_tailscale_non_secret_configuration_is_typed(self) -> None:
         configuration = TailscaleConfiguration.model_validate(
-            {"restore_backup": True, "backup_archive": "backups/tailscale.tgz", "enable_ip_forwarding": True, "up_args": ["--accept-dns=false"]}
+            {
+                "restore_backup": True,
+                "backup_archive": "backups/tailscale.tgz",
+                "enable_ip_forwarding": True,
+                "up_args": ["--accept-dns=false"],
+            }
         )
         self.assertTrue(configuration.restore_backup)
         self.assertEqual(configuration.up_args, ["--accept-dns=false"])
 
     def test_infisical_non_secret_configuration_is_typed(self) -> None:
         configuration = InfisicalConfiguration.model_validate(
-            {"data_dir": "/var/lib/infisical", "postgres_user": "infisical", "postgres_db": "infisical"}
+            {
+                "data_dir": "/var/lib/infisical",
+                "postgres_user": "infisical",
+                "postgres_db": "infisical",
+            }
         )
         self.assertEqual(configuration.data_dir, "/var/lib/infisical")
         self.assertEqual(configuration.postgres_user, "infisical")
@@ -785,11 +1001,15 @@ class CanonicalValuesTests(unittest.TestCase):
         values = render_opentofu_variables(model)
         self.assertNotIn("guest_vm_cloud_init_user", values)
         self.assertEqual(values["lxc_template_download_timeout_seconds"], 1800)
-        self.assertEqual(values["service_runtime"]["forgejo"]["cloud_init_user"], "forgejo-admin")
+        self.assertEqual(
+            values["service_runtime"]["forgejo"]["cloud_init_user"], "forgejo-admin"
+        )
         with self.assertRaises(CanonicalValuesError):
             load_site(self.write_site(content.replace("vmadmin", "bad user")))
 
-    def test_resource_lifecycle_projection_preserves_existing_variable_names(self) -> None:
+    def test_resource_lifecycle_projection_preserves_existing_variable_names(
+        self,
+    ) -> None:
         model = load_site(self.write_site(VALID_SITE))
         values = render_opentofu_variables(model)
         resource = model.resources.guests["forgejo"]
@@ -818,7 +1038,9 @@ class CanonicalValuesTests(unittest.TestCase):
 
     def test_digest_is_stable_across_formatting_and_key_order(self) -> None:
         first = load_site(self.write_site(VALID_SITE))
-        reformatted = VALID_SITE.replace("  name: dev", "  # comment\n  name: dev").replace(
+        reformatted = VALID_SITE.replace(
+            "  name: dev", "  # comment\n  name: dev"
+        ).replace(
             "default_bridge: vmbr0\n    default_gateway: 192.0.2.1",
             "default_gateway: 192.0.2.1\n    default_bridge: vmbr0",
         )
@@ -827,7 +1049,9 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(normalized_model(first), normalized_model(second))
 
     def test_rejects_duplicate_yaml_keys(self) -> None:
-        content = VALID_SITE.replace("schema_version: 1", "schema_version: 1\nschema_version: 1", 1)
+        content = VALID_SITE.replace(
+            "schema_version: 1", "schema_version: 1\nschema_version: 1", 1
+        )
         with self.assertRaises(CanonicalValuesError):
             load_site(self.write_site(content))
 
@@ -853,7 +1077,8 @@ class CanonicalValuesTests(unittest.TestCase):
 
     def test_rejects_duplicate_vmids(self) -> None:
         content = VALID_SITE.replace(
-            "services:\n", "  guests:\n    other:\n      type: lxc\n      identity:\n        vmid: 107\n        hostname: other\n      network:\n        address: dhcp\n      compute:\n        cores: 1\n        memory_mb: 512\n      storage:\n        root:\n          type: directory\n          target: /\n      runtime: {}\nservices:\n",
+            "services:\n",
+            "  guests:\n    other:\n      type: lxc\n      identity:\n        vmid: 107\n        hostname: other\n      network:\n        address: dhcp\n      compute:\n        cores: 1\n        memory_mb: 512\n      storage:\n        root:\n          type: directory\n          target: /\n      runtime: {}\nservices:\n",
         )
         with self.assertRaises(CanonicalValuesError):
             load_site(self.write_site(content))
@@ -874,19 +1099,29 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(network.bridge, "vmbr0")
         self.assertEqual(network.dns_servers, ["1.1.1.1", "9.9.9.9"])
         self.assertEqual(network.search_domain, "example.internal")
-        self.assertEqual(model.resources.guests["forgejo"].storage.root.storage_id, "local-lvm")
+        self.assertEqual(
+            model.resources.guests["forgejo"].storage.root.storage_id, "local-lvm"
+        )
 
     def test_resource_network_overlaps_are_rejected(self) -> None:
-        content = VALID_SITE.replace(
-            "services:\n",
-            "    other:\n      type: lxc\n      identity:\n        vmid: 108\n        hostname: other\n      network:\n        address: 192.0.2.64/25\n      compute:\n        cores: 1\n        memory_mb: 512\n      storage:\n        root:\n          type: directory\n          target: /\n      runtime: {}\nservices:\n",
-            1,
-        ).replace("address: dhcp", "address: 192.0.2.64/26", 1).replace("        expected_address: 192.0.2.62\n", "")
-        with self.assertRaisesRegex(CanonicalValuesError, "network addresses duplicate"):
+        content = (
+            VALID_SITE.replace(
+                "services:\n",
+                "    other:\n      type: lxc\n      identity:\n        vmid: 108\n        hostname: other\n      network:\n        address: 192.0.2.64/25\n      compute:\n        cores: 1\n        memory_mb: 512\n      storage:\n        root:\n          type: directory\n          target: /\n      runtime: {}\nservices:\n",
+                1,
+            )
+            .replace("address: dhcp", "address: 192.0.2.64/26", 1)
+            .replace("        expected_address: 192.0.2.62\n", "")
+        )
+        with self.assertRaisesRegex(
+            CanonicalValuesError, "network addresses duplicate"
+        ):
             load_site(self.write_site(content))
 
     def test_invalid_ipv4_octets_are_rejected(self) -> None:
-        content = VALID_SITE.replace("expected_address: 192.0.2.62", "expected_address: 999.0.2.62")
+        content = VALID_SITE.replace(
+            "expected_address: 192.0.2.62", "expected_address: 999.0.2.62"
+        )
         with self.assertRaises(CanonicalValuesError):
             load_site(self.write_site(content))
 
@@ -896,7 +1131,9 @@ class CanonicalValuesTests(unittest.TestCase):
             "      public_url: https://git.example.internal/\n      protocols:\n        - HTTPS\n        - ssh",
         )
         model = load_site(self.write_site(content))
-        self.assertEqual(model.services["forgejo"].endpoints.protocols, ["https", "ssh"])
+        self.assertEqual(
+            model.services["forgejo"].endpoints.protocols, ["https", "ssh"]
+        )
         duplicate = content.replace("        - ssh", "        - HTTPS")
         with self.assertRaises(CanonicalValuesError):
             load_site(self.write_site(duplicate))
@@ -930,20 +1167,54 @@ class CanonicalValuesTests(unittest.TestCase):
             load_site(self.write_site(content))
 
     def test_loads_public_scaffold_fixture(self) -> None:
-        path = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "sites" / "dev" / "site.yaml"
-        model = load_site(path, expected_site="dev", catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        path = (
+            Path(__file__).resolve().parents[1]
+            / "tests"
+            / "fixtures"
+            / "sites"
+            / "dev"
+            / "site.yaml"
+        )
+        model = load_site(
+            path,
+            expected_site="dev",
+            catalog_path=Path(__file__).resolve().parents[1]
+            / "infra"
+            / "services.json",
+        )
         self.assertEqual(model.site.class_, "development")
-        self.assertEqual(sorted(name for name, service in model.services.items() if service.enabled), ["forgejo", "technitium"])
+        self.assertEqual(
+            sorted(name for name, service in model.services.items() if service.enabled),
+            ["forgejo", "technitium"],
+        )
 
-    def test_renderer_writes_non_secret_projection_set_with_restricted_directory(self) -> None:
+    def test_renderer_writes_non_secret_projection_set_with_restricted_directory(
+        self,
+    ) -> None:
         root = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: self._remove(root))
         script = Path(__file__).resolve().parents[1] / "scripts" / "canonical-render.py"
-        site = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "sites" / "dev" / "site.yaml"
+        site = (
+            Path(__file__).resolve().parents[1]
+            / "tests"
+            / "fixtures"
+            / "sites"
+            / "dev"
+            / "site.yaml"
+        )
         catalog = Path(__file__).resolve().parents[1] / "infra" / "services.json"
         output = root / "generated"
         result = subprocess.run(
-            [sys.executable, str(script), "--site-file", str(site), "--catalog", str(catalog), "--output-dir", str(output)],
+            [
+                sys.executable,
+                str(script),
+                "--site-file",
+                str(site),
+                "--catalog",
+                str(catalog),
+                "--output-dir",
+                str(output),
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -961,7 +1232,9 @@ class CanonicalValuesTests(unittest.TestCase):
                 "terraform.auto.tfvars.json",
             ],
         )
-        self.assertNotIn("password", (output / "manifest.json").read_text(encoding="utf-8").lower())
+        self.assertNotIn(
+            "password", (output / "manifest.json").read_text(encoding="utf-8").lower()
+        )
 
     def test_renderer_failure_does_not_leave_partial_output_or_secret(self) -> None:
         root = Path(tempfile.mkdtemp())
@@ -970,7 +1243,14 @@ class CanonicalValuesTests(unittest.TestCase):
         output.mkdir()
         (output / "previous.json").write_text("previous\n", encoding="utf-8")
         script = Path(__file__).resolve().parents[1] / "scripts" / "canonical-render.py"
-        site = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "sites" / "dev" / "site.yaml"
+        site = (
+            Path(__file__).resolve().parents[1]
+            / "tests"
+            / "fixtures"
+            / "sites"
+            / "dev"
+            / "site.yaml"
+        )
         catalog = Path(__file__).resolve().parents[1] / "infra" / "services.json"
         invalid_site = root / "invalid-site.yaml"
         invalid_site.write_text(
@@ -981,31 +1261,51 @@ class CanonicalValuesTests(unittest.TestCase):
             encoding="utf-8",
         )
         result = subprocess.run(
-            [sys.executable, str(script), "--site-file", str(invalid_site), "--catalog", str(catalog), "--output-dir", str(output)],
+            [
+                sys.executable,
+                str(script),
+                "--site-file",
+                str(invalid_site),
+                "--catalog",
+                str(catalog),
+                "--output-dir",
+                str(output),
+            ],
             capture_output=True,
             text=True,
             check=False,
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual((output / "previous.json").read_text(encoding="utf-8"), "previous\n")
-        self.assertEqual(sorted(path.name for path in output.iterdir()), ["previous.json"])
+        self.assertEqual(
+            (output / "previous.json").read_text(encoding="utf-8"), "previous\n"
+        )
+        self.assertEqual(
+            sorted(path.name for path in output.iterdir()), ["previous.json"]
+        )
         self.assertNotIn("SECRET_SENTINEL", result.stderr)
 
-    def test_atomic_output_preserves_previous_directory_when_replacement_fails(self) -> None:
+    def test_atomic_output_preserves_previous_directory_when_replacement_fails(
+        self,
+    ) -> None:
         root = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: self._remove(root))
         output = root / "generated"
         output.mkdir()
         (output / "previous.json").write_text("previous\n", encoding="utf-8")
         with mock.patch(
-            "atomic_output._renameat2", side_effect=OSError("simulated replacement failure")
+            "atomic_output._renameat2",
+            side_effect=OSError("simulated replacement failure"),
         ):
             with self.assertRaisesRegex(OSError, "simulated replacement failure"):
                 atomic_output_directory(
                     output,
-                    lambda directory: (directory / "new.json").write_text("new\n", encoding="utf-8"),
+                    lambda directory: (directory / "new.json").write_text(
+                        "new\n", encoding="utf-8"
+                    ),
                 )
-        self.assertEqual((output / "previous.json").read_text(encoding="utf-8"), "previous\n")
+        self.assertEqual(
+            (output / "previous.json").read_text(encoding="utf-8"), "previous\n"
+        )
         self.assertFalse((output / "new.json").exists())
 
     def test_atomic_output_stays_bound_to_held_parent_after_ancestor_swap(self) -> None:
@@ -1028,22 +1328,35 @@ class CanonicalValuesTests(unittest.TestCase):
 
         atomic_output_directory(output, populate)
 
-        self.assertEqual((held_ancestor / "generated/new.json").read_text(encoding="utf-8"), "new\n")
-        self.assertEqual((attacker / "sentinel").read_text(encoding="utf-8"), "untouched\n")
+        self.assertEqual(
+            (held_ancestor / "generated/new.json").read_text(encoding="utf-8"), "new\n"
+        )
+        self.assertEqual(
+            (attacker / "sentinel").read_text(encoding="utf-8"), "untouched\n"
+        )
         self.assertFalse((attacker / "generated").exists())
 
-    def test_atomic_output_preserves_destination_created_during_publication(self) -> None:
+    def test_atomic_output_preserves_destination_created_during_publication(
+        self,
+    ) -> None:
         root = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: self._remove(root))
         output = root / "generated"
         original_rename = atomic_output._renameat2
 
-        def create_racer(parent_fd: int, source: str, destination: str, flags: int) -> None:
+        def create_racer(
+            parent_fd: int, source: str, destination: str, flags: int
+        ) -> None:
             os.mkdir(destination, 0o700, dir_fd=parent_fd)
-            racer_fd = os.open(destination, os.O_RDONLY | os.O_DIRECTORY, dir_fd=parent_fd)
+            racer_fd = os.open(
+                destination, os.O_RDONLY | os.O_DIRECTORY, dir_fd=parent_fd
+            )
             try:
                 file_fd = os.open(
-                    "sentinel", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=racer_fd
+                    "sentinel",
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                    0o600,
+                    dir_fd=racer_fd,
                 )
                 os.write(file_fd, b"racer\n")
                 os.close(file_fd)
@@ -1055,13 +1368,19 @@ class CanonicalValuesTests(unittest.TestCase):
             with self.assertRaisesRegex(AtomicOutputError, "already exists"):
                 atomic_output_directory(
                     output,
-                    lambda directory: (directory / "new.json").write_text("new\n", encoding="utf-8"),
+                    lambda directory: (directory / "new.json").write_text(
+                        "new\n", encoding="utf-8"
+                    ),
                 )
 
         self.assertEqual((output / "sentinel").read_text(encoding="utf-8"), "racer\n")
-        self.assertFalse(any(path.name.startswith(".generated.tmp-") for path in root.iterdir()))
+        self.assertFalse(
+            any(path.name.startswith(".generated.tmp-") for path in root.iterdir())
+        )
 
-    def test_atomic_output_rejects_symlink_destination_without_touching_target(self) -> None:
+    def test_atomic_output_rejects_symlink_destination_without_touching_target(
+        self,
+    ) -> None:
         root = Path(tempfile.mkdtemp())
         self.addCleanup(lambda: self._remove(root))
         attacker = root / "attacker"
@@ -1094,14 +1413,24 @@ class CanonicalValuesTests(unittest.TestCase):
             atomic_output_directory(output, populate)
 
         self.assertFalse(output.exists())
-        self.assertEqual((displaced / "expected").read_text(encoding="utf-8"), "expected\n")
+        self.assertEqual(
+            (displaced / "expected").read_text(encoding="utf-8"), "expected\n"
+        )
 
     def test_cli_summary_is_redacted_and_catalog_validated(self) -> None:
         site_path = self.write_site(VALID_SITE)
         script = Path(__file__).resolve().parents[1] / "scripts" / "canonical-values.py"
         catalog = Path(__file__).resolve().parents[1] / "infra" / "services.json"
         result = subprocess.run(
-            [sys.executable, str(script), "--site-file", str(site_path), "--catalog", str(catalog), "summary"],
+            [
+                sys.executable,
+                str(script),
+                "--site-file",
+                str(site_path),
+                "--catalog",
+                str(catalog),
+                "summary",
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -1115,7 +1444,9 @@ class CanonicalValuesTests(unittest.TestCase):
             "      version: 12.0.4",
             "      version: 12.0.4\n    configuration:\n      api_token: SECRET_SENTINEL_DO_NOT_PROJECT",
         )
-        with self.assertRaisesRegex(CanonicalValuesError, "services.forgejo.configuration"):
+        with self.assertRaisesRegex(
+            CanonicalValuesError, "services.forgejo.configuration"
+        ):
             load_site(self.write_site(content))
 
     def test_non_secret_projection_rejects_opaque_runtime_template(self) -> None:
@@ -1124,7 +1455,9 @@ class CanonicalValuesTests(unittest.TestCase):
             "        unprivileged: true\n        template:\n          image: public-template",
         )
         model = load_site(self.write_site(content))
-        catalog = load_catalog(Path(__file__).resolve().parents[1] / "infra" / "services.json")
+        catalog = load_catalog(
+            Path(__file__).resolve().parents[1] / "infra" / "services.json"
+        )
         with self.assertRaisesRegex(ProjectionError, "runtime.template"):
             render_ansible_vars(model, catalog)
 
@@ -1139,12 +1472,18 @@ class CanonicalValuesTests(unittest.TestCase):
 
     def test_dns_metadata_requires_strict_supported_values(self) -> None:
         for replacement in (
-            "      visibility: internal\n      dns:\n        enabled: \"true\"",
+            '      visibility: internal\n      dns:\n        enabled: "true"',
             "      visibility: internal\n      dns:\n        record_type: AAAA",
         ):
             with self.subTest(replacement=replacement):
                 with self.assertRaises(CanonicalValuesError):
-                    load_site(self.write_site(VALID_SITE.replace("      visibility: internal", replacement)))
+                    load_site(
+                        self.write_site(
+                            VALID_SITE.replace(
+                                "      visibility: internal", replacement
+                            )
+                        )
+                    )
 
     def test_technitium_release_fields_project_to_ansible_adapter_vars(self) -> None:
         content = (
@@ -1204,7 +1543,9 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(ansible_vars["infisical_postgres_user"], "infisical")
         self.assertEqual(ansible_vars["infisical_postgres_db"], "infisical")
         self.assertEqual(ansible_vars["infisical_domain"], "infisical.example.internal")
-        self.assertEqual(ansible_vars["infisical_version"], "v0.162.3@sha256:" + "a" * 64)
+        self.assertEqual(
+            ansible_vars["infisical_version"], "v0.162.3@sha256:" + "a" * 64
+        )
 
     def test_non_secret_consumer_projections_use_canonical_ownership(self) -> None:
         content = VALID_SITE.replace(
@@ -1222,7 +1563,9 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(tofu["forgejo_container_vmid"], 107)
         self.assertEqual(tofu["forgejo_server_name"], "git.example.internal")
         self.assertEqual(set(inventory["forgejo"]["hosts"]), {"forgejo_lxc"})
-        self.assertEqual(inventory["forgejo"]["hosts"]["forgejo_lxc"]["canonical_service"], "forgejo")
+        self.assertEqual(
+            inventory["forgejo"]["hosts"]["forgejo_lxc"]["canonical_service"], "forgejo"
+        )
         self.assertEqual(ansible_vars["canonical_site"], "dev")
         self.assertEqual(ansible_vars["services"]["forgejo"]["resource"], "forgejo")
         self.assertEqual(
@@ -1234,7 +1577,9 @@ class CanonicalValuesTests(unittest.TestCase):
     def test_forgejo_runner_lxc_uses_its_unsuffixed_opentofu_interface(self) -> None:
         resource = SimpleNamespace(
             type="lxc",
-            identity=SimpleNamespace(vmid=7003, hostname="forgejo-runner", description="runner"),
+            identity=SimpleNamespace(
+                vmid=7003, hostname="forgejo-runner", description="runner"
+            ),
             network=SimpleNamespace(
                 address="dhcp",
                 gateway=None,
@@ -1257,19 +1602,26 @@ class CanonicalValuesTests(unittest.TestCase):
     def test_opentofu_projection_uses_only_declared_root_variables(self) -> None:
         model = load_site(self.write_site(VALID_SITE))
         values = render_opentofu_variables(model)
-        variables_path = Path(__file__).resolve().parents[1] / "infra" / "opentofu" / "variables.tf"
-        declared = set(re.findall(r'(?m)^variable "([^"]+)"', variables_path.read_text()))
+        variables_path = (
+            Path(__file__).resolve().parents[1] / "infra" / "opentofu" / "variables.tf"
+        )
+        declared = set(
+            re.findall(r'(?m)^variable "([^"]+)"', variables_path.read_text())
+        )
 
         self.assertEqual(set(values) - declared, set())
 
-
     def test_general_dns_contract_projects_owned_records_and_settings(self) -> None:
         model = load_site(
-            self.write_site(VALID_SITE.replace(
-                "      visibility: internal",
-                "      visibility: internal\n      dns:\n        enabled: true\n        record_type: A",
-            )),
-            catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json",
+            self.write_site(
+                VALID_SITE.replace(
+                    "      visibility: internal",
+                    "      visibility: internal\n      dns:\n        enabled: true\n        record_type: A",
+                )
+            ),
+            catalog_path=Path(__file__).resolve().parents[1]
+            / "infra"
+            / "services.json",
         )
         model.platform.dns = PlatformDNS(
             enabled=True,
@@ -1288,7 +1640,9 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertEqual(dns["zones"], {"example.internal": ["192.0.2.10:54"]})
         self.assertEqual(dns["a_records"]["static.example.internal"], "192.0.2.80")
         self.assertEqual(dns["a_records"]["git.example.internal"], "192.0.2.62")
-        self.assertEqual(dns["cname_records"], {"www.example.internal": "proxy.example.internal"})
+        self.assertEqual(
+            dns["cname_records"], {"www.example.internal": "proxy.example.internal"}
+        )
         self.assertEqual(dns["settings"]["forwarderProtocol"], "Tls")
 
     def test_general_dns_contract_rejects_overlap_and_out_of_zone_records(self) -> None:
@@ -1322,11 +1676,15 @@ class CanonicalValuesTests(unittest.TestCase):
 
     def test_general_dns_projection_rejects_derived_target_conflict(self) -> None:
         model = load_site(
-            self.write_site(VALID_SITE.replace(
-                "      visibility: internal",
-                "      visibility: internal\n      dns:\n        enabled: true\n        record_type: A",
-            )),
-            catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json",
+            self.write_site(
+                VALID_SITE.replace(
+                    "      visibility: internal",
+                    "      visibility: internal\n      dns:\n        enabled: true\n        record_type: A",
+                )
+            ),
+            catalog_path=Path(__file__).resolve().parents[1]
+            / "infra"
+            / "services.json",
         )
         model.platform.dns = PlatformDNS(
             enabled=True,
@@ -1343,8 +1701,15 @@ class CanonicalValuesTests(unittest.TestCase):
         with self.assertRaises(ProjectionError):
             render_dns_records(model)
 
-    def test_distinct_vm_image_families_project_independently_without_file_id(self) -> None:
-        model = load_site(self.write_site(VALID_SITE), catalog_path=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+    def test_distinct_vm_image_families_project_independently_without_file_id(
+        self,
+    ) -> None:
+        model = load_site(
+            self.write_site(VALID_SITE),
+            catalog_path=Path(__file__).resolve().parents[1]
+            / "infra"
+            / "services.json",
+        )
         model.platform.images.vm["guest"] = ImageDefinition(
             type="vm_image",
             datastore_id="guest-store",
@@ -1367,7 +1732,9 @@ class CanonicalValuesTests(unittest.TestCase):
         self.assertNotIn("guest_vm_image_file_id", tofu)
         self.assertNotIn("onramp_host_image_file_id", tofu)
 
-    def test_searxng_immutable_image_reference_splits_and_rejects_mutable_forms(self) -> None:
+    def test_searxng_immutable_image_reference_splits_and_rejects_mutable_forms(
+        self,
+    ) -> None:
         digest = "sha256:" + "a" * 64
         self.assertEqual(
             normalize_container_image_reference("docker.io/searxng/searxng@" + digest),
@@ -1378,17 +1745,29 @@ class CanonicalValuesTests(unittest.TestCase):
             "docker.io/searxng/searxng@sha256:" + "A" * 64,
             "Docker.io/searxng/searxng@" + digest,
         ):
-            with self.subTest(reference=reference), self.assertRaises(CanonicalValuesError):
+            with self.subTest(reference=reference), self.assertRaises(
+                CanonicalValuesError
+            ):
                 normalize_container_image_reference(reference)
 
     def test_container_release_requires_separate_lowercase_sha256_digest(self) -> None:
-        valid = ServiceRelease(source="container", image="ghcr.io/example/app:1.0", digest="sha256:" + "a" * 64)
+        valid = ServiceRelease(
+            source="container",
+            image="ghcr.io/example/app:1.0",
+            digest="sha256:" + "a" * 64,
+        )
         self.assertEqual(valid.digest, "sha256:" + "a" * 64)
         for digest in ("not-a-digest", "SHA256:" + "a" * 64, "sha512:" + "a" * 128):
             with self.assertRaises(ValueError):
-                ServiceRelease(source="container", image="ghcr.io/example/app:1.0", digest=digest)
+                ServiceRelease(
+                    source="container", image="ghcr.io/example/app:1.0", digest=digest
+                )
         with self.assertRaises(ValueError):
-            ServiceRelease(source="container", image="ghcr.io/example/app@sha256:" + "a" * 64, digest="sha256:" + "a" * 64)
+            ServiceRelease(
+                source="container",
+                image="ghcr.io/example/app@sha256:" + "a" * 64,
+                digest="sha256:" + "a" * 64,
+            )
 
         network = ResourceNetwork(address="dhcp", mac_address="AA:bb:00:11:22:33")
         self.assertEqual(network.mac_address, "aa:bb:00:11:22:33")
@@ -1412,7 +1791,12 @@ class CanonicalValuesTests(unittest.TestCase):
         )
         self.assertEqual(http_image.url, "http://images.example.internal/image")
         with self.assertRaises(ValueError):
-            ImageDefinition(type="lxc_template", url="https://images.example.internal/image", file_name="../image", checksum=checksum)
+            ImageDefinition(
+                type="lxc_template",
+                url="https://images.example.internal/image",
+                file_name="../image",
+                checksum=checksum,
+            )
 
     def test_image_family_and_identifier_must_match(self) -> None:
         checksum = ImageChecksum(algorithm="sha256", value="b" * 64)

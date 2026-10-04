@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Read local operator settings for setup and service selection."""
+
 from __future__ import annotations
 
 import argparse
@@ -31,7 +32,9 @@ def load_service_registry(path: Path = SERVICE_REGISTRY) -> dict[str, Any]:
     defaults = registry.get("default_services")
     if not isinstance(services, dict):
         raise ValueError(f"{path}: services must be an object")
-    if not isinstance(defaults, list) or not all(isinstance(item, str) for item in defaults):
+    if not isinstance(defaults, list) or not all(
+        isinstance(item, str) for item in defaults
+    ):
         raise ValueError(f"{path}: default_services must be a list of strings")
     return registry
 
@@ -46,7 +49,9 @@ SERVICES = {
         "terraform_addresses": tuple(config.get("terraform_addresses", ())),
         "terraform_replace_addresses": {
             runtime: tuple(addresses)
-            for runtime, addresses in config.get("terraform_replace_addresses", {}).items()
+            for runtime, addresses in config.get(
+                "terraform_replace_addresses", {}
+            ).items()
             if isinstance(runtime, str) and isinstance(addresses, list)
         },
     }
@@ -84,7 +89,9 @@ def normalize_services(value: Any, path: Path) -> list[str]:
     if value is None:
         services = list(DEFAULT_SERVICES)
     else:
-        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
             raise SettingsError(f"{path}: services must be a list of strings")
         services = value
     unknown = sorted(set(services) - SERVICE_NAMES)
@@ -108,9 +115,7 @@ def normalize_services(value: Any, path: Path) -> list[str]:
 
 def ansible_playbooks(services: list[str]) -> list[str]:
     return [
-        playbook
-        for service in services
-        for playbook in SERVICES[service]["playbooks"]
+        playbook for service in services for playbook in SERVICES[service]["playbooks"]
     ]
 
 
@@ -131,14 +136,22 @@ def tofu_targets(service: str, enabled_services: list[str]) -> list[str]:
     return targets
 
 
-def tofu_replace_targets(service: str, enabled_services: list[str], runtime_type: str) -> list[str]:
+def tofu_replace_targets(
+    service: str, enabled_services: list[str], runtime_type: str
+) -> list[str]:
     if service not in SERVICE_NAMES:
         raise SettingsError(f"unknown service: {service}")
     if service not in enabled_services:
         raise SettingsError(f"service is not enabled: {service}")
     if runtime_type not in {"lxc", "vm"}:
         raise SettingsError(f"unsupported service runtime: {runtime_type}")
-    targets = [target for target in SERVICES[service]["terraform_replace_addresses"].get(runtime_type, ()) if target]
+    targets = [
+        target
+        for target in SERVICES[service]["terraform_replace_addresses"].get(
+            runtime_type, ()
+        )
+        if target
+    ]
     if not targets:
         raise SettingsError(f"service has no OpenTofu replacement targets: {service}")
     return list(dict.fromkeys(targets))
@@ -148,12 +161,18 @@ def projection_services(path: Path) -> list[str]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise SettingsError(f"cannot read canonical projection {path}: {error}") from error
+        raise SettingsError(
+            f"cannot read canonical projection {path}: {error}"
+        ) from error
     if not isinstance(data, dict) or not isinstance(data.get("enabled_services"), list):
-        raise SettingsError(f"canonical projection {path}: enabled_services must be a list")
+        raise SettingsError(
+            f"canonical projection {path}: enabled_services must be a list"
+        )
     services = data["enabled_services"]
     if not all(isinstance(service, str) for service in services):
-        raise SettingsError(f"canonical projection {path}: enabled_services must contain strings")
+        raise SettingsError(
+            f"canonical projection {path}: enabled_services must contain strings"
+        )
     return normalize_services(services, path)
 
 
@@ -171,7 +190,13 @@ def validate_site_metadata(metadata: dict[str, Any], site: str, path: Path) -> N
         raise SettingsError(f"{path}: site metadata name does not match selected site")
     site_class = metadata.get("class", "")
     lifecycle = metadata.get("lifecycle", "")
-    if site_class not in {"development", "staging", "production", "location", "purpose"}:
+    if site_class not in {
+        "development",
+        "staging",
+        "production",
+        "location",
+        "purpose",
+    }:
         raise SettingsError(f"{path}: unsupported site class")
     if lifecycle not in {"disposable", "persistent"}:
         raise SettingsError(f"{path}: lifecycle must be disposable or persistent")
@@ -213,8 +238,14 @@ def canonical_site_policy(action: str) -> None:
         if isinstance(error, SettingsError):
             raise
         raise SettingsError(str(error)) from error
-    validate_site_metadata(metadata, context.site, canonical_site_path or context.metadata_path or DEFAULT_SETTINGS)
-    ensure_site_action_allowed({"site": context.site, "site_metadata": metadata}, action)
+    validate_site_metadata(
+        metadata,
+        context.site,
+        canonical_site_path or context.metadata_path or DEFAULT_SETTINGS,
+    )
+    ensure_site_action_allowed(
+        {"site": context.site, "site_metadata": metadata}, action
+    )
 
 
 def settings_summary(settings: dict[str, Any]) -> str:
@@ -240,16 +271,27 @@ def load_settings(path: Path | None = None) -> dict[str, Any]:
 
     resolved_path = path or settings_path()
     raw = load_raw(resolved_path)
-    root_raw = load_raw(DEFAULT_SETTINGS) if context.site is not None and resolved_path != DEFAULT_SETTINGS else raw
-    site_raw = raw if context.site is not None and resolved_path != DEFAULT_SETTINGS else {}
+    root_raw = (
+        load_raw(DEFAULT_SETTINGS)
+        if context.site is not None and resolved_path != DEFAULT_SETTINGS
+        else raw
+    )
+    site_raw = (
+        raw if context.site is not None and resolved_path != DEFAULT_SETTINGS else {}
+    )
     unknown = sorted(set(root_raw) - {"values_repo", "services"})
     if unknown:
-        raise SettingsError(f"{DEFAULT_SETTINGS}: unknown top-level keys: {', '.join(unknown)}")
+        raise SettingsError(
+            f"{DEFAULT_SETTINGS}: unknown top-level keys: {', '.join(unknown)}"
+        )
     site_unknown = sorted(
-        set(site_raw) - {"name", "class", "lifecycle", "allow_apply", "allow_destroy", "services"}
+        set(site_raw)
+        - {"name", "class", "lifecycle", "allow_apply", "allow_destroy", "services"}
     )
     if site_unknown:
-        raise SettingsError(f"{resolved_path}: unknown site keys: {', '.join(site_unknown)}")
+        raise SettingsError(
+            f"{resolved_path}: unknown site keys: {', '.join(site_unknown)}"
+        )
 
     values_repo = root_raw.get("values_repo", {})
     if values_repo is None:
@@ -273,7 +315,9 @@ def load_settings(path: Path | None = None) -> dict[str, Any]:
         raise SettingsError(str(error)) from error
     if context.site is not None:
         validate_site_metadata(metadata, context.site, resolved_path)
-    services_raw = site_raw.get("services") if context.site is not None else raw.get("services")
+    services_raw = (
+        site_raw.get("services") if context.site is not None else raw.get("services")
+    )
     if context.site is not None and services_raw is None:
         raise SettingsError(f"{resolved_path}: site services are required")
     return {
@@ -298,7 +342,9 @@ def main(argv: list[str] | None = None) -> int:
     ansible_playbooks_parser.add_argument("--settings", type=Path, default=None)
     subparsers.add_parser("summary")
     policy_parser = subparsers.add_parser("policy")
-    policy_parser.add_argument("--action", required=True, choices=("plan", "apply", "destroy"))
+    policy_parser.add_argument(
+        "--action", required=True, choices=("plan", "apply", "destroy")
+    )
     policy_parser.add_argument("--canonical", action="store_true")
     subparsers.add_parser("tofu-var")
     tofu_target_parser = subparsers.add_parser("tofu-targets")
@@ -319,7 +365,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"site policy allows {args.action}")
         return 0
 
-    if args.command in {"tofu-targets", "tofu-replace-targets", "ansible-playbooks"} and args.projection is not None:
+    if (
+        args.command in {"tofu-targets", "tofu-replace-targets", "ansible-playbooks"}
+        and args.projection is not None
+    ):
         try:
             enabled = projection_services(args.projection)
             if args.command == "tofu-targets":
@@ -347,7 +396,11 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "services":
         print(" ".join(settings["services"]))
     elif args.command == "ansible-playbooks":
-        playbooks = all_ansible_playbooks() if args.all else ansible_playbooks(settings["services"])
+        playbooks = (
+            all_ansible_playbooks()
+            if args.all
+            else ansible_playbooks(settings["services"])
+        )
         for playbook in playbooks:
             print(playbook)
     elif args.command == "summary":
@@ -365,7 +418,9 @@ def main(argv: list[str] | None = None) -> int:
         for target in tofu_targets(args.service, settings["services"]):
             print(target)
     elif args.command == "tofu-replace-targets":
-        for target in tofu_replace_targets(args.service, settings["services"], args.runtime):
+        for target in tofu_replace_targets(
+            args.service, settings["services"], args.runtime
+        ):
             print(target)
     return 0
 

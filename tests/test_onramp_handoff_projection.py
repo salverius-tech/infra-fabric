@@ -141,7 +141,9 @@ class OnrampHandoffProjectionTests(unittest.TestCase):
         self.assertEqual(handoff["metadata"]["canonical_service"], "onramp_host")
         self.assertEqual(handoff["metadata"]["canonical_resource"], "onramp-node")
         self.assertTrue(handoff["metadata"]["enabled"])
-        self.assertRegex(handoff["metadata"]["canonical_model_digest"], r"^[0-9a-f]{64}$")
+        self.assertRegex(
+            handoff["metadata"]["canonical_model_digest"], r"^[0-9a-f]{64}$"
+        )
         spec = handoff["spec"]
         self.assertEqual(
             spec["identity"],
@@ -192,7 +194,9 @@ class OnrampHandoffProjectionTests(unittest.TestCase):
         handoff = render_onramp_handoff(self.model(data), self.catalog)
         self.assertFalse(handoff["metadata"]["enabled"])
         self.assertIsNone(handoff["metadata"]["canonical_resource"])
-        self.assertRegex(handoff["metadata"]["canonical_model_digest"], r"^[0-9a-f]{64}$")
+        self.assertRegex(
+            handoff["metadata"]["canonical_model_digest"], r"^[0-9a-f]{64}$"
+        )
         self.assertIsNone(handoff["spec"])
 
     def test_projection_rejects_guest_owned_or_non_vm_substrate(self) -> None:
@@ -230,7 +234,9 @@ class OnrampHandoffProjectionTests(unittest.TestCase):
             ):
                 render_onramp_handoff(self.model(data), self.catalog)
 
-    def test_canonical_resource_rejects_invalid_handoff_connection_identity(self) -> None:
+    def test_canonical_resource_rejects_invalid_handoff_connection_identity(
+        self,
+    ) -> None:
         cases = (
             ("deploy_user", "root"),
             ("deploy_user", "Bad User"),
@@ -343,9 +349,7 @@ class OnrampHandoffProjectionTests(unittest.TestCase):
                 encoding="utf-8",
             )
             handoff_path.chmod(0o600)
-            model = load_site(
-                site, catalog_path=ROOT / "infra" / "services.json"
-            )
+            model = load_site(site, catalog_path=ROOT / "infra" / "services.json")
             rebuilt = build_manifest(
                 site=model.site.name,
                 schema_version=model.schema_version,

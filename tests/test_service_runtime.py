@@ -23,7 +23,10 @@ class ServiceRuntimeTests(unittest.TestCase):
 
     def test_partial_shared_runtime_uses_the_catalog_default_type(self) -> None:
         self.assertEqual(
-            service_runtime.runtime_type("forgejo", {"service_runtime": {"forgejo": {"cloud_init_user": "forgejo"}}}),
+            service_runtime.runtime_type(
+                "forgejo",
+                {"service_runtime": {"forgejo": {"cloud_init_user": "forgejo"}}},
+            ),
             "lxc",
         )
 
@@ -32,17 +35,23 @@ class ServiceRuntimeTests(unittest.TestCase):
 
     def test_shared_runtime_map_takes_precedence(self) -> None:
         self.assertEqual(
-            service_runtime.runtime_type("forgejo", {"service_runtime": {"forgejo": {"type": "vm"}}}),
+            service_runtime.runtime_type(
+                "forgejo", {"service_runtime": {"forgejo": {"type": "vm"}}}
+            ),
             "vm",
         )
 
     def test_retired_runtime_alias_is_rejected(self) -> None:
-        with self.assertRaisesRegex(service_runtime.ServiceRuntimeError, "retired runtime alias is not accepted"):
+        with self.assertRaisesRegex(
+            service_runtime.ServiceRuntimeError, "retired runtime alias is not accepted"
+        ):
             service_runtime.runtime_type("forgejo", {"forgejo_runtime": {"type": "vm"}})
 
     def test_rejects_unknown_runtime(self) -> None:
         with self.assertRaises(service_runtime.ServiceRuntimeError):
-            service_runtime.runtime_type("hermes", {"service_runtime": {"hermes": {"type": "baremetal"}}})
+            service_runtime.runtime_type(
+                "hermes", {"service_runtime": {"hermes": {"type": "baremetal"}}}
+            )
 
     def test_main_accepts_canonical_projection(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -58,7 +67,9 @@ class ServiceRuntimeTests(unittest.TestCase):
             )
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
-                result = service_runtime.main(["forgejo", "--projection", str(projection)])
+                result = service_runtime.main(
+                    ["forgejo", "--projection", str(projection)]
+                )
 
         self.assertEqual(result, 0)
         self.assertEqual(output.getvalue().strip(), "vm")

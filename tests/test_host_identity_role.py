@@ -19,9 +19,14 @@ class HostIdentityRoleTests(unittest.TestCase):
         source = ROLE_TASKS.read_text(encoding="utf-8")
 
         self.assertNotIn("systemboss", source)
-        self.assertIn('/etc/sudoers.d/{{ host_identity_operator_user }}', source)
-        self.assertIn('/etc/sudoers.d/{{ host_identity_operator_user }}-bootstrap', source)
-        self.assertIn("Apply pinned operator dotfiles as {{ host_identity_operator_user }}", source)
+        self.assertIn("/etc/sudoers.d/{{ host_identity_operator_user }}", source)
+        self.assertIn(
+            "/etc/sudoers.d/{{ host_identity_operator_user }}-bootstrap", source
+        )
+        self.assertIn(
+            "Apply pinned operator dotfiles as {{ host_identity_operator_user }}",
+            source,
+        )
         self.assertIn("Run chezmoi as {{ host_identity_operator_user }}", source)
 
 

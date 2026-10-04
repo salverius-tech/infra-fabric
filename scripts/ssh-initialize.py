@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Initialize a canonical site's bootstrap SSH identity through SOPS."""
+
 from __future__ import annotations
 
 import argparse
@@ -55,7 +56,9 @@ def _set_path(data: dict[str, Any], path: str, value: Any) -> None:
             child = {}
             current[component] = child
         if not isinstance(child, dict):
-            raise SshInitializationError(f"secret namespace is not a mapping: {component}")
+            raise SshInitializationError(
+                f"secret namespace is not a mapping: {component}"
+            )
         current = child
     current[components[-1]] = value
 
@@ -111,13 +114,17 @@ def _generate_key(directory: Path, name: str = "bootstrap") -> tuple[str, str]:
         key_type, key_material = derive_public_key(private)
         public = f"{key_type} {key_material}"
     except (OSError, ValueError) as error:
-        raise SshInitializationError("generated bootstrap SSH key could not be verified") from error
+        raise SshInitializationError(
+            "generated bootstrap SSH key could not be verified"
+        ) from error
     return private_text, public
 
 
 def _atomic_write(path: Path, content: bytes, mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=path.parent, prefix=f".{path.name}.", delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        dir=path.parent, prefix=f".{path.name}.", delete=False
+    ) as handle:
         temporary = Path(handle.name)
         handle.write(content)
     try:
@@ -128,11 +135,15 @@ def _atomic_write(path: Path, content: bytes, mode: int = 0o600) -> None:
 
 
 def _backup_path(path: Path) -> Path:
-    with tempfile.NamedTemporaryFile(prefix=f".{path.name}.backup-", dir=path.parent, delete=False) as handle:
+    with tempfile.NamedTemporaryFile(
+        prefix=f".{path.name}.backup-", dir=path.parent, delete=False
+    ) as handle:
         return Path(handle.name)
 
 
-def _replace_bundle_and_site(bundle: Path, ciphertext: bytes, site_file: Path, site_temp: Path) -> None:
+def _replace_bundle_and_site(
+    bundle: Path, ciphertext: bytes, site_file: Path, site_temp: Path
+) -> None:
     bundle_backup: Path | None = None
     site_backup: Path | None = None
     try:
@@ -159,55 +170,88 @@ def _replace_bundle_and_site(bundle: Path, ciphertext: bytes, site_file: Path, s
             site_backup.unlink(missing_ok=True)
 
 
-def initialize(site_file: Path, bundle: Path, key_file: Path, *, sops: str = "sops") -> str:
+def initialize(
+    site_file: Path, bundle: Path, key_file: Path, *, sops: str = "sops"
+) -> str:
     if not key_file.is_file() or not os.access(key_file, os.R_OK):
-        raise SshInitializationError("external SOPS age identity is missing or unreadable")
-    model = load_site(site_file, expected_site=os.environ.get("VALUES_SITE"), catalog_path=Path("infra/services.json"))
+        raise SshInitializationError(
+            "external SOPS age identity is missing or unreadable"
+        )
+    model = load_site(
+        site_file,
+        expected_site=os.environ.get("VALUES_SITE"),
+        catalog_path=Path("infra/services.json"),
+    )
     public_keys = list(model.bootstrap.ssh.public_keys)
     if not public_keys:
-        raise SshInitializationError("bootstrap.ssh.public_keys must contain at least one key")
+        raise SshInitializationError(
+            "bootstrap.ssh.public_keys must contain at least one key"
+        )
 
     management = model.platform.proxmox.management
     if management is None or management.ssh_public_key is None:
-        raise SshInitializationError("platform.proxmox.management.ssh_public_key is required")
+        raise SshInitializationError(
+            "platform.proxmox.management.ssh_public_key is required"
+        )
     existing_private: dict[str, str] = {}
     if bundle.is_file():
         try:
             provider = SopsAgeProvider(bundle, key_file=key_file)
         except (SecretProviderError, OSError) as error:
-            raise SshInitializationError("existing SOPS bundle could not be decrypted") from error
+            raise SshInitializationError(
+                "existing SOPS bundle could not be decrypted"
+            ) from error
         try:
             discovered = set(provider.discover())
-            for logical_path in (BOOTSTRAP_LOGICAL_PATH, management.ssh_private_key_secret_ref):
+            for logical_path in (
+                BOOTSTRAP_LOGICAL_PATH,
+                management.ssh_private_key_secret_ref,
+            ):
                 if logical_path in discovered:
                     existing_private[logical_path] = provider.resolve(logical_path)
         except (SecretProviderError, OSError) as error:
-            raise SshInitializationError("existing SOPS bundle could not resolve bootstrap SSH identity") from error
+            raise SshInitializationError(
+                "existing SOPS bundle could not resolve bootstrap SSH identity"
+            ) from error
 
     with tempfile.TemporaryDirectory(prefix="ssh-initialize-") as temp_dir:
         encrypted_data: dict[str, Any] = {}
         if bundle.is_file():
             try:
                 existing = SopsAgeProvider(bundle, key_file=key_file)
-                encrypted_data = existing._data.copy()  # validated in-memory bundle only
+                encrypted_data = (
+                    existing._data.copy()
+                )  # validated in-memory bundle only
             except (SecretProviderError, OSError) as error:
-                raise SshInitializationError("existing SOPS bundle could not be decrypted") from error
+                raise SshInitializationError(
+                    "existing SOPS bundle could not be decrypted"
+                ) from error
         expected = {
-            BOOTSTRAP_LOGICAL_PATH: {tuple(key.strip().split()[:2]) for key in public_keys},
-            management.ssh_private_key_secret_ref: {tuple(management.ssh_public_key.split()[:2])},
+            BOOTSTRAP_LOGICAL_PATH: {
+                tuple(key.strip().split()[:2]) for key in public_keys
+            },
+            management.ssh_private_key_secret_ref: {
+                tuple(management.ssh_public_key.split()[:2])
+            },
         }
         for logical_path, private_text in existing_private.items():
             private = Path(temp_dir) / logical_path.rsplit(".", 1)[-1]
             private.write_text(private_text, encoding="utf-8")
             os.chmod(private, 0o600)
             if derive_public_key(private) not in expected[logical_path]:
-                raise SshInitializationError("existing canonical SSH private key does not match its declared public key")
+                raise SshInitializationError(
+                    "existing canonical SSH private key does not match its declared public key"
+                )
 
         generated: dict[str, tuple[str, str]] = {}
         if BOOTSTRAP_LOGICAL_PATH not in existing_private:
-            generated[BOOTSTRAP_LOGICAL_PATH] = _generate_key(Path(temp_dir), "bootstrap")
+            generated[BOOTSTRAP_LOGICAL_PATH] = _generate_key(
+                Path(temp_dir), "bootstrap"
+            )
         if management.ssh_private_key_secret_ref not in existing_private:
-            generated[management.ssh_private_key_secret_ref] = _generate_key(Path(temp_dir), "proxmox-management")
+            generated[management.ssh_private_key_secret_ref] = _generate_key(
+                Path(temp_dir), "proxmox-management"
+            )
         if not generated:
             return "already initialized"
         for logical_path, (private_text, _public) in generated.items():
@@ -230,14 +274,26 @@ def initialize(site_file: Path, bundle: Path, key_file: Path, *, sops: str = "so
         ssh["public_keys"] = declared
         management_generated = generated.get(management.ssh_private_key_secret_ref)
         if management_generated is not None:
-            site_data["platform"]["proxmox"]["management"]["ssh_public_key"] = management_generated[1]
+            site_data["platform"]["proxmox"]["management"]["ssh_public_key"] = (
+                management_generated[1]
+            )
 
-        site_buffer = tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=site_file.parent, prefix=f".{site_file.name}.", delete=False)
+        site_buffer = tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=site_file.parent,
+            prefix=f".{site_file.name}.",
+            delete=False,
+        )
         site_temp = Path(site_buffer.name)
         try:
             site_yaml.dump(site_data, site_buffer)
             site_buffer.close()
-            load_site(site_temp, expected_site=os.environ.get("VALUES_SITE"), catalog_path=Path("infra/services.json"))
+            load_site(
+                site_temp,
+                expected_site=os.environ.get("VALUES_SITE"),
+                catalog_path=Path("infra/services.json"),
+            )
             _replace_bundle_and_site(bundle, ciphertext, site_file, site_temp)
         finally:
             site_buffer.close() if not site_buffer.closed else None
@@ -249,7 +305,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site-file", type=Path, required=True)
     parser.add_argument("--bundle", type=Path, required=True)
-    parser.add_argument("--key-file", type=Path, default=Path(os.environ.get("SOPS_AGE_KEY_FILE", "")))
+    parser.add_argument(
+        "--key-file", type=Path, default=Path(os.environ.get("SOPS_AGE_KEY_FILE", ""))
+    )
     parser.add_argument("--sops", default="sops")
     args = parser.parse_args(argv)
     try:

@@ -36,7 +36,9 @@ class CompatibilityBoundaryTests(unittest.TestCase):
         self.assertIn("just setup", result.stderr)
         self.assertIn("migration or recovery", result.stderr)
 
-    def test_legacy_compatibility_environment_cannot_bypass_canonical_authority(self) -> None:
+    def test_legacy_compatibility_environment_cannot_bypass_canonical_authority(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             env = os.environ.copy()
             env.update(

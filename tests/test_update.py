@@ -22,13 +22,18 @@ spec.loader.exec_module(update_script)
 
 class UpdateTests(unittest.TestCase):
     def test_release_fetch_rejects_non_https_and_embedded_credentials(self) -> None:
-        for url in ("http://example.invalid/release", "https://user:pass@example.invalid/release"):
+        for url in (
+            "http://example.invalid/release",
+            "https://user:pass@example.invalid/release",
+        ):
             with self.subTest(url=url), self.assertRaises(update_script.UpdateError):
                 update_script.fetch_url(url, opener=lambda _: b"unused")
 
     def test_release_redirect_rejects_downgrade(self) -> None:
         handler = update_script.HTTPSOnlyRedirectHandler()
-        with self.assertRaisesRegex(update_script.UpdateError, "redirect must remain on HTTPS"):
+        with self.assertRaisesRegex(
+            update_script.UpdateError, "redirect must remain on HTTPS"
+        ):
             handler.redirect_request(
                 update_script.urllib.request.Request("https://example.invalid/release"),
                 None,
@@ -39,10 +44,17 @@ class UpdateTests(unittest.TestCase):
             )
 
     def test_catalog_update_statuses_are_public_safe_and_deterministic(self) -> None:
-        statuses = update_script.catalog_update_statuses(Path(__file__).resolve().parents[1])
+        statuses = update_script.catalog_update_statuses(
+            Path(__file__).resolve().parents[1]
+        )
 
-        self.assertEqual([entry["service"] for entry in statuses], sorted(entry["service"] for entry in statuses))
-        technitium = next(entry for entry in statuses if entry["service"] == "technitium")
+        self.assertEqual(
+            [entry["service"] for entry in statuses],
+            sorted(entry["service"] for entry in statuses),
+        )
+        technitium = next(
+            entry for entry in statuses if entry["service"] == "technitium"
+        )
         forgejo = next(entry for entry in statuses if entry["service"] == "forgejo")
         self.assertEqual(technitium["status"], "manual")
         self.assertIn("version/checksum", technitium["detail"])
@@ -51,8 +63,12 @@ class UpdateTests(unittest.TestCase):
 
     def test_dry_run_output_includes_catalog_derived_service_statuses(self) -> None:
         output = io.StringIO()
-        with patch.object(update_script, "run", return_value=[]), redirect_stdout(output):
-            exit_code = update_script.main(["--root", str(Path(__file__).resolve().parents[1]), "--dry-run"])
+        with patch.object(update_script, "run", return_value=[]), redirect_stdout(
+            output
+        ):
+            exit_code = update_script.main(
+                ["--root", str(Path(__file__).resolve().parents[1]), "--dry-run"]
+            )
 
         self.assertEqual(exit_code, 0)
         rendered = output.getvalue()
@@ -91,8 +107,7 @@ class UpdateTests(unittest.TestCase):
             (root / "tools").mkdir()
             dockerfile = root / "tools" / "Dockerfile"
             dockerfile.write_text(
-                "ARG OPENTOFU_VERSION=1.0.0\n"
-                "ARG OPENTOFU_LINUX_AMD64_SHA256=old\n",
+                "ARG OPENTOFU_VERSION=1.0.0\n" "ARG OPENTOFU_LINUX_AMD64_SHA256=old\n",
                 encoding="utf-8",
             )
             target = update_script.TARGETS[0]
@@ -118,10 +133,19 @@ class UpdateTests(unittest.TestCase):
             root = Path(temp)
             (root / "tools").mkdir()
             dockerfile = root / "tools" / "Dockerfile"
-            original = "ARG OPENTOFU_VERSION=1.0.0\nARG OPENTOFU_LINUX_AMD64_SHA256=old\n"
+            original = (
+                "ARG OPENTOFU_VERSION=1.0.0\nARG OPENTOFU_LINUX_AMD64_SHA256=old\n"
+            )
             dockerfile.write_text(original, encoding="utf-8")
             now = datetime(2026, 7, 5, tzinfo=timezone.utc)
-            result = update_script.process_target(update_script.TARGETS[0], root, now, timedelta(hours=48), self.fake_opener("1.1.0", now - timedelta(hours=72)), dry_run=True)
+            result = update_script.process_target(
+                update_script.TARGETS[0],
+                root,
+                now,
+                timedelta(hours=48),
+                self.fake_opener("1.1.0", now - timedelta(hours=72)),
+                dry_run=True,
+            )
             self.assertEqual(result.status, "updated")
             self.assertEqual(dockerfile.read_text(encoding="utf-8"), original)
 
@@ -144,7 +168,9 @@ class UpdateTests(unittest.TestCase):
             )
 
             self.assertEqual(result.status, "hold")
-            self.assertEqual(inventory.read_text(encoding="utf-8"), 'forgejo_version: "12.0.4"\n')
+            self.assertEqual(
+                inventory.read_text(encoding="utf-8"), 'forgejo_version: "12.0.4"\n'
+            )
 
     def test_updates_repository_owned_sssf_pin_and_checksum(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -155,7 +181,11 @@ class UpdateTests(unittest.TestCase):
                 "sssf_uv_version: 0.12.0\nsssf_uv_sha256: old\n",
                 encoding="utf-8",
             )
-            target = next(target for target in update_script.TARGETS if target.name == "SSSF uv runtime")
+            target = next(
+                target
+                for target in update_script.TARGETS
+                if target.name == "SSSF uv runtime"
+            )
             now = datetime(2026, 7, 5, tzinfo=timezone.utc)
 
             def opener(url: str) -> bytes:
@@ -164,13 +194,22 @@ class UpdateTests(unittest.TestCase):
                 return json.dumps(
                     {
                         "tag_name": "0.12.1",
-                        "published_at": (now - timedelta(hours=72)).isoformat().replace("+00:00", "Z"),
+                        "published_at": (now - timedelta(hours=72))
+                        .isoformat()
+                        .replace("+00:00", "Z"),
                         "html_url": "https://example.invalid/uv",
-                        "assets": [{"name": "sha256.sum", "browser_download_url": "https://example.invalid/checksum"}],
+                        "assets": [
+                            {
+                                "name": "sha256.sum",
+                                "browser_download_url": "https://example.invalid/checksum",
+                            }
+                        ],
                     }
                 ).encode("utf-8")
 
-            result = update_script.process_target(target, root, now, timedelta(hours=48), opener)
+            result = update_script.process_target(
+                target, root, now, timedelta(hours=48), opener
+            )
 
             self.assertEqual(result.status, "updated")
             self.assertEqual(
@@ -179,9 +218,7 @@ class UpdateTests(unittest.TestCase):
             )
 
     def test_updates_canonical_release_owner(self) -> None:
-        document = {
-            "services": {"forgejo": {"release": {"version": "12.0.4"}}}
-        }
+        document = {"services": {"forgejo": {"release": {"version": "12.0.4"}}}}
         now = datetime(2026, 7, 5, tzinfo=timezone.utc)
         result, changed = update_script.process_canonical_target(
             update_script.TARGETS[2],
@@ -194,12 +231,12 @@ class UpdateTests(unittest.TestCase):
 
         self.assertEqual(result.status, "updated")
         self.assertTrue(changed)
-        self.assertEqual(document["services"]["forgejo"]["release"]["version"], "12.1.0")
+        self.assertEqual(
+            document["services"]["forgejo"]["release"]["version"], "12.1.0"
+        )
 
     def test_canonical_update_holds_without_mutating(self) -> None:
-        document = {
-            "services": {"forgejo": {"release": {"version": "12.0.4"}}}
-        }
+        document = {"services": {"forgejo": {"release": {"version": "12.0.4"}}}}
         now = datetime(2026, 7, 5, tzinfo=timezone.utc)
         result, changed = update_script.process_canonical_target(
             update_script.TARGETS[2],
@@ -212,7 +249,9 @@ class UpdateTests(unittest.TestCase):
 
         self.assertEqual(result.status, "hold")
         self.assertFalse(changed)
-        self.assertEqual(document["services"]["forgejo"]["release"]["version"], "12.0.4")
+        self.assertEqual(
+            document["services"]["forgejo"]["release"]["version"], "12.0.4"
+        )
 
     def test_skips_missing_private_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -222,7 +261,9 @@ class UpdateTests(unittest.TestCase):
                 Path(temp),
                 datetime(2026, 7, 5, tzinfo=timezone.utc),
                 timedelta(hours=48),
-                lambda _url: self.fake_release("12.1.0", datetime(2026, 7, 1, tzinfo=timezone.utc)),
+                lambda _url: self.fake_release(
+                    "12.1.0", datetime(2026, 7, 1, tzinfo=timezone.utc)
+                ),
             )
 
             self.assertEqual(result.status, "skip")
@@ -234,15 +275,26 @@ class UpdateTests(unittest.TestCase):
             site = root / "values" / "sites" / "dev"
             inventory = site / "ansible" / "inventory"
             inventory.mkdir(parents=True)
-            (site / "site.yaml").write_text("schema_version: 1\nsite:\n  name: dev\n", encoding="utf-8")
-            (inventory / "local.yml").write_text('forgejo_version: "12.0.4"\n', encoding="utf-8")
+            (site / "site.yaml").write_text(
+                "schema_version: 1\nsite:\n  name: dev\n", encoding="utf-8"
+            )
+            (inventory / "local.yml").write_text(
+                'forgejo_version: "12.0.4"\n', encoding="utf-8"
+            )
             environment = {"VALUES_SITE": "dev", "VALUES_DIR": str(root / "values")}
             with patch.dict(os.environ, environment, clear=False):
-                results = update_script.run(root, 48, lambda _url: self.fail("legacy release lookup must not run"))
+                results = update_script.run(
+                    root,
+                    48,
+                    lambda _url: self.fail("legacy release lookup must not run"),
+                )
             forgejo = next(result for result in results if result.name == "Forgejo")
             self.assertEqual(forgejo.status, "skip")
             self.assertIn("not authoritative", forgejo.detail)
-            self.assertEqual((inventory / "local.yml").read_text(encoding="utf-8"), 'forgejo_version: "12.0.4"\n')
+            self.assertEqual(
+                (inventory / "local.yml").read_text(encoding="utf-8"),
+                'forgejo_version: "12.0.4"\n',
+            )
 
 
 if __name__ == "__main__":

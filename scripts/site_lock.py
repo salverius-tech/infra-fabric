@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Serialize supported infrastructure operations for one selected site."""
+
 from __future__ import annotations
 
 import argparse
@@ -66,7 +67,9 @@ def acquire_site_lock(lock_path: Path) -> Iterator[None]:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
-            raise SiteLockError("another operation already holds the selected site lock") from error
+            raise SiteLockError(
+                "another operation already holds the selected site lock"
+            ) from error
     except BaseException:
         os.close(descriptor)
         raise

@@ -22,7 +22,9 @@ class CaddyTemplateDeduplicationTests(unittest.TestCase):
                 self.assertIn("../caddy_proxy/templates/caddy.env.j2", tasks)
                 self.assertIn("../caddy_proxy/templates/caddy-override.conf.j2", tasks)
                 self.assertFalse((ROLES / role / "templates/caddy.env.j2").exists())
-                self.assertFalse((ROLES / role / "templates/caddy-override.conf.j2").exists())
+                self.assertFalse(
+                    (ROLES / role / "templates/caddy-override.conf.j2").exists()
+                )
 
     def test_shared_override_preserves_onramp_systemd_behavior(self) -> None:
         source = (ROLES / "caddy_proxy/templates/caddy-override.conf.j2").read_text(
@@ -34,7 +36,9 @@ class CaddyTemplateDeduplicationTests(unittest.TestCase):
         standard = template.render()
         onramp = template.render(caddy_override_execstart=False)
 
-        self.assertIn("ExecStart=/usr/bin/caddy run --config /etc/caddy/Caddyfile", standard)
+        self.assertIn(
+            "ExecStart=/usr/bin/caddy run --config /etc/caddy/Caddyfile", standard
+        )
         self.assertNotIn("ExecStart=", onramp)
         self.assertIn("EnvironmentFile=/etc/caddy/env", onramp)
 

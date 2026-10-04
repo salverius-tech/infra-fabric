@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Print the configured runtime type for an enabled service."""
+
 from __future__ import annotations
 
 import argparse
@@ -22,7 +23,9 @@ def load_projection(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise ServiceRuntimeError(f"cannot read canonical projection {path}: {error}") from error
+        raise ServiceRuntimeError(
+            f"cannot read canonical projection {path}: {error}"
+        ) from error
     if not isinstance(data, dict):
         raise ServiceRuntimeError(f"canonical projection {path} must contain an object")
     return data
@@ -31,7 +34,9 @@ def load_projection(path: Path) -> dict[str, Any]:
 def runtime_type(service: str, tfvars: dict[str, Any]) -> str:
     retired_alias = f"{service}_runtime"
     if retired_alias in tfvars:
-        raise ServiceRuntimeError(f"retired runtime alias is not accepted: {retired_alias}; use service_runtime.{service}")
+        raise ServiceRuntimeError(
+            f"retired runtime alias is not accepted: {retired_alias}; use service_runtime.{service}"
+        )
     runtimes = tfvars.get("service_runtime", {})
     runtime = runtimes.get(service) if isinstance(runtimes, dict) else None
     if not isinstance(runtime, dict):
@@ -51,16 +56,27 @@ def runtime_type(service: str, tfvars: dict[str, Any]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("service")
-    parser.add_argument("--projection", type=Path, required=True, help="generated canonical OpenTofu JSON projection")
+    parser.add_argument(
+        "--projection",
+        type=Path,
+        required=True,
+        help="generated canonical OpenTofu JSON projection",
+    )
     args = parser.parse_args(argv)
     try:
         projection = load_projection(args.projection)
         enabled = projection.get("enabled_services")
-        if not isinstance(enabled, list) or not all(isinstance(item, str) for item in enabled):
-            raise ServiceRuntimeError("canonical projection enabled_services must be a string list")
+        if not isinstance(enabled, list) or not all(
+            isinstance(item, str) for item in enabled
+        ):
+            raise ServiceRuntimeError(
+                "canonical projection enabled_services must be a string list"
+            )
         runtimes = projection.get("service_runtime")
         if not isinstance(runtimes, dict):
-            raise ServiceRuntimeError("canonical projection service_runtime must be an object")
+            raise ServiceRuntimeError(
+                "canonical projection service_runtime must be an object"
+            )
         tfvars = projection
         if args.service not in enabled:
             raise ServiceRuntimeError(f"service is not enabled: {args.service}")

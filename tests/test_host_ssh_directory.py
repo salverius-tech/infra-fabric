@@ -10,7 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class HostSshDirectoryTests(unittest.TestCase):
-    def run_helper(self, environment: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    def run_helper(
+        self, environment: dict[str, str]
+    ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             [
                 "bash",

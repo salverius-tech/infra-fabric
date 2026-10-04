@@ -7,7 +7,9 @@ from typing import Any
 import yaml
 
 REPO = Path(__file__).resolve().parents[1]
-RUNNER_TASKS = REPO / "infra" / "ansible" / "roles" / "forgejo_runner" / "tasks" / "main.yml"
+RUNNER_TASKS = (
+    REPO / "infra" / "ansible" / "roles" / "forgejo_runner" / "tasks" / "main.yml"
+)
 CADDY_TASK_FILES = (
     REPO / "infra" / "ansible" / "roles" / "caddy_proxy" / "tasks" / "main.yml",
     REPO / "infra" / "ansible" / "roles" / "forgejo" / "tasks" / "caddy.yml",
@@ -15,7 +17,9 @@ CADDY_TASK_FILES = (
     REPO / "infra" / "ansible" / "roles" / "hermes" / "tasks" / "main.yml",
     REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "tasks" / "main.yml",
 )
-TECHNITIUM_DNS_PLAYBOOK = REPO / "infra" / "ansible" / "playbooks" / "technitium-dns.yml"
+TECHNITIUM_DNS_PLAYBOOK = (
+    REPO / "infra" / "ansible" / "playbooks" / "technitium-dns.yml"
+)
 ANSIBLE_TASK_FILES = tuple((REPO / "infra" / "ansible" / "roles").glob("*/tasks/*.yml"))
 SERVICE_SMOKE_TASK_FILES = (
     REPO / "infra" / "ansible" / "roles" / "technitium" / "tasks" / "main.yml",
@@ -74,7 +78,11 @@ class AnsibleSafetyTests(unittest.TestCase):
             if path in ALLOWLIST_PCT:
                 continue
             for task in load_tasks(path):
-                self.assertNotRegex(command_text(task), r"(^|\s)pct(\s|$)", f"{path}: {task.get('name')}")
+                self.assertNotRegex(
+                    command_text(task),
+                    r"(^|\s)pct(\s|$)",
+                    f"{path}: {task.get('name')}",
+                )
 
     def test_forgejo_runner_secret_tasks_are_no_log(self) -> None:
         for name in (
@@ -91,9 +99,13 @@ class AnsibleSafetyTests(unittest.TestCase):
         for path in CADDY_TASK_FILES:
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("caddy fmt --overwrite", text, str(path))
-            self.assertIn("caddy validate --config /etc/caddy/Caddyfile", text, str(path))
+            self.assertIn(
+                "caddy validate --config /etc/caddy/Caddyfile", text, str(path)
+            )
 
-    def test_dns_sync_requires_the_canonical_generated_projection_transport(self) -> None:
+    def test_dns_sync_requires_the_canonical_generated_projection_transport(
+        self,
+    ) -> None:
         playbook = TECHNITIUM_DNS_PLAYBOOK.read_text(encoding="utf-8")
         self.assertIn("lookup('env', 'DNS_RECORDS_FILE')", playbook)
         self.assertNotIn("dns-records.local.json", playbook)
@@ -110,7 +122,16 @@ class AnsibleSafetyTests(unittest.TestCase):
     def test_browser_facing_service_roles_have_http_smoke_checks(self) -> None:
         for path in SERVICE_SMOKE_TASK_FILES:
             text = path.read_text(encoding="utf-8")
-            if path == REPO / "infra" / "ansible" / "roles" / "technitium" / "tasks" / "main.yml":
+            if (
+                path
+                == REPO
+                / "infra"
+                / "ansible"
+                / "roles"
+                / "technitium"
+                / "tasks"
+                / "main.yml"
+            ):
                 text += (path.parent / "health.yml").read_text(encoding="utf-8")
             has_http_check = "ansible.builtin.uri:" in text or "      - curl\n" in text
             self.assertTrue(has_http_check, str(path))
@@ -128,9 +149,16 @@ class AnsibleSafetyTests(unittest.TestCase):
             self.assertNotEqual(task.get("failed_when"), False, rel_path)
 
     def test_forgejo_runner_registration_is_guarded_by_existing_lookup(self) -> None:
-        existing_sqlite = task_by_name(RUNNER_TASKS, "Check existing Forgejo Actions runner registration in SQLite")
-        existing_postgres = task_by_name(RUNNER_TASKS, "Check existing Forgejo Actions runner registration in PostgreSQL")
-        registration = task_by_name(RUNNER_TASKS, "Register Forgejo Actions runner with Forgejo")
+        existing_sqlite = task_by_name(
+            RUNNER_TASKS, "Check existing Forgejo Actions runner registration in SQLite"
+        )
+        existing_postgres = task_by_name(
+            RUNNER_TASKS,
+            "Check existing Forgejo Actions runner registration in PostgreSQL",
+        )
+        registration = task_by_name(
+            RUNNER_TASKS, "Register Forgejo Actions runner with Forgejo"
+        )
         config = task_by_name(RUNNER_TASKS, "Install Forgejo runner config")
 
         for existing in (existing_sqlite, existing_postgres):
@@ -142,27 +170,51 @@ class AnsibleSafetyTests(unittest.TestCase):
             self.assertIn("forgejo_runner_name", existing_text)
             self.assertEqual(existing.get("changed_when"), False)
             self.assertEqual(existing.get("delegate_to"), "{{ groups['forgejo'][0] }}")
-        self.assertIn('forgejo_runner_existing_registration_stdout | trim == ""', str(registration.get("when")))
+        self.assertIn(
+            'forgejo_runner_existing_registration_stdout | trim == ""',
+            str(registration.get("when")),
+        )
         self.assertEqual(registration.get("delegate_to"), "{{ groups['forgejo'][0] }}")
-        self.assertEqual(task_by_name(RUNNER_TASKS, "Normalize Forgejo repository-scoped runner ownership in SQLite").get("delegate_to"), "{{ groups['forgejo'][0] }}")
-        self.assertEqual(task_by_name(RUNNER_TASKS, "Normalize Forgejo repository-scoped runner ownership in PostgreSQL").get("delegate_to"), "{{ groups['forgejo'][0] }}")
+        self.assertEqual(
+            task_by_name(
+                RUNNER_TASKS,
+                "Normalize Forgejo repository-scoped runner ownership in SQLite",
+            ).get("delegate_to"),
+            "{{ groups['forgejo'][0] }}",
+        )
+        self.assertEqual(
+            task_by_name(
+                RUNNER_TASKS,
+                "Normalize Forgejo repository-scoped runner ownership in PostgreSQL",
+            ).get("delegate_to"),
+            "{{ groups['forgejo'][0] }}",
+        )
         self.assertNotIn("forgejo_runner_registration.stdout", str(config))
-        self.assertIn("forgejo_runner_uuid", str(task_by_name(RUNNER_TASKS, "Set Forgejo runner UUID")))
+        self.assertIn(
+            "forgejo_runner_uuid",
+            str(task_by_name(RUNNER_TASKS, "Set Forgejo runner UUID")),
+        )
 
     def test_forgejo_runner_registration_secret_matches_cli_contract(self) -> None:
-        validation = task_by_name(RUNNER_TASKS, "Validate Forgejo Actions runner variables")
+        validation = task_by_name(
+            RUNNER_TASKS, "Validate Forgejo Actions runner variables"
+        )
         assertion = validation.get("ansible.builtin.assert", {})
-        self.assertIn("forgejo_runner_registration_secret is match", str(assertion.get("that")))
+        self.assertIn(
+            "forgejo_runner_registration_secret is match", str(assertion.get("that"))
+        )
         self.assertIn("{40}", str(assertion.get("that")))
 
     def test_forgejo_runner_registration_uses_transient_secret_file(self) -> None:
-        registration = task_by_name(RUNNER_TASKS, "Register Forgejo Actions runner with Forgejo")
+        registration = task_by_name(
+            RUNNER_TASKS, "Register Forgejo Actions runner with Forgejo"
+        )
         text = command_text(registration)
         self.assertIn("mktemp", text)
         self.assertIn("trap", text)
         self.assertIn("--secret-file", text)
-        self.assertIn("--labels \"$3\"", text)
-        self.assertNotIn("--secret \"${FORGEJO_RUNNER_SECRET}\"", text)
+        self.assertIn('--labels "$3"', text)
+        self.assertNotIn('--secret "${FORGEJO_RUNNER_SECRET}"', text)
 
     def test_forgejo_runner_registration_task_order(self) -> None:
         names = task_names(RUNNER_TASKS)
@@ -205,25 +257,67 @@ class AnsibleSafetyTests(unittest.TestCase):
         self.assertEqual(copy["mode"], "0440")
         self.assertEqual(copy["validate"], "/usr/sbin/visudo -cf %s")
         self.assertIn("NOPASSWD: ALL", copy["content"])  # public-safety: allow-secret
-        when = task["when"] if isinstance(task["when"], str) else "\n".join(task["when"])
+        when = (
+            task["when"] if isinstance(task["when"], str) else "\n".join(task["when"])
+        )
         self.assertIn("hermes_runtime_passwordless_sudo", when)
 
     def test_hermes_exports_native_searxng_url_key(self) -> None:
-        template = REPO / "infra" / "ansible" / "roles" / "hermes" / "templates" / "hermes-dashboard.env.j2"
+        template = (
+            REPO
+            / "infra"
+            / "ansible"
+            / "roles"
+            / "hermes"
+            / "templates"
+            / "hermes-dashboard.env.j2"
+        )
         text = template.read_text(encoding="utf-8")
         self.assertIn("HERMES_WEB_SEARXNG_URL={{ hermes_web_searxng_url }}", text)
         self.assertIn("SEARXNG_URL={{ hermes_web_searxng_url }}", text)
 
     def test_searxng_onramp_ports_are_loopback_only(self) -> None:
-        compose = REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "templates" / "docker-compose.yml.j2"
+        compose = (
+            REPO
+            / "infra"
+            / "ansible"
+            / "roles"
+            / "searxng_onramp"
+            / "templates"
+            / "docker-compose.yml.j2"
+        )
         text = compose.read_text(encoding="utf-8")
-        self.assertIn("{{ searxng_onramp_bind_address }}:{{ searxng_onramp_container_port }}:8080", text)
-        self.assertNotIn("0.0.0.0:{{ searxng_onramp_container_port }}:8080", text)  # public-safety: allow-ip
-        task = task_by_name(REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "tasks" / "main.yml", "Validate SearXNG onramp required variables")
-        self.assertIn("searxng_onramp_bind_address in ['127.0.0.1', '::1']", str(task))  # public-safety: allow-ip
+        self.assertIn(
+            "{{ searxng_onramp_bind_address }}:{{ searxng_onramp_container_port }}:8080",
+            text,
+        )
+        self.assertNotIn(
+            "0.0.0.0:{{ searxng_onramp_container_port }}:8080", text
+        )  # public-safety: allow-ip
+        task = task_by_name(
+            REPO
+            / "infra"
+            / "ansible"
+            / "roles"
+            / "searxng_onramp"
+            / "tasks"
+            / "main.yml",
+            "Validate SearXNG onramp required variables",
+        )
+        self.assertIn(
+            "searxng_onramp_bind_address in ['127.0.0.1', '::1']", str(task)
+        )  # public-safety: allow-ip
 
     def test_searxng_onramp_allows_json_search_for_hermes_consumer(self) -> None:
-        settings = REPO / "infra" / "ansible" / "roles" / "searxng_onramp" / "templates" / "settings.yml.j2"
+        settings = (
+            REPO
+            / "infra"
+            / "ansible"
+            / "roles"
+            / "searxng_onramp"
+            / "templates"
+            / "settings.yml.j2"
+        )
         text = settings.read_text(encoding="utf-8")
         self.assertIn("formats:", text)
         self.assertRegex(text, r"(?m)^\s+- json$")

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run enabled service Ansible playbooks, optionally in dependency-safe parallel waves."""
+
 from __future__ import annotations
 
 import argparse
@@ -17,7 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-SETTINGS_SPEC = importlib.util.spec_from_file_location("settings", REPO / "scripts" / "settings.py")
+SETTINGS_SPEC = importlib.util.spec_from_file_location(
+    "settings", REPO / "scripts" / "settings.py"
+)
 if SETTINGS_SPEC is None or SETTINGS_SPEC.loader is None:
     raise RuntimeError("cannot load scripts/settings.py")
 settings = importlib.util.module_from_spec(SETTINGS_SPEC)
@@ -91,12 +94,22 @@ def runtime_known_hosts_path(context: object) -> Path:
 def canonical_enabled_services(context: object, service: str = "") -> list[str]:
     site_file = getattr(context, "canonical_site_path", None)
     if site_file is None:
-        raise RuntimeError("canonical Ansible execution requires a selected canonical site")
-    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
-    services = [name for name, definition in model.services.items() if definition.enabled]
+        raise RuntimeError(
+            "canonical Ansible execution requires a selected canonical site"
+        )
+    model = load_site(
+        site_file,
+        expected_site=getattr(context, "site", None),
+        catalog_path=REPO / "infra" / "services.json",
+    )
+    services = [
+        name for name, definition in model.services.items() if definition.enabled
+    ]
     if service:
         if service not in services:
-            raise RuntimeError(f"service is not enabled in the canonical site: {service}")
+            raise RuntimeError(
+                f"service is not enabled in the canonical site: {service}"
+            )
         return [service]
     return services
 
@@ -114,29 +127,43 @@ def dependency_waves(services: Iterable[str]) -> list[list[str]]:
         ]
         if not ready:
             unresolved = ", ".join(pending)
-            raise settings.SettingsError(f"cannot resolve service dependency order: {unresolved}")
+            raise settings.SettingsError(
+                f"cannot resolve service dependency order: {unresolved}"
+            )
         waves.append(ready)
         completed.update(ready)
         pending = [service for service in pending if service not in ready]
     return waves
 
 
-def execution_resource_keys(services: Iterable[str], model: object | None = None) -> dict[str, str]:
+def execution_resource_keys(
+    services: Iterable[str], model: object | None = None
+) -> dict[str, str]:
     """Return one validated scheduler key per service without inventing host ownership."""
     keys: dict[str, str] = {}
     canonical_services = getattr(model, "services", {}) if model is not None else {}
     for service in services:
-        canonical = canonical_services.get(service) if hasattr(canonical_services, "get") else None
+        canonical = (
+            canonical_services.get(service)
+            if hasattr(canonical_services, "get")
+            else None
+        )
         resource = str(getattr(canonical, "resource", "") or "").strip()
-        inventory_host = str(settings.SERVICES[service].get("execution_resource", "")).strip()
+        inventory_host = str(
+            settings.SERVICES[service].get("execution_resource", "")
+        ).strip()
         key = resource or inventory_host
         if not key:
-            raise settings.SettingsError(f"service has no execution resource: {service}")
+            raise settings.SettingsError(
+                f"service has no execution resource: {service}"
+            )
         keys[service] = key
     return keys
 
 
-def execution_resource_waves(services: Iterable[str], resources: Mapping[str, str]) -> list[list[str]]:
+def execution_resource_waves(
+    services: Iterable[str], resources: Mapping[str, str]
+) -> list[list[str]]:
     """Split dependency-ready services so each batch has one service per host/resource."""
     batches: list[list[str]] = []
     for ready in dependency_waves(services):
@@ -148,7 +175,9 @@ def execution_resource_waves(services: Iterable[str], resources: Mapping[str, st
             for service in pending:
                 resource = str(resources.get(service, "")).strip()
                 if not resource:
-                    raise settings.SettingsError(f"service has no execution resource: {service}")
+                    raise settings.SettingsError(
+                        f"service has no execution resource: {service}"
+                    )
                 if resource in used:
                     deferred.append(service)
                 else:
@@ -170,7 +199,9 @@ def canonical_identity_extra_args() -> tuple[str, ...]:
     identity = os.environ.get("INFRA_SSH_IDENTITY_FILE", "")
     args: list[str] = []
     if identity and re.fullmatch(r"[A-Za-z0-9._-]+", identity):
-        args.extend(("-e", f"ansible_ssh_private_key_file={Path.home() / '.ssh' / identity}"))
+        args.extend(
+            ("-e", f"ansible_ssh_private_key_file={Path.home() / '.ssh' / identity}")
+        )
     # LXC first-boot root access is handled explicitly by run_canonical_host_identity.
     # Service lifecycle playbooks must never reuse the guest bootstrap identity on PVE.
     args.extend(("-e", "infra_host_identity_skip_root=true"))
@@ -183,7 +214,11 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
     if site_file is None:
         raise RuntimeError("canonical DNS transport requires a selected canonical site")
     catalog_path = REPO / "infra" / "services.json"
-    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=catalog_path)
+    model = load_site(
+        site_file,
+        expected_site=getattr(context, "site", None),
+        catalog_path=catalog_path,
+    )
     catalog = load_catalog(catalog_path)
     expected_projections = render_projection_set(model, catalog)
     configured_generated = os.environ.get("INFRA_GENERATED_DIR", "").strip()
@@ -194,6 +229,7 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
 
         def generated_path(name: str) -> Path:
             return generated_dir / name
+
     else:
         generated_path = context.generated_path
     projections: dict[str, object] = {}
@@ -202,9 +238,13 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
             path = generated_path(name)
             projections[name] = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise RuntimeError("canonical generated projection is unavailable or invalid") from error
+        raise RuntimeError(
+            "canonical generated projection is unavailable or invalid"
+        ) from error
     if projections != expected_projections:
-        raise RuntimeError("canonical generated projection does not match the selected model")
+        raise RuntimeError(
+            "canonical generated projection does not match the selected model"
+        )
     verify_cross_projection_identity(
         site=model.site.name,
         opentofu=projections["terraform.auto.tfvars.json"],
@@ -246,21 +286,30 @@ def canonical_bootstrap_targets(
     if site_file is None:
         raise RuntimeError("canonical bootstrap requires a selected canonical site")
     catalog_path = REPO / "infra" / "services.json"
-    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=catalog_path)
+    model = load_site(
+        site_file,
+        expected_site=getattr(context, "site", None),
+        catalog_path=catalog_path,
+    )
     catalog = load_catalog(catalog_path)
     selected_resource = os.environ.get("INFRA_HOST_IDENTITY_ONLY", "").strip()
     targets: dict[str, str] = {}
     for service_name, service in model.services.items():
         if not service.enabled or service.resource is None:
             continue
-        if selected_resources is not None and service.resource not in selected_resources:
+        if (
+            selected_resources is not None
+            and service.resource not in selected_resources
+        ):
             continue
         if selected_resource and service.resource != selected_resource:
             continue
         host = str(catalog.get(service_name).inventory.get("host", service.resource))
         existing = targets.get(service.resource)
         if existing is not None and existing != host:
-            raise RuntimeError(f"canonical resource maps to multiple bootstrap hosts: {service.resource}")
+            raise RuntimeError(
+                f"canonical resource maps to multiple bootstrap hosts: {service.resource}"
+            )
         targets[service.resource] = host
     return tuple(sorted(targets.items()))
 
@@ -285,16 +334,27 @@ def run_canonical_bootstrap(
     site_file = getattr(context, "canonical_site_path", None)
     if site_file is None:
         raise RuntimeError("canonical bootstrap requires a selected canonical site")
-    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
+    model = load_site(
+        site_file,
+        expected_site=getattr(context, "site", None),
+        catalog_path=REPO / "infra" / "services.json",
+    )
     policy = model.bootstrap.root_password
     runner = runner or default_runner
-    for resource_id, host in canonical_bootstrap_targets(context, selected_resources=selected_resources):
+    for resource_id, host in canonical_bootstrap_targets(
+        context, selected_resources=selected_resources
+    ):
         requirements = root_password_requirements(
             [resource_id],
             default_secret=policy.default_secret,
             host_overrides=policy.host_overrides,
         )
-        delivered = deliver(provider, path=requirements[0].path, consumer="ansible-bootstrap", requirements=requirements)
+        delivered = deliver(
+            provider,
+            path=requirements[0].path,
+            consumer="ansible-bootstrap",
+            requirements=requirements,
+        )
         rc = run_bootstrap_host(
             host,
             inventories,
@@ -322,16 +382,24 @@ def run_canonical_host_identity(
     try:
         bundle_path = context.path("secrets.sops.yaml")
     except (AttributeError, TypeError, ValueError) as error:
-        raise RuntimeError("canonical host identity secret bundle path is unavailable") from error
+        raise RuntimeError(
+            "canonical host identity secret bundle path is unavailable"
+        ) from error
     if not bundle_path.is_file():
         raise RuntimeError("canonical host identity secret bundle is unavailable")
     provider = SopsAgeProvider(bundle_path)
     runner = runner or default_runner
     operator_requirement = operator_password_requirements()[0]
     site_file = context.canonical_site_path
-    model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
+    model = load_site(
+        site_file,
+        expected_site=getattr(context, "site", None),
+        catalog_path=REPO / "infra" / "services.json",
+    )
     resources = {**model.resources.guests, **model.resources.shared_hosts}
-    for resource_id, host in canonical_bootstrap_targets(context, selected_resources=selected_resources):
+    for resource_id, host in canonical_bootstrap_targets(
+        context, selected_resources=selected_resources
+    ):
         resource = resources[resource_id]
         root_requirements = root_password_requirements(
             [resource_id],
@@ -348,11 +416,18 @@ def run_canonical_host_identity(
         # Root SSH is a first-boot/recovery exception. Normal steady-state
         # convergence defaults to the canonical infra account; callers must
         # explicitly opt into the root phase with the literal value false.
-        skip_root = os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "true").strip().lower() != "false"
+        skip_root = (
+            os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "true").strip().lower()
+            != "false"
+        )
         if resource.type == "lxc" and skip_root:
             phases = (("infra", True),)
         else:
-            phases = (("root", False), ("infra", True)) if resource.type == "lxc" else (("infra", True),)
+            phases = (
+                (("root", False), ("infra", True))
+                if resource.type == "lxc"
+                else (("infra", True),)
+            )
         for connection_user, cleanup_root in phases:
             env = dict(base_env)
             root_environment_name: str | None = None
@@ -381,7 +456,11 @@ def run_canonical_host_identity(
                 "infra/ansible/playbooks/host-identity.yml",
             ]
             try:
-                rc = runner(command, log_dir / f"host-identity-{host}-{connection_user}.log", env)
+                rc = runner(
+                    command,
+                    log_dir / f"host-identity-{host}-{connection_user}.log",
+                    env,
+                )
             finally:
                 env.pop(operator_delivered.environment_name, None)
                 if root_environment_name is not None:
@@ -407,7 +486,9 @@ def run_canonical_direct_access_ready(
     ready_hosts = "all:!proxmox"
     selected_resource = os.environ.get("INFRA_HOST_IDENTITY_ONLY", "").strip()
     if selected_resource or selected_resources is not None:
-        selected_targets = dict(canonical_bootstrap_targets(context, selected_resources=selected_resources))
+        selected_targets = dict(
+            canonical_bootstrap_targets(context, selected_resources=selected_resources)
+        )
         if selected_resource:
             ready_hosts = selected_targets.get(selected_resource, ready_hosts)
         else:
@@ -427,10 +508,14 @@ def run_canonical_direct_access_ready(
     return runner(command, log_dir / "direct-access-ready.log", dict(base_env))
 
 
-def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsibleTransport:
+def canonical_ansible_transport(
+    context: object, log_dir: Path
+) -> CanonicalAnsibleTransport:
     """Build paired inventory/vars transport only from verified canonical projections."""
     if getattr(context, "canonical_site_path", None) is None:
-        raise RuntimeError("canonical Ansible execution requires a selected canonical site")
+        raise RuntimeError(
+            "canonical Ansible execution requires a selected canonical site"
+        )
     environment = canonical_dns_environment(context)
     configured_generated = os.environ.get("INFRA_GENERATED_DIR", "").strip()
     if configured_generated:
@@ -440,6 +525,7 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
 
         def generated_path(name: str) -> Path:
             return generated_dir / name
+
     else:
         generated_path = context.generated_path
     inventory_path = generated_path("ansible-inventory.json")
@@ -447,7 +533,9 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
     try:
         projection = json.loads(vars_projection_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise RuntimeError("canonical Ansible vars projection is unavailable") from error
+        raise RuntimeError(
+            "canonical Ansible vars projection is unavailable"
+        ) from error
     services = projection.get("services") if isinstance(projection, dict) else None
     if not isinstance(services, dict):
         raise RuntimeError("canonical Ansible vars projection has an invalid shape")
@@ -456,14 +544,20 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
     }
     flattened["canonical_enabled_services"] = sorted(services)
     for service, values in sorted(services.items()):
-        ansible_vars = values.get("ansible_vars", {}) if isinstance(values, dict) else None
+        ansible_vars = (
+            values.get("ansible_vars", {}) if isinstance(values, dict) else None
+        )
         if not isinstance(ansible_vars, dict):
             raise RuntimeError(f"canonical Ansible adapter vars are invalid: {service}")
         for key, value in ansible_vars.items():
             if not isinstance(key, str):
-                raise RuntimeError(f"canonical Ansible adapter key is invalid: {service}")
+                raise RuntimeError(
+                    f"canonical Ansible adapter key is invalid: {service}"
+                )
             if key in flattened and flattened[key] != value:
-                raise RuntimeError(f"conflicting canonical Ansible adapter variable: {key}")
+                raise RuntimeError(
+                    f"conflicting canonical Ansible adapter variable: {key}"
+                )
             flattened[key] = value
     file_descriptor, vars_name = tempfile.mkstemp(
         prefix=".canonical-ansible-vars-",
@@ -485,8 +579,20 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
     runtime_inventory_path.write_text(
         json.dumps(
             {
-                "all": {"vars": {"ansible_ssh_private_key_file": str(Path.home() / ".ssh" / "canonical-bootstrap")}},
-                "proxmox": {"vars": {"ansible_ssh_private_key_file": str(Path.home() / ".ssh" / "canonical-proxmox-management")}},
+                "all": {
+                    "vars": {
+                        "ansible_ssh_private_key_file": str(
+                            Path.home() / ".ssh" / "canonical-bootstrap"
+                        )
+                    }
+                },
+                "proxmox": {
+                    "vars": {
+                        "ansible_ssh_private_key_file": str(
+                            Path.home() / ".ssh" / "canonical-proxmox-management"
+                        )
+                    }
+                },
             },
             sort_keys=True,
         )
@@ -495,7 +601,9 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
     )
     os.chmod(runtime_inventory_path, 0o600)
     known_hosts = runtime_known_hosts_path(context)
-    ssh_common_args = f"-o UserKnownHostsFile={known_hosts} -o StrictHostKeyChecking=yes"
+    ssh_common_args = (
+        f"-o UserKnownHostsFile={known_hosts} -o StrictHostKeyChecking=yes"
+    )
     ssh_transport_vars = json.dumps({"ansible_ssh_common_args": ssh_common_args})
     return CanonicalAnsibleTransport(
         inventories=(str(inventory_path), str(runtime_inventory_path)),
@@ -513,11 +621,15 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
     )
 
 
-def bootstrap_technitium_token(log_path: Path, env: dict[str, str], runner: RunCommand) -> int:
+def bootstrap_technitium_token(
+    log_path: Path, env: dict[str, str], runner: RunCommand
+) -> int:
     values_dir = env.get("INFRA_VALUES_DIR", "")
     age_key_file = env.get("SOPS_AGE_KEY_FILE", "")
     if not values_dir or not age_key_file:
-        raise RuntimeError("canonical Technitium token bootstrap requires selected SOPS inputs")
+        raise RuntimeError(
+            "canonical Technitium token bootstrap requires selected SOPS inputs"
+        )
     return runner(
         [
             "python",
@@ -536,7 +648,9 @@ def default_runner(command: list[str], log_path: Path, env: dict[str, str]) -> i
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("ab") as log:
         log.write(("$ " + " ".join(command) + "\n").encode("utf-8"))
-        process = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=env, check=False)
+        process = subprocess.run(
+            command, stdout=log, stderr=subprocess.STDOUT, env=env, check=False
+        )
         log.write((f"\nexit_code={process.returncode}\n").encode())
         return process.returncode
 
@@ -585,13 +699,21 @@ def run_service(
     if service_environment:
         env.update(service_environment)
     for playbook in playbooks:
-        if bootstrap_technitium and playbook == "infra/ansible/playbooks/technitium-dns.yml":
+        if (
+            bootstrap_technitium
+            and playbook == "infra/ansible/playbooks/technitium-dns.yml"
+        ):
             rc = bootstrap_technitium_token(log_path, env, runner)
             if rc != 0:
                 return ServiceResult(service, playbooks, rc, log_path)
             if refresh_service_environment is not None:
                 env.update(refresh_service_environment(service))
-        command = ["ansible-playbook", *inventory_args(inventories), *extra_args, playbook]
+        command = [
+            "ansible-playbook",
+            *inventory_args(inventories),
+            *extra_args,
+            playbook,
+        ]
         rc = runner(command, log_path, env)
         if rc != 0:
             return ServiceResult(service, playbooks, rc, log_path)
@@ -647,7 +769,9 @@ def run_parallel(
     resources = dict(execution_resources or execution_resource_keys(services))
     for index, wave in enumerate(execution_resource_waves(services, resources), 1):
         print(f"==> ansible wave {index}: {', '.join(wave)}", flush=True)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(max_workers, len(wave))) as executor:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(max_workers, len(wave))
+        ) as executor:
             future_map = {
                 executor.submit(
                     run_service,
@@ -667,7 +791,9 @@ def run_parallel(
             for future in concurrent.futures.as_completed(future_map):
                 result = future.result()
                 wave_results.append(result)
-                status = "ok" if result.returncode == 0 else f"failed rc={result.returncode}"
+                status = (
+                    "ok" if result.returncode == 0 else f"failed rc={result.returncode}"
+                )
                 print(f"<== ansible service {result.service} {status}", flush=True)
         wave_results.sort(key=lambda item: wave.index(item.service))
         results.extend(wave_results)
@@ -695,16 +821,30 @@ def summarize_failures(results: list[ServiceResult]) -> int:
         return 0
     print("Ansible service configuration failed:", file=sys.stderr)
     for result in failed:
-        print(f"  {result.service}: exit {result.returncode}; log {result.log_path}", file=sys.stderr)
-    print("Review the log file(s), fix the failure, rerun just plan if needed, then rerun just apply.", file=sys.stderr)
+        print(
+            f"  {result.service}: exit {result.returncode}; log {result.log_path}",
+            file=sys.stderr,
+        )
+    print(
+        "Review the log file(s), fix the failure, rerun just plan if needed, then rerun just apply.",
+        file=sys.stderr,
+    )
     return 1
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("parallel", "sequential"), default=os.environ.get("INFRA_APPLY_ANSIBLE_MODE", "parallel"))
+    parser.add_argument(
+        "--mode",
+        choices=("parallel", "sequential"),
+        default=os.environ.get("INFRA_APPLY_ANSIBLE_MODE", "parallel"),
+    )
     parser.add_argument("--service", default="")
-    parser.add_argument("--max-workers", type=int, default=int(os.environ.get("INFRA_APPLY_ANSIBLE_MAX_WORKERS", "4")))
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=int(os.environ.get("INFRA_APPLY_ANSIBLE_MAX_WORKERS", "4")),
+    )
     parser.add_argument("--log-dir", type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -718,7 +858,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.service:
         selected_site_file = context.canonical_site_path
         if selected_site_file is None:
-            print("canonical Ansible execution requires a selected canonical site", file=sys.stderr)
+            print(
+                "canonical Ansible execution requires a selected canonical site",
+                file=sys.stderr,
+            )
             return 1
         selected_model = load_site(
             selected_site_file,
@@ -727,36 +870,48 @@ def main(argv: list[str] | None = None) -> int:
         )
         selected_resource = selected_model.services[args.service].resource
         if selected_resource is None:
-            print("selected canonical service has no execution resource", file=sys.stderr)
+            print(
+                "selected canonical service has no execution resource", file=sys.stderr
+            )
             return 1
         selected_resources = {selected_resource}
     inventories: tuple[str, ...] = ()
     timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    log_dir = args.log_dir or Path(".tmp") / f"apply-ansible-{timestamp.replace(':', '')}"
+    log_dir = (
+        args.log_dir or Path(".tmp") / f"apply-ansible-{timestamp.replace(':', '')}"
+    )
     log_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Ansible service apply mode: {args.mode}; started {timestamp}; logs: {log_dir}", flush=True)
+    print(
+        f"Ansible service apply mode: {args.mode}; started {timestamp}; logs: {log_dir}",
+        flush=True,
+    )
     base_env = dict(os.environ)
     transport: CanonicalAnsibleTransport | None = None
     execution_resources: dict[str, str] = {}
     try:
         execution_resources = execution_resource_keys(services)
         transport = canonical_ansible_transport(context, log_dir)
-        if transport is None:  # pragma: no cover - return type is deliberately fail-closed
+        if (
+            transport is None
+        ):  # pragma: no cover - return type is deliberately fail-closed
             raise RuntimeError("canonical Ansible transport is unavailable")
         base_env.update(transport.environment)
         inventories = transport.inventories
         extra_args = transport.extra_args
         direct_access_rc = run_canonical_direct_access_ready(
-                context,
-                inventories,
-                log_dir,
-                base_env,
-                extra_args=extra_args,
-                enroll_only=True,
-                selected_resources=selected_resources,
-            )
+            context,
+            inventories,
+            log_dir,
+            base_env,
+            extra_args=extra_args,
+            enroll_only=True,
+            selected_resources=selected_resources,
+        )
         if direct_access_rc != 0:
-            print(f"canonical direct access readiness failed with exit code {direct_access_rc}", file=sys.stderr)
+            print(
+                f"canonical direct access readiness failed with exit code {direct_access_rc}",
+                file=sys.stderr,
+            )
             return 1
         host_identity_rc = run_canonical_host_identity(
             context,
@@ -767,18 +922,24 @@ def main(argv: list[str] | None = None) -> int:
             selected_resources=selected_resources,
         )
         if host_identity_rc != 0:
-            print(f"canonical host identity convergence failed with exit code {host_identity_rc}", file=sys.stderr)
+            print(
+                f"canonical host identity convergence failed with exit code {host_identity_rc}",
+                file=sys.stderr,
+            )
             return 1
         direct_access_rc = run_canonical_direct_access_ready(
-                context,
-                inventories,
-                log_dir,
-                base_env,
-                extra_args=extra_args,
-                selected_resources=selected_resources,
-            )
+            context,
+            inventories,
+            log_dir,
+            base_env,
+            extra_args=extra_args,
+            selected_resources=selected_resources,
+        )
         if direct_access_rc != 0:
-            print(f"canonical direct service readiness failed with exit code {direct_access_rc}", file=sys.stderr)
+            print(
+                f"canonical direct service readiness failed with exit code {direct_access_rc}",
+                file=sys.stderr,
+            )
             return 1
         if os.environ.get("INFRA_HOST_IDENTITY_ONLY", "").strip():
             print("host-identity-only recovery completed; skipping service apply")
@@ -786,23 +947,25 @@ def main(argv: list[str] | None = None) -> int:
         provider = SopsAgeProvider(context.path("secrets.sops.yaml"))
         site_file = context.canonical_site_path
         if site_file is None:
-            raise RuntimeError("canonical Ansible execution requires a selected canonical site")
-        model = load_site(
-                site_file,
-                expected_site=context.site,
-                catalog_path=REPO / "infra" / "services.json",
+            raise RuntimeError(
+                "canonical Ansible execution requires a selected canonical site"
             )
+        model = load_site(
+            site_file,
+            expected_site=context.site,
+            catalog_path=REPO / "infra" / "services.json",
+        )
         catalog = load_catalog(REPO / "infra" / "services.json")
         execution_resources = execution_resource_keys(services, model)
         service_environments = {
-                selected_service: deliver_services_environment(
-                    provider,
-                    catalog,
-                    model.services,
-                    selected_services=[selected_service],
-                )
-                for selected_service in services
-            }
+            selected_service: deliver_services_environment(
+                provider,
+                catalog,
+                model.services,
+                selected_services=[selected_service],
+            )
+            for selected_service in services
+        }
 
         def refresh_service_environment(selected_service: str) -> Mapping[str, str]:
             refreshed_provider = SopsAgeProvider(context.path("secrets.sops.yaml"))
@@ -839,12 +1002,20 @@ def main(argv: list[str] | None = None) -> int:
                 refresh_service_environment=refresh_service_environment,
             )
         print("==> canonical host bootstrap", flush=True)
-        bootstrap_rc = run_canonical_bootstrap(context, inventories, log_dir, base_env, extra_args=extra_args)
+        bootstrap_rc = run_canonical_bootstrap(
+            context, inventories, log_dir, base_env, extra_args=extra_args
+        )
         if bootstrap_rc != 0:
-            print(f"canonical host bootstrap failed with exit code {bootstrap_rc}", file=sys.stderr)
+            print(
+                f"canonical host bootstrap failed with exit code {bootstrap_rc}",
+                file=sys.stderr,
+            )
             return 1
     except (OSError, ValueError, RuntimeError) as error:
-        print(f"canonical Ansible projection verification failed: {error}", file=sys.stderr)
+        print(
+            f"canonical Ansible projection verification failed: {error}",
+            file=sys.stderr,
+        )
         return 1
     finally:
         if transport is not None:

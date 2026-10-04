@@ -49,7 +49,9 @@ class TfplanMetadataTests(unittest.TestCase):
             )
             + "\n"
         )
-        (repo / "infra" / "ansible" / "scripts" / "apply-technitium-dns.py").write_text("# helper\n")
+        (repo / "infra" / "ansible" / "scripts" / "apply-technitium-dns.py").write_text(
+            "# helper\n"
+        )
         (repo / "values" / "ansible" / "inventory").mkdir(parents=True)
         (repo / "values" / "terraform.tfvars").write_text("x = 1\n")
         (repo / "values" / "dns-records.local.json").write_text("{}\n")
@@ -77,7 +79,11 @@ class TfplanMetadataTests(unittest.TestCase):
             (source_root / "infra" / "services.json").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
-        model = load_site(site / "site.yaml", expected_site="dev", catalog_path=repo / "infra" / "services.json")
+        model = load_site(
+            site / "site.yaml",
+            expected_site="dev",
+            catalog_path=repo / "infra" / "services.json",
+        )
         catalog = load_catalog(repo / "infra" / "services.json")
         projections = render_projection_set(model, catalog)
         generated = site / "generated"
@@ -107,7 +113,9 @@ class TfplanMetadataTests(unittest.TestCase):
             {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
             clear=True,
         ):
-            data = tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            data = tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
             self.assertEqual(data["canonical"]["site"], "dev")
             self.assertTrue(data["canonical"]["model_digest"])
             self.assertTrue(data["canonical"]["projection_digest"])
@@ -136,21 +144,38 @@ class TfplanMetadataTests(unittest.TestCase):
         temp_dir, repo, plan, metadata = self.make_repo()
         self.add_canonical_projection_set(repo, "_template")
         site_dir = repo / "values" / "sites" / "dev"
-        (site_dir / "site.json").write_text('{"name": "dev", "services": ["technitium"]}\n', encoding="utf-8")
+        (site_dir / "site.json").write_text(
+            '{"name": "dev", "services": ["technitium"]}\n', encoding="utf-8"
+        )
         with temp_dir, patch.dict(
             os.environ,
             {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
             clear=True,
         ):
             mapping = tfplan_metadata.enabled_stateful_services_by_address(repo)
-            self.assertIn("sssf", {service for services in mapping.values() for service in services})
-            sssf_address = next(address for address, services in mapping.items() if "sssf" in services)
-            forgejo_address = next(address for address, services in mapping.items() if "forgejo" in services)
+            self.assertIn(
+                "sssf",
+                {service for services in mapping.values() for service in services},
+            )
+            sssf_address = next(
+                address for address, services in mapping.items() if "sssf" in services
+            )
+            forgejo_address = next(
+                address
+                for address, services in mapping.items()
+                if "forgejo" in services
+            )
             summary = tfplan_metadata.summarize_plan(
                 {
                     "resource_changes": [
-                        {"address": f"{forgejo_address}.example", "change": {"actions": ["delete"]}},
-                        {"address": f"{sssf_address}.example", "change": {"actions": ["delete"]}},
+                        {
+                            "address": f"{forgejo_address}.example",
+                            "change": {"actions": ["delete"]},
+                        },
+                        {
+                            "address": f"{sssf_address}.example",
+                            "change": {"actions": ["delete"]},
+                        },
                     ]
                 },
                 repo,
@@ -166,8 +191,12 @@ class TfplanMetadataTests(unittest.TestCase):
             {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
             clear=True,
         ):
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
-            projection = repo / "values" / "sites" / "dev" / "generated" / "dns-records.json"
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
+            projection = (
+                repo / "values" / "sites" / "dev" / "generated" / "dns-records.json"
+            )
             projection.write_text('{"altered": true}\n', encoding="utf-8")
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
@@ -182,9 +211,13 @@ class TfplanMetadataTests(unittest.TestCase):
             {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
             clear=True,
         ):
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
             policy.write_text("creation_rules: [changed]\n", encoding="utf-8")
-            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "inputs changed"):
+            with self.assertRaisesRegex(
+                tfplan_metadata.MetadataError, "inputs changed"
+            ):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
     def test_missing_canonical_manifest_fails_creation(self) -> None:
@@ -196,12 +229,16 @@ class TfplanMetadataTests(unittest.TestCase):
             {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
             clear=True,
         ), self.assertRaises(tfplan_metadata.MetadataError):
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
 
     def test_create_and_verify_metadata(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
             tfplan_metadata.verify_metadata(plan, metadata, repo)
 
     def test_plan_metadata_binds_to_selected_site(self) -> None:
@@ -210,10 +247,20 @@ class TfplanMetadataTests(unittest.TestCase):
         site.mkdir(parents=True)
         (site / "terraform.tfvars").write_text("x = 1\n")
         with temp_dir:
-            with patch.dict(os.environ, {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")}, clear=True):
-                tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            with patch.dict(
+                os.environ,
+                {"VALUES_SITE": "dev", "VALUES_DIR": str(repo / "values")},
+                clear=True,
+            ):
+                tfplan_metadata.create_metadata(
+                    plan, metadata, repo, 24, {"resource_changes": []}
+                )
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
-            with patch.dict(os.environ, {"VALUES_SITE": "prod", "VALUES_DIR": str(repo / "values")}, clear=True):
+            with patch.dict(
+                os.environ,
+                {"VALUES_SITE": "prod", "VALUES_DIR": str(repo / "values")},
+                clear=True,
+            ):
                 with self.assertRaises(tfplan_metadata.MetadataError):
                     tfplan_metadata.verify_metadata(plan, metadata, repo)
 
@@ -226,7 +273,9 @@ class TfplanMetadataTests(unittest.TestCase):
     def test_changed_plan_hash_fails(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
             plan.write_text("changed\n")
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
@@ -234,50 +283,80 @@ class TfplanMetadataTests(unittest.TestCase):
     def test_changed_input_hash_fails(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
-            (repo / "values" / "dns-records.local.json").write_text('{"changed": true}\n')
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
+            (repo / "values" / "dns-records.local.json").write_text(
+                '{"changed": true}\n'
+            )
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
     def test_docs_only_commit_change_keeps_identical_plan_valid(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
-        with temp_dir, patch.object(tfplan_metadata, "git_commit", side_effect=["plan-commit", "docs-commit"]):
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+        with temp_dir, patch.object(
+            tfplan_metadata, "git_commit", side_effect=["plan-commit", "docs-commit"]
+        ):
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
             tfplan_metadata.verify_metadata(plan, metadata, repo)
 
     def test_operational_source_input_change_rejects_identical_plan(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
-            (repo / "infra" / "opentofu" / "main.tf").write_text("terraform { required_version = \">= 1.0\" }\n")
-            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "inputs changed"):
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
+            (repo / "infra" / "opentofu" / "main.tf").write_text(
+                'terraform { required_version = ">= 1.0" }\n'
+            )
+            with self.assertRaisesRegex(
+                tfplan_metadata.MetadataError, "inputs changed"
+            ):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
     def test_changed_canonical_site_file_fails(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            (repo / "values" / "site.yaml").write_text("site: original\n", encoding="utf-8")
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
-            (repo / "values" / "site.yaml").write_text("site: altered\n", encoding="utf-8")
+            (repo / "values" / "site.yaml").write_text(
+                "site: original\n", encoding="utf-8"
+            )
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
+            (repo / "values" / "site.yaml").write_text(
+                "site: altered\n", encoding="utf-8"
+            )
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
     def test_changed_encrypted_secret_ciphertext_fails(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            (repo / "values" / "secrets.sops.yaml").write_text("ciphertext-a\n", encoding="utf-8")
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
-            (repo / "values" / "secrets.sops.yaml").write_text("ciphertext-b\n", encoding="utf-8")
+            (repo / "values" / "secrets.sops.yaml").write_text(
+                "ciphertext-a\n", encoding="utf-8"
+            )
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
+            (repo / "values" / "secrets.sops.yaml").write_text(
+                "ciphertext-b\n", encoding="utf-8"
+            )
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
     def test_expired_plan_fails(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
             data = metadata.read_text(encoding="utf-8")
             expired = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-            metadata.write_text(data.replace(data.split('"expires_at": "')[1].split('"')[0], expired))
+            metadata.write_text(
+                data.replace(data.split('"expires_at": "')[1].split('"')[0], expired)
+            )
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
 
@@ -288,7 +367,10 @@ class TfplanMetadataTests(unittest.TestCase):
                     {"address": "resource.create", "change": {"actions": ["create"]}},
                     {"address": "resource.update", "change": {"actions": ["update"]}},
                     {"address": "resource.delete", "change": {"actions": ["delete"]}},
-                    {"address": "resource.replace", "change": {"actions": ["delete", "create"]}},
+                    {
+                        "address": "resource.replace",
+                        "change": {"actions": ["delete", "create"]},
+                    },
                 ]
             }
         )
@@ -308,13 +390,22 @@ class TfplanMetadataTests(unittest.TestCase):
                 metadata,
                 repo,
                 24,
-                {"resource_changes": [{"address": "resource.delete", "change": {"actions": ["delete"]}}]},
+                {
+                    "resource_changes": [
+                        {
+                            "address": "resource.delete",
+                            "change": {"actions": ["delete"]},
+                        }
+                    ]
+                },
             )
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
             tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
 
-    def test_multi_service_stateful_destructive_plan_requires_allow_stateful_batch(self) -> None:
+    def test_multi_service_stateful_destructive_plan_requires_allow_stateful_batch(
+        self,
+    ) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
             tfplan_metadata.create_metadata(
@@ -324,16 +415,28 @@ class TfplanMetadataTests(unittest.TestCase):
                 24,
                 {
                     "resource_changes": [
-                        {"address": "module.forgejo_vm[0].resource", "change": {"actions": ["delete"]}},
-                        {"address": "module.hermes[0].resource", "change": {"actions": ["delete"]}},
+                        {
+                            "address": "module.forgejo_vm[0].resource",
+                            "change": {"actions": ["delete"]},
+                        },
+                        {
+                            "address": "module.hermes[0].resource",
+                            "change": {"actions": ["delete"]},
+                        },
                     ]
                 },
             )
             with self.assertRaises(tfplan_metadata.MetadataError):
-                tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
-            tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True, allow_stateful_batch=True)
+                tfplan_metadata.verify_metadata(
+                    plan, metadata, repo, allow_destroy=True
+                )
+            tfplan_metadata.verify_metadata(
+                plan, metadata, repo, allow_destroy=True, allow_stateful_batch=True
+            )
 
-    def test_single_service_stateful_destructive_plan_does_not_require_batch_override(self) -> None:
+    def test_single_service_stateful_destructive_plan_does_not_require_batch_override(
+        self,
+    ) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
             data = tfplan_metadata.create_metadata(
@@ -341,7 +444,14 @@ class TfplanMetadataTests(unittest.TestCase):
                 metadata,
                 repo,
                 24,
-                {"resource_changes": [{"address": "module.forgejo_vm[0].resource", "change": {"actions": ["delete"]}}]},
+                {
+                    "resource_changes": [
+                        {
+                            "address": "module.forgejo_vm[0].resource",
+                            "change": {"actions": ["delete"]},
+                        }
+                    ]
+                },
             )
             self.assertEqual(data["summary"]["stateful_services"], ["forgejo"])
             tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
@@ -357,11 +467,15 @@ class TfplanMetadataTests(unittest.TestCase):
                 {"resource_changes": []},
                 target_service="forgejo",
             )
-            tfplan_metadata.verify_metadata(plan, metadata, repo, target_service="forgejo")
+            tfplan_metadata.verify_metadata(
+                plan, metadata, repo, target_service="forgejo"
+            )
             with self.assertRaises(tfplan_metadata.MetadataError):
                 tfplan_metadata.verify_metadata(plan, metadata, repo)
             with self.assertRaises(tfplan_metadata.MetadataError):
-                tfplan_metadata.verify_metadata(plan, metadata, repo, target_service="hermes")
+                tfplan_metadata.verify_metadata(
+                    plan, metadata, repo, target_service="hermes"
+                )
 
     def test_destroy_metadata_cannot_execute_as_normal_apply(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
@@ -371,17 +485,32 @@ class TfplanMetadataTests(unittest.TestCase):
                 metadata,
                 repo,
                 24,
-                {"resource_changes": [{"address": "resource.delete", "change": {"actions": ["delete"]}}]},
+                {
+                    "resource_changes": [
+                        {
+                            "address": "resource.delete",
+                            "change": {"actions": ["delete"]},
+                        }
+                    ]
+                },
                 operation="destroy",
             )
             self.assertEqual(data["operation"], "destroy")
-            with self.assertRaisesRegex(tfplan_metadata.MetadataError, "operation differs"):
-                tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True)
-            tfplan_metadata.verify_metadata(plan, metadata, repo, allow_destroy=True, operation="destroy")
+            with self.assertRaisesRegex(
+                tfplan_metadata.MetadataError, "operation differs"
+            ):
+                tfplan_metadata.verify_metadata(
+                    plan, metadata, repo, allow_destroy=True
+                )
+            tfplan_metadata.verify_metadata(
+                plan, metadata, repo, allow_destroy=True, operation="destroy"
+            )
 
     def test_destroy_metadata_rejects_targeted_scope(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
-        with temp_dir, self.assertRaisesRegex(tfplan_metadata.MetadataError, "destroy plan cannot target"):
+        with temp_dir, self.assertRaisesRegex(
+            tfplan_metadata.MetadataError, "destroy plan cannot target"
+        ):
             tfplan_metadata.create_metadata(
                 plan,
                 metadata,
@@ -395,7 +524,9 @@ class TfplanMetadataTests(unittest.TestCase):
     def test_summary_command_loads_and_formats_metadata(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
             output = StringIO()
             with patch("sys.stdout", output):
                 result = tfplan_metadata.main(
@@ -408,9 +539,16 @@ class TfplanMetadataTests(unittest.TestCase):
     def test_destroy_summary_has_no_normal_apply_acknowledgement(self) -> None:
         text = tfplan_metadata.format_plan_summary(
             {
-                "resource_changes": {"create": 0, "update": 0, "replace": 0, "delete": 1},
+                "resource_changes": {
+                    "create": 0,
+                    "update": 0,
+                    "replace": 0,
+                    "delete": 1,
+                },
                 "destructive": True,
-                "destructive_changes": [{"address": "resource.delete", "actions": "delete"}],
+                "destructive_changes": [
+                    {"address": "resource.delete", "actions": "delete"}
+                ],
                 "stateful_changes": [],
                 "stateful_targets": [],
                 "stateful_services": [],
@@ -427,7 +565,9 @@ class TfplanMetadataTests(unittest.TestCase):
     def test_missing_summary_fails_closed(self) -> None:
         temp_dir, repo, plan, metadata = self.make_repo()
         with temp_dir:
-            data = tfplan_metadata.create_metadata(plan, metadata, repo, 24, {"resource_changes": []})
+            data = tfplan_metadata.create_metadata(
+                plan, metadata, repo, 24, {"resource_changes": []}
+            )
             del data["summary"]
             metadata.write_text(tfplan_metadata.json.dumps(data), encoding="utf-8")
             with self.assertRaises(tfplan_metadata.MetadataError):
@@ -436,9 +576,16 @@ class TfplanMetadataTests(unittest.TestCase):
     def test_format_plan_summary_lists_destructive_addresses(self) -> None:
         text = tfplan_metadata.format_plan_summary(
             {
-                "resource_changes": {"create": 0, "update": 0, "replace": 1, "delete": 0},
+                "resource_changes": {
+                    "create": 0,
+                    "update": 0,
+                    "replace": 1,
+                    "delete": 0,
+                },
                 "destructive": True,
-                "destructive_changes": [{"address": "resource.replace", "actions": "delete/create"}],
+                "destructive_changes": [
+                    {"address": "resource.replace", "actions": "delete/create"}
+                ],
                 "stateful_changes": [],
                 "stateful_targets": [],
                 "stateful_services": [],

@@ -677,7 +677,7 @@ This section records source changes, not acceptance evidence.
 | Finding | Progress |
 | --- | --- |
 | P1-3 | Added subprocess coverage collection and included `infra/ansible/scripts` in the source set. Confirmed subprocess attribution: `canonical-provider-env.py` now measures 97%. |
-| P1-1 | Broadened Ruff to E/F/W/I/B/UP/C4/PERF/SIM plus targeted S107, with documented rule ignores; added a clean mypy gate for nine core modules. Security rules, all-script typing, and the Black baseline remain outstanding. |
+| P1-1 | Broadened Ruff to E/F/W/I/B/UP/C4/PERF/SIM plus targeted S107; added a clean mypy gate for nine core modules. Formatted all 139 Python files with Black and made the inventory exact. Broader security-rule triage and all-script typing remain outstanding. |
 | P2-2 | Added `tools/coverage-floors.json` and a named per-module floor check for all seven critical modules. |
 | P2-3 | Split validation into cached-image `unit` and dependent `full` jobs; moved the filesystem dependency scan to pull-request/push events. Unit/full modes both pass locally; hosted cache and cold-build timing remain unverified. |
 | P2-6 | Added `tests/README.md` and `just test-local` for host-portable documentation contracts; registered and documented the recipe. |
@@ -688,10 +688,10 @@ This section records source changes, not acceptance evidence.
 | P3-2 | Consolidated duplicate Caddy templates under `caddy_proxy`; preserved the `onramp_host` systemd difference as an explicit template variable and added tests. |
 | P3-6 | Added `CODEOWNERS`, `SECURITY.md`, `.editorconfig`, and the inventory entry. GitHub private-reporting availability still requires repository-settings verification. |
 | P3-4 | Removed the identity function and its call sites; callers now invoke `require_site_context` directly, and compatibility tests exercise that contract. |
-| P3-8 | Added `pyproject.toml` with explicit Black/Ruff line length, Ruff rules/ignores, mypy scope, and subprocess-aware coverage configuration. Broader security lint and the Black baseline remain outstanding. |
+| P3-8 | Added `pyproject.toml` with explicit Black/Ruff line length, Ruff rules/ignores, mypy scope, and subprocess-aware coverage configuration. Black now checks every listed Python source. |
 | P4-1 | Added fail-closed SSH mount directory validation to `just setup` and `scripts/run-infra.sh`. |
 
 After these changes, `VALUES_SITE=dev just validate` passes all stages;
-832 tests pass, aggregate coverage is 77%, and all seven per-module floors pass.
+833 tests pass, aggregate coverage is 77%, and all seven per-module floors pass.
 No plan, apply, or teardown command was run. Remaining recommendations are not
 considered complete by this progress entry.

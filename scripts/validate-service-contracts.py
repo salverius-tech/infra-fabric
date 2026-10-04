@@ -28,13 +28,20 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        args.report.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     if report["summary"]["failed"]:
         for service in report["services"]:
             for error in service["errors"]:
-                print(f"service-contracts: {service['service_id']}: {error}", file=sys.stderr)
+                print(
+                    f"service-contracts: {service['service_id']}: {error}",
+                    file=sys.stderr,
+                )
         return 1
-    print(f"validated all public service catalog contracts ({report['summary']['total']} services)")
+    print(
+        f"validated all public service catalog contracts ({report['summary']['total']} services)"
+    )
     return 0
 
 

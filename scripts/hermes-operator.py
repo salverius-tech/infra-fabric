@@ -60,6 +60,7 @@ def verify_snapshot(*args: Any, **kwargs: Any) -> Any:
     except implementation_error as error:
         raise AuditSnapshotError(str(error)) from error
 
+
 # Keep this aligned with scripts/tfplan-metadata.py, the canonical saved-plan
 # producer and verifier consumed by the operator bridge.
 SCHEMA_VERSION = 7
@@ -128,14 +129,21 @@ def deployed_context() -> list[str] | None:
     try:
         payload = json.loads(Path(path_value).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise OperatorError("deployed Hermes operator context is unavailable") from error
+        raise OperatorError(
+            "deployed Hermes operator context is unavailable"
+        ) from error
     selected_site = os.environ.get("VALUES_SITE", "").strip()
     services = payload.get("enabled_services") if isinstance(payload, dict) else None
     if payload.get("site") != selected_site:
-        raise OperatorError("deployed Hermes operator context site does not match VALUES_SITE")
+        raise OperatorError(
+            "deployed Hermes operator context site does not match VALUES_SITE"
+        )
     if (
         not isinstance(services, list)
-        or not all(isinstance(service, str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", service) for service in services)
+        or not all(
+            isinstance(service, str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", service)
+            for service in services
+        )
         or len(services) != len(set(services))
     ):
         raise OperatorError("deployed Hermes operator context services are unsafe")
@@ -163,9 +171,7 @@ def enabled_services(repo: Path) -> list[str]:
             catalog_path=repo / "infra" / "services.json",
         )
     except Exception as error:
-        raise OperatorError(
-            f"selected canonical site is invalid: {error}"
-        ) from error
+        raise OperatorError(f"selected canonical site is invalid: {error}") from error
     return sorted(name for name, service in model.services.items() if service.enabled)
 
 

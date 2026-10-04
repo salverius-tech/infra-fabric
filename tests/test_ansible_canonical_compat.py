@@ -22,7 +22,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.model = load_site(ROOT / "tests/fixtures/sites/dev/site.yaml", catalog_path=ROOT / "infra/services.json")
+        cls.model = load_site(
+            ROOT / "tests/fixtures/sites/dev/site.yaml",
+            catalog_path=ROOT / "infra/services.json",
+        )
         cls.catalog = load_catalog(ROOT / "infra/services.json")
 
     def test_inventory_has_consistent_catalog_owned_enabled_service_hosts(self) -> None:
@@ -39,10 +42,13 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             inventory["all"]["vars"]["ansible_ssh_common_args"],
             "-o UserKnownHostsFile=/workspace/values/sites/dev/ansible/known_hosts -o StrictHostKeyChecking=yes",
         )
-        enabled = {name for name, service in self.model.services.items() if service.enabled}
+        enabled = {
+            name for name, service in self.model.services.items() if service.enabled
+        }
         self.assertEqual(
             set(inventory["all"]["children"]),
-            {self.catalog.get(name).inventory["group"] for name in enabled} | {"proxmox"},
+            {self.catalog.get(name).inventory["group"] for name in enabled}
+            | {"proxmox"},
         )
         for name in enabled:
             capability = self.catalog.get(name)
@@ -53,22 +59,34 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             self.assertEqual(hostvars[host]["canonical_service"], name)
             self.assertEqual(hostvars[host]["canonical_site"], "dev")
 
-    def test_vars_projection_contains_enabled_services_only_and_preserves_ownership(self) -> None:
+    def test_vars_projection_contains_enabled_services_only_and_preserves_ownership(
+        self,
+    ) -> None:
         projected = render_ansible_vars(self.model, self.catalog)
-        enabled = {name for name, service in self.model.services.items() if service.enabled}
+        enabled = {
+            name for name, service in self.model.services.items() if service.enabled
+        }
         self.assertEqual(set(projected["services"]), enabled)
         self.assertEqual(projected["canonical_site"], "dev")
         for name in enabled:
             service = self.model.services[name]
             self.assertEqual(projected["services"][name]["resource"], service.resource)
-            resource = self.model.resources.guests.get(service.resource) or self.model.resources.shared_hosts.get(service.resource)
-            self.assertEqual(projected["services"][name]["resource_type"], resource.type)
+            resource = self.model.resources.guests.get(
+                service.resource
+            ) or self.model.resources.shared_hosts.get(service.resource)
+            self.assertEqual(
+                projected["services"][name]["resource_type"], resource.type
+            )
             self.assertIn("endpoints", projected["services"][name])
             self.assertIn("release", projected["services"][name])
 
-    def test_catalog_owned_release_adapter_vars_flatten_non_secret_technitium_vars(self) -> None:
+    def test_catalog_owned_release_adapter_vars_flatten_non_secret_technitium_vars(
+        self,
+    ) -> None:
         model = self.model.model_copy(deep=True)
-        model.services["technitium"].release = model.services["technitium"].release.model_copy(
+        model.services["technitium"].release = model.services[
+            "technitium"
+        ].release.model_copy(
             update={"version": "14.0.0", "checksum": "a" * 64, "source": "binary"}
         )
         projected = render_ansible_vars(model, self.catalog)
@@ -81,9 +99,13 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
     def test_onramp_root_datastore_projects_from_typed_resource_storage(self) -> None:
         resource = self.model.resources.guests["forgejo"]
         projected = _resource_variables("onramp_host", resource)
-        self.assertEqual(projected["onramp_host_datastore_id"], resource.storage.root.storage_id)
+        self.assertEqual(
+            projected["onramp_host_datastore_id"], resource.storage.root.storage_id
+        )
 
-    def test_enabled_hermes_control_renders_all_non_secret_fields_report_only(self) -> None:
+    def test_enabled_hermes_control_renders_all_non_secret_fields_report_only(
+        self,
+    ) -> None:
         model = self.model.model_copy(deep=True)
         configuration = HermesConfiguration.model_validate(
             {
@@ -96,12 +118,32 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "runtime_user": "anvil",
                 "repository_path": "/srv/homelab-infra",
                 "allow_legacy_runtime": False,
-                "caddy_artifact": {"version": "2.8.4", "checksums": {"amd64": "a" * 64, "arm64": "b" * 64}},
-                "compose_artifact": {"version": "2.29.7", "checksums": {"amd64": "c" * 64, "arm64": "d" * 64}},
-                "just_artifact": {"version": "1.36.0", "checksums": {"amd64": "e" * 64, "arm64": "f" * 64}},
-                "tuning": {"compression_threshold": 0.7, "max_concurrent_children": 2, "max_spawn_depth": 1},
-                "node": {"version": "22.0.0", "checksums": {"amd64": "b" * 64, "arm64": "c" * 64}},
-                "dashboard": {"enabled": False, "host": "127.0.0.1", "auth_username": "admin"},
+                "caddy_artifact": {
+                    "version": "2.8.4",
+                    "checksums": {"amd64": "a" * 64, "arm64": "b" * 64},
+                },
+                "compose_artifact": {
+                    "version": "2.29.7",
+                    "checksums": {"amd64": "c" * 64, "arm64": "d" * 64},
+                },
+                "just_artifact": {
+                    "version": "1.36.0",
+                    "checksums": {"amd64": "e" * 64, "arm64": "f" * 64},
+                },
+                "tuning": {
+                    "compression_threshold": 0.7,
+                    "max_concurrent_children": 2,
+                    "max_spawn_depth": 1,
+                },
+                "node": {
+                    "version": "22.0.0",
+                    "checksums": {"amd64": "b" * 64, "arm64": "c" * 64},
+                },
+                "dashboard": {
+                    "enabled": False,
+                    "host": "127.0.0.1",
+                    "auth_username": "admin",
+                },
                 "web": {"searxng_url": "http://127.0.0.1:8080"},
             }
         ).model_dump(mode="json", exclude_none=True)
@@ -109,14 +151,28 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             {
                 "enabled": True,
                 "resource": "forgejo",
-                "endpoints": {"public_names": ["hermes.example.internal"], "ports": {"dashboard": 8080}},
-                "release": {"version": "1.0.0", "tag": "v2026.7.1", "commit": "d" * 40, "checksum": "e" * 64},
+                "endpoints": {
+                    "public_names": ["hermes.example.internal"],
+                    "ports": {"dashboard": 8080},
+                },
+                "release": {
+                    "version": "1.0.0",
+                    "tag": "v2026.7.1",
+                    "commit": "d" * 40,
+                    "checksum": "e" * 64,
+                },
                 "configuration": configuration,
             }
         )
-        projected = render_ansible_vars(model, self.catalog)["services"]["hermes"]["ansible_vars"]
+        projected = render_ansible_vars(model, self.catalog)["services"]["hermes"][
+            "ansible_vars"
+        ]
         self.assertEqual(
-            {key: projected[key] for key in projected if key.startswith("hermes_control_")},
+            {
+                key: projected[key]
+                for key in projected
+                if key.startswith("hermes_control_")
+            },
             {
                 "hermes_control_enabled": True,
                 "hermes_control_domain": "control.example.internal",
@@ -152,27 +208,30 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "forgejo_bootstrap_owner_email": "configuration.bootstrap_owner_email",
                 "forgejo_actions_enabled": "configuration.actions_enabled",
                 "forgejo_actions_default_url": "configuration.actions_default_url",
-            }.items() <= mapping.items()
+            }.items()
+            <= mapping.items()
         )
         model = self.model.model_copy(deep=True)
-        model.services["forgejo"].release = model.services["forgejo"].release.model_copy(update={"version": "10.0.0"})
+        model.services["forgejo"].release = model.services[
+            "forgejo"
+        ].release.model_copy(update={"version": "10.0.0"})
         projected = render_ansible_vars(model, self.catalog)
         legacy = projected["services"]["forgejo"]["ansible_vars"]
         expected = {
-                "forgejo_domain": "git.example.internal",
-                "forgejo_root_url": "https://git.example.internal/",
-                "forgejo_ssh_port": 22,
-                "forgejo_version": "10.0.0",
-                "forgejo_database": {
-                    "type": "sqlite",
-                    "managed": True,
-                    "host": "127.0.0.1",
-                    "port": 5432,
-                    "name": "forgejo",
-                    "user": "forgejo",
-                    "ssl_mode": "disable",
-                },
-            }
+            "forgejo_domain": "git.example.internal",
+            "forgejo_root_url": "https://git.example.internal/",
+            "forgejo_ssh_port": 22,
+            "forgejo_version": "10.0.0",
+            "forgejo_database": {
+                "type": "sqlite",
+                "managed": True,
+                "host": "127.0.0.1",
+                "port": 5432,
+                "name": "forgejo",
+                "user": "forgejo",
+                "ssl_mode": "disable",
+            },
+        }
         self.assertEqual({key: legacy[key] for key in expected}, expected)
         self.assertEqual(legacy["forgejo_vmid"], 107)
         self.assertIn("forgejo_runtime", legacy)
@@ -180,14 +239,32 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
         mapping = self.catalog.get("hermes").inventory["ansible_var_mappings"]
         self.assertEqual(mapping["hermes_runtime_user"], "configuration.runtime_user")
         self.assertEqual(mapping["hermes_repo_path"], "configuration.repository_path")
-        self.assertEqual(mapping["hermes_control_enabled"], "configuration.control.enabled")
-        self.assertEqual(mapping["hermes_control_domain"], "configuration.control.domain")
-        self.assertEqual(mapping["hermes_control_source_url"], "configuration.control.source_url")
-        self.assertEqual(mapping["hermes_control_source_ref"], "configuration.control.source_ref")
-        self.assertEqual(mapping["hermes_control_api_host"], "configuration.control.api_host")
-        self.assertEqual(mapping["hermes_control_api_port"], "configuration.control.api_port")
-        self.assertEqual(mapping["hermes_control_require_task_approval"], "configuration.control.require_task_approval")
-        self.assertEqual(mapping["hermes_control_plugin_socket"], "configuration.control.plugin_socket")
+        self.assertEqual(
+            mapping["hermes_control_enabled"], "configuration.control.enabled"
+        )
+        self.assertEqual(
+            mapping["hermes_control_domain"], "configuration.control.domain"
+        )
+        self.assertEqual(
+            mapping["hermes_control_source_url"], "configuration.control.source_url"
+        )
+        self.assertEqual(
+            mapping["hermes_control_source_ref"], "configuration.control.source_ref"
+        )
+        self.assertEqual(
+            mapping["hermes_control_api_host"], "configuration.control.api_host"
+        )
+        self.assertEqual(
+            mapping["hermes_control_api_port"], "configuration.control.api_port"
+        )
+        self.assertEqual(
+            mapping["hermes_control_require_task_approval"],
+            "configuration.control.require_task_approval",
+        )
+        self.assertEqual(
+            mapping["hermes_control_plugin_socket"],
+            "configuration.control.plugin_socket",
+        )
         self.assertEqual(
             set(self.catalog.get("hermes").conditional_required_secrets),
             {"configuration.control.enabled", "configuration.dashboard.enabled"},
@@ -202,16 +279,45 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
                 "secrets.providers.cloudflare.api_token",
             },
         )
-        self.assertEqual(mapping["hermes_runtime_passwordless_sudo"], "resources.guests.hermes.security.allow_passwordless_sudo")
+        self.assertEqual(
+            mapping["hermes_runtime_passwordless_sudo"],
+            "resources.guests.hermes.security.allow_passwordless_sudo",
+        )
 
         self.assertEqual(mapping["hermes_discovery_tag"], "release.tag")
         self.assertEqual(mapping["hermes_discovery_commit"], "release.commit")
-        self.assertEqual(mapping["hermes_node_sha256_arm64"], "configuration.node.checksums.arm64")
-        service = type("Service", (), {"configuration": {"runtime_user": "anvil", "repository_path": "/srv/homelab-infra"}, "release": type("Release", (), {"tag": "v2026.7.1"})()})()
-        resource = type("Resource", (), {"security": type("Security", (), {"allow_passwordless_sudo": False})()})()
-        self.assertEqual(_resolve_mapping_value(service, resource, "configuration.runtime_user"), "anvil")
-        self.assertEqual(_resolve_mapping_value(service, resource, "configuration.repository_path"), "/srv/homelab-infra")
-        self.assertFalse(_resolve_mapping_value(service, resource, "resource.security.allow_passwordless_sudo"))
+        self.assertEqual(
+            mapping["hermes_node_sha256_arm64"], "configuration.node.checksums.arm64"
+        )
+        service = type(
+            "Service",
+            (),
+            {
+                "configuration": {
+                    "runtime_user": "anvil",
+                    "repository_path": "/srv/homelab-infra",
+                },
+                "release": type("Release", (), {"tag": "v2026.7.1"})(),
+            },
+        )()
+        resource = type(
+            "Resource",
+            (),
+            {"security": type("Security", (), {"allow_passwordless_sudo": False})()},
+        )()
+        self.assertEqual(
+            _resolve_mapping_value(service, resource, "configuration.runtime_user"),
+            "anvil",
+        )
+        self.assertEqual(
+            _resolve_mapping_value(service, resource, "configuration.repository_path"),
+            "/srv/homelab-infra",
+        )
+        self.assertFalse(
+            _resolve_mapping_value(
+                service, resource, "resource.security.allow_passwordless_sudo"
+            )
+        )
 
     def test_inventory_and_vars_projections_share_service_identity(self) -> None:
         inventory = render_ansible_inventory(self.model, self.catalog)
@@ -229,7 +335,10 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             self.assertEqual(identity["canonical_site"], variables["canonical_site"])
             self.assertEqual(identity["canonical_service"], name)
             self.assertEqual(identity["canonical_resource"], service_vars["resource"])
-            self.assertEqual(identity["service_runtime_current"]["type"], service_vars["resource_type"])
+            self.assertEqual(
+                identity["service_runtime_current"]["type"],
+                service_vars["resource_type"],
+            )
 
     def test_tailscale_adapter_flag_is_derived_from_the_typed_service(self) -> None:
         model = self.model.model_copy(deep=True)
@@ -238,15 +347,26 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
 
         projected = render_ansible_vars(model, self.catalog)
 
-        self.assertTrue(projected["services"]["tailscale_client"]["ansible_vars"]["tailscale_client_enabled"])
+        self.assertTrue(
+            projected["services"]["tailscale_client"]["ansible_vars"][
+                "tailscale_client_enabled"
+            ]
+        )
 
-    def test_forgejo_public_name_has_paired_ansible_and_opentofu_transport(self) -> None:
+    def test_forgejo_public_name_has_paired_ansible_and_opentofu_transport(
+        self,
+    ) -> None:
         ansible = render_ansible_vars(self.model, self.catalog)
         tofu = render_opentofu_variables(self.model)
-        self.assertEqual(ansible["services"]["forgejo"]["ansible_vars"]["forgejo_domain"], "git.example.internal")
+        self.assertEqual(
+            ansible["services"]["forgejo"]["ansible_vars"]["forgejo_domain"],
+            "git.example.internal",
+        )
         self.assertEqual(tofu["forgejo_server_name"], "git.example.internal")
 
-    def test_shared_host_extra_endpoint_vars_reach_canonical_ansible_projection(self) -> None:
+    def test_shared_host_extra_endpoint_vars_reach_canonical_ansible_projection(
+        self,
+    ) -> None:
         model = self.model.model_copy(deep=True)
         service = model.services["searxng_onramp"].model_copy(
             update={
@@ -268,13 +388,17 @@ class CanonicalAnsibleProjectionContractTests(unittest.TestCase):
             }
         )
         model.services["searxng_onramp"] = service
-        ansible = render_ansible_vars(model, self.catalog)["services"]["searxng_onramp"]["ansible_vars"]
+        ansible = render_ansible_vars(model, self.catalog)["services"][
+            "searxng_onramp"
+        ]["ansible_vars"]
         tofu = render_opentofu_variables(model, self.catalog)
         self.assertEqual(tofu["searxng_server_name"], "search.example.internal")
         self.assertEqual(tofu["searxng_public_url"], "https://search.example.internal/")
         self.assertIsInstance(tofu["searxng_enable_public_url"], bool)
         self.assertEqual(ansible["searxng_server_name"], "search.example.internal")
-        self.assertEqual(ansible["searxng_public_url"], "https://search.example.internal/")
+        self.assertEqual(
+            ansible["searxng_public_url"], "https://search.example.internal/"
+        )
 
     def test_projection_does_not_emit_sensitive_sentinel(self) -> None:
         inventory = render_ansible_inventory(self.model, self.catalog)

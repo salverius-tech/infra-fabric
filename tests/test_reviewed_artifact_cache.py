@@ -1,4 +1,5 @@
 """Focused source contract for reviewed production artifact acquisition."""
+
 from __future__ import annotations
 
 import unittest
@@ -23,12 +24,27 @@ class ReviewedArtifactCacheTests(unittest.TestCase):
         self.assertIn("item.stat.exists", text)
         self.assertIn("item.stat.checksum == item.item.sha256", text)
         self.assertIn("deployment never fetches or populates this cache", text)
-        self.assertLess(text.index("Require reviewed artifacts before guest mutation"), text.index("Stage checksum-verified reviewed artifacts"))
-        for required in ("item.version", "item.architecture", "item.filename", "item.sha256"):
+        self.assertLess(
+            text.index("Require reviewed artifacts before guest mutation"),
+            text.index("Stage checksum-verified reviewed artifacts"),
+        )
+        for required in (
+            "item.version",
+            "item.architecture",
+            "item.filename",
+            "item.sha256",
+        ):
             self.assertIn(required, text)
 
-    def test_every_custom_caddy_build_uses_a_reviewed_binary_not_a_remote_build(self) -> None:
-        forbidden = ("go.dev/dl", "xcaddy build", "go install github.com/caddyserver/xcaddy", "curl -fsSL https://go")
+    def test_every_custom_caddy_build_uses_a_reviewed_binary_not_a_remote_build(
+        self,
+    ) -> None:
+        forbidden = (
+            "go.dev/dl",
+            "xcaddy build",
+            "go install github.com/caddyserver/xcaddy",
+            "curl -fsSL https://go",
+        )
         for relative, prefix in CADDY_TASKS.items():
             text = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn("reviewed-artifact-cache.yml", text, relative)

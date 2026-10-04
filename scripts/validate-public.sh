@@ -122,6 +122,10 @@ run_stage "python-quality" bash -euo pipefail -c "
   while IFS= read -r file; do
     if [[ -n \"\${file}\" && \"\${file}\" != \#* ]]; then quality_files+=(\"\${file}\"); fi
   done < tools/python-format-files.txt
+  if [[ \"\${quality_files[*]}\" != \"\${python_files[*]}\" ]]; then
+    printf \"%s\\n\" \"tools/python-format-files.txt must enumerate every Python source exactly once.\" >&2
+    exit 1
+  fi
   black --check --diff \"\${quality_files[@]}\"
   ruff check \"\${python_files[@]}\"
   mypy

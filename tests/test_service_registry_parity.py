@@ -26,22 +26,36 @@ class ServiceRegistryParityTests(unittest.TestCase):
                 "terraform_addresses": tuple(config.get("terraform_addresses", ())),
                 "terraform_replace_addresses": {
                     runtime: tuple(addresses)
-                    for runtime, addresses in config.get("terraform_replace_addresses", {}).items()
+                    for runtime, addresses in config.get(
+                        "terraform_replace_addresses", {}
+                    ).items()
                 },
-                "execution_resource": str(config.get("inventory", {}).get("host", "")).strip(),
+                "execution_resource": str(
+                    config.get("inventory", {}).get("host", "")
+                ).strip(),
             }
             for name, config in service_registry["services"].items()
         }
-        self.assertEqual(tuple(service_registry["default_services"]), settings_script.DEFAULT_SERVICES)
+        self.assertEqual(
+            tuple(service_registry["default_services"]),
+            settings_script.DEFAULT_SERVICES,
+        )
         self.assertEqual(expected_services, settings_script.SERVICES)
-        self.assertEqual(set(service_registry["services"]), settings_script.SERVICE_NAMES)
-
+        self.assertEqual(
+            set(service_registry["services"]), settings_script.SERVICE_NAMES
+        )
 
     def test_opentofu_enabled_services_validation_reads_registry(self) -> None:
-        variables = (REPO / "infra" / "opentofu" / "variables.tf").read_text(encoding="utf-8")
-        services = (REPO / "infra" / "opentofu" / "services.tf").read_text(encoding="utf-8")
+        variables = (REPO / "infra" / "opentofu" / "variables.tf").read_text(
+            encoding="utf-8"
+        )
+        services = (REPO / "infra" / "opentofu" / "services.tf").read_text(
+            encoding="utf-8"
+        )
         self.assertIn('jsondecode(file("${path.module}/../services.json"))', services)
-        self.assertIn('resource "terraform_data" "enabled_services_validation"', services)
+        self.assertIn(
+            'resource "terraform_data" "enabled_services_validation"', services
+        )
         self.assertIn("invalid_enabled_services", services)
         self.assertNotIn('contains(["technitium"', variables)
 
@@ -61,8 +75,12 @@ class ServiceRegistryParityTests(unittest.TestCase):
         for service, config in settings_script.SERVICES.items():
             for playbook in config["playbooks"]:
                 group = special.get(playbook, groups[service])
-                self.assertTrue(group == "localhost" or group in groups.values(), playbook)
-        self.assertEqual(special["infra/ansible/playbooks/caddy-proxy.yml"], "technitium")
+                self.assertTrue(
+                    group == "localhost" or group in groups.values(), playbook
+                )
+        self.assertEqual(
+            special["infra/ansible/playbooks/caddy-proxy.yml"], "technitium"
+        )
 
 
 if __name__ == "__main__":

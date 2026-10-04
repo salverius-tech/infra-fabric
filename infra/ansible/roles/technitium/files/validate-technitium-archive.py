@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate a Technitium portable archive before Ansible extracts it."""
+
 from __future__ import annotations
 
 import argparse
@@ -35,7 +36,9 @@ def validate_archive(path: str) -> None:
             members[member.name] = member
 
         missing = sorted(
-            name for name in REQUIRED_FILES if name not in members or not members[name].isfile()
+            name
+            for name in REQUIRED_FILES
+            if name not in members or not members[name].isfile()
         )
         if missing:
             raise ValueError(f"archive is missing required files: {', '.join(missing)}")

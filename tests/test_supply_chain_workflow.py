@@ -13,7 +13,9 @@ COMMIT_ACTION = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 
 class SupplyChainWorkflowTests(unittest.TestCase):
     def test_manual_and_scheduled_read_only_scan_job_is_present(self) -> None:
-        workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        workflow = yaml.load(
+            WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader
+        )
         triggers = workflow["on"]
         job = workflow["jobs"]["supply-chain-evidence"]
 
@@ -28,8 +30,14 @@ class SupplyChainWorkflowTests(unittest.TestCase):
         for step in actions:
             self.assertRegex(step["uses"], COMMIT_ACTION)
 
-        sbom = next(step for step in actions if step["uses"].startswith("anchore/sbom-action@"))
-        scan = next(step for step in actions if step["uses"].startswith("aquasecurity/trivy-action@"))
+        sbom = next(
+            step for step in actions if step["uses"].startswith("anchore/sbom-action@")
+        )
+        scan = next(
+            step
+            for step in actions
+            if step["uses"].startswith("aquasecurity/trivy-action@")
+        )
         self.assertEqual(sbom["with"]["format"], "spdx-json")
         self.assertEqual(sbom["with"]["upload-artifact"], "true")
         self.assertEqual(scan["with"]["severity"], "HIGH,CRITICAL")

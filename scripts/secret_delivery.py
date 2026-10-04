@@ -4,6 +4,7 @@
 This module deliberately keeps resolved values in memory. It does not write
 secret projections, command-line arguments, logs, or persistent dotenv files.
 """
+
 from __future__ import annotations
 
 import re
@@ -112,11 +113,15 @@ def root_password_requirements(
 ) -> tuple[SecretRequirement, ...]:
     """Build bootstrap delivery requirements for canonical resource IDs."""
     paths = {
-        root_password_secret_path(resource_id, default_secret=default_secret, host_overrides=host_overrides)
+        root_password_secret_path(
+            resource_id, default_secret=default_secret, host_overrides=host_overrides
+        )
         for resource_id in resource_ids
     }
     return tuple(
-        SecretRequirement(path, "bootstrap", frozenset({consumer}), "INFRA_BOOTSTRAP_ROOT_PASSWORD")
+        SecretRequirement(
+            path, "bootstrap", frozenset({consumer}), "INFRA_BOOTSTRAP_ROOT_PASSWORD"
+        )
         for path in sorted(paths)
     )
 
@@ -133,10 +138,14 @@ def requirements_for_model(
     bindings provide the only mapping from an approved logical path to a
     consumer environment name; no legacy path table is retained here.
     """
-    enabled = {name for name, service in services.items() if getattr(service, "enabled", False)}
+    enabled = {
+        name for name, service in services.items() if getattr(service, "enabled", False)
+    }
     selected = set(selected_services or enabled)
     if not selected <= enabled:
-        raise SecretDeliveryError("requested service is not enabled in the canonical model")
+        raise SecretDeliveryError(
+            "requested service is not enabled in the canonical model"
+        )
     active_paths = catalog.required_secret_paths_for_model(dict(services))
     requirements: list[SecretRequirement] = []
     for service in sorted(selected):
@@ -147,7 +156,9 @@ def requirements_for_model(
             try:
                 environment_name = capability.secret_environment[path]
             except KeyError as error:
-                raise SecretDeliveryError("service secret has no catalog environment binding") from error
+                raise SecretDeliveryError(
+                    "service secret has no catalog environment binding"
+                ) from error
             requirements.append(
                 SecretRequirement(
                     path,
@@ -175,7 +186,11 @@ def requirement_index(
     for requirement in requirements:
         if requirement.path in index:
             raise SecretDeliveryError("duplicate logical secret delivery requirement")
-        if not requirement.path or not requirement.consumers or not requirement.environment_name:
+        if (
+            not requirement.path
+            or not requirement.consumers
+            or not requirement.environment_name
+        ):
             raise SecretDeliveryError("secret delivery requirement is incomplete")
         if not _ENVIRONMENT_NAME.fullmatch(requirement.environment_name):
             raise SecretDeliveryError("secret delivery environment name is invalid")
@@ -205,7 +220,9 @@ def deliver(
     if not isinstance(value, str) or not value:
         raise SecretDeliveryError("secret provider returned an invalid value")
     if "\n" in value or "\r" in value:
-        raise SecretDeliveryError("secret provider returned a multiline environment value")
+        raise SecretDeliveryError(
+            "secret provider returned a multiline environment value"
+        )
     return DeliveredSecret(path, consumer, requirement.environment_name or "", value)
 
 
@@ -216,15 +233,27 @@ def deliver_environment(
     requirements: tuple[SecretRequirement, ...] = DEFAULT_REQUIREMENTS,
 ) -> dict[str, str]:
     """Return a transient environment mapping for one approved consumer."""
-    approved_consumers = {consumer_name for requirement in requirements for consumer_name in requirement.consumers}
+    approved_consumers = {
+        consumer_name
+        for requirement in requirements
+        for consumer_name in requirement.consumers
+    }
     if consumer not in approved_consumers:
         raise SecretDeliveryError("consumer has no approved secret contract")
     environment: dict[str, str] = {}
     for requirement in requirements:
         if consumer not in requirement.consumers:
             continue
-        delivered = deliver(provider, path=requirement.path, consumer=consumer, requirements=requirements)
-        if delivered.environment_name in environment and environment[delivered.environment_name] != delivered.value:
+        delivered = deliver(
+            provider,
+            path=requirement.path,
+            consumer=consumer,
+            requirements=requirements,
+        )
+        if (
+            delivered.environment_name in environment
+            and environment[delivered.environment_name] != delivered.value
+        ):
             raise SecretDeliveryError("conflicting secret environment delivery")
         environment[delivered.environment_name] = delivered.value
     return environment
@@ -239,9 +268,21 @@ def deliver_services_environment(
 ) -> dict[str, str]:
     """Resolve only model-derived runtime secrets for selected services."""
     environment: dict[str, str] = {}
-    service_requirements = requirements_for_model(catalog, services, selected_services=selected_services)
-    for service in sorted({requirement.service for requirement in service_requirements if requirement.service is not None}):
-        requirements = tuple(requirement for requirement in service_requirements if requirement.service == service)
+    service_requirements = requirements_for_model(
+        catalog, services, selected_services=selected_services
+    )
+    for service in sorted(
+        {
+            requirement.service
+            for requirement in service_requirements
+            if requirement.service is not None
+        }
+    ):
+        requirements = tuple(
+            requirement
+            for requirement in service_requirements
+            if requirement.service == service
+        )
         delivered = deliver_environment(
             provider,
             consumer=f"ansible-service:{service}",
@@ -278,9 +319,14 @@ def without_protected_environment(
     return {name: value for name, value in environment.items() if name not in protected}
 
 
-def redact_environment(environment: Mapping[str, str], secret_names: set[str]) -> dict[str, str]:
+def redact_environment(
+    environment: Mapping[str, str], secret_names: set[str]
+) -> dict[str, str]:
     """Return metadata-only environment diagnostics."""
-    return {name: "<redacted>" if name in secret_names else value for name, value in environment.items()}
+    return {
+        name: "<redacted>" if name in secret_names else value
+        for name, value in environment.items()
+    }
 
 
 __all__ = [
