@@ -330,7 +330,7 @@ def runners_payload(rows: list[dict[str, Any]], service: object) -> dict[str, An
 def latest_runs(limit: int) -> list[dict[str, Any]]:
     selected_limit = bounded_limit(limit, MAX_STATUS_ROWS)
     return forgejo_sql(
-        "select r.id, r.status, r.event, r.workflow_id, r.created, r.updated, "
+        "select r.id, r.status, r.event, r.workflow_id, r.created, r.updated, "  # noqa: S608 - only bounded integers are interpolated
         "coalesce(j.name, '-') as job_name, coalesce(j.status, 0) as job_status, "
         "coalesce(j.task_id, 0) as task_id, coalesce(j.started, 0) as started, "
         "coalesce(j.stopped, 0) as stopped "
@@ -374,7 +374,7 @@ def run_id_or_latest(value: str) -> int:
 
 def run_state(run_id: int) -> dict[str, Any]:
     rows = forgejo_sql(
-        "select r.id, r.status, r.workflow_id, coalesce(j.name, '-') as job_name, "
+        "select r.id, r.status, r.workflow_id, coalesce(j.name, '-') as job_name, "  # noqa: S608 - run_id is validated as an integer
         "coalesce(j.status, 0) as job_status, coalesce(j.started, 0) as started, "
         "coalesce(j.stopped, 0) as stopped, coalesce(j.task_id, 0) as task_id "
         "from action_run r left join action_run_job j on j.run_id = r.id "
@@ -408,7 +408,7 @@ def watch(run: str, interval: int, timeout: int) -> int:
 
 def print_runners(as_json: bool) -> None:
     rows = forgejo_sql(
-        "select id, name, owner_id, repo_id, last_online, last_active, agent_labels "
+        "select id, name, owner_id, repo_id, last_online, last_active, agent_labels "  # noqa: S608 - limit is a source constant
         f"from action_runner order by id limit {MAX_RUNNERS + 1}"
     )
     service_output = run_ansible_shell(
