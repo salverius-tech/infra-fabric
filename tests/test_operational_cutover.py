@@ -79,7 +79,9 @@ class OperationalCutoverTests(unittest.TestCase):
         script = (ROOT / "scripts" / "rehearse-development-rollback.sh").read_text(
             encoding="utf-8"
         )
-        justfile = (ROOT / "justfile").read_text(encoding="utf-8")
+        justfile = subprocess.run(
+            ["just", "--dump"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout
         self.assertIn("--approve-development-rollback", script)
         self.assertIn('"${VALUES_SITE}" != "dev"', script)
         self.assertIn("StrictHostKeyChecking=yes", script)
@@ -88,7 +90,10 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertIn("verify-projections.py", script)
         self.assertIn('--generated-dir \\"\\${generated_dir}\\"', script)
         self.assertNotIn('inventory="/workspace/${values_dir}/generated/', script)
-        self.assertIn("rehearse-development-rollback approval=\"\":", justfile)
+        self.assertRegex(
+            justfile,
+            r'(?m)^rehearse-development-rollback approval=""\s*:',
+        )
         rollback = (ROOT / "infra/ansible/playbooks/hermes-rollback-rehearsal.yml").read_text(encoding="utf-8")
         self.assertIn("hermes_rollback_dashboard_ready", rollback)
         self.assertIn("until: hermes_rollback_dashboard_ready.status | default(0) == 200", rollback)

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import subprocess
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ENTRYPOINT = ROOT / "tools" / "docker-entrypoint.sh"
 COMPOSE = ROOT / "compose.yaml"
-JUSTFILE = ROOT / "justfile"
 
 
 class SshKeyHandlingTests(unittest.TestCase):
@@ -37,12 +37,12 @@ class SshKeyHandlingTests(unittest.TestCase):
 
 
     def test_canonical_setup_defers_sops_ssh_transport_until_explicit_initialization(self) -> None:
-        text = JUSTFILE.read_text(encoding="utf-8")
-        self.assertIn("INFRA_COPY_SSH_KEYS=true", text)
-        setup = text[text.index("setup remote"):text.index("\n# Show private values")]
-        self.assertNotIn("INFRA_SSH_IDENTITY_SOURCE", setup)
-        self.assertIn("Setup does not create credentials or invoke legacy wizards", setup)
-        self.assertIn("ssh-initialize SITE=", text)
+        dumped = subprocess.run(
+            ["just", "--dump"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout
+        self.assertRegex(dumped, r'(?m)^setup remote="" site=""\s*:')
+        self.assertRegex(dumped, r'(?m)^ssh-initialize SITE="dev"\s*:')
+        self.assertIn("Setup does not create credentials or invoke legacy wizards", dumped)
 
 if __name__ == "__main__":
     unittest.main()

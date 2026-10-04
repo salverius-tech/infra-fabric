@@ -14,10 +14,20 @@ class PlanProjectionLifecycleTests(unittest.TestCase):
     def test_setup_requires_an_explicit_remote_and_has_no_legacy_discovery_entrypoint(self) -> None:
         # Safety category: pre-mutation ordering. Setup can initialize or clone a
         # private values repository, so retain this narrow public entrypoint guard.
-        justfile = (ROOT / "justfile").read_text(encoding="utf-8")
-        setup_recipe = justfile.split("# Initialize the selected canonical site's bootstrap SSH identity", 1)[0]
+        dumped = subprocess.run(
+            ["just", "--dump"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout
         self.assertFalse((ROOT / "scripts" / "discover-values-remote.sh").exists())
-        self.assertIn('selected_remote="{{remote}}"', setup_recipe)
+        self.assertRegex(dumped, r'(?m)^setup remote="" site=""\s*:')
+        missing_site = subprocess.run(
+            ["just", "setup", "", ""],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(missing_site.returncode, 2)
+        self.assertIn("A canonical site is required", missing_site.stderr)
 
     def test_shared_projection_set_helper_fails_closed_and_accepts_complete_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
