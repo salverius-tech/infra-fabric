@@ -314,6 +314,61 @@ PACKAGE_EVIDENCE = {
     },
 }
 
+AUDIT_SYMBOLS = {
+    "R1": {
+        "production": "service_group",
+        "verification": "test_hermes_backup_includes_gateway_and_dashboard",
+    },
+    "R2": {
+        "production": "check_canonical_projection",
+        "verification": "test_canonical_site_preflight_renders_and_cleans_temporary_projections",
+    },
+    "S1": {
+        "production": "enabled_stateful_services_by_address",
+        "verification": "test_canonical_stateful_selection_ignores_stale_site_json",
+    },
+    "S2": {
+        "production": "requirements_for_model",
+        "verification": "test_service_delivery_is_scoped_to_selected_services",
+    },
+    "S3": {
+        "production": "verify_snapshot",
+        "verification": "test_destroy_metadata_cannot_execute_as_normal_apply",
+    },
+    "O1": {
+        "production": "Check out Hermes Control at the reviewed revision",
+        "verification": "test_control_role_enforces_pinned_source_and_readiness",
+    },
+    "O2": {
+        "production": "dependency_waves",
+        "verification": "test_dependency_waves_parallelize_independent_services",
+    },
+    "O3": {
+        "production": "Stage checksum-verified reviewed artifacts",
+        "verification": "test_enabled_public_fixture_projects_reviewed_artifact_pins",
+    },
+    "Q1": {
+        "production": "assert_redacted",
+        "verification": "test_static_checker_rejects_non_executable_tags_and_nested_play_tasks",
+    },
+    "Q2": {
+        "production": "enabled_services_validation",
+        "verification": "test_runtime_selection_defaults_and_acceptance_are_catalog_backed",
+    },
+    "Q3": {
+        "production": "process_canonical_target",
+        "verification": "test_updates_eligible_dockerfile_pin",
+    },
+    "DOCS": {
+        "production": "Service operations matrix",
+        "verification": "test_documentation_inventory_covers_every_tracked_markdown_file",
+    },
+    "CI": {
+        "production": "python3 -m venv /opt/ansible",
+        "verification": "test_validation_has_named_stages_quality_and_summary",
+    },
+}
+
 MATRIX_COLUMNS = (
     "plan",
     "apply",
@@ -499,7 +554,11 @@ def audit_findings(data: dict[str, Any]) -> list[dict[str, Any]]:
             "disposition": "implemented-static",
             "source": {**source, "lines": finding["lines"]},
             "evidence": {
-                role: {**citation, "role": role}
+                role: {
+                    **citation,
+                    "role": role,
+                    "symbol": AUDIT_SYMBOLS[AUDIT_PACKAGE[finding["id"]]][role],
+                }
                 for role, citation in PACKAGE_EVIDENCE[
                     AUDIT_PACKAGE[finding["id"]]
                 ].items()
@@ -699,6 +758,19 @@ def validate(
                 )
         for citation in finding.get("evidence", {}).values():
             errors.extend(citation_errors(citation))
+            if isinstance(citation, dict):
+                symbol = citation.get("symbol")
+                path = citation.get("path", "")
+                if not isinstance(symbol, str) or not symbol:
+                    errors.append(
+                        f"audit evidence symbol is missing: {finding.get('id')}"
+                    )
+                elif isinstance(path, str) and (ROOT / path).is_file():
+                    cited_source = (ROOT / path).read_text(encoding="utf-8")
+                    if symbol not in cited_source:
+                        errors.append(
+                            f"audit evidence symbol is not present: {path}#{symbol}"
+                        )
     matrix = completion.get("acceptance_matrix", {})
     if set(matrix.get("environments", [])) != {
         "development",
@@ -850,7 +922,7 @@ def artifacts(
             f["disposition"],
             citation_label(f["source"]),
             "; ".join(
-                f"{role}: `{item['path']}:{item['lines']}`"
+                f"{role}: `{item['path']}#{item['symbol']}`"
                 for role, item in f["evidence"].items()
             ),
         ]
@@ -860,7 +932,7 @@ def artifacts(
         [
             "# Original audit finding dispositions",
             "",
-            "All 38 original findings retain title, package, disposition, and current production/verification citations. Original audit provenance is commit-qualified; external evidence remains in the acceptance matrix.",
+            "All 38 original findings retain title, package, disposition, and commit-qualified provenance. Evidence points to named production symbols and verification tests; keep these identifiers current when implementation moves. External acceptance remains in the acceptance matrix.",
             "",
             markdown_table(
                 [

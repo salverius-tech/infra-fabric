@@ -21,12 +21,14 @@
         "production": {
           "path": "scripts/tfplan-metadata.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "enabled_stateful_services_by_address"
         },
         "verification": {
           "path": "tests/test_tfplan_metadata.py",
           "lines": "1-140",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_canonical_stateful_selection_ignores_stale_site_json"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -45,12 +47,14 @@
         "production": {
           "path": "infra/ansible/tasks/reviewed-artifact-cache.yml",
           "lines": "1-62",
-          "role": "production"
+          "role": "production",
+          "symbol": "Stage checksum-verified reviewed artifacts"
         },
         "verification": {
           "path": "tests/test_artifact_projection.py",
           "lines": "1-130",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_enabled_public_fixture_projects_reviewed_artifact_pins"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -69,12 +73,14 @@
         "production": {
           "path": "scripts/apply-ansible-services.py",
           "lines": "84-155",
-          "role": "production"
+          "role": "production",
+          "symbol": "dependency_waves"
         },
         "verification": {
           "path": "tests/test_apply_ansible_services.py",
           "lines": "20-70",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_dependency_waves_parallelize_independent_services"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -93,12 +99,14 @@
         "production": {
           "path": "scripts/service-state.sh",
           "lines": "1-80",
-          "role": "production"
+          "role": "production",
+          "symbol": "service_group"
         },
         "verification": {
           "path": "tests/test_service_state.py",
           "lines": "1-80",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_hermes_backup_includes_gateway_and_dashboard"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -117,12 +125,14 @@
         "production": {
           "path": "scripts/workspace-preflight.py",
           "lines": "1-80",
-          "role": "production"
+          "role": "production",
+          "symbol": "check_canonical_projection"
         },
         "verification": {
           "path": "tests/test_workspace_preflight.py",
           "lines": "1-100",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_canonical_site_preflight_renders_and_cleans_temporary_projections"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -141,12 +151,14 @@
         "production": {
           "path": "scripts/tfplan-metadata.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "enabled_stateful_services_by_address"
         },
         "verification": {
           "path": "tests/test_tfplan_metadata.py",
           "lines": "1-140",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_canonical_stateful_selection_ignores_stale_site_json"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -165,12 +177,14 @@
         "production": {
           "path": "scripts/secret_delivery.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "requirements_for_model"
         },
         "verification": {
           "path": "tests/test_secret_delivery.py",
           "lines": "1-210",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_service_delivery_is_scoped_to_selected_services"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -189,12 +203,14 @@
         "production": {
           "path": "scripts/execution-snapshot.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "verify_snapshot"
         },
         "verification": {
           "path": "tests/test_tfplan_metadata.py",
           "lines": "180-300",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_destroy_metadata_cannot_execute_as_normal_apply"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -213,12 +229,14 @@
         "production": {
           "path": "infra/ansible/roles/hermes_control/tasks/main.yml",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "Check out Hermes Control at the reviewed revision"
         },
         "verification": {
           "path": "tests/test_hermes_control_role.py",
           "lines": "1-130",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_control_role_enforces_pinned_source_and_readiness"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -237,12 +255,14 @@
         "production": {
           "path": "scripts/secret_delivery.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "requirements_for_model"
         },
         "verification": {
           "path": "tests/test_secret_delivery.py",
           "lines": "1-210",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_service_delivery_is_scoped_to_selected_services"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -261,12 +281,14 @@
         "production": {
           "path": "infra/ansible/tasks/reviewed-artifact-cache.yml",
           "lines": "1-62",
-          "role": "production"
+          "role": "production",
+          "symbol": "Stage checksum-verified reviewed artifacts"
         },
         "verification": {
           "path": "tests/test_artifact_projection.py",
           "lines": "1-130",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_enabled_public_fixture_projects_reviewed_artifact_pins"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -285,12 +307,14 @@
         "production": {
           "path": "scripts/execution-snapshot.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "verify_snapshot"
         },
         "verification": {
           "path": "tests/test_tfplan_metadata.py",
           "lines": "180-300",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_destroy_metadata_cannot_execute_as_normal_apply"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -309,12 +333,14 @@
         "production": {
           "path": "scripts/apply-ansible-services.py",
           "lines": "84-155",
-          "role": "production"
+          "role": "production",
+          "symbol": "dependency_waves"
         },
         "verification": {
           "path": "tests/test_apply_ansible_services.py",
           "lines": "20-70",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_dependency_waves_parallelize_independent_services"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -333,12 +359,14 @@
         "production": {
           "path": "scripts/workspace-preflight.py",
           "lines": "1-80",
-          "role": "production"
+          "role": "production",
+          "symbol": "check_canonical_projection"
         },
         "verification": {
           "path": "tests/test_workspace_preflight.py",
           "lines": "1-100",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_canonical_site_preflight_renders_and_cleans_temporary_projections"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -357,12 +385,14 @@
         "production": {
           "path": "scripts/execution-snapshot.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "verify_snapshot"
         },
         "verification": {
           "path": "tests/test_tfplan_metadata.py",
           "lines": "180-300",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_destroy_metadata_cannot_execute_as_normal_apply"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -381,12 +411,14 @@
         "production": {
           "path": "scripts/check-direct-service-ansible.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "assert_redacted"
         },
         "verification": {
           "path": "tests/test_ansible_convergence_contract.py",
           "lines": "1-100",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_static_checker_rejects_non_executable_tags_and_nested_play_tasks"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -405,12 +437,14 @@
         "production": {
           "path": "scripts/check-direct-service-ansible.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "assert_redacted"
         },
         "verification": {
           "path": "tests/test_ansible_convergence_contract.py",
           "lines": "1-100",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_static_checker_rejects_non_executable_tags_and_nested_play_tasks"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -429,12 +463,14 @@
         "production": {
           "path": "infra/opentofu/services.tf",
           "lines": "1-170",
-          "role": "production"
+          "role": "production",
+          "symbol": "enabled_services_validation"
         },
         "verification": {
           "path": "tests/test_canonical_service_authority.py",
           "lines": "1-180",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_runtime_selection_defaults_and_acceptance_are_catalog_backed"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -453,12 +489,14 @@
         "production": {
           "path": "infra/opentofu/services.tf",
           "lines": "1-170",
-          "role": "production"
+          "role": "production",
+          "symbol": "enabled_services_validation"
         },
         "verification": {
           "path": "tests/test_canonical_service_authority.py",
           "lines": "1-180",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_runtime_selection_defaults_and_acceptance_are_catalog_backed"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -477,12 +515,14 @@
         "production": {
           "path": "infra/ansible/tasks/reviewed-artifact-cache.yml",
           "lines": "1-62",
-          "role": "production"
+          "role": "production",
+          "symbol": "Stage checksum-verified reviewed artifacts"
         },
         "verification": {
           "path": "tests/test_artifact_projection.py",
           "lines": "1-130",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_enabled_public_fixture_projects_reviewed_artifact_pins"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -501,12 +541,14 @@
         "production": {
           "path": "scripts/update.py",
           "lines": "1-100",
-          "role": "production"
+          "role": "production",
+          "symbol": "process_canonical_target"
         },
         "verification": {
           "path": "tests/test_update.py",
           "lines": "1-230",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_updates_eligible_dockerfile_pin"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -525,12 +567,14 @@
         "production": {
           "path": "scripts/secret_delivery.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "requirements_for_model"
         },
         "verification": {
           "path": "tests/test_secret_delivery.py",
           "lines": "1-210",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_service_delivery_is_scoped_to_selected_services"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -549,12 +593,14 @@
         "production": {
           "path": "scripts/secret_delivery.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "requirements_for_model"
         },
         "verification": {
           "path": "tests/test_secret_delivery.py",
           "lines": "1-210",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_service_delivery_is_scoped_to_selected_services"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -573,12 +619,14 @@
         "production": {
           "path": "scripts/service-state.sh",
           "lines": "1-80",
-          "role": "production"
+          "role": "production",
+          "symbol": "service_group"
         },
         "verification": {
           "path": "tests/test_service_state.py",
           "lines": "1-80",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_hermes_backup_includes_gateway_and_dashboard"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -597,12 +645,14 @@
         "production": {
           "path": "scripts/secret_delivery.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "requirements_for_model"
         },
         "verification": {
           "path": "tests/test_secret_delivery.py",
           "lines": "1-210",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_service_delivery_is_scoped_to_selected_services"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -621,12 +671,14 @@
         "production": {
           "path": "scripts/check-direct-service-ansible.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "assert_redacted"
         },
         "verification": {
           "path": "tests/test_ansible_convergence_contract.py",
           "lines": "1-100",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_static_checker_rejects_non_executable_tags_and_nested_play_tasks"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -645,12 +697,14 @@
         "production": {
           "path": "scripts/tfplan-metadata.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "enabled_stateful_services_by_address"
         },
         "verification": {
           "path": "tests/test_tfplan_metadata.py",
           "lines": "1-140",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_canonical_stateful_selection_ignores_stale_site_json"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -669,12 +723,14 @@
         "production": {
           "path": "scripts/secret_delivery.py",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "requirements_for_model"
         },
         "verification": {
           "path": "tests/test_secret_delivery.py",
           "lines": "1-210",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_service_delivery_is_scoped_to_selected_services"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -693,12 +749,14 @@
         "production": {
           "path": "tools/Dockerfile",
           "lines": "1-60",
-          "role": "production"
+          "role": "production",
+          "symbol": "python3 -m venv /opt/ansible"
         },
         "verification": {
           "path": "tests/test_phase7_tooling_contract.py",
           "lines": "1-80",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_validation_has_named_stages_quality_and_summary"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -717,12 +775,14 @@
         "production": {
           "path": "infra/ansible/roles/hermes_control/tasks/main.yml",
           "lines": "1-120",
-          "role": "production"
+          "role": "production",
+          "symbol": "Check out Hermes Control at the reviewed revision"
         },
         "verification": {
           "path": "tests/test_hermes_control_role.py",
           "lines": "1-130",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_control_role_enforces_pinned_source_and_readiness"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -741,12 +801,14 @@
         "production": {
           "path": "scripts/service-state.sh",
           "lines": "1-80",
-          "role": "production"
+          "role": "production",
+          "symbol": "service_group"
         },
         "verification": {
           "path": "tests/test_service_state.py",
           "lines": "1-80",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_hermes_backup_includes_gateway_and_dashboard"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -765,12 +827,14 @@
         "production": {
           "path": "scripts/workspace-preflight.py",
           "lines": "1-80",
-          "role": "production"
+          "role": "production",
+          "symbol": "check_canonical_projection"
         },
         "verification": {
           "path": "tests/test_workspace_preflight.py",
           "lines": "1-100",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_canonical_site_preflight_renders_and_cleans_temporary_projections"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -789,12 +853,14 @@
         "production": {
           "path": "infra/ansible/tasks/reviewed-artifact-cache.yml",
           "lines": "1-62",
-          "role": "production"
+          "role": "production",
+          "symbol": "Stage checksum-verified reviewed artifacts"
         },
         "verification": {
           "path": "tests/test_artifact_projection.py",
           "lines": "1-130",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_enabled_public_fixture_projects_reviewed_artifact_pins"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -813,12 +879,14 @@
         "production": {
           "path": "tools/Dockerfile",
           "lines": "1-60",
-          "role": "production"
+          "role": "production",
+          "symbol": "python3 -m venv /opt/ansible"
         },
         "verification": {
           "path": "tests/test_phase7_tooling_contract.py",
           "lines": "1-80",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_validation_has_named_stages_quality_and_summary"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -837,12 +905,14 @@
         "production": {
           "path": "scripts/workspace-preflight.py",
           "lines": "1-80",
-          "role": "production"
+          "role": "production",
+          "symbol": "check_canonical_projection"
         },
         "verification": {
           "path": "tests/test_workspace_preflight.py",
           "lines": "1-100",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_canonical_site_preflight_renders_and_cleans_temporary_projections"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -861,12 +931,14 @@
         "production": {
           "path": "docs/service-operations.md",
           "lines": "1-70",
-          "role": "production"
+          "role": "production",
+          "symbol": "Service operations matrix"
         },
         "verification": {
           "path": "tests/test_documentation_contract.py",
           "lines": "39-245",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_documentation_inventory_covers_every_tracked_markdown_file"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -885,12 +957,14 @@
         "production": {
           "path": "infra/opentofu/services.tf",
           "lines": "1-170",
-          "role": "production"
+          "role": "production",
+          "symbol": "enabled_services_validation"
         },
         "verification": {
           "path": "tests/test_canonical_service_authority.py",
           "lines": "1-180",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_runtime_selection_defaults_and_acceptance_are_catalog_backed"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"
@@ -909,12 +983,14 @@
         "production": {
           "path": "docs/service-operations.md",
           "lines": "1-70",
-          "role": "production"
+          "role": "production",
+          "symbol": "Service operations matrix"
         },
         "verification": {
           "path": "tests/test_documentation_contract.py",
           "lines": "39-245",
-          "role": "verification"
+          "role": "verification",
+          "symbol": "test_documentation_inventory_covers_every_tracked_markdown_file"
         }
       },
       "external_acceptance": "see acceptance-matrix; static evidence does not establish provider, live, recovery, or production acceptance"

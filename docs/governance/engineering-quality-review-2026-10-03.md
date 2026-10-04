@@ -688,6 +688,7 @@ This section records source changes, not acceptance evidence.
 | P3-1 | Deleted `compare-plans.py`; documented `hermes-password-hash.py` and added a retirement/documentation contract. |
 | P3-2 | Consolidated duplicate Caddy templates under `caddy_proxy`; preserved the `onramp_host` systemd difference as an explicit template variable and added tests. |
 | P3-3 | Split the large Hermes task list into ordered preflight, host-runtime, application-runtime, configuration, and verification imports. Updated static contracts to resolve imports; full Ansible validation passes. |
+| P3-5 | Replaced broad evidence line spans in the generated audit table with named production symbols and verification test identifiers; reconciliation now verifies each symbol exists and records the maintenance expectation. |
 | P3-6 | Added `CODEOWNERS`, `SECURITY.md`, `.editorconfig`, and the inventory entry. GitHub private-reporting availability still requires repository-settings verification. |
 | P3-4 | Removed the identity function and its call sites; callers now invoke `require_site_context` directly, and compatibility tests exercise that contract. |
 | P3-8 | Added `pyproject.toml` with explicit Black/Ruff line length, Ruff rules/ignores, mypy scope, and subprocess-aware coverage configuration. Black now checks every listed Python source. |
