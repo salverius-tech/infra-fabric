@@ -691,10 +691,10 @@ This section records source changes, not acceptance evidence.
 | P3-5 | Replaced broad evidence line spans in the generated audit table with named production symbols and verification test identifiers; reconciliation now verifies each symbol exists and records the maintenance expectation. |
 | P3-6 | Added `CODEOWNERS`, `SECURITY.md`, `.editorconfig`, and the inventory entry. GitHub private-reporting availability still requires repository-settings verification. |
 | P3-4 | Removed the identity function and its call sites; callers now invoke `require_site_context` directly, and compatibility tests exercise that contract. |
-| P3-8 | Added `pyproject.toml` with explicit Black/Ruff line length, Ruff rules/ignores, mypy scope, and subprocess-aware coverage configuration. Black now checks every listed Python source. |
+| P3-8 | Added `pyproject.toml` with explicit Black/Ruff line length, Ruff rules/ignores, all-script MyPy scope, and subprocess-aware coverage configuration. Black checks every listed Python source. |
 | P4-1 | Added fail-closed SSH mount directory validation to `just setup` and `scripts/run-infra.sh`. |
 
 After these changes, `VALUES_SITE=dev just validate` passes all stages;
-834 tests pass, aggregate coverage is 77%, and all seven per-module floors pass.
+835 tests pass, aggregate coverage is 77%, and all seven per-module floors pass.
 No plan, apply, or teardown command was run. Remaining recommendations are not
 considered complete by this progress entry.
