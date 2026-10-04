@@ -1,9 +1,9 @@
 """Rendered canonical pins supply every reviewed-artifact consumer."""
 from __future__ import annotations
 
-from pathlib import Path
 import sys
 import unittest
+from pathlib import Path
 
 import yaml
 

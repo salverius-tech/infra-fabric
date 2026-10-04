@@ -46,9 +46,9 @@ class FakeRouter:
 
 
 fake_fastapi = types.ModuleType("fastapi")
-setattr(fake_fastapi, "APIRouter", FakeRouter)
-setattr(fake_fastapi, "HTTPException", FakeHTTPException)
-setattr(fake_fastapi, "Request", object)
+fake_fastapi.APIRouter = FakeRouter
+fake_fastapi.HTTPException = FakeHTTPException
+fake_fastapi.Request = object
 
 dashboard_spec = importlib.util.spec_from_file_location(
     "homelab_infra_operator_dashboard_api", DASHBOARD_API

@@ -112,8 +112,8 @@ run_stage "python-quality" bash -euo pipefail -c "
     if [[ -n \"\${file}\" && \"\${file}\" != \#* ]]; then quality_files+=(\"\${file}\"); fi
   done < tools/python-format-files.txt
   black --check --diff \"\${quality_files[@]}\"
-  ruff check --select=E9,F63,F7,F82 \"\${python_files[@]}\"
-  mypy --follow-imports=skip --ignore-missing-imports scripts/canonical_values.py scripts/service_catalog.py
+  ruff check \"\${python_files[@]}\"
+  mypy
 "
 run_stage "contracts" bash -euo pipefail -c "
   if ! command -v just >/dev/null 2>&1; then

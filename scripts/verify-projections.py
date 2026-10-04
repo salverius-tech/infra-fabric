@@ -7,9 +7,17 @@ import json
 import sys
 from pathlib import Path
 
+from canonical_projections import (
+    ProjectionError,
+    verify_cross_projection_identity,
+    verify_onramp_handoff_identity,
+)
 from canonical_values import CanonicalValuesError, load_site, model_digest
-from canonical_projections import ProjectionError, verify_cross_projection_identity, verify_onramp_handoff_identity
-from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
+from projection_manifest import (
+    ManifestError,
+    verify_manifest,
+    verify_projection_permissions,
+)
 from service_catalog import ServiceCatalogError, load_catalog
 
 PROJECTION_FILES = (

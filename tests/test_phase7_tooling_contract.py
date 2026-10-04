@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import yaml
 
@@ -83,7 +83,8 @@ class Phase7ToolingContractTests(unittest.TestCase):
             self.assertIn(f'run_stage "{stage}"', text)
         self.assertIn("black --check", text)
         self.assertIn("tools/python-format-files.txt", text)
-        self.assertIn("ruff check --select=E9,F63,F7,F82", text)
+        self.assertIn("ruff check", text)
+        self.assertIn('"F401"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         self.assertIn("${python_files[@]}", text)
         self.assertIn("mypy", text)
         self.assertIn("coverage run", text)

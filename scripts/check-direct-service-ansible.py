@@ -15,6 +15,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 import settings as settings_lib  # noqa: E402
 
+
 def service_groups() -> dict[str, str]:
     """Derive canonical inventory groups directly from the service catalog."""
     return {

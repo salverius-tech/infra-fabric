@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -14,8 +13,6 @@ try:
     from canonical_projections import render_projection_set
     from canonical_values import load_site, model_digest
     from projection_manifest import build_manifest, verify_manifest
-    from service_catalog import load_catalog
-    from values_context import from_environment
     from secret_delivery import (
         BOOTSTRAP_SSH_PRIVATE_KEY_PATH,
         PROXMOX_PROVIDER_PATH,
@@ -30,13 +27,13 @@ try:
         sops_policy_recipients,
         validate_sops_age_recipients,
     )
+    from service_catalog import load_catalog
+    from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from canonical_projections import render_projection_set
     from canonical_values import load_site, model_digest
     from projection_manifest import build_manifest, verify_manifest
-    from service_catalog import load_catalog
-    from values_context import from_environment
     from secret_delivery import (
         BOOTSTRAP_SSH_PRIVATE_KEY_PATH,
         PROXMOX_PROVIDER_PATH,
@@ -51,6 +48,8 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
         sops_policy_recipients,
         validate_sops_age_recipients,
     )
+    from service_catalog import load_catalog
+    from values_context import from_environment
 
 
 class PreflightError(RuntimeError):

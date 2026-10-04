@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 try:
     from secret_delivery import deliver_environment, provider_requirements
-    from secret_provider import SopsAgeProvider, SecretProviderError
+    from secret_provider import SecretProviderError, SopsAgeProvider
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from secret_delivery import deliver_environment, provider_requirements
-    from secret_provider import SopsAgeProvider, SecretProviderError
+    from secret_provider import SecretProviderError, SopsAgeProvider
     from values_context import from_environment
 
 

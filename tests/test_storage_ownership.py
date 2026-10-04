@@ -8,7 +8,6 @@ from typing import Any
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 STORAGE_TASKS = {
     "directory": ROOT / "infra" / "ansible" / "tasks" / "host-storage-directory.yml",

@@ -6,7 +6,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-
 SCRIPT = Path(__file__).resolve().parents[1] / "infra" / "ansible" / "scripts" / "service-state-capacity-preflight.py"
 spec = importlib.util.spec_from_file_location("service_state_capacity", SCRIPT)
 assert spec and spec.loader

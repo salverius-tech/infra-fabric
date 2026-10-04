@@ -1,8 +1,7 @@
 """Static regression coverage for verified Debian VM image ownership."""
 
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_MAIN = ROOT / "infra/opentofu/modules/debian-vm/main.tf"

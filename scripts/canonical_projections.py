@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from canonical_values import CanonicalSite, model_digest
 from service_catalog import ServiceCatalog, load_catalog

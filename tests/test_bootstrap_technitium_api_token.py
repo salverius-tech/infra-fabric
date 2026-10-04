@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import os
 import sys
 import tempfile
 import unittest
@@ -17,7 +16,7 @@ spec.loader.exec_module(bootstrap_token)
 
 
 class FakeClient:
-    last: "FakeClient | None" = None
+    last: FakeClient | None = None
 
     def __init__(self, api_url: str) -> None:
         self.api_url = api_url

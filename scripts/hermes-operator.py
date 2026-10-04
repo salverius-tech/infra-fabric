@@ -172,7 +172,7 @@ def enabled_services(repo: Path) -> list[str]:
 def plan_metadata_path(repo: Path) -> Path:
     """Resolve saved-plan metadata from the selected canonical site context."""
     try:
-        from values_context import ValuesContextError, from_environment
+        from values_context import from_environment
 
         context = from_environment(repo)
     except Exception as error:

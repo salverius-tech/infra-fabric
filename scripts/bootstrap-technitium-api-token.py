@@ -6,12 +6,13 @@ import argparse
 import importlib.util
 import json
 import os
-from pathlib import Path
 import sys
 import time
 import urllib.parse
 import urllib.request
-from typing import Any, Mapping
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -125,7 +126,7 @@ def bootstrap_canonical(
         try:
             default_session_token = login(client, "admin")
         except BootstrapError:
-            raise configured_login_error
+            raise configured_login_error from None
         client.call("/user/changePassword", {"pass": "admin", "newPass": admin_password}, token=default_session_token)
         session_token = login(client, admin_password)
     api_token = create_api_token(client, session_token, token_name)

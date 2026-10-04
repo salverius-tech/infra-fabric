@@ -10,17 +10,26 @@ import hashlib
 import ipaddress
 import json
 import re
-from pathlib import Path
-from pathlib import PurePosixPath
-from typing import Any, Literal, Mapping
+from collections.abc import Mapping
+from pathlib import Path, PurePosixPath
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from ruamel.yaml import YAML
 from ruamel.yaml.constructor import DuplicateKeyError
 from ruamel.yaml.parser import ParserError
 from ruamel.yaml.tokens import AliasToken, AnchorToken
-
 from service_catalog import ServiceCatalogError, load_catalog
 
 
@@ -79,7 +88,7 @@ class SiteMetadata(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def validate_policy(self) -> "SiteMetadata":
+    def validate_policy(self) -> SiteMetadata:
         if self.class_ == "production" and self.lifecycle == "disposable":
             raise ValueError("production sites cannot use disposable lifecycle")
         if self.class_ == "production" and self.allow_destroy:
@@ -121,7 +130,7 @@ class PlatformDNS(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def validate_records(self) -> "PlatformDNS":
+    def validate_records(self) -> PlatformDNS:
         def hostname(value: str, field: str) -> str:
             normalized = value.lower().rstrip(".")
             if not _HOSTNAME_RE.fullmatch(normalized):
@@ -230,7 +239,7 @@ class ImageChecksum(StrictModel):
         return value.lower()
 
     @model_validator(mode="after")
-    def validate_algorithm_length(self) -> "ImageChecksum":
+    def validate_algorithm_length(self) -> ImageChecksum:
         expected = 64 if self.algorithm == "sha256" else 128
         if len(self.value) != expected:
             raise ValueError(f"{self.algorithm} checksum must contain {expected} hex characters")
@@ -245,7 +254,7 @@ class ImageDefinition(StrictModel):
     checksum: ImageChecksum
 
     @model_validator(mode="after")
-    def validate_datastore_ownership(self) -> "ImageDefinition":
+    def validate_datastore_ownership(self) -> ImageDefinition:
         if self.type == "vm_image" and not self.datastore_id:
             raise ValueError("vm images require datastore_id ownership")
         if self.type == "lxc_template" and self.datastore_id is not None:
@@ -273,7 +282,7 @@ class PlatformImages(StrictModel):
     vm: dict[str, ImageDefinition] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_image_keys(self) -> "PlatformImages":
+    def validate_image_keys(self) -> PlatformImages:
         for family, definitions, expected_type in (
             ("lxc", self.lxc, "lxc_template"),
             ("vm", self.vm, "vm_image"),
@@ -383,7 +392,7 @@ class ResourceNetwork(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def validate_dhcp_policy(self) -> "ResourceNetwork":
+    def validate_dhcp_policy(self) -> ResourceNetwork:
         if self.address == "dhcp" and self.gateway is not None:
             raise ValueError("DHCP resources cannot declare a static gateway")
         if self.address != "dhcp" and self.expected_address is not None:
@@ -398,7 +407,7 @@ class ResourceCompute(StrictModel):
     cpu_type: Literal["x86-64-v2-AES", "x86-64-v3"] | None = None
 
     @model_validator(mode="after")
-    def validate_sizes(self) -> "ResourceCompute":
+    def validate_sizes(self) -> ResourceCompute:
         if self.cores <= 0 or self.memory_mb <= 0 or self.swap_mb < 0:
             raise ValueError("resource compute values must be positive, with non-negative swap")
         return self
@@ -520,7 +529,7 @@ class Resource(StrictModel):
     artifacts: SharedHostArtifacts = Field(default_factory=SharedHostArtifacts)
 
     @model_validator(mode="after")
-    def validate_runtime_fields(self) -> "Resource":
+    def validate_runtime_fields(self) -> Resource:
         runtime = self.runtime
         if self.type == "lxc" and self.compute.cpu_type is not None:
             raise ValueError("VM-only compute.cpu_type is not valid on LXC resources")
@@ -538,7 +547,7 @@ class Resources(StrictModel):
     shared_hosts: dict[str, Resource] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_ids(self) -> "Resources":
+    def validate_ids(self) -> Resources:
         all_items = [*self.guests.items(), *self.shared_hosts.items()]
         names = [name for name, _ in all_items]
         if len(names) != len(set(names)):
@@ -585,7 +594,7 @@ class ForgejoDatabaseConfiguration(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def validate_postgres_identifiers(self) -> "ForgejoDatabaseConfiguration":
+    def validate_postgres_identifiers(self) -> ForgejoDatabaseConfiguration:
         if self.type == "postgres":
             identifier = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
             if not identifier.fullmatch(self.name) or not identifier.fullmatch(self.user):
@@ -613,7 +622,7 @@ class CaddyUpstream(StrictModel):
         except ValueError:
             normalized = value.lower().rstrip(".")
             if not _HOSTNAME_RE.fullmatch(normalized):
-                raise ValueError("Caddy upstream host must be an IP address or hostname")
+                raise ValueError("Caddy upstream host must be an IP address or hostname") from None
             return normalized
 
 
@@ -656,7 +665,7 @@ class CaddyConfiguration(StrictModel):
         return normalized
 
     @model_validator(mode="after")
-    def require_reviewed_artifact_when_enabled(self) -> "CaddyConfiguration":
+    def require_reviewed_artifact_when_enabled(self) -> CaddyConfiguration:
         if self.enabled and self.artifact is None:
             raise ValueError("enabled Caddy configuration requires a reviewed artifact pin")
         return self
@@ -860,7 +869,7 @@ class ForgejoConfiguration(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def require_reviewed_caddy_artifact(self) -> "ForgejoConfiguration":
+    def require_reviewed_caddy_artifact(self) -> ForgejoConfiguration:
         if self.enable_caddy and self.caddy_artifact is None:
             raise ValueError("Forgejo Caddy requires a reviewed artifact pin")
         return self
@@ -936,7 +945,7 @@ class ServiceState(StrictModel):
     disable_policy: Literal["retain", "archive", "destroy"] | None = None
 
     @model_validator(mode="after")
-    def validate_policy(self) -> "ServiceState":
+    def validate_policy(self) -> ServiceState:
         if self.capable and self.disable_policy is None:
             raise ValueError("state-capable services require a disable_policy")
         if not self.capable and self.disable_policy is not None:
@@ -987,7 +996,7 @@ class ServiceEndpoints(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def validate_protocol_ports(self) -> "ServiceEndpoints":
+    def validate_protocol_ports(self) -> ServiceEndpoints:
         if "ssh" in self.protocols:
             self.ports.setdefault("ssh", 22)
         elif "ssh" in self.ports:
@@ -1005,7 +1014,7 @@ class ServiceRelease(StrictModel):
     source: Literal["package", "container", "binary", "image"] | None = None
 
     @model_validator(mode="after")
-    def validate_release(self) -> "ServiceRelease":
+    def validate_release(self) -> ServiceRelease:
         if self.tag is not None and not _HERMES_TAG_RE.fullmatch(self.tag):
             raise ValueError("release tag must use the managed Hermes release-tag form")
         if self.commit is not None and not _HERMES_COMMIT_RE.fullmatch(self.commit):
@@ -1174,7 +1183,7 @@ class HermesControlConfiguration(StrictModel):
         return values
 
     @model_validator(mode="after")
-    def validate_enabled_requirements(self) -> "HermesControlConfiguration":
+    def validate_enabled_requirements(self) -> HermesControlConfiguration:
         if self.enabled:
             missing = [name for name, value in (("domain", self.domain), ("source_url", self.source_url), ("source_ref", self.source_ref)) if not value]
             if missing:
@@ -1237,7 +1246,7 @@ class HermesConfiguration(StrictModel):
         return value
 
     @model_validator(mode="after")
-    def validate_mutation_activation(self) -> "HermesConfiguration":
+    def validate_mutation_activation(self) -> HermesConfiguration:
         if self.operator_mutation_enabled:
             raise ValueError(
                 "Hermes operator mutation is unavailable during the hard read-only pilot; "
@@ -1452,7 +1461,7 @@ class CanonicalSite(StrictModel):
     operator: OperatorPolicy = Field(default_factory=OperatorPolicy)
 
     @model_validator(mode="after")
-    def validate_service_ownership(self) -> "CanonicalSite":
+    def validate_service_ownership(self) -> CanonicalSite:
         if self.bootstrap.ssh.user == self.operator.user:
             raise ValueError("bootstrap.ssh.user and operator.user must be distinct")
         management = self.platform.proxmox.management

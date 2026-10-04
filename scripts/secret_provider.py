@@ -6,15 +6,16 @@ import hashlib
 import json
 import os
 import re
-import signal
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator, Protocol
+from typing import Any, Protocol
 
 from ruamel.yaml import YAML
 from ruamel.yaml.constructor import DuplicateKeyError
@@ -388,8 +389,8 @@ def secret_material_directory(parent: Path | None = None) -> Iterator[Path]:
     finally:
         cleanup()
         if install_handlers:
-            for signum, handler in previous_handlers.items():
-                signal.signal(signum, handler)
+            for previous_signal, handler in previous_handlers.items():
+                signal.signal(previous_signal, handler)
 
 
 def write_secret_material(directory: Path, name: str, content: str) -> Path:

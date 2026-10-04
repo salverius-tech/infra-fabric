@@ -1,11 +1,10 @@
 """Read-only CI contract for scheduled supply-chain evidence."""
 
-from pathlib import Path
 import re
 import unittest
+from pathlib import Path
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/validate.yml"

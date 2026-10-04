@@ -1,25 +1,28 @@
 from __future__ import annotations
 
 import os
-import sys
-import subprocess
-import tempfile
-import stat
 import re
+import stat
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
+
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import atomic_output
-from atomic_output import AtomicOutputError, atomic_output_directory
-from pydantic import ValidationError
-
 import canonical_values
-from canonical_values import CaddyConfiguration, CanonicalValuesError, DNSSettings, ForgejoRunnerConfiguration, HermesConfiguration, ImageChecksum, ImageDefinition, InfisicalConfiguration, InfisicalOnrampConfiguration, PlatformDNS, PlatformImages, ResourceNetwork, ServiceEndpoints, ServiceRelease, SearxngConfiguration, SssfConfiguration, TailscaleConfiguration, TechnitiumConfiguration, load_site, model_digest, normalize_container_image_reference, normalized_model, redacted_summary
+from atomic_output import AtomicOutputError, atomic_output_directory
+from canonical_mapping import (
+    MappingContractError,
+    MappingEntry,
+    validate_mapping_matrix,
+)
 from canonical_projections import (
     ProjectionError,
     _resource_variables,
@@ -29,9 +32,33 @@ from canonical_projections import (
     render_opentofu_variables,
     render_runtime_env,
 )
-from canonical_mapping import MappingContractError, MappingEntry, validate_mapping_matrix
+from canonical_values import (
+    CaddyConfiguration,
+    CanonicalValuesError,
+    DNSSettings,
+    ForgejoRunnerConfiguration,
+    HermesConfiguration,
+    ImageChecksum,
+    ImageDefinition,
+    InfisicalConfiguration,
+    InfisicalOnrampConfiguration,
+    PlatformDNS,
+    PlatformImages,
+    ResourceNetwork,
+    SearxngConfiguration,
+    ServiceEndpoints,
+    ServiceRelease,
+    SssfConfiguration,
+    TailscaleConfiguration,
+    TechnitiumConfiguration,
+    load_site,
+    model_digest,
+    normalize_container_image_reference,
+    normalized_model,
+    redacted_summary,
+)
+from pydantic import ValidationError
 from service_catalog import ServiceCatalogError, load_catalog
-
 
 VALID_SITE = """
 schema_version: 1

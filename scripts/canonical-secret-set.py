@@ -4,18 +4,17 @@ from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ruamel.yaml import YAML
-
 from secret_provider import (
-    SopsAgeProvider,
     SecretProviderError,
+    SopsAgeProvider,
     canonical_sops_filename,
     validate_canonical_secret_path,
 )

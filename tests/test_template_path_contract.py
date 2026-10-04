@@ -4,7 +4,6 @@ import re
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 VARIABLES = (ROOT / "infra" / "opentofu" / "variables.tf").read_text(encoding="utf-8")
 RESOURCE = (ROOT / "infra" / "opentofu" / "main.tf").read_text(encoding="utf-8")

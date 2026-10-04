@@ -479,7 +479,7 @@ class SiteAgeIntegrationBase(unittest.TestCase):
 
     def staging_leftovers(self) -> list[str]:
         found = []
-        for root, dirs, files in os.walk(self.td):
+        for root, dirs, _files in os.walk(self.td):
             for d in dirs:
                 if d.startswith(".staging") or d == "site-identity":
                     found.append(os.path.join(root, d))

@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Mapping
+from typing import Any, Literal
 
 
 class ServiceCatalogError(ValueError):
@@ -87,7 +88,7 @@ class ServiceCapability:
     name: str
     state_capable: bool
     runtime_owner: RuntimeOwner
-    runtime: "RuntimeMetadata | None"
+    runtime: RuntimeMetadata | None
     handoff: dict[str, object] | None
     configuration_schema: str | None
     release_sources: tuple[str, ...]

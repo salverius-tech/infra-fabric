@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
 import fcntl
 import os
-from pathlib import Path
 import stat
 import subprocess
 import sys
-from typing import Iterator, Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from pathlib import Path
 
 
 class SiteLockError(RuntimeError):

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import os
 import signal
 import stat
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, cast
+from typing import cast
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
@@ -24,6 +24,7 @@ from secret_provider import (
     validate_sops_age_recipients,
     write_secret_material,
 )
+
 
 class SecretProviderTests(unittest.TestCase):
     def setUp(self) -> None:

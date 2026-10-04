@@ -6,9 +6,10 @@ secret projections, command-line arguments, logs, or persistent dotenv files.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
-from typing import Any, Mapping, Protocol
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any, Protocol
 
 from secret_provider import SecretProvider, SecretProviderError
 

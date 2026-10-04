@@ -1,7 +1,7 @@
 """Regression coverage for canonical network-backed OpenTofu outputs."""
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 
 class OpenTofuOutputBindingsTests(unittest.TestCase):

@@ -1,8 +1,8 @@
 """Focused source contract for reviewed production artifact acquisition."""
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_TASK = ROOT / "infra/ansible/tasks/reviewed-artifact-cache.yml"

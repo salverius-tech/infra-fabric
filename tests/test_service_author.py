@@ -6,7 +6,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("service_author", ROOT / "scripts" / "service-author.py")
 service_author = importlib.util.module_from_spec(SPEC)

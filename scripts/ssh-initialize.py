@@ -12,11 +12,14 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from ruamel.yaml import YAML
-
 from canonical_ssh_identity import derive_public_key
 from canonical_values import load_site
-from secret_provider import SopsAgeProvider, SecretProviderError, canonical_sops_filename
+from ruamel.yaml import YAML
+from secret_provider import (
+    SecretProviderError,
+    SopsAgeProvider,
+    canonical_sops_filename,
+)
 
 BOOTSTRAP_LOGICAL_PATH = "secrets.bootstrap.ssh_private_key"
 MANAGEMENT_LOGICAL_PATH = "secrets.providers.proxmox.ssh_private_key"

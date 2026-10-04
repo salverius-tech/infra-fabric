@@ -10,6 +10,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import settings
+
 REQUIRED_FEATURES = {"guest_nfs": "nfs", "guest_cifs": "cifs"}
 SERVICE_HOSTS = settings.SERVICE_REGISTRY_DATA["services"]
 

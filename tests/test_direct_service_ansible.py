@@ -88,8 +88,9 @@ class DirectServiceAnsibleHelperTests(unittest.TestCase):
         self.assertFalse(checker({"ansible.builtin.command": {"argv": ["tool"]}}))
 
     def test_redaction_blocks_private_values(self) -> None:
-        assert_redacted = self.load_helper().assert_redacted
-        with self.assertRaises(Exception):
+        helper = self.load_helper()
+        assert_redacted = helper.assert_redacted
+        with self.assertRaises(helper.RedactionError):
             assert_redacted("token=super-secret-value 192.168.1.10")  # public-safety: allow-ip
         assert_redacted("service=technitium endpoint=example.internal address=192.0.2.10")
 

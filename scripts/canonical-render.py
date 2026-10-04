@@ -24,7 +24,6 @@ from projection_manifest import (
 )
 from service_catalog import ServiceCatalogError, load_catalog
 
-
 PROJECTION_FILES = {
     "terraform.auto.tfvars.json": "terraform",
     "ansible-inventory.json": "ansible",

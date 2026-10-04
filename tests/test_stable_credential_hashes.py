@@ -1,9 +1,8 @@
 """Regression coverage for deterministic site/resource credential hashes."""
 
+import unittest
 from hashlib import sha256
 from pathlib import Path
-import unittest
-
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST_TASKS = ROOT / "infra/ansible/roles/host_identity/tasks/main.yml"

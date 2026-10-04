@@ -246,12 +246,12 @@ class DesignReconciliationTests(unittest.TestCase):
             )
             authority_path.write_text(json.dumps(invalid), encoding="utf-8")
             original_authority_path = self.module.AUTHORITY_PATH
-            setattr(self.module, "AUTHORITY_PATH", authority_path)
+            self.module.AUTHORITY_PATH = authority_path
             try:
                 with self.assertRaisesRegex(ValueError, "audit IDs are incomplete"):
                     self.module.authority()
             finally:
-                setattr(self.module, "AUTHORITY_PATH", original_authority_path)
+                self.module.AUTHORITY_PATH = original_authority_path
 
     def test_generation_is_idempotent_and_never_uses_generated_output_as_input(self):
         artifacts = self.module.artifacts(
@@ -350,13 +350,13 @@ class DesignReconciliationTests(unittest.TestCase):
             retired = reconciliation / "backlog.json"
             retired.write_text("{}\n", encoding="utf-8")
             original_reconciliation = self.module.RECON
-            setattr(self.module, "RECON", reconciliation)
+            self.module.RECON = reconciliation
             try:
                 self.assertTrue(
                     self.module.validate(self.completion, self.audit, self.backlog)
                 )
             finally:
-                setattr(self.module, "RECON", original_reconciliation)
+                self.module.RECON = original_reconciliation
 
 
 if __name__ == "__main__":

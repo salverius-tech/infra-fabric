@@ -1,18 +1,18 @@
 """Static and rendered-shell contracts for SSSF managed deployment."""
 
 import os
-from pathlib import Path
 import pwd
 import subprocess
 import tempfile
 import threading
 import time
-from typing import Callable, cast
 import unittest
+from collections.abc import Callable
+from pathlib import Path
+from typing import cast
 
-from jinja2 import Environment, StrictUndefined
 import yaml
-
+from jinja2 import Environment, StrictUndefined
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLE = ROOT / "infra/ansible/roles/sssf"

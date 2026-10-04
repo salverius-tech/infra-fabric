@@ -6,9 +6,9 @@ import os
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
-from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "apply-ansible-services.py"
 spec = importlib.util.spec_from_file_location("apply_ansible_services", SCRIPT)

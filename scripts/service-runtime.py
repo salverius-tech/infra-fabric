@@ -10,6 +10,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from service_catalog import ServiceCatalogError, load_catalog
+
 CATALOG_PATH = Path(__file__).resolve().parents[1] / "infra" / "services.json"
 
 

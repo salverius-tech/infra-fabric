@@ -8,7 +8,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -63,7 +63,7 @@ class UpdateTests(unittest.TestCase):
     def fake_opener(self, version: str, published_at: datetime) -> callable:
         def opener(url: str) -> bytes:
             if url.endswith("/checksums"):
-                return f"abc123  tofu_{version}_linux_amd64.zip\n".encode("utf-8")
+                return f"abc123  tofu_{version}_linux_amd64.zip\n".encode()
             return self.fake_release(version, published_at)
 
         return opener

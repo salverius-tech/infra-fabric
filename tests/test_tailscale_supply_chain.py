@@ -1,10 +1,9 @@
 """Supply-chain contract for the managed Tailscale client installation."""
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 TASKS = ROOT / "infra/ansible/roles/tailscale_client/tasks/main.yml"

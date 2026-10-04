@@ -20,11 +20,19 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
 
 try:
     from canonical_values import load_site, model_digest
-    from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
+    from projection_manifest import (
+        ManifestError,
+        verify_manifest,
+        verify_projection_permissions,
+    )
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from canonical_values import load_site, model_digest
-    from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
+    from projection_manifest import (
+        ManifestError,
+        verify_manifest,
+        verify_projection_permissions,
+    )
 
 SCHEMA_VERSION = 7
 DEFAULT_MAX_AGE_HOURS = 24

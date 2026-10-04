@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from values_context import ValuesContextError, from_environment
 from canonical_projections import (
     render_projection_set,
     verify_cross_projection_identity,
@@ -22,6 +21,7 @@ from canonical_projections import (
 from canonical_values import load_site, model_digest
 from projection_manifest import verify_manifest
 from service_catalog import load_catalog
+from values_context import ValuesContextError, from_environment
 
 REPO = Path(__file__).resolve().parents[1]
 INVENTORY = "values/ansible/inventory/local.yml"
@@ -164,7 +164,7 @@ def verify_canonical_monitor_inputs(context: object) -> Path:
     try:
         for name in names:
             projection = json.loads(
-                getattr(context, "generated_path")(name).read_text(encoding="utf-8")
+                context.generated_path(name).read_text(encoding="utf-8")
             )
             if not isinstance(projection, dict):
                 raise MonitorError(
@@ -172,7 +172,7 @@ def verify_canonical_monitor_inputs(context: object) -> Path:
                 )
             projections[name] = projection
         manifest = json.loads(
-            getattr(context, "projection_manifest_path").read_text(encoding="utf-8")
+            context.projection_manifest_path.read_text(encoding="utf-8")
         )
         if not isinstance(manifest, dict):
             raise MonitorError("canonical monitor manifest is not an object")
@@ -202,7 +202,7 @@ def verify_canonical_monitor_inputs(context: object) -> Path:
         raise MonitorError(
             "canonical monitor projection identity verification failed"
         ) from error
-    return getattr(context, "generated_path")("ansible-inventory.json")
+    return context.generated_path("ansible-inventory.json")
 
 
 def run_ansible_shell(command: str) -> str:

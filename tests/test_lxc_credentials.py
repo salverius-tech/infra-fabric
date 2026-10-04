@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_TASKS = ROOT / "infra/ansible/roles/root_credentials/tasks/main.yml"
 ROLE_DEFAULTS = ROOT / "infra/ansible/roles/root_credentials/defaults/main.yml"

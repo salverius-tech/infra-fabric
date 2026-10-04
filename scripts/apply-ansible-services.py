@@ -12,9 +12,9 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Mapping
 
 REPO = Path(__file__).resolve().parents[1]
 SETTINGS_SPEC = importlib.util.spec_from_file_location("settings", REPO / "scripts" / "settings.py")
@@ -23,19 +23,37 @@ if SETTINGS_SPEC is None or SETTINGS_SPEC.loader is None:
 settings = importlib.util.module_from_spec(SETTINGS_SPEC)
 SETTINGS_SPEC.loader.exec_module(settings)
 try:
-    from canonical_projections import render_projection_set, verify_cross_projection_identity
+    from canonical_projections import (
+        render_projection_set,
+        verify_cross_projection_identity,
+    )
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements, without_protected_environment
+    from secret_delivery import (
+        deliver,
+        deliver_services_environment,
+        operator_password_requirements,
+        root_password_requirements,
+        without_protected_environment,
+    )
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(REPO / "scripts"))
-    from canonical_projections import render_projection_set, verify_cross_projection_identity
+    from canonical_projections import (
+        render_projection_set,
+        verify_cross_projection_identity,
+    )
     from canonical_values import load_site, model_digest
     from projection_manifest import verify_manifest
-    from secret_delivery import deliver, deliver_services_environment, operator_password_requirements, root_password_requirements, without_protected_environment
+    from secret_delivery import (
+        deliver,
+        deliver_services_environment,
+        operator_password_requirements,
+        root_password_requirements,
+        without_protected_environment,
+    )
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
     from values_context import from_environment
@@ -67,7 +85,7 @@ def runtime_known_hosts_path(context: object) -> Path:
         if not values_dir.is_absolute():
             values_dir = (REPO / values_dir).resolve()
         return values_dir / "ansible" / "known_hosts"
-    return getattr(context, "path")("ansible/known_hosts")
+    return context.path("ansible/known_hosts")
 
 
 def canonical_enabled_services(context: object, service: str = "") -> list[str]:
@@ -177,7 +195,7 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
         def generated_path(name: str) -> Path:
             return generated_dir / name
     else:
-        generated_path = getattr(context, "generated_path")
+        generated_path = context.generated_path
     projections: dict[str, object] = {}
     try:
         for name in expected_projections:
@@ -258,7 +276,7 @@ def run_canonical_bootstrap(
 ) -> int:
     """Deliver and rotate one host credential at a time for canonical execution."""
     try:
-        bundle_path = getattr(context, "path")("secrets.sops.yaml")
+        bundle_path = context.path("secrets.sops.yaml")
     except (AttributeError, TypeError, ValueError) as error:
         raise RuntimeError("canonical secret bundle path is unavailable") from error
     if not bundle_path.is_file():
@@ -302,7 +320,7 @@ def run_canonical_host_identity(
 ) -> int:
     """Converge canonical accounts before any service role executes."""
     try:
-        bundle_path = getattr(context, "path")("secrets.sops.yaml")
+        bundle_path = context.path("secrets.sops.yaml")
     except (AttributeError, TypeError, ValueError) as error:
         raise RuntimeError("canonical host identity secret bundle path is unavailable") from error
     if not bundle_path.is_file():
@@ -310,7 +328,7 @@ def run_canonical_host_identity(
     provider = SopsAgeProvider(bundle_path)
     runner = runner or default_runner
     operator_requirement = operator_password_requirements()[0]
-    site_file = getattr(context, "canonical_site_path")
+    site_file = context.canonical_site_path
     model = load_site(site_file, expected_site=getattr(context, "site", None), catalog_path=REPO / "infra" / "services.json")
     resources = {**model.resources.guests, **model.resources.shared_hosts}
     for resource_id, host in canonical_bootstrap_targets(context, selected_resources=selected_resources):
@@ -423,7 +441,7 @@ def canonical_ansible_transport(context: object, log_dir: Path) -> CanonicalAnsi
         def generated_path(name: str) -> Path:
             return generated_dir / name
     else:
-        generated_path = getattr(context, "generated_path")
+        generated_path = context.generated_path
     inventory_path = generated_path("ansible-inventory.json")
     vars_projection_path = generated_path("ansible-vars.json")
     try:
@@ -519,7 +537,7 @@ def default_runner(command: list[str], log_path: Path, env: dict[str, str]) -> i
     with log_path.open("ab") as log:
         log.write(("$ " + " ".join(command) + "\n").encode("utf-8"))
         process = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=env, check=False)
-        log.write((f"\nexit_code={process.returncode}\n").encode("utf-8"))
+        log.write((f"\nexit_code={process.returncode}\n").encode())
         return process.returncode
 
 

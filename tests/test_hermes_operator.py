@@ -1413,7 +1413,7 @@ class HermesOperatorTests(unittest.TestCase):
                 root = Path(temp)
                 with self.assertRaises(hermes_operator.OperatorError) as caught:
                     hermes_operator.run_action(
-                        root, "validate", runner=lambda *_: invalid
+                        root, "validate", runner=lambda *_, invalid=invalid: invalid
                     )
                 records = [
                     json.loads(line)

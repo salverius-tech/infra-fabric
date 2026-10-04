@@ -9,8 +9,9 @@ import re
 import sys
 import urllib.parse
 import urllib.request
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 DNS_NAME_RE = re.compile(r"^(?=.{1,253}\.?$)([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.?$")
 TOP_LEVEL_KEYS = {"settings", "zones", "a_records", "cname_records"}

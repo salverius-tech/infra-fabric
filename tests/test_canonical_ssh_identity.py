@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
-import os
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1] / "scripts"
 spec = importlib.util.spec_from_file_location("canonical_ssh_identity", ROOT / "canonical_ssh_identity.py")

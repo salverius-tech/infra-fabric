@@ -1,11 +1,10 @@
 """Typed interface coverage for reusable security-sensitive Ansible roles."""
 
+import unittest
 from pathlib import Path
 from typing import Any
-import unittest
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = ROOT / "infra/ansible/roles"

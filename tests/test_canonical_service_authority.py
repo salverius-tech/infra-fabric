@@ -1,15 +1,15 @@
 """Canonical service selection remains the sole resource enablement authority."""
 
-from copy import deepcopy
-import os
 import json
-from pathlib import Path
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
+from pathlib import Path
 
 import yaml
 
@@ -22,10 +22,12 @@ TOFU_RUNTIME_AVAILABLE = bool(
 )
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from scripts.canonical_projections import render_ansible_inventory, render_opentofu_variables
+from scripts.canonical_projections import (
+    render_ansible_inventory,
+    render_opentofu_variables,
+)
 from scripts.canonical_values import load_site
 from scripts.service_catalog import load_catalog
-
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = ROOT / "infra/services.json"

@@ -6,10 +6,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from canonical_projections import _resolve_mapping_value, _resource_variables, render_ansible_inventory, render_ansible_vars, render_opentofu_variables
+from canonical_projections import (
+    _resolve_mapping_value,
+    _resource_variables,
+    render_ansible_inventory,
+    render_ansible_vars,
+    render_opentofu_variables,
+)
 from canonical_values import HermesConfiguration, Service, load_site
 from service_catalog import load_catalog
-
 
 ROOT = Path(__file__).resolve().parents[1]
 

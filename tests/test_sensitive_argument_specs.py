@@ -1,11 +1,10 @@
 """Sensitive Ansible role inputs must be hidden during argument validation."""
 
 import json
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_SECRET_FIELDS = {
