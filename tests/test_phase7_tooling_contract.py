@@ -88,9 +88,10 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("ruff check", text)
         config_text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
         self.assertIn(
-            'select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107", "S201", "S301", "S310", "S324", "S501", "S608"]',
+            'select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S101", "S107", "S201", "S301", "S310", "S324", "S501", "S608"]',
             config_text,
         )
+        self.assertIn('"tests/**/*.py" = ["S101"]', config_text)
         self.assertIn(
             '"scripts/bootstrap-technitium-api-token.py" = ["S310"]',
             config_text,

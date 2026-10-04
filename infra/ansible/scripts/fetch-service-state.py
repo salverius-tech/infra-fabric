@@ -81,7 +81,8 @@ def stream_archive(args: argparse.Namespace) -> dict[str, int | str]:
         process = subprocess.Popen(
             ssh_command(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
-        assert process.stdout is not None
+        if process.stdout is None:
+            raise RuntimeError("archive SSH process did not expose its output stream")
         with os.fdopen(fd, "wb", closefd=True) as handle:
             fd = -1
             while chunk := process.stdout.read(1024 * 1024):

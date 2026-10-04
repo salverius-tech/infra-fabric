@@ -11,7 +11,8 @@ from pathlib import Path
 
 SERVICE_AUTHOR = Path(__file__).resolve().with_name("service-author.py")
 SPEC = importlib.util.spec_from_file_location("service_author", SERVICE_AUTHOR)
-assert SPEC and SPEC.loader
+if SPEC is None or SPEC.loader is None:
+    raise RuntimeError("service author implementation is unavailable")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 

@@ -159,7 +159,8 @@ def _resolve_mapping_value(
         model = model_or_service
         service = service_or_resource
         resource = resource_or_path
-    assert isinstance(path, str)
+    if not isinstance(path, str):
+        raise ProjectionError("canonical mapping path must be a string")
     if path.startswith("resources."):
         if model is not None:
             try:
@@ -651,7 +652,8 @@ def render_onramp_handoff(
     if not enabled:
         _assert_non_secret(result, "onramp_handoff")
         return result
-    assert service is not None
+    if service is None:
+        raise ProjectionError("enabled onramp_host service is unavailable")
     if not service.resource:
         raise ProjectionError("enabled onramp_host service has no canonical resource")
     resource = model.resources.shared_hosts.get(service.resource)

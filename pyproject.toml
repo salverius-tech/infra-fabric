@@ -5,7 +5,7 @@ line-length = 88
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107", "S201", "S301", "S310", "S324", "S501", "S608"]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S101", "S107", "S201", "S301", "S310", "S324", "S501", "S608"]
 ignore = [
   "E402",
   "E501",
@@ -19,6 +19,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"] # Assertions are the idiomatic test failure mechanism.
 "scripts/bootstrap-technitium-api-token.py" = ["S310"] # Uses the canonical local Technitium API endpoint.
 "infra/ansible/scripts/apply-technitium-dns.py" = ["S310"] # Uses the configured in-guest Technitium endpoint.
 
