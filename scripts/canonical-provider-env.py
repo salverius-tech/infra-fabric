@@ -37,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         provider = SopsAgeProvider(bundle)
         environment = dict(os.environ)
+        environment.pop("SOPS_AGE_KEY", None)
         environment.update(
             deliver_environment(provider, consumer="opentofu-provider", requirements=provider_requirements(args.provider))
         )
