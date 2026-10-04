@@ -680,6 +680,7 @@ This section records source changes, not acceptance evidence.
 | P1-1 | Broadened Ruff to E/F/W/I/B/UP/C4/PERF/SIM plus targeted S107; added a clean mypy gate for nine core modules. Formatted all 139 Python files with Black and made the inventory exact. Broader security-rule triage and all-script typing remain outstanding. |
 | P2-2 | Added `tools/coverage-floors.json` and a named per-module floor check for all seven critical modules. |
 | P2-3 | Split validation into cached-image `unit` and dependent `full` jobs; moved the filesystem dependency scan to pull-request/push events. Unit/full modes both pass locally; hosted cache and cold-build timing remain unverified. |
+| P3-7 | Added weekly/manual update eligibility reporting via `just update --dry-run` against a disposable scaffold-only site fixture; no private site values or PR side effects are used. |
 | P2-6 | Added `tests/README.md` and `just test-local` for host-portable documentation contracts; registered and documented the recipe. |
 | P2-5 | Provider child environment now removes `SOPS_AGE_KEY`; five direct tests cover propagation, failure paths, and the no-site case. |
 | P2-1 | Extracted `edit-secrets` and `ssh-initialize` shell logic into linted scripts; recipes delegate to those scripts and a contract test checks the delegation. |

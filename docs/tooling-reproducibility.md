@@ -23,7 +23,7 @@ This is a reproducibility **policy**, not a dated Debian snapshot. A future migr
 
 ## SBOM and advisory policy
 
-The pull-request/push `dependency-scan` job is read-only and scans the hash-locked filesystem dependencies. The scheduled/manual `supply-chain-evidence` job builds the public tooling image, generates an SPDX JSON SBOM, and scans the resulting image. HIGH and CRITICAL findings fail the relevant job, including unfixed findings. No provider, private values, credentials, plans, or live infrastructure are available to these workflows.
+The pull-request/push `dependency-scan` job is read-only and scans the hash-locked filesystem dependencies. The scheduled/manual `supply-chain-evidence` job builds the public tooling image, runs weekly `just update --dry-run` eligibility reporting with a disposable scaffold-only site fixture, generates an SPDX JSON SBOM, and scans the resulting image. HIGH and CRITICAL findings fail the relevant job, including unfixed findings. No provider, private values, credentials, plans, or live infrastructure are available to these workflows.
 
 An exception is allowed only when a finding is documented in a reviewed public exception record with its advisory identifier, affected artifact, justified risk acceptance, owner, expiry date, and removal condition. Expired exceptions fail review and must be removed or renewed explicitly. There are currently no exceptions.
 

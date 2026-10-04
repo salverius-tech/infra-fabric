@@ -79,7 +79,17 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Build pinned tooling image without cache
-        run: docker build --no-cache -f tools/Dockerfile -t infra-fabric-tools:ci .
+        run: docker build --no-cache -f tools/Dockerfile -t infra-fabric-tools:ci -t homelab-infra-tooling:local .
+      - name: Report public pin update eligibility without private site values
+        env:
+          HOST_SSH_DIR: ${{ runner.temp }}/empty-ssh
+        run: |
+          mkdir -p "$HOST_SSH_DIR"
+          values_dir="$(mktemp -d "$GITHUB_WORKSPACE/.update-values.XXXXXX")"
+          trap 'rm -rf "$values_dir"' EXIT
+          mkdir -p "$values_dir/sites/update-dry-run"
+          cp scaffold/sites/_template/site.yaml "$values_dir/sites/update-dry-run/site.yaml"
+          VALUES_DIR="${values_dir#"$GITHUB_WORKSPACE/"}" VALUES_SITE=update-dry-run just update --dry-run
       - name: Generate tooling image SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
