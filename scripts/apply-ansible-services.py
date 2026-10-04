@@ -652,7 +652,7 @@ def default_runner(command: list[str], log_path: Path, env: dict[str, str]) -> i
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("ab") as log:
         log.write(("$ " + " ".join(command) + "\n").encode("utf-8"))
-        process = subprocess.run(
+        process = subprocess.run(  # noqa: S603 - internal service runner supplies shell-free argv.
             command, stdout=log, stderr=subprocess.STDOUT, env=env, check=False
         )
         log.write((f"\nexit_code={process.returncode}\n").encode())

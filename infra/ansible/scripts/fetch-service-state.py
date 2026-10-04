@@ -78,7 +78,7 @@ def stream_archive(args: argparse.Namespace) -> dict[str, int | str]:
     process: subprocess.Popen[bytes] | None = None
     try:
         os.fchmod(fd, 0o600)
-        process = subprocess.Popen(
+        process = subprocess.Popen(  # noqa: S603 - operator transfer uses shell-free SSH argv.
             ssh_command(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         if process.stdout is None:

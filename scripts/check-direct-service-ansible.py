@@ -423,12 +423,14 @@ def run_live_probe(kind: str, args: argparse.Namespace) -> list[str]:
             if kind == "connectivity"
             else ["true"]
         )
-        result = subprocess.run(
-            command,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=False,
+        result = (
+            subprocess.run(  # noqa: S603 - the probe selects fixed ansible/true argv.
+                command,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
         )
         if result.returncode != 0:
             raise CheckError(f"{kind} status=fail error_class=probe-command-failed")

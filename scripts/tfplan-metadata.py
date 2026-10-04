@@ -102,7 +102,11 @@ def git_commit(repo: Path) -> str | None:
         return env_commit
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            [  # noqa: S607 - controlled tooling PATH resolves the bundled Git client.
+                "git",
+                "rev-parse",
+                "HEAD",
+            ],
             cwd=repo,
             text=True,
             capture_output=True,
@@ -128,7 +132,7 @@ def load_plan_json(plan: Path, repo: Path) -> dict[str, Any]:
         ]
     else:
         command = ["tofu", "show", "-json", plan.as_posix()]
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - inspected plan path is validated and passed as argv.
         command,
         cwd=repo,
         text=True,

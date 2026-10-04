@@ -28,8 +28,15 @@ def _key_identity(value: str) -> tuple[str, str]:
 
 def derive_public_key(private_key: Path) -> tuple[str, str]:
     try:
-        result = subprocess.run(
-            ["ssh-keygen", "-y", "-P", "", "-f", str(private_key)],
+        result = subprocess.run(  # noqa: S603 - fixed ssh-keygen argv reads the selected private key.
+            [  # noqa: S607 - controlled tooling PATH resolves OpenSSH.
+                "ssh-keygen",
+                "-y",
+                "-P",
+                "",
+                "-f",
+                str(private_key),
+            ],
             check=False,
             capture_output=True,
             stdin=subprocess.DEVNULL,

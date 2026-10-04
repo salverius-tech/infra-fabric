@@ -501,14 +501,23 @@ def citation_errors(citation: Any, *, require_historical: bool = False) -> list[
     if git_ref:
         if not isinstance(git_ref, str) or not re.fullmatch(r"[0-9a-f]{40}", git_ref):
             return [f"citation must use an immutable full Git commit reference: {path}"]
-        if subprocess.run(
-            ["git", "cat-file", "-e", f"{git_ref}^{{commit}}"],
+        if subprocess.run(  # noqa: S603 - this performs a read-only historical-object check.
+            [  # noqa: S607 - controlled tooling PATH resolves Git.
+                "git",
+                "cat-file",
+                "-e",
+                f"{git_ref}^{{commit}}",
+            ],
             cwd=ROOT,
             capture_output=True,
         ).returncode:
             return [f"historical citation is not resolvable: {git_ref}:{path}"]
-        result = subprocess.run(
-            ["git", "show", f"{git_ref}:{path}"],
+        result = subprocess.run(  # noqa: S603 - validated citation data is read via shell-free Git argv.
+            [  # noqa: S607 - controlled tooling PATH resolves Git.
+                "git",
+                "show",
+                f"{git_ref}:{path}",
+            ],
             cwd=ROOT,
             text=True,
             capture_output=True,
@@ -530,8 +539,12 @@ def cited_text(citation: dict[str, str]) -> str | None:
     git_ref = citation.get("git_ref")
     if not git_ref:
         return None
-    result = subprocess.run(
-        ["git", "show", f"{git_ref}:{citation['path']}"],
+    result = subprocess.run(  # noqa: S603 - validated citation data is read via shell-free Git argv.
+        [  # noqa: S607 - controlled tooling PATH resolves Git.
+            "git",
+            "show",
+            f"{git_ref}:{citation['path']}",
+        ],
         cwd=ROOT,
         text=True,
         capture_output=True,
@@ -677,8 +690,14 @@ def validate(
         errors.append(
             "historical ledger must use an immutable full Git commit reference"
         )
-    elif subprocess.run(
-        ["git", "cat-file", "-e", f"{ref}:{path}"], cwd=ROOT
+    elif subprocess.run(  # noqa: S603 - this performs a read-only historical-object check.
+        [  # noqa: S607 - controlled tooling PATH resolves Git.
+            "git",
+            "cat-file",
+            "-e",
+            f"{ref}:{path}",
+        ],
+        cwd=ROOT,
     ).returncode:
         errors.append("historical ledger Git reference is not resolvable")
     packages = completion.get("packages", [])
@@ -819,8 +838,13 @@ def validate(
                 errors.append(
                     f"acceptance evidence must use an immutable full Git commit: {cell}"
                 )
-            elif subprocess.run(
-                ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+            elif subprocess.run(  # noqa: S603 - this performs a read-only historical-object check.
+                [  # noqa: S607 - controlled tooling PATH resolves Git.
+                    "git",
+                    "cat-file",
+                    "-e",
+                    f"{commit}^{{commit}}",
+                ],
                 cwd=ROOT,
                 capture_output=True,
             ).returncode:

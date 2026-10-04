@@ -88,7 +88,9 @@ def run_locked(lock_path: Path, command: Sequence[str]) -> int:
     with acquire_site_lock(lock_path):
         environment = dict(os.environ)
         environment[HELD_LOCK_ENV] = str(lock_path)
-        return subprocess.run(list(command), check=False, env=environment).returncode
+        return subprocess.run(  # noqa: S603 - the lock wrapper preserves caller argv without a shell.
+            list(command), check=False, env=environment
+        ).returncode
 
 
 def main(argv: list[str] | None = None) -> int:

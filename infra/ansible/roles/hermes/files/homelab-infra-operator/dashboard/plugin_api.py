@@ -30,7 +30,7 @@ def _bridge(action: str, *extra: str) -> dict[str, Any]:
     script = repo / "scripts" / "hermes-operator.py"
     if not script.is_file():
         raise HTTPException(status_code=503, detail="operator bridge is not installed")
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - action is allow-listed and bridge argv is shell-free.
         [sys.executable, str(script), action, "--repo", str(repo), "--json", *extra],
         cwd=repo,
         text=True,

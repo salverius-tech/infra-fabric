@@ -113,7 +113,7 @@ class SopsAgeProvider:
             env["SOPS_AGE_KEY_FILE"] = str(self.key_file)
         try:
             # The executable and arguments are passed without a shell; SOPS stdout stays in memory.
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S603 - fixed SOPS argv is shell-free and stdout stays in memory.
                 [
                     self.executable,
                     "--decrypt",

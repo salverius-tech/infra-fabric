@@ -228,7 +228,7 @@ def run_ansible_shell(command: str) -> str:
             "-a",
             command,
         ]
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - remote shell arguments are quoted at construction.
         argv,
         cwd=REPO,
         text=True,

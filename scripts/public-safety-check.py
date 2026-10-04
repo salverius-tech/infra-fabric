@@ -70,8 +70,17 @@ class Finding:
 
 
 def run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, text=True, capture_output=True, check=False
+    return (
+        subprocess.run(  # noqa: S603 - this helper invokes only fixed Git subcommands.
+            [  # noqa: S607 - controlled tooling PATH resolves the bundled Git client.
+                "git",
+                *args,
+            ],
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
     )
 
 

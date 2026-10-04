@@ -240,7 +240,12 @@ def load_plan_summary(repo: Path) -> dict[str, Any] | None:
 def git_dirty(repo: Path) -> bool:
     try:
         result = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],
+            [  # noqa: S607 - controlled tooling PATH resolves the bundled Git client.
+                "git",
+                "status",
+                "--porcelain",
+                "--untracked-files=no",
+            ],
             cwd=repo,
             text=True,
             capture_output=True,
@@ -418,14 +423,16 @@ def write_audit_record(
 def default_runner(
     command: list[str], env: dict[str, str], repo: Path
 ) -> tuple[int, str]:
-    result = subprocess.run(
-        command,
-        cwd=repo,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
+    result = (
+        subprocess.run(  # noqa: S603 - actions are allow-listed and assembled as argv.
+            command,
+            cwd=repo,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
     )
     return result.returncode, result.stdout
 

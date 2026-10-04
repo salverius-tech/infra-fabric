@@ -41,8 +41,10 @@ class Phase7ToolingContractTests(unittest.TestCase):
             lock, r"(?m)^[A-Za-z0-9_.-]+==[^\s]+ \\\n    --hash=sha256:[0-9a-f]{64}$"
         )
         self.assertRegex(
-            bootstrap_lock, r"(?m)^pip==[^\s]+ \\\n    --hash=sha256:[0-9a-f]{64}$"
+            bootstrap_lock,
+            r"(?m)^(?:pip|setuptools)==[^\s]+ \\\n    --hash=sha256:[0-9a-f]{64}$",
         )
+        self.assertIn("setuptools==84.0.0", bootstrap_lock)
         self.assertNotIn("-r tools/requirements.txt", text)
 
     def test_apt_and_advisory_policy_are_documented(self) -> None:
@@ -104,14 +106,17 @@ class Phase7ToolingContractTests(unittest.TestCase):
                 "S324",
                 "S501",
                 "S506",
+                "S603",
+                "S606",
+                "S607",
                 "S608",
                 "S701",
             }
             <= selected
         )
-        self.assertTrue({"S603", "S606", "S607"}.isdisjoint(selected))
+        self.assertTrue({"S603", "S606", "S607"} <= selected)
         per_file = ruff_config["per-file-ignores"]
-        self.assertEqual(per_file["tests/**/*.py"], ["S101"])
+        self.assertEqual(per_file["tests/**/*.py"], ["S101", "S603", "S606", "S607"])
         self.assertEqual(
             per_file["scripts/bootstrap-technitium-api-token.py"],
             ["S105", "S310"],

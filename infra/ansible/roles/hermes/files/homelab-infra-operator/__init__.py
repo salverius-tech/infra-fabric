@@ -68,13 +68,15 @@ def _run(action: str, extra: tuple[str, ...] = ()) -> str:
         "--json",
         *extra,
     ]
-    result = subprocess.run(
-        command,
-        cwd=repo,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
+    result = (
+        subprocess.run(  # noqa: S603 - internal operator bridge passes shell-free argv.
+            command,
+            cwd=repo,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
     )
     output = result.stdout.strip()
     if output:

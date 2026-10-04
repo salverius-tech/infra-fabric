@@ -49,7 +49,9 @@ def main(argv: list[str] | None = None) -> int:
                 requirements=provider_requirements(args.provider),
             )
         )
-        os.execvpe(command[0], command, environment)
+        os.execvpe(  # noqa: S606 - this CLI intentionally execs the operator's argv, without a shell.
+            command[0], command, environment
+        )
     except (OSError, SecretProviderError, ValueError) as error:
         print(f"canonical provider credential handoff failed: {error}", file=sys.stderr)
         return 1

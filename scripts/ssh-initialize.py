@@ -71,7 +71,7 @@ def _sops_yaml(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) ->
     yaml.dump(data, plaintext)
     env = os.environ.copy()
     env["SOPS_AGE_KEY_FILE"] = str(key_file)
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - fixed SOPS argv keeps key material on stdin only.
         [
             sops,
             "--encrypt",
@@ -100,8 +100,17 @@ def _sops_yaml(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) ->
 
 def _generate_key(directory: Path, name: str = "bootstrap") -> tuple[str, str]:
     private = directory / name
-    result = subprocess.run(
-        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(private)],
+    result = subprocess.run(  # noqa: S603 - fixed ssh-keygen argv writes only into private staging.
+        [  # noqa: S607 - controlled tooling PATH resolves OpenSSH.
+            "ssh-keygen",
+            "-q",
+            "-t",
+            "ed25519",
+            "-N",
+            "",
+            "-f",
+            str(private),
+        ],
         capture_output=True,
         text=True,
         check=False,

@@ -56,27 +56,29 @@ def encrypt(sops: str, bundle: Path, data: dict[str, Any], key_file: Path) -> by
     yaml_parser().dump(data, plaintext)
     environment = os.environ.copy()
     environment["SOPS_AGE_KEY_FILE"] = str(key_file)
-    result = subprocess.run(
-        [
-            sops,
-            "--encrypt",
-            "--input-type",
-            "yaml",
-            "--output-type",
-            "yaml",
-            "--filename-override",
-            canonical_sops_filename(bundle),
-            "--config",
-            str(bundle.parent / ".sops.yaml"),
-            "/dev/stdin",
-        ],
-        input=plaintext.getvalue(),
-        capture_output=True,
-        text=True,
-        env=environment,
-        cwd=bundle.parent,
-        check=False,
-        timeout=30,
+    result = (
+        subprocess.run(  # noqa: S603 - fixed SOPS argv keeps plaintext on stdin only.
+            [
+                sops,
+                "--encrypt",
+                "--input-type",
+                "yaml",
+                "--output-type",
+                "yaml",
+                "--filename-override",
+                canonical_sops_filename(bundle),
+                "--config",
+                str(bundle.parent / ".sops.yaml"),
+                "/dev/stdin",
+            ],
+            input=plaintext.getvalue(),
+            capture_output=True,
+            text=True,
+            env=environment,
+            cwd=bundle.parent,
+            check=False,
+            timeout=30,
+        )
     )
     if result.returncode != 0 or not result.stdout.strip():
         raise SecretSetError("SOPS encryption failed")
