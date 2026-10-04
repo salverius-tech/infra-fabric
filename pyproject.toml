@@ -5,7 +5,7 @@ line-length = 88
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107"]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107", "S201", "S301", "S324", "S501"]
 ignore = [
   "E402",
   "E501",
@@ -19,19 +19,9 @@ ignore = [
 ]
 
 [tool.mypy]
-follow_imports = "skip"
+follow_imports = "silent"
 ignore_missing_imports = true
-files = [
-  "scripts/atomic_output.py",
-  "scripts/private_files.py",
-  "scripts/execution-snapshot.py",
-  "scripts/tfplan-metadata.py",
-  "scripts/secret_provider.py",
-  "scripts/site_lock.py",
-  "scripts/canonical-provider-env.py",
-  "scripts/canonical_values.py",
-  "scripts/service_catalog.py",
-]
+files = ["scripts", "infra/ansible/scripts"]
 
 [tool.coverage.run]
 patch = ["subprocess"]

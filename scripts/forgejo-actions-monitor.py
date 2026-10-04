@@ -21,7 +21,7 @@ from canonical_projections import (
 from canonical_values import load_site, model_digest
 from projection_manifest import verify_manifest
 from service_catalog import load_catalog
-from values_context import ValuesContextError, from_environment
+from values_context import ValuesContext, ValuesContextError, from_environment
 
 REPO = Path(__file__).resolve().parents[1]
 INVENTORY = "values/ansible/inventory/local.yml"
@@ -70,6 +70,8 @@ class MonitorError(RuntimeError):
 
 
 def status_name(value: int | str | None) -> str:
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return "unknown"
     try:
         return STATUS[int(value)]
     except (TypeError, ValueError, KeyError):
@@ -80,9 +82,14 @@ def safe_int(value: object, *, maximum: int = MAX_SAFE_ID) -> int | None:
     """Return a bounded non-negative integer, never attacker-controlled text."""
     if isinstance(value, bool):
         return None
-    try:
-        result = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError, OverflowError):
+    if isinstance(value, int):
+        result = value
+    elif isinstance(value, str):
+        try:
+            result = int(value)
+        except ValueError:
+            return None
+    else:
         return None
     return result if 0 <= result <= maximum else None
 
@@ -144,7 +151,7 @@ def shell_quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
 
 
-def verify_canonical_monitor_inputs(context: object) -> Path:
+def verify_canonical_monitor_inputs(context: ValuesContext) -> Path:
     site_file = getattr(context, "canonical_site_path", None)
     if site_file is None:
         raise MonitorError("canonical site.yaml is required")

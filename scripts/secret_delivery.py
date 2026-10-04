@@ -25,6 +25,10 @@ class SecretCatalog(Protocol):
 
     def get(self, name: str) -> Any: ...
 
+    def required_secret_paths_for_model(
+        self, services: dict[str, object]
+    ) -> frozenset[str]: ...
+
 
 @dataclass(frozen=True)
 class SecretRequirement:
@@ -127,7 +131,7 @@ def root_password_requirements(
 
 
 def requirements_for_model(
-    catalog: object,
+    catalog: SecretCatalog,
     services: Mapping[str, object],
     *,
     selected_services: list[str] | tuple[str, ...] | None = None,
@@ -261,7 +265,7 @@ def deliver_environment(
 
 def deliver_services_environment(
     provider: SecretProvider,
-    catalog: object,
+    catalog: SecretCatalog,
     services: Mapping[str, object],
     *,
     selected_services: list[str] | tuple[str, ...] | None = None,

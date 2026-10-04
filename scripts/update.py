@@ -14,7 +14,9 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from http.client import HTTPMessage
 from pathlib import Path
+from typing import IO
 
 import yaml
 
@@ -183,10 +185,10 @@ class HTTPSOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(
         self,
         request: urllib.request.Request,
-        file: object,
+        file: IO[bytes],
         code: int,
         message: str,
-        headers: object,
+        headers: HTTPMessage,
         new_url: str,
     ) -> urllib.request.Request | None:
         parsed_url = urllib.parse.urlsplit(new_url)
@@ -522,18 +524,18 @@ def run(
             ) from error
         if not isinstance(document, dict):
             raise UpdateError(f"canonical site {site_path} must contain an object")
-        results: list[UpdateResult] = []
+        canonical_results: list[UpdateResult] = []
         changed = False
         for target in TARGETS:
             if target.canonical_path is None:
-                results.append(
+                canonical_results.append(
                     process_target(target, root, now, min_age, opener, dry_run)
                 )
                 continue
             result, target_changed = process_canonical_target(
                 target, document, root, now, min_age, opener, dry_run
             )
-            results.append(result)
+            canonical_results.append(result)
             changed = changed or target_changed
         if changed:
             rendered = yaml.safe_dump(document, sort_keys=False)
@@ -559,7 +561,7 @@ def run(
             finally:
                 if candidate_path is not None:
                     candidate_path.unlink(missing_ok=True)
-        return results
+        return canonical_results
     inventory_path = context.path("ansible/inventory/local.yml").relative_to(root)
     targets = tuple(
         Target(
@@ -580,10 +582,10 @@ def run(
         )
         for target in TARGETS
     )
-    results: list[UpdateResult] = []
+    legacy_results: list[UpdateResult] = []
     for target in targets:
         if context.canonical_site_path is not None and target.path == inventory_path:
-            results.append(
+            legacy_results.append(
                 UpdateResult(
                     target.name,
                     target.path,
@@ -594,8 +596,10 @@ def run(
                 )
             )
             continue
-        results.append(process_target(target, root, now, min_age, opener, dry_run))
-    return results
+        legacy_results.append(
+            process_target(target, root, now, min_age, opener, dry_run)
+        )
+    return legacy_results
 
 
 def print_results(results: list[UpdateResult]) -> None:

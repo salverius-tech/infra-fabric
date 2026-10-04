@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 try:
@@ -25,7 +26,7 @@ LIFECYCLE_FIELDS = frozenset({"correlation_id", "phase", "action", "returncode",
 LEGACY_RESULT_FIELDS = frozenset({"action", "returncode", "ok"})
 
 
-def audit_record_hash(record: dict[str, object]) -> str:
+def audit_record_hash(record: Mapping[str, object]) -> str:
     unsigned = {key: value for key, value in record.items() if key != "record_hash"}
     payload = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode(
         "utf-8"

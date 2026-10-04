@@ -468,7 +468,9 @@ def authority() -> dict[str, Any]:
                 f"malformed reconciliation authority {name} source: "
                 f"{'; '.join(citation_problems)}"
             )
-    for record in [*findings, *records]:
+    if not isinstance(findings, list) or not isinstance(records, list):
+        raise ValueError("malformed reconciliation authority: records must be lists")
+    for record in findings + records:
         if not isinstance(record.get("title"), str) or not record["title"]:
             raise ValueError("malformed reconciliation authority: title is required")
         if not isinstance(record.get("lines"), str):
@@ -588,7 +590,7 @@ def build() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
             {
                 **package,
                 "source_status": "source-complete",
-                "evidence": PACKAGE_EVIDENCE[package["id"]],
+                "evidence": PACKAGE_EVIDENCE[str(package["id"])],
             }
         )
     data = authority()

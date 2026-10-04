@@ -59,7 +59,10 @@ def build_feature_checks(
         for mount_name, definition in service_storage.items():
             if not isinstance(definition, dict):
                 continue
-            feature = REQUIRED_FEATURES.get(definition.get("type"))
+            mount_type = definition.get("type")
+            if not isinstance(mount_type, str):
+                continue
+            feature = REQUIRED_FEATURES.get(mount_type)
             if not feature:
                 continue
             if vmid is None:

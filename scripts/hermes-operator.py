@@ -34,7 +34,7 @@ from private_files import PrivateFileError, _fsync_descriptor, _private_director
 # deployed read-only bundle intentionally carries neither canonical values nor
 # snapshot code; status/audit-verify use only their allow-listed context/audit
 # journal inputs. These public symbols preserve testable controller boundaries.
-load_site = None
+load_site: Callable[..., Any] | None = None
 
 
 class AuditSnapshotError(RuntimeError):
@@ -162,9 +162,12 @@ def enabled_services(repo: Path) -> list[str]:
     if not canonical_path.is_file():
         raise OperatorError(f"selected canonical site is missing: {selected_site}")
     try:
-        loader = load_site
-        if loader is None:
-            from canonical_values import load_site as loader
+        if load_site is None:
+            from canonical_values import load_site as default_load_site
+
+            loader = default_load_site
+        else:
+            loader = load_site
         model = loader(
             canonical_path,
             expected_site=selected_site,

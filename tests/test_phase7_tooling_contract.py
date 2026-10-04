@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+import tomllib
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -86,7 +87,7 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("tools/python-format-files.txt", text)
         self.assertIn("ruff check", text)
         self.assertIn(
-            'select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107"]',
+            'select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S107", "S201", "S301", "S324", "S501"]',
             (ROOT / "pyproject.toml").read_text(encoding="utf-8"),
         )
         self.assertIn("${python_files[@]}", text)
@@ -99,6 +100,14 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn('stages+=("FAIL ${current_stage}")', text)
         self.assertIn("scripts/canonical-render.py", text)
         self.assertIn("scripts/verify-projections.py", text)
+
+    def test_mypy_covers_all_operator_python_modules(self) -> None:
+        config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        self.assertEqual(
+            config["tool"]["mypy"]["files"],
+            ["scripts", "infra/ansible/scripts"],
+        )
+        self.assertEqual(config["tool"]["mypy"]["follow_imports"], "silent")
 
     def test_black_inventory_covers_every_python_source(self) -> None:
         sources = sorted(

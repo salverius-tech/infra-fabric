@@ -8,7 +8,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 try:
     from values_context import ValuesContextError, from_environment, load_metadata
@@ -145,13 +145,11 @@ def tofu_replace_targets(
         raise SettingsError(f"service is not enabled: {service}")
     if runtime_type not in {"lxc", "vm"}:
         raise SettingsError(f"unsupported service runtime: {runtime_type}")
-    targets = [
-        target
-        for target in SERVICES[service]["terraform_replace_addresses"].get(
-            runtime_type, ()
-        )
-        if target
-    ]
+    replace_addresses = cast(
+        dict[str, tuple[str, ...]],
+        SERVICES[service]["terraform_replace_addresses"],
+    )
+    targets = [target for target in replace_addresses.get(runtime_type, ()) if target]
     if not targets:
         raise SettingsError(f"service has no OpenTofu replacement targets: {service}")
     return list(dict.fromkeys(targets))

@@ -446,9 +446,9 @@ def render_ansible_inventory(
         else:
             hosts[host] = {**hostvars, "canonical_services": [name]}
         groups.setdefault(group, {"hosts": {}})["hosts"][host] = {}
-    for group in groups.values():
-        for host in group["hosts"]:
-            group["hosts"][host] = hosts[host]
+    for service_group_vars in groups.values():
+        for host in service_group_vars["hosts"]:
+            service_group_vars["hosts"][host] = hosts[host]
     result = {
         "all": {
             "children": {group: {} for group in sorted(groups)},
@@ -501,7 +501,6 @@ def render_ansible_vars(
         ansible_vars: dict[str, Any] = {}
         ansible_var_mappings = capability.inventory.get("ansible_var_mappings")
         if isinstance(ansible_var_mappings, Mapping):
-            ansible_vars: dict[str, Any] = {}
             for ansible_var_name, canonical_path in ansible_var_mappings.items():
                 if not isinstance(ansible_var_name, str) or not isinstance(
                     canonical_path, str

@@ -1821,10 +1821,10 @@ class CanonicalSite(StrictModel):
         searxng = self.services.get("searxng_onramp")
         if searxng is not None:
             try:
-                configuration = SearxngConfiguration.model_validate(
+                searxng_configuration = SearxngConfiguration.model_validate(
                     searxng.configuration
                 )
-                searxng.configuration = configuration.model_dump(
+                searxng.configuration = searxng_configuration.model_dump(
                     mode="json", exclude_none=False
                 )
             except ValidationError as error:
@@ -1838,10 +1838,10 @@ class CanonicalSite(StrictModel):
         runner = self.services.get("forgejo_runner")
         if runner is not None:
             try:
-                configuration = ForgejoRunnerConfiguration.model_validate(
+                runner_configuration = ForgejoRunnerConfiguration.model_validate(
                     runner.configuration
                 )
-                runner.configuration = configuration.model_dump(
+                runner.configuration = runner_configuration.model_dump(
                     mode="json", exclude_none=False
                 )
             except ValidationError as error:
@@ -1855,10 +1855,10 @@ class CanonicalSite(StrictModel):
         tailscale = self.services.get("tailscale_client")
         if tailscale is not None:
             try:
-                configuration = TailscaleConfiguration.model_validate(
+                tailscale_configuration = TailscaleConfiguration.model_validate(
                     tailscale.configuration
                 )
-                tailscale.configuration = configuration.model_dump(
+                tailscale.configuration = tailscale_configuration.model_dump(
                     mode="json", exclude_none=False
                 )
             except ValidationError as error:
@@ -1872,10 +1872,10 @@ class CanonicalSite(StrictModel):
         infisical = self.services.get("infisical")
         if infisical is not None:
             try:
-                configuration = InfisicalConfiguration.model_validate(
+                infisical_configuration = InfisicalConfiguration.model_validate(
                     infisical.configuration
                 )
-                infisical.configuration = configuration.model_dump(
+                infisical.configuration = infisical_configuration.model_dump(
                     mode="json", exclude_none=False
                 )
             except ValidationError as error:
@@ -1889,11 +1889,15 @@ class CanonicalSite(StrictModel):
         infisical_onramp = self.services.get("infisical_onramp")
         if infisical_onramp is not None:
             try:
-                configuration = InfisicalOnrampConfiguration.model_validate(
-                    infisical_onramp.configuration
+                infisical_onramp_configuration = (
+                    InfisicalOnrampConfiguration.model_validate(
+                        infisical_onramp.configuration
+                    )
                 )
-                infisical_onramp.configuration = configuration.model_dump(
-                    mode="json", exclude_none=False
+                infisical_onramp.configuration = (
+                    infisical_onramp_configuration.model_dump(
+                        mode="json", exclude_none=False
+                    )
                 )
             except ValidationError as error:
                 details = "; ".join(
@@ -1906,10 +1910,10 @@ class CanonicalSite(StrictModel):
         forgejo = self.services.get("forgejo")
         if forgejo is not None:
             try:
-                configuration = ForgejoConfiguration.model_validate(
+                forgejo_configuration = ForgejoConfiguration.model_validate(
                     forgejo.configuration
                 )
-                forgejo.configuration = configuration.model_dump(
+                forgejo.configuration = forgejo_configuration.model_dump(
                     mode="json", exclude_none=False
                 )
             except ValidationError as error:

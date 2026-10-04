@@ -16,6 +16,7 @@ import tempfile
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 SETTINGS_SPEC = importlib.util.spec_from_file_location(
@@ -41,7 +42,7 @@ try:
     )
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
-    from values_context import from_environment
+    from values_context import ValuesContext, from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(REPO / "scripts"))
     from canonical_projections import (
@@ -59,7 +60,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     )
     from secret_provider import SopsAgeProvider
     from service_catalog import load_catalog
-    from values_context import from_environment
+    from values_context import ValuesContext, from_environment
 RunCommand = Callable[[list[str], Path, dict[str, str]], int]
 
 
@@ -80,7 +81,7 @@ class CanonicalAnsibleTransport:
     environment: dict[str, str]
 
 
-def runtime_known_hosts_path(context: object) -> Path:
+def runtime_known_hosts_path(context: ValuesContext) -> Path:
     """Keep mutable SSH trust material outside an immutable execution snapshot."""
     configured = os.environ.get("INFRA_VALUES_DIR", "").strip()
     if configured:
@@ -91,7 +92,7 @@ def runtime_known_hosts_path(context: object) -> Path:
     return context.path("ansible/known_hosts")
 
 
-def canonical_enabled_services(context: object, service: str = "") -> list[str]:
+def canonical_enabled_services(context: ValuesContext, service: str = "") -> list[str]:
     site_file = getattr(context, "canonical_site_path", None)
     if site_file is None:
         raise RuntimeError(
@@ -208,7 +209,7 @@ def canonical_identity_extra_args() -> tuple[str, ...]:
     return tuple(args)
 
 
-def canonical_dns_environment(context: object) -> dict[str, str]:
+def canonical_dns_environment(context: ValuesContext) -> dict[str, str]:
     """Return the verified canonical DNS projection transport for execution."""
     site_file = getattr(context, "canonical_site_path", None)
     if site_file is None:
@@ -232,7 +233,7 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
 
     else:
         generated_path = context.generated_path
-    projections: dict[str, object] = {}
+    projections: dict[str, Any] = {}
     try:
         for name in expected_projections:
             path = generated_path(name)
@@ -277,7 +278,7 @@ def canonical_dns_environment(context: object) -> dict[str, str]:
 
 
 def canonical_bootstrap_targets(
-    context: object,
+    context: ValuesContext,
     *,
     selected_resources: set[str] | None = None,
 ) -> tuple[tuple[str, str], ...]:
@@ -315,7 +316,7 @@ def canonical_bootstrap_targets(
 
 
 def run_canonical_bootstrap(
-    context: object,
+    context: ValuesContext,
     inventories: tuple[str, ...],
     log_dir: Path,
     base_env: dict[str, str],
@@ -370,7 +371,7 @@ def run_canonical_bootstrap(
 
 
 def run_canonical_host_identity(
-    context: object,
+    context: ValuesContext,
     inventories: tuple[str, ...],
     log_dir: Path,
     base_env: dict[str, str],
@@ -391,9 +392,11 @@ def run_canonical_host_identity(
     runner = runner or default_runner
     operator_requirement = operator_password_requirements()[0]
     site_file = context.canonical_site_path
+    if site_file is None:
+        raise RuntimeError("canonical host identity requires a selected canonical site")
     model = load_site(
         site_file,
-        expected_site=getattr(context, "site", None),
+        expected_site=context.site,
         catalog_path=REPO / "infra" / "services.json",
     )
     resources = {**model.resources.guests, **model.resources.shared_hosts}
@@ -420,6 +423,7 @@ def run_canonical_host_identity(
             os.environ.get("INFRA_HOST_IDENTITY_SKIP_ROOT", "true").strip().lower()
             != "false"
         )
+        phases: tuple[tuple[str, bool], ...]
         if resource.type == "lxc" and skip_root:
             phases = (("infra", True),)
         else:
@@ -471,7 +475,7 @@ def run_canonical_host_identity(
 
 
 def run_canonical_direct_access_ready(
-    context: object,
+    context: ValuesContext,
     inventories: tuple[str, ...],
     log_dir: Path,
     base_env: dict[str, str],
@@ -509,7 +513,7 @@ def run_canonical_direct_access_ready(
 
 
 def canonical_ansible_transport(
-    context: object, log_dir: Path
+    context: ValuesContext, log_dir: Path
 ) -> CanonicalAnsibleTransport:
     """Build paired inventory/vars transport only from verified canonical projections."""
     if getattr(context, "canonical_site_path", None) is None:

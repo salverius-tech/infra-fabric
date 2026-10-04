@@ -164,7 +164,7 @@ def check_canonical_secret_availability(repo: Path) -> dict[str, str] | None:
         raise PreflightError("canonical secret availability preflight failed")
     bundle = context.values_dir / "secrets.sops.yaml"
     if not bundle.is_file():
-        return
+        return None
     try:
         policy, expected_recipients = _sops_policy_inputs(repo)
         policy_metadata = (

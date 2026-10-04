@@ -19,7 +19,7 @@ The image deliberately uses the package set from the digest-pinned Debian Bookwo
 3. record the generated SBOM and fail the advisory scan under the policy below; and
 4. update the base digest or package policy in a reviewed source change when Debian security updates require it.
 
-This is a reproducibility **policy**, not a dated Debian snapshot. A future migration to snapshots must pin both snapshot timestamp and archive checks, retain the above evidence, and prove the supported build still succeeds.
+This is a reproducibility **policy**, not a dated Debian snapshot. A future migration to snapshots must pin both snapshot timestamp and archive checks, retain the above evidence, and prove the supported build still succeeds. An uncached local tooling-image build completed in 42 seconds on 2026-10-04; this is a runner-specific observation, not a CI timing guarantee.
 
 ## SBOM and advisory policy
 
@@ -29,4 +29,4 @@ An exception is allowed only when a finding is documented in a reviewed public e
 
 ## Quality and coverage policy
 
-Public validation compiles every repository Python file, applies Ruff checks to that complete set, and runs Black over every Python source. `tools/python-format-files.txt` is the complete formatting inventory; a contract test requires it to match the source tree exactly. MyPy checks nine core modules, with broader script coverage still incremental. Coverage includes `scripts/` and `infra/ansible/scripts`, collects subprocess data, enforces an aggregate 70% threshold and named per-module floors. Cache, bytecode, and coverage data are written beneath `/tmp/infra-fabric` in the container, not into the source mount.
+Public validation compiles every repository Python file, applies Ruff checks to that complete set, and runs Black over every Python source. Ruff enables the E/F/W, import, bugbear, modern-Python, comprehension, performance, simplification, and targeted Bandit rules S107/S201/S301/S324/S501; broader Bandit rules remain excluded pending review of command, URL, temporary-path, and test-assertion false positives. `tools/python-format-files.txt` is the complete formatting inventory; a contract test requires it to match the source tree exactly. MyPy checks all 50 Python modules under `scripts/` and `infra/ansible/scripts`, with imports checked silently to avoid duplicate third-party diagnostics. Coverage includes `scripts/` and `infra/ansible/scripts`, collects subprocess data, enforces an aggregate 70% threshold and named per-module floors. Cache, bytecode, and coverage data are written beneath `/tmp/infra-fabric` in the container, not into the source mount.
