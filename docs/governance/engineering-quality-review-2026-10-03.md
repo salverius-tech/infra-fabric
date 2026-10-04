@@ -677,7 +677,7 @@ This section records source changes, not acceptance evidence.
 | Finding | Progress |
 | --- | --- |
 | P1-3 | Added subprocess coverage collection and included `infra/ansible/scripts` in the source set. Confirmed subprocess attribution: `canonical-provider-env.py` now measures 97%. |
-| P1-1 | Ruff gates S107/S201/S301/S310/S324/S501. Reviewed the recommended hotspots: updater HTTPS validation, the secret provider's fixed-argv subprocess, and no applicable findings in `secret_delivery.py`; local Technitium URL exceptions are path-scoped. MyPy gates all 50 script modules and Black covers every Python source. Other subprocess/tmp/assertion Bandit triage remains outstanding. |
+| P1-1 | Ruff gates S107/S201/S301/S310/S324/S501. Reviewed the recommended hotspots: updater HTTPS validation, the secret provider's fixed-argv subprocess, and no applicable findings in `secret_delivery.py`; local Technitium URL exceptions are path-scoped. MyPy gates all 50 script modules and Black covers every Python source. The complete S-family remains deferred: its 49 initial findings include broad subprocess, temporary-path, and assertion heuristics requiring separate review. |
 | P2-2 | Added `tools/coverage-floors.json` and a named per-module floor check for all seven critical modules. |
 | P2-3 | Split validation into cached-image `unit` and dependent `full` jobs; moved filesystem scanning to PR/push events. Both profiles pass locally; an uncached tooling image build took 42s on this runner. Hosted Actions cache behavior remains unverified. |
 | P3-7 | Added weekly/manual update eligibility reporting via `just update --dry-run` against a disposable scaffold-only site fixture; no private site values or PR side effects are used. |
@@ -689,7 +689,7 @@ This section records source changes, not acceptance evidence.
 | P3-2 | Consolidated duplicate Caddy templates under `caddy_proxy`; preserved the `onramp_host` systemd difference as an explicit template variable and added tests. |
 | P3-3 | Split the large Hermes task list into ordered preflight, host-runtime, application-runtime, configuration, and verification imports. Updated static contracts to resolve imports; full Ansible validation passes. |
 | P3-5 | Replaced broad evidence line spans in the generated audit table with named production symbols and verification test identifiers; reconciliation now verifies each symbol exists and records the maintenance expectation. |
-| P3-6 | Added `CODEOWNERS`, `SECURITY.md`, `.editorconfig`, and the inventory entry. GitHub private-reporting availability still requires repository-settings verification. |
+| P3-6 | Added `CODEOWNERS`, `SECURITY.md`, `.editorconfig`, and the inventory entry. Enabled and API-verified GitHub private vulnerability reporting on 2026-10-04. |
 | P3-4 | Removed the identity function and its call sites; callers now invoke `require_site_context` directly, and compatibility tests exercise that contract. |
 | P3-8 | Added `pyproject.toml` with explicit Black/Ruff line length, Ruff rules/ignores, all-script MyPy scope, and subprocess-aware coverage configuration. Black checks every listed Python source. |
 | P4-1 | Added fail-closed SSH mount directory validation to `just setup` and `scripts/run-infra.sh`. |
