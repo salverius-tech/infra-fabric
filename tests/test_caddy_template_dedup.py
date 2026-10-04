@@ -13,12 +13,25 @@ class CaddyTemplateDeduplicationTests(unittest.TestCase):
     def test_service_roles_reference_shared_templates(self) -> None:
         for role, task_file in (
             ("forgejo", "tasks/caddy.yml"),
-            ("hermes", "tasks/main.yml"),
+            ("hermes", "tasks/configuration.yml"),
             ("infisical", "tasks/main.yml"),
             ("onramp_host", "tasks/main.yml"),
         ):
             with self.subTest(role=role):
-                tasks = (ROLES / role / task_file).read_text(encoding="utf-8")
+                if role == "hermes":
+                    task_dir = ROLES / role / "tasks"
+                    tasks = "\n".join(
+                        (task_dir / name).read_text(encoding="utf-8")
+                        for name in (
+                            "preflight.yml",
+                            "host-runtime.yml",
+                            "application-runtime.yml",
+                            "configuration.yml",
+                            "verification.yml",
+                        )
+                    )
+                else:
+                    tasks = (ROLES / role / task_file).read_text(encoding="utf-8")
                 self.assertIn("../caddy_proxy/templates/caddy.env.j2", tasks)
                 self.assertIn("../caddy_proxy/templates/caddy-override.conf.j2", tasks)
                 self.assertFalse((ROLES / role / "templates/caddy.env.j2").exists())

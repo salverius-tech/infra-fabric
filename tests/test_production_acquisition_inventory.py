@@ -12,6 +12,23 @@ ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = ROOT / "docs/production-acquisition-inventory.json"
 CANONICAL_VALUES = ROOT / "scripts/canonical_values.py"
 
+
+def source_text(relative: str) -> str:
+    if relative == "infra/ansible/roles/hermes/tasks/main.yml":
+        task_dir = ROOT / "infra/ansible/roles/hermes/tasks"
+        return "\n".join(
+            (task_dir / name).read_text(encoding="utf-8")
+            for name in (
+                "preflight.yml",
+                "host-runtime.yml",
+                "application-runtime.yml",
+                "configuration.yml",
+                "verification.yml",
+            )
+        )
+    return (ROOT / relative).read_text(encoding="utf-8")
+
+
 # These patterns intentionally find consumer *files*, not every URL: one source file
 # may contain a health probe and several downloads.  Every discovered file must have
 # an explicit inventory record before it can be treated as reviewed.
@@ -131,7 +148,7 @@ class ProductionAcquisitionInventoryTests(unittest.TestCase):
     def test_digest_and_checksum_claims_are_backed_by_source_syntax(self) -> None:
         inventory = self.load_inventory()
         for entry in inventory["consumers"]:
-            text = (ROOT / entry["source"]).read_text(encoding="utf-8")
+            text = source_text(entry["source"])
             for acquisition in entry["acquisitions"]:
                 if acquisition["contract"] == "immutable-digest":
                     self.assertRegex(text, r"@sha256:[0-9a-f]{64}", entry["source"])
@@ -176,7 +193,7 @@ class ProductionAcquisitionInventoryTests(unittest.TestCase):
         }:
             self.assertIn(
                 "reviewed-artifact-cache.yml",
-                (ROOT / source).read_text(encoding="utf-8"),
+                source_text(source),
             )
         raw_installers = (
             "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
@@ -184,7 +201,7 @@ class ProductionAcquisitionInventoryTests(unittest.TestCase):
             'curl -fsSL -o "${tmp}/just.tar.gz"',
         )
         deployment = "\n".join(
-            (ROOT / source).read_text(encoding="utf-8")
+            source_text(source)
             for source in REQUIRED_REVIEWED_CACHE_AUTHORITIES
             | {"infra/ansible/roles/forgejo_runner/tasks/main.yml"}
         )

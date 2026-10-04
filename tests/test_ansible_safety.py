@@ -38,7 +38,28 @@ def load_tasks(path: Path) -> list[dict[str, Any]]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or []
     if not isinstance(data, list):
         return []
-    return [task for task in data if isinstance(task, dict)]
+    result: list[dict[str, Any]] = []
+    for task in data:
+        if not isinstance(task, dict):
+            continue
+        imported = task.get("ansible.builtin.import_tasks")
+        if isinstance(imported, str):
+            result.extend(load_tasks(path.parent / imported))
+        else:
+            result.append(task)
+    return result
+
+
+def task_source(path: Path) -> str:
+    text = path.read_text(encoding="utf-8")
+    data = yaml.safe_load(text) or []
+    if isinstance(data, list):
+        for task in data:
+            if isinstance(task, dict):
+                imported = task.get("ansible.builtin.import_tasks")
+                if isinstance(imported, str):
+                    text += "\\n" + task_source(path.parent / imported)
+    return text
 
 
 def task_by_name(path: Path, name: str) -> dict[str, Any]:
@@ -97,7 +118,7 @@ class AnsibleSafetyTests(unittest.TestCase):
 
     def test_caddy_validation_does_not_fmt_overwrite_managed_files(self) -> None:
         for path in CADDY_TASK_FILES:
-            text = path.read_text(encoding="utf-8")
+            text = task_source(path)
             self.assertNotIn("caddy fmt --overwrite", text, str(path))
             self.assertIn(
                 "caddy validate --config /etc/caddy/Caddyfile", text, str(path)
@@ -121,7 +142,7 @@ class AnsibleSafetyTests(unittest.TestCase):
 
     def test_browser_facing_service_roles_have_http_smoke_checks(self) -> None:
         for path in SERVICE_SMOKE_TASK_FILES:
-            text = path.read_text(encoding="utf-8")
+            text = task_source(path)
             if (
                 path
                 == REPO
@@ -235,7 +256,7 @@ class AnsibleSafetyTests(unittest.TestCase):
     def test_secret_files_are_direct_final_destinations_with_modes(self) -> None:
         checks = {
             "infra/ansible/roles/infisical/tasks/main.yml": "/etc/infisical/infisical.env",
-            "infra/ansible/roles/hermes/tasks/main.yml": "/etc/hermes-dashboard.env",
+            "infra/ansible/roles/hermes/tasks/application-runtime.yml": "/etc/hermes-dashboard.env",
             "infra/ansible/roles/caddy_proxy/tasks/main.yml": "/etc/caddy/env",
             "infra/ansible/roles/forgejo_runner/tasks/main.yml": "/etc/forgejo-runner/config.yml",
             "infra/ansible/roles/searxng_onramp/tasks/main.yml": "{{ searxng_onramp_base_dir }}/settings.yml",
@@ -249,7 +270,13 @@ class AnsibleSafetyTests(unittest.TestCase):
 
     def test_hermes_passwordless_sudo_policy_is_opt_in_and_validated(self) -> None:
         task = task_by_name(
-            REPO / "infra" / "ansible" / "roles" / "hermes" / "tasks" / "main.yml",
+            REPO
+            / "infra"
+            / "ansible"
+            / "roles"
+            / "hermes"
+            / "tasks"
+            / "host-runtime.yml",
             "Install passwordless sudo policy for Hermes runtime user",
         )
         copy = task["ansible.builtin.copy"]

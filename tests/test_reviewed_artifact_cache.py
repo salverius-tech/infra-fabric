@@ -46,7 +46,20 @@ class ReviewedArtifactCacheTests(unittest.TestCase):
             "curl -fsSL https://go",
         )
         for relative, prefix in CADDY_TASKS.items():
-            text = (ROOT / relative).read_text(encoding="utf-8")
+            if relative == "infra/ansible/roles/hermes/tasks/main.yml":
+                task_dir = ROOT / "infra/ansible/roles/hermes/tasks"
+                text = "\n".join(
+                    (task_dir / name).read_text(encoding="utf-8")
+                    for name in (
+                        "preflight.yml",
+                        "host-runtime.yml",
+                        "application-runtime.yml",
+                        "configuration.yml",
+                        "verification.yml",
+                    )
+                )
+            else:
+                text = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn("reviewed-artifact-cache.yml", text, relative)
             self.assertIn(f"{prefix}_caddy_cloudflare_version", text, relative)
             self.assertIn(f"{prefix}_caddy_cloudflare_sha256", text, relative)

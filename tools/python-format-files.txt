@@ -82,6 +82,7 @@ tests/test_hermes_audit_snapshot.py
 tests/test_hermes_control_role.py
 tests/test_hermes_operator.py
 tests/test_hermes_operator_plugin.py
+tests/test_hermes_role_task_split.py
 tests/test_hermes_runtime.py
 tests/test_host_identity_role.py
 tests/test_host_ssh_directory.py

@@ -4,6 +4,8 @@ import re
 import unittest
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 ROLE = ROOT / "infra" / "ansible" / "roles" / "hermes"
 LOCK = ROLE / "files" / "requirements-0.18.0.lock"
@@ -67,7 +69,13 @@ class HermesRuntimeContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.tasks = RUNTIME_TASKS.read_text(encoding="utf-8")
-        cls.main = MAIN_TASKS.read_text(encoding="utf-8")
+        manifest = yaml.safe_load(MAIN_TASKS.read_text(encoding="utf-8"))
+        cls.main = "\n".join(
+            (MAIN_TASKS.parent / task["ansible.builtin.import_tasks"]).read_text(
+                encoding="utf-8"
+            )
+            for task in manifest
+        )
         cls.bootstrap = BOOTSTRAP_TASKS.read_text(encoding="utf-8")
         cls.defaults = DEFAULTS.read_text(encoding="utf-8")
         cls.unit = UNIT.read_text(encoding="utf-8")
