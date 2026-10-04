@@ -125,7 +125,8 @@ run_stage "contracts" bash -euo pipefail -c "
   python scripts/validate-service-contracts.py --repo .
   python scripts/validate-design-reconciliation.py --check
   coverage erase
-  coverage run --source=scripts -m unittest discover -s tests -p '\''test_*.py'\''
+  coverage run -m unittest discover -s tests -p '\''test_*.py'\''
+  coverage combine --quiet
   coverage report --fail-under=70
 "
 run_stage "ansible" bash -euo pipefail -c "

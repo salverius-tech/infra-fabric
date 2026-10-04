@@ -87,6 +87,7 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("${python_files[@]}", text)
         self.assertIn("mypy", text)
         self.assertIn("coverage run", text)
+        self.assertIn("coverage combine --quiet", text)
         self.assertIn("coverage report --fail-under=", text)
         self.assertIn('stages+=("FAIL ${current_stage}")', text)
         self.assertIn("scripts/canonical-render.py", text)
@@ -101,7 +102,7 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertLess(text.index('run_stage "contracts"'), text.index(guard))
         self.assertLess(
             text.index(guard),
-            text.index("coverage run --source=scripts -m unittest discover"),
+            text.index("coverage run -m unittest discover"),
         )
 
     def test_validate_public_checkout_fetches_full_history_for_reconciliation(
