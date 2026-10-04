@@ -14,7 +14,7 @@ class CompatibilityBoundaryTests(unittest.TestCase):
         env = os.environ.copy()
         env.update({"VALUES_DIR": str(values_dir), "VALUES_SITE": "dev"})
         return subprocess.run(
-            ["bash", "-c", "source scripts/site-context.sh; require_canonical_authority"],
+            ["bash", "-c", "source scripts/site-context.sh; require_site_context"],
             cwd=ROOT,
             env=env,
             text=True,
@@ -47,7 +47,7 @@ class CompatibilityBoundaryTests(unittest.TestCase):
                 }
             )
             result = subprocess.run(
-                ["bash", "-c", "source scripts/site-context.sh; require_canonical_authority"],
+                ["bash", "-c", "source scripts/site-context.sh; require_site_context"],
                 cwd=ROOT,
                 env=env,
                 text=True,

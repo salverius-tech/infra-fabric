@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -49,9 +50,25 @@ class OperationalCutoverTests(unittest.TestCase):
             "plan-infra.sh",
             "apply-infra.sh",
             "rehearse-development-rollback.sh",
+            "edit-secrets.sh",
+            "ssh-initialize.sh",
         ):
             result = subprocess.run(["bash", "-n", str(ROOT / "scripts" / name)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, msg=f"{name}: {result.stderr}")
+
+    def test_protected_just_recipes_delegate_to_linted_scripts(self) -> None:
+        dumped = subprocess.run(
+            ["just", "--dump"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout
+        for recipe, script in (
+            ("edit-secrets SITE=\"dev\":", "scripts/edit-secrets.sh"),
+            ("ssh-initialize SITE=\"dev\":", "scripts/ssh-initialize.sh"),
+        ):
+            with self.subTest(recipe=recipe):
+                self.assertRegex(
+                    dumped,
+                    rf"(?m)^{re.escape(recipe)}\n\s+@{re.escape(script)} "
+                )
 
     def test_canonical_lifecycle_wrappers_are_executable(self) -> None:
         for name in ("plan-infra.sh", "apply-infra.sh", "teardown-infra.sh"):
@@ -93,7 +110,12 @@ class OperationalCutoverTests(unittest.TestCase):
         self.assertFalse((ROOT / "tests/test_tfvars_inventory.py").exists())
         self.assertFalse((ROOT / "tests/test_bootstrap_domain.py").exists())
         self.assertFalse((ROOT / "tests/test_parse_env.py").exists())
+        self.assertFalse((ROOT / "scripts/compare-plans.py").exists())
         self.assertFalse((ROOT / "scaffold/.env.example").exists())
+        hermes_operations = (ROOT / "docs/hermes-control-operations.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("scripts/hermes-password-hash.py", hermes_operations)
 
     def test_lifecycle_projection_helpers_have_no_legacy_input_mode(self) -> None:
         for relative in (

@@ -3,7 +3,7 @@ set -euo pipefail
 
 source scripts/site-context.sh
 require_site_context
-require_canonical_authority
+require_site_context
 
 destroy_verify_flag=""
 if [[ "${INFRA_ALLOW_DESTROY:-}" == "1" ]]; then

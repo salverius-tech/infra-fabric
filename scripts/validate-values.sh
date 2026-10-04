@@ -3,7 +3,7 @@ set -euo pipefail
 
 source scripts/site-context.sh
 require_site_context
-require_canonical_authority
+require_site_context
 
 # shellcheck disable=SC2016
 scripts/run-infra.sh bash -euo pipefail -c '
