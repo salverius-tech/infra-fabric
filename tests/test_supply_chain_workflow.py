@@ -30,6 +30,19 @@ class SupplyChainWorkflowTests(unittest.TestCase):
         for step in actions:
             self.assertRegex(step["uses"], COMMIT_ACTION)
 
+        dry_run = next(
+            step
+            for step in job["steps"]
+            if step.get("name")
+            == "Report public pin update eligibility without private site values"
+        )
+        self.assertIn("scripts/require-site-context.sh", dry_run["run"])
+        self.assertIn("scripts/python.sh scripts/update.py --dry-run", dry_run["run"])
+        self.assertIn("export VALUES_SITE=update-dry-run", dry_run["run"])
+        self.assertIn(
+            "export SOPS_AGE_KEY_FILE=/run/secrets/sops-age-key", dry_run["run"]
+        )
+
         sbom = next(
             step for step in actions if step["uses"].startswith("anchore/sbom-action@")
         )

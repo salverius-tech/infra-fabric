@@ -89,7 +89,13 @@ jobs:
           trap 'rm -rf "$values_dir"' EXIT
           mkdir -p "$values_dir/sites/update-dry-run"
           cp scaffold/sites/_template/site.yaml "$values_dir/sites/update-dry-run/site.yaml"
-          VALUES_DIR="${values_dir#"$GITHUB_WORKSPACE/"}" VALUES_SITE=update-dry-run just update --dry-run
+          export VALUES_DIR="${values_dir#"$GITHUB_WORKSPACE/"}"
+          export VALUES_SITE=update-dry-run
+          export SOPS_AGE_KEY_FILE=/run/secrets/sops-age-key
+          scripts/require-site-context.sh
+          source scripts/site-context.sh
+          require_site_context
+          scripts/python.sh scripts/update.py --dry-run
       - name: Generate tooling image SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:

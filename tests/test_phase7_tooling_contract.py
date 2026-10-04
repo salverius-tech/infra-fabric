@@ -193,7 +193,7 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertIn("workflow_dispatch", scheduled_job["if"])
         self.assertIn("schedule", scheduled_job["if"])
         self.assertIn("image", scheduled_steps)
-        self.assertIn("just update --dry-run", scheduled_steps)
+        self.assertIn("scripts/python.sh scripts/update.py --dry-run", scheduled_steps)
         self.assertIn("scaffold/sites/_template/site.yaml", scheduled_steps)
         self.assertNotIn("scan-type: fs", scheduled_steps)
 
