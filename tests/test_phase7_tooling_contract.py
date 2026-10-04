@@ -117,7 +117,7 @@ class Phase7ToolingContractTests(unittest.TestCase):
         workflow = yaml.load(
             WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader
         )
-        checkout = workflow["jobs"]["validate-public"]["steps"][0]
+        checkout = workflow["jobs"]["unit"]["steps"][0]
 
         self.assertEqual(
             checkout["uses"],
@@ -131,14 +131,30 @@ class Phase7ToolingContractTests(unittest.TestCase):
         workflow = yaml.load(
             WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader
         )
-        job = workflow["jobs"]["supply-chain-evidence"]
-        rendered = "\n".join(str(step) for step in job["steps"])
+        scan_job = workflow["jobs"]["dependency-scan"]
+        scan_steps = "\n".join(str(step) for step in scan_job["steps"])
+        scheduled_job = workflow["jobs"]["supply-chain-evidence"]
+        scheduled_steps = "\n".join(str(step) for step in scheduled_job["steps"])
 
-        self.assertIn("dependencies", rendered.lower())
-        self.assertIn("fs", rendered)
-        self.assertIn("HIGH,CRITICAL", rendered)
-        self.assertIn("workflow_dispatch", job["if"])
-        self.assertIn("schedule", job["if"])
+        self.assertIn("fs", scan_steps)
+        self.assertIn("HIGH,CRITICAL", scan_steps)
+        self.assertIn("workflow_dispatch", scheduled_job["if"])
+        self.assertIn("schedule", scheduled_job["if"])
+        self.assertIn("image", scheduled_steps)
+        self.assertNotIn("scan-type: fs", scheduled_steps)
+
+    def test_workflow_runs_unit_before_cached_full_validation(self) -> None:
+        workflow = yaml.load(
+            WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader
+        )
+        jobs = workflow["jobs"]
+        self.assertEqual(jobs["full"]["needs"], "unit")
+        for name in ("unit", "full"):
+            rendered = "\n".join(str(step) for step in jobs[name]["steps"])
+            self.assertIn(
+                "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830", rendered
+            )
+            self.assertIn("linux-amd64-tooling-", rendered)
 
 
 if __name__ == "__main__":

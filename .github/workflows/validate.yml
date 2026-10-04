@@ -12,25 +12,57 @@ permissions:
   contents: read
 
 jobs:
-  validate-public:
+  unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         # Reconciliation validates immutable commits from repository history.
         with:
           fetch-depth: 0
-      - name: Build tooling image
-        run: docker compose build infra
-      - name: Validate public runbook
+      - name: Restore or build the pinned tooling image
+        id: tooling-image
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: /tmp/infra-fabric-tooling.tar
+          key: linux-amd64-tooling-${{ hashFiles('tools/Dockerfile', 'tools/requirements.lock', 'tools/pip-bootstrap.lock', 'tools/docker-entrypoint.sh') }}
+      - name: Load cached tooling image
+        if: steps.tooling-image.outputs.cache-hit == 'true'
+        run: docker image load --input /tmp/infra-fabric-tooling.tar
+      - name: Build and cache tooling image
+        if: steps.tooling-image.outputs.cache-hit != 'true'
+        run: |
+          docker compose build infra
+          docker image save homelab-infra-tooling:local --output /tmp/infra-fabric-tooling.tar
+      - name: Run unit and quality validation
+        env:
+          INFRA_VALIDATE_MODE: unit
         run: scripts/validate-public.sh
 
-  supply-chain-evidence:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  full:
+    needs: unit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Build pinned tooling image without cache
-        run: docker build --no-cache -f tools/Dockerfile -t infra-fabric-tools:ci .
+        # Reconciliation validates immutable commits from repository history.
+        with:
+          fetch-depth: 0
+      - name: Restore cached tooling image
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: /tmp/infra-fabric-tooling.tar
+          key: linux-amd64-tooling-${{ hashFiles('tools/Dockerfile', 'tools/requirements.lock', 'tools/pip-bootstrap.lock', 'tools/docker-entrypoint.sh') }}
+      - name: Load tooling image
+        run: docker image load --input /tmp/infra-fabric-tooling.tar
+      - name: Run infrastructure and Ansible validation
+        env:
+          INFRA_VALIDATE_MODE: full
+        run: scripts/validate-public.sh
+
+  dependency-scan:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan hash-locked Python dependencies for high-severity vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -40,6 +72,14 @@ jobs:
           ignore-unfixed: false
           exit-code: '1'
           format: table
+
+  supply-chain-evidence:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Build pinned tooling image without cache
+        run: docker build --no-cache -f tools/Dockerfile -t infra-fabric-tools:ci .
       - name: Generate tooling image SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:

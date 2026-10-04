@@ -679,6 +679,7 @@ This section records source changes, not acceptance evidence.
 | P1-3 | Added subprocess coverage collection and included `infra/ansible/scripts` in the source set. Confirmed subprocess attribution: `canonical-provider-env.py` now measures 97%. |
 | P1-1 | Broadened Ruff to E/F/W/I/B/UP/C4/PERF/SIM plus targeted S107, with documented rule ignores; added a clean mypy gate for nine core modules. Security rules, all-script typing, and the Black baseline remain outstanding. |
 | P2-2 | Added `tools/coverage-floors.json` and a named per-module floor check for all seven critical modules. |
+| P2-3 | Split validation into cached-image `unit` and dependent `full` jobs; moved the filesystem dependency scan to pull-request/push events. Unit/full modes both pass locally; hosted cache and cold-build timing remain unverified. |
 | P2-6 | Added `tests/README.md` and `just test-local` for host-portable documentation contracts; registered and documented the recipe. |
 | P2-5 | Provider child environment now removes `SOPS_AGE_KEY`; five direct tests cover propagation, failure paths, and the no-site case. |
 | P2-1 | Extracted `edit-secrets` and `ssh-initialize` shell logic into linted scripts; recipes delegate to those scripts and a contract test checks the delegation. |
@@ -691,6 +692,6 @@ This section records source changes, not acceptance evidence.
 | P4-1 | Added fail-closed SSH mount directory validation to `just setup` and `scripts/run-infra.sh`. |
 
 After these changes, `VALUES_SITE=dev just validate` passes all stages;
-831 tests pass, aggregate coverage is 77%, and all seven per-module floors pass.
+832 tests pass, aggregate coverage is 77%, and all seven per-module floors pass.
 No plan, apply, or teardown command was run. Remaining recommendations are not
 considered complete by this progress entry.
