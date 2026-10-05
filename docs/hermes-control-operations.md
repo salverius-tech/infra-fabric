@@ -27,6 +27,20 @@ Verify source identity, immutable source reference, installation/readiness, auth
 
 Use `HERMES_PLUGINS_DEBUG=1` only for an explicitly approved diagnostic session, then remove it. `HERMES_CONTROL_SOURCE_REF` must remain an immutable reviewed reference.
 
+## Dashboard password hash
+
+When configuring basic authentication for the Hermes dashboard, generate the
+scrypt hash interactively:
+
+```bash
+scripts/python.sh scripts/hermes-password-hash.py
+```
+
+The command prompts for the password twice and prints only the derived hash.
+Transfer that hash directly into the encrypted site bundle with
+`just edit-secrets SITE=<site>`. Do not pass the password as a command-line
+argument or store it in shell history, logs, or plaintext site values.
+
 ## Rotation and rollback
 
 Rotate API and bridge tokens through the encrypted canonical bundle, validate policy and required paths, apply only from a reviewed plan, then verify Control health and dependent Hermes behavior. Roll back by restoring the prior encrypted bundle and re-running the canonical validation/plan workflow.

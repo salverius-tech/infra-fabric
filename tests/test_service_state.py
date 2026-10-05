@@ -11,7 +11,9 @@ CATALOG = ROOT / "infra" / "ansible" / "vars" / "service-state.yml"
 SERVICES = ROOT / "infra" / "services.json"
 BACKUP = ROOT / "infra" / "ansible" / "playbooks" / "service-state-backup.yml"
 RESTORE = ROOT / "infra" / "ansible" / "playbooks" / "service-state-restore.yml"
-ONRAMP_DEFAULTS = ROOT / "infra" / "ansible" / "roles" / "onramp_host" / "defaults" / "main.yml"
+ONRAMP_DEFAULTS = (
+    ROOT / "infra" / "ansible" / "roles" / "onramp_host" / "defaults" / "main.yml"
+)
 COMPOSE = ROOT / "compose.yaml"
 SERVICE_STATE_CLI = ROOT / "scripts" / "service-state.sh"
 HERMES_STATE_CLI = ROOT / "scripts" / "hermes-state.sh"
@@ -20,13 +22,19 @@ HERMES_STATE_CLI = ROOT / "scripts" / "hermes-state.sh"
 class ServiceStateTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.catalog = yaml.safe_load(CATALOG.read_text(encoding="utf-8"))["managed_service_state_catalog"]
+        cls.catalog = yaml.safe_load(CATALOG.read_text(encoding="utf-8"))[
+            "managed_service_state_catalog"
+        ]
 
     def test_stateful_services_have_catalog_entries(self) -> None:
         import json
 
         registry = json.loads(SERVICES.read_text(encoding="utf-8"))
-        missing = [name for name, config in registry["services"].items() if config.get("state_capable") and name not in self.catalog]
+        missing = [
+            name
+            for name, config in registry["services"].items()
+            if config.get("state_capable") and name not in self.catalog
+        ]
         self.assertEqual(missing, [])
 
     def test_legacy_infisical_state_includes_application_data(self) -> None:
@@ -74,16 +82,21 @@ class ServiceStateTests(unittest.TestCase):
         self.assertIn("service_state_backup_root | length > 0", restore)
         self.assertIn("delegate_to: localhost", restore)
 
-    def test_cli_derives_targets_from_state_catalog_and_uses_verified_projection_pair(self) -> None:
+    def test_cli_derives_targets_from_state_catalog_and_uses_verified_projection_pair(
+        self,
+    ) -> None:
         cli = SERVICE_STATE_CLI.read_text(encoding="utf-8")
         stateful = {
-            name for name, config in json.loads(SERVICES.read_text(encoding="utf-8"))["services"].items()
+            name
+            for name, config in json.loads(SERVICES.read_text(encoding="utf-8"))[
+                "services"
+            ].items()
             if config.get("state_capable")
         }
         self.assertEqual(stateful, set(self.catalog))
         self.assertIn("state_capable_services()", cli)
         self.assertNotIn("supported_services=(", cli)
-        self.assertIn('print(name)', cli)
+        self.assertIn("print(name)", cli)
         self.assertIn("ansible-vars.json", cli)
         self.assertIn("flatten-ansible-vars.py", cli)
         self.assertIn(".service-state-ansible-vars-", cli)
@@ -100,14 +113,25 @@ class ServiceStateTests(unittest.TestCase):
     def test_cli_uses_effective_controller_local_projection_directory(self) -> None:
         cli = SERVICE_STATE_CLI.read_text(encoding="utf-8")
         self.assertEqual(
-            cli.count('generated_dir=\\"\\${INFRA_GENERATED_DIR:-/workspace/${site_values_dir}/generated}\\"'),
+            cli.count(
+                'generated_dir=\\"\\${INFRA_GENERATED_DIR:-/workspace/${site_values_dir}/generated}\\"'
+            ),
             2,
         )
-        self.assertEqual(cli.count('inventory=\\"\\${generated_dir}/ansible-inventory.json\\"'), 2)
-        self.assertEqual(cli.count('vars_file=\\"\\${generated_dir}/ansible-vars.json\\"'), 2)
+        self.assertEqual(
+            cli.count('inventory=\\"\\${generated_dir}/ansible-inventory.json\\"'), 2
+        )
+        self.assertEqual(
+            cli.count('vars_file=\\"\\${generated_dir}/ansible-vars.json\\"'), 2
+        )
         self.assertEqual(cli.count('--generated-dir \\"\\${generated_dir}\\"'), 2)
-        self.assertNotIn('inventory="/workspace/${site_values_dir}/generated/ansible-inventory.json"', cli)
-        self.assertNotIn('vars_file="/workspace/${site_values_dir}/generated/ansible-vars.json"', cli)
+        self.assertNotIn(
+            'inventory="/workspace/${site_values_dir}/generated/ansible-inventory.json"',
+            cli,
+        )
+        self.assertNotIn(
+            'vars_file="/workspace/${site_values_dir}/generated/ansible-vars.json"', cli
+        )
         self.assertEqual(cli.count("scripts/run-infra.sh bash -euo pipefail -c"), 2)
         self.assertNotIn("scripts/run-infra.sh bash -lc", cli)
 
@@ -117,7 +141,9 @@ class ServiceStateTests(unittest.TestCase):
         self.assertIn("values/sites/<site>/service-backups/hermes/", wrapper)
         self.assertNotIn("values/service-backups/hermes/", wrapper)
 
-    def test_forgejo_database_state_contract_fails_closed_without_projection(self) -> None:
+    def test_forgejo_database_state_contract_fails_closed_without_projection(
+        self,
+    ) -> None:
         for path in (BACKUP, RESTORE):
             playbook = path.read_text(encoding="utf-8")
             self.assertIn("forgejo_database is defined", playbook)
@@ -141,9 +167,16 @@ class ServiceStateTests(unittest.TestCase):
         cli = SERVICE_STATE_CLI.read_text(encoding="utf-8")
 
         self.assertIn("rsync", defaults["onramp_host_podman_packages"])
-        self.assertIn("SERVICE_STATE_BACKUP_ROOT: ${SERVICE_STATE_BACKUP_ROOT:-}", compose)
-        self.assertIn("SERVICE_STATE_RESTORE_FILE: ${SERVICE_STATE_RESTORE_FILE:-}", compose)
-        self.assertIn('msys_env_conv_excl+="SERVICE_STATE_BACKUP_ROOT;SERVICE_STATE_RESTORE_FILE"', cli)
+        self.assertIn(
+            "SERVICE_STATE_BACKUP_ROOT: ${SERVICE_STATE_BACKUP_ROOT:-}", compose
+        )
+        self.assertIn(
+            "SERVICE_STATE_RESTORE_FILE: ${SERVICE_STATE_RESTORE_FILE:-}", compose
+        )
+        self.assertIn(
+            'msys_env_conv_excl+="SERVICE_STATE_BACKUP_ROOT;SERVICE_STATE_RESTORE_FILE"',
+            cli,
+        )
 
 
 if __name__ == "__main__":

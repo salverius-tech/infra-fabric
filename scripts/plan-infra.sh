@@ -3,7 +3,7 @@ set -euo pipefail
 
 source scripts/site-context.sh
 require_site_context
-require_canonical_authority
+require_site_context
 
 target_service="${INFRA_TARGET_SERVICE:-}"
 replace_service="${INFRA_REPLACE_SERVICE:-}"

@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """Run one canonical provider command with transient SOPS-backed credentials."""
+
 from __future__ import annotations
 
 import argparse
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 try:
     from secret_delivery import deliver_environment, provider_requirements
-    from secret_provider import SopsAgeProvider, SecretProviderError
+    from secret_provider import SecretProviderError, SopsAgeProvider
     from values_context import from_environment
 except ModuleNotFoundError:  # pragma: no cover - direct script execution
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from secret_delivery import deliver_environment, provider_requirements
-    from secret_provider import SopsAgeProvider, SecretProviderError
+    from secret_provider import SecretProviderError, SopsAgeProvider
     from values_context import from_environment
 
 
@@ -31,16 +32,26 @@ def main(argv: list[str] | None = None) -> int:
 
     context = from_environment(Path.cwd())
     if context.canonical_site_path is None:
-        print("canonical provider environment requires a selected canonical site", file=sys.stderr)
+        print(
+            "canonical provider environment requires a selected canonical site",
+            file=sys.stderr,
+        )
         return 2
     bundle = context.values_dir / "secrets.sops.yaml"
     try:
         provider = SopsAgeProvider(bundle)
         environment = dict(os.environ)
+        environment.pop("SOPS_AGE_KEY", None)
         environment.update(
-            deliver_environment(provider, consumer="opentofu-provider", requirements=provider_requirements(args.provider))
+            deliver_environment(
+                provider,
+                consumer="opentofu-provider",
+                requirements=provider_requirements(args.provider),
+            )
         )
-        os.execvpe(command[0], command, environment)
+        os.execvpe(  # noqa: S606 - this CLI intentionally execs the operator's argv, without a shell.
+            command[0], command, environment
+        )
     except (OSError, SecretProviderError, ValueError) as error:
         print(f"canonical provider credential handoff failed: {error}", file=sys.stderr)
         return 1

@@ -15,7 +15,9 @@ for name in ("secret_provider", "secret_delivery"):
     spec.loader.exec_module(module)
 secret_delivery = sys.modules["secret_delivery"]
 
-service_catalog_spec = importlib.util.spec_from_file_location("service_catalog", ROOT / "service_catalog.py")
+service_catalog_spec = importlib.util.spec_from_file_location(
+    "service_catalog", ROOT / "service_catalog.py"
+)
 assert service_catalog_spec and service_catalog_spec.loader
 service_catalog = importlib.util.module_from_spec(service_catalog_spec)
 sys.modules["service_catalog"] = service_catalog
@@ -44,7 +46,9 @@ class SecretDeliveryTests(unittest.TestCase):
         self.assertEqual(
             secret_delivery.root_password_secret_path(
                 "forgejo",
-                host_overrides={"forgejo": "secrets.bootstrap.hosts.forgejo.root_password"},
+                host_overrides={
+                    "forgejo": "secrets.bootstrap.hosts.forgejo.root_password"
+                },
             ),
             "secrets.bootstrap.hosts.forgejo.root_password",
         )
@@ -63,11 +67,15 @@ class SecretDeliveryTests(unittest.TestCase):
     def test_root_password_override_wins_for_one_resource(self) -> None:
         overrides = {"forgejo": "secrets.bootstrap.hosts.forgejo.root_password"}
         self.assertEqual(
-            secret_delivery.root_password_secret_path("forgejo", host_overrides=overrides),
+            secret_delivery.root_password_secret_path(
+                "forgejo", host_overrides=overrides
+            ),
             "secrets.bootstrap.hosts.forgejo.root_password",
         )
         self.assertEqual(
-            secret_delivery.root_password_secret_path("hermes", host_overrides=overrides),
+            secret_delivery.root_password_secret_path(
+                "hermes", host_overrides=overrides
+            ),
             "secrets.bootstrap.root_password",
         )
 
@@ -89,7 +97,9 @@ class SecretDeliveryTests(unittest.TestCase):
             ["forgejo"],
             consumer="ansible-host-identity",
         )
-        self.assertEqual(requirements[0].consumers, frozenset({"ansible-host-identity"}))
+        self.assertEqual(
+            requirements[0].consumers, frozenset({"ansible-host-identity"})
+        )
 
     def test_delivery_requires_explicit_consumer_contract(self) -> None:
         provider = FakeProvider({"secrets.bootstrap.root_password": "SENTINEL"})
@@ -101,7 +111,9 @@ class SecretDeliveryTests(unittest.TestCase):
         self.assertEqual(delivered.environment_name, "INFRA_BOOTSTRAP_ROOT_PASSWORD")
         self.assertEqual(delivered.value, "SENTINEL")
 
-    def test_proxmox_provider_contract_delivers_api_token_only_to_opentofu(self) -> None:
+    def test_proxmox_provider_contract_delivers_api_token_only_to_opentofu(
+        self,
+    ) -> None:
         provider = FakeProvider({secret_delivery.PROXMOX_PROVIDER_PATH: "TOKEN"})
         requirements = secret_delivery.provider_requirements()
         environment = secret_delivery.deliver_environment(
@@ -118,7 +130,9 @@ class SecretDeliveryTests(unittest.TestCase):
             )
 
     def test_provider_contract_rejects_unsupported_provider(self) -> None:
-        with self.assertRaisesRegex(secret_delivery.SecretDeliveryError, "unsupported canonical provider"):
+        with self.assertRaisesRegex(
+            secret_delivery.SecretDeliveryError, "unsupported canonical provider"
+        ):
             secret_delivery.provider_requirements("unknown")
 
     def test_delivery_rejects_multiline_environment_values(self) -> None:
@@ -137,7 +151,9 @@ class SecretDeliveryTests(unittest.TestCase):
             frozenset({"ansible-bootstrap"}),
             "not-an-environment",
         )
-        with self.assertRaisesRegex(secret_delivery.SecretDeliveryError, "environment name"):
+        with self.assertRaisesRegex(
+            secret_delivery.SecretDeliveryError, "environment name"
+        ):
             secret_delivery.deliver(
                 FakeProvider({"secrets.bootstrap.root_password": "ROOT"}),
                 path=requirement.path,
@@ -146,23 +162,37 @@ class SecretDeliveryTests(unittest.TestCase):
             )
 
     def test_service_delivery_is_scoped_to_selected_services(self) -> None:
-        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        catalog = service_catalog.load_catalog(
+            ROOT.parents[0] / "infra" / "services.json"
+        )
         services = {"forgejo": SimpleNamespace(enabled=True, configuration={})}
         requirements = secret_delivery.requirements_for_model(catalog, services)
         provider = FakeProvider(
-            {requirement.path: f"VALUE_{requirement.environment_name}" for requirement in requirements}
+            {
+                requirement.path: f"VALUE_{requirement.environment_name}"
+                for requirement in requirements
+            }
         )
-        environment = secret_delivery.deliver_services_environment(provider, catalog, services)
+        environment = secret_delivery.deliver_services_environment(
+            provider, catalog, services
+        )
         self.assertNotIn("INFRA_BOOTSTRAP_ROOT_PASSWORD", environment)
         self.assertEqual(environment["FORGEJO_SECRET_KEY"], "VALUE_FORGEJO_SECRET_KEY")
         self.assertNotIn("HERMES_CONTROL_API_TOKEN", environment)
 
-    def test_catalog_model_requirements_use_service_owned_paths_and_feature_conditions(self) -> None:
-        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+    def test_catalog_model_requirements_use_service_owned_paths_and_feature_conditions(
+        self,
+    ) -> None:
+        catalog = service_catalog.load_catalog(
+            ROOT.parents[0] / "infra" / "services.json"
+        )
         services = {
             "hermes": SimpleNamespace(
                 enabled=True,
-                configuration={"control": {"enabled": True}, "dashboard": {"enabled": False}},
+                configuration={
+                    "control": {"enabled": True},
+                    "dashboard": {"enabled": False},
+                },
             )
         }
 
@@ -178,18 +208,26 @@ class SecretDeliveryTests(unittest.TestCase):
         )
         self.assertEqual(
             {requirement.environment_name for requirement in requirements},
-            {"HERMES_CONTROL_API_TOKEN", "HERMES_CONTROL_BRIDGE_TOKEN", "CF_DNS_API_TOKEN"},
+            {
+                "HERMES_CONTROL_API_TOKEN",
+                "HERMES_CONTROL_BRIDGE_TOKEN",
+                "CF_DNS_API_TOKEN",
+            },
         )
 
     def test_service_delivery_requires_every_selected_contract_secret(self) -> None:
-        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        catalog = service_catalog.load_catalog(
+            ROOT.parents[0] / "infra" / "services.json"
+        )
         services = {"forgejo": SimpleNamespace(enabled=True, configuration={})}
         provider = FakeProvider({"secrets.bootstrap.root_password": "ROOT"})
         with self.assertRaises(secret_delivery.SecretDeliveryError):
             secret_delivery.deliver_services_environment(provider, catalog, services)
 
     def test_technitium_delivery_includes_protected_admin_password(self) -> None:
-        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        catalog = service_catalog.load_catalog(
+            ROOT.parents[0] / "infra" / "services.json"
+        )
         services = {"technitium": SimpleNamespace(enabled=True, configuration={})}
         provider = FakeProvider(
             {
@@ -198,14 +236,25 @@ class SecretDeliveryTests(unittest.TestCase):
                 "services.technitium.secrets.admin_password": "ADMIN",
             }
         )
-        environment = secret_delivery.deliver_services_environment(provider, catalog, services)
-        self.assertEqual(environment, {"CF_DNS_API_TOKEN": "CF", "TECHNITIUM_API_TOKEN": "TOKEN", "TECHNITIUM_ADMIN_PASSWORD": "ADMIN"})
+        environment = secret_delivery.deliver_services_environment(
+            provider, catalog, services
+        )
+        self.assertEqual(
+            environment,
+            {
+                "CF_DNS_API_TOKEN": "CF",
+                "TECHNITIUM_API_TOKEN": "TOKEN",
+                "TECHNITIUM_ADMIN_PASSWORD": "ADMIN",
+            },
+        )
         self.assertNotIn("INFRA_BOOTSTRAP_ROOT_PASSWORD", environment)
         self.assertNotIn("INFRA_OPERATOR_PASSWORD", environment)
         self.assertNotIn("PROXMOX_VE_API_TOKEN", environment)
 
     def test_infisical_onramp_declares_every_role_secret(self) -> None:
-        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        catalog = service_catalog.load_catalog(
+            ROOT.parents[0] / "infra" / "services.json"
+        )
         services = {
             "infisical_onramp": SimpleNamespace(enabled=True, configuration={}),
             "onramp_host": SimpleNamespace(enabled=True, configuration={}),
@@ -217,17 +266,26 @@ class SecretDeliveryTests(unittest.TestCase):
         )
         self.assertEqual(
             {requirement.environment_name for requirement in requirements},
-            {"INFISICAL_AUTH_SECRET", "INFISICAL_ENCRYPTION_KEY", "INFISICAL_POSTGRES_PASSWORD"},
+            {
+                "INFISICAL_AUTH_SECRET",
+                "INFISICAL_ENCRYPTION_KEY",
+                "INFISICAL_POSTGRES_PASSWORD",
+            },
         )
 
     def test_sssf_delivers_only_the_selected_provider_key(self) -> None:
-        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        catalog = service_catalog.load_catalog(
+            ROOT.parents[0] / "infra" / "services.json"
+        )
         services = {
             "sssf": SimpleNamespace(enabled=True, configuration={"provider": "openai"}),
         }
         requirements = secret_delivery.requirements_for_model(catalog, services)
         self.assertEqual(
-            {(requirement.path, requirement.environment_name) for requirement in requirements},
+            {
+                (requirement.path, requirement.environment_name)
+                for requirement in requirements
+            },
             {("services.sssf.secrets.openai_api_key", "OPENAI_API_KEY")},
         )
         environment = secret_delivery.deliver_services_environment(
@@ -238,7 +296,9 @@ class SecretDeliveryTests(unittest.TestCase):
         self.assertEqual(environment, {"OPENAI_API_KEY": "synthetic"})
 
     def test_protected_environment_is_removed_before_service_delivery(self) -> None:
-        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        catalog = service_catalog.load_catalog(
+            ROOT.parents[0] / "infra" / "services.json"
+        )
         inherited = {
             "SAFE_FLAG": "1",
             "PROXMOX_VE_API_TOKEN": "provider",
@@ -253,11 +313,18 @@ class SecretDeliveryTests(unittest.TestCase):
         )
 
     def test_model_contract_secrets_forbid_state_exposure(self) -> None:
-        catalog = service_catalog.load_catalog(ROOT.parents[0] / "infra" / "services.json")
+        catalog = service_catalog.load_catalog(
+            ROOT.parents[0] / "infra" / "services.json"
+        )
         services = {"forgejo": SimpleNamespace(enabled=True, configuration={})}
         requirements = secret_delivery.requirements_for_model(catalog, services)
         self.assertTrue(requirements)
-        self.assertTrue(all(requirement.state_exposure == "forbidden" for requirement in requirements))
+        self.assertTrue(
+            all(
+                requirement.state_exposure == "forbidden"
+                for requirement in requirements
+            )
+        )
 
     def test_delivery_rejects_wrong_consumer(self) -> None:
         provider = FakeProvider({"secrets.bootstrap.root_password": "SENTINEL"})
@@ -279,7 +346,9 @@ class SecretDeliveryTests(unittest.TestCase):
 
     def test_environment_delivery_is_value_bearing_only_in_memory(self) -> None:
         provider = FakeProvider({"secrets.bootstrap.root_password": "SENTINEL"})
-        environment = secret_delivery.deliver_environment(provider, consumer="ansible-bootstrap")
+        environment = secret_delivery.deliver_environment(
+            provider, consumer="ansible-bootstrap"
+        )
         self.assertEqual(environment, {"INFRA_BOOTSTRAP_ROOT_PASSWORD": "SENTINEL"})
         self.assertEqual(
             secret_delivery.redact_environment(environment, set(environment)),
@@ -288,7 +357,10 @@ class SecretDeliveryTests(unittest.TestCase):
 
     def test_environment_delivery_rejects_unknown_consumer(self) -> None:
         provider = FakeProvider({"secrets.bootstrap.root_password": "SENTINEL"})
-        with self.assertRaisesRegex(secret_delivery.SecretDeliveryError, "consumer has no approved secret contract"):
+        with self.assertRaisesRegex(
+            secret_delivery.SecretDeliveryError,
+            "consumer has no approved secret contract",
+        ):
             secret_delivery.deliver_environment(provider, consumer="unknown-consumer")
 
 

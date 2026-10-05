@@ -1,8 +1,7 @@
 """Static regression coverage for verified Debian VM image ownership."""
 
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_MAIN = ROOT / "infra/opentofu/modules/debian-vm/main.tf"
@@ -19,7 +18,10 @@ class DebianVmImageContractTests(unittest.TestCase):
 
         self.assertNotIn('resource "proxmox_download_file"', main)
         self.assertIn("image_file_id = var.image.file_id", main)
-        self.assertIn("image.file_id must reference a separately checksum-verified Proxmox image.", variables)
+        self.assertIn(
+            "image.file_id must reference a separately checksum-verified Proxmox image.",
+            variables,
+        )
         self.assertIn("debian-vm does not download images", variables)
         self.assertIn("condition     = !var.image.create", variables)
 
@@ -27,9 +29,13 @@ class DebianVmImageContractTests(unittest.TestCase):
         forgejo = FORGEJO.read_text(encoding="utf-8")
         root_tofu = ROOT_TOFU.read_text(encoding="utf-8")
 
-        self.assertIn('resource "proxmox_download_file" "debian_13_service_vm_image"', root_tofu)
+        self.assertIn(
+            'resource "proxmox_download_file" "debian_13_service_vm_image"', root_tofu
+        )
         self.assertIn("checksum            = var.guest_vm_image_checksum", root_tofu)
-        self.assertIn("checksum_algorithm  = var.guest_vm_image_checksum_algorithm", root_tofu)
+        self.assertIn(
+            "checksum_algorithm  = var.guest_vm_image_checksum_algorithm", root_tofu
+        )
         self.assertIn("proxmox_download_file.debian_13_service_vm_image[0].id", forgejo)
         self.assertIn("create       = false", forgejo)
         self.assertNotIn("forgejo_vm_image_url", forgejo)
@@ -65,12 +71,30 @@ class DebianVmImageContractTests(unittest.TestCase):
     def test_service_refactor_preserves_legacy_state_addresses(self) -> None:
         services = (ROOT / "infra/opentofu/services.tf").read_text(encoding="utf-8")
         for source, destination in (
-            ("proxmox_virtual_environment_container.technitium_dns[0]", "module.technitium_dns[0].proxmox_virtual_environment_container.this"),
-            ("proxmox_virtual_environment_container.forgejo[0]", "module.forgejo[0].proxmox_virtual_environment_container.this"),
-            ("proxmox_virtual_environment_container.tailscale_client[0]", "module.tailscale_client[0].proxmox_virtual_environment_container.this"),
-            ("proxmox_virtual_environment_container.forgejo_runner[0]", "module.forgejo_runner[0].proxmox_virtual_environment_container.this"),
-            ("proxmox_virtual_environment_container.infisical[0]", "module.infisical[0].proxmox_virtual_environment_container.this"),
-            ("proxmox_virtual_environment_container.hermes[0]", "module.hermes[0].proxmox_virtual_environment_container.this"),
+            (
+                "proxmox_virtual_environment_container.technitium_dns[0]",
+                "module.technitium_dns[0].proxmox_virtual_environment_container.this",
+            ),
+            (
+                "proxmox_virtual_environment_container.forgejo[0]",
+                "module.forgejo[0].proxmox_virtual_environment_container.this",
+            ),
+            (
+                "proxmox_virtual_environment_container.tailscale_client[0]",
+                "module.tailscale_client[0].proxmox_virtual_environment_container.this",
+            ),
+            (
+                "proxmox_virtual_environment_container.forgejo_runner[0]",
+                "module.forgejo_runner[0].proxmox_virtual_environment_container.this",
+            ),
+            (
+                "proxmox_virtual_environment_container.infisical[0]",
+                "module.infisical[0].proxmox_virtual_environment_container.this",
+            ),
+            (
+                "proxmox_virtual_environment_container.hermes[0]",
+                "module.hermes[0].proxmox_virtual_environment_container.this",
+            ),
         ):
             self.assertIn(f"from = {source}", services)
             self.assertIn(f"to   = {destination}", services)

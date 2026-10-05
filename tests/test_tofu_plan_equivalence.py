@@ -31,25 +31,32 @@ class TofuPlanEquivalenceTests(unittest.TestCase):
             }
         )
         self.assertEqual(normalized["schema_version"], 1)
-        self.assertEqual(normalized["resources"], [{
-            "address": "proxmox_virtual_environment_container.technitium",
-            "actions": ["update"],
-            "values": {"vmid": 101, "hostname": "dns.example.internal"},
-        }])
+        self.assertEqual(
+            normalized["resources"],
+            [
+                {
+                    "address": "proxmox_virtual_environment_container.technitium",
+                    "actions": ["update"],
+                    "values": {"vmid": 101, "hostname": "dns.example.internal"},
+                }
+            ],
+        )
 
     def test_preserves_unknown_and_sensitive_markers(self) -> None:
         normalized = normalize_tofu_plan(
             {
-                "resource_changes": [{
-                    "address": "resource.example",
-                    "change": {
-                        "actions": ["create"],
-                        "before": None,
-                        "after": {"id": None, "password": "redacted"},
-                        "after_unknown": {"id": True},
-                        "after_sensitive": {"password": True},
-                    },
-                }]
+                "resource_changes": [
+                    {
+                        "address": "resource.example",
+                        "change": {
+                            "actions": ["create"],
+                            "before": None,
+                            "after": {"id": None, "password": "redacted"},
+                            "after_unknown": {"id": True},
+                            "after_sensitive": {"password": True},
+                        },
+                    }
+                ]
             }
         )
         self.assertEqual(
@@ -59,21 +66,34 @@ class TofuPlanEquivalenceTests(unittest.TestCase):
 
     def test_normalized_output_compares_with_provider_neutral_contract(self) -> None:
         document = {
-            "resource_changes": [{
-                "address": "resource.example",
-                "change": {"actions": ["no-op"], "before": {"vmid": 101}, "after": {"vmid": 101}},
-            }]
+            "resource_changes": [
+                {
+                    "address": "resource.example",
+                    "change": {
+                        "actions": ["no-op"],
+                        "before": {"vmid": 101},
+                        "after": {"vmid": 101},
+                    },
+                }
+            ]
         }
         normalized = normalize_tofu_plan(document)
-        self.assertEqual(compare_plans(normalized, normalized), {"equivalent": True, "differences": []})
+        self.assertEqual(
+            compare_plans(normalized, normalized),
+            {"equivalent": True, "differences": []},
+        )
 
     def test_invalid_resource_changes_fail_closed(self) -> None:
         with self.assertRaises(TofuPlanError):
             normalize_tofu_plan({"resource_changes": {}})
         with self.assertRaises(TofuPlanError):
-            normalize_tofu_plan({"resource_changes": [{"address": "x", "change": {"actions": []}}]})
+            normalize_tofu_plan(
+                {"resource_changes": [{"address": "x", "change": {"actions": []}}]}
+            )
         with self.assertRaises(TofuPlanError):
-            normalize_tofu_plan({"resource_changes": [{"change": {"actions": ["create"]}}]})
+            normalize_tofu_plan(
+                {"resource_changes": [{"change": {"actions": ["create"]}}]}
+            )
 
 
 if __name__ == "__main__":

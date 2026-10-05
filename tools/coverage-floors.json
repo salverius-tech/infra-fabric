@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "floors": {
+    "scripts/atomic_output.py": 85,
+    "scripts/canonical-provider-env.py": 90,
+    "scripts/execution-snapshot.py": 70,
+    "scripts/private_files.py": 80,
+    "scripts/secret_provider.py": 80,
+    "scripts/site_lock.py": 80,
+    "scripts/tfplan-metadata.py": 75
+  }
+}

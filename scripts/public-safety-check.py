@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Check tracked files for public-safe examples and secret-looking content."""
+
 from __future__ import annotations
 
 import argparse
@@ -30,11 +31,15 @@ ALLOWED_IPS = {
 }
 
 IPV4_RE = re.compile(r"(?<![0-9.])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?![0-9.])")
-IPV6_RE = re.compile(r"(?<![0-9A-Za-z_:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![0-9A-Za-z_:])")
+IPV6_RE = re.compile(
+    r"(?<![0-9A-Za-z_:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![0-9A-Za-z_:])"
+)
 SECRET_ASSIGN_RE = re.compile(
     r"\b([A-Z0-9_]*(?:TOKEN|PASSWORD|SECRET|API_KEY|PASS)[A-Z0-9_]*)\s*[=:]\s*([^\s#]+)"
 )
-TOKEN_PREFIX_RE = re.compile(r"\b(ghp_|github_pat_|glpat-|xoxb-|sk-)[A-Za-z0-9_\-]{10,}")
+TOKEN_PREFIX_RE = re.compile(
+    r"\b(ghp_|github_pat_|glpat-|xoxb-|sk-)[A-Za-z0-9_\-]{10,}"
+)
 PRIVATE_KEY_RE = re.compile(r"BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY")
 
 PLACEHOLDER_MARKERS = (
@@ -65,14 +70,25 @@ class Finding:
 
 
 def run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, text=True, capture_output=True, check=False
+    return (
+        subprocess.run(  # noqa: S603 - this helper invokes only fixed Git subcommands.
+            [  # noqa: S607 - controlled tooling PATH resolves the bundled Git client.
+                "git",
+                *args,
+            ],
+            cwd=cwd,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
     )
 
 
 def tracked_files(cwd: Path, tracked_file_list: Path | None = None) -> list[Path]:
     if tracked_file_list is None:
-        result = run_git(["ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd)
+        result = run_git(
+            ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd
+        )
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or "git ls-files failed")
         raw_files = result.stdout.split("\0")
@@ -98,7 +114,9 @@ def is_ignored(path: str, cwd: Path, ignored_paths: set[str] | None = None) -> b
     return result.returncode == 0
 
 
-def validate_scaffold_contract(cwd: Path, ignored_paths: set[str] | None = None) -> list[Finding]:
+def validate_scaffold_contract(
+    cwd: Path, ignored_paths: set[str] | None = None
+) -> list[Finding]:
     findings: list[Finding] = []
     for path in REQUIRED_SCAFFOLD:
         if not (cwd / path).is_file():
@@ -131,12 +149,14 @@ def scan_ips(path: str, line_number: int, line: str) -> list[Finding]:
         except ValueError:
             continue
         if not ip_is_allowed(address):
-            findings.append(Finding(path, line_number, f"non-example IP literal {address}"))
+            findings.append(
+                Finding(path, line_number, f"non-example IP literal {address}")
+            )
     return findings
 
 
 def secret_value_is_placeholder(value: str) -> bool:
-    stripped = value.strip().strip('"\'')
+    stripped = value.strip().strip("\"'")
     return not stripped or any(marker in stripped for marker in PLACEHOLDER_MARKERS)
 
 
@@ -158,11 +178,13 @@ def scan_secrets(path: str, line_number: int, line: str) -> list[Finding]:
             continue
         if key.upper().endswith("_RE") or key.lower().startswith("old_"):
             continue
-        normalized_value = value.strip().strip('"\') ,:')
+        normalized_value = value.strip().strip("\"') ,:")
         if key in {"SECRET_KEYS"} or normalized_value in {"str", "None", "{"}:
             continue
         if not secret_value_is_placeholder(value):
-            findings.append(Finding(path, line_number, f"secret-like assignment {key}=<redacted>"))
+            findings.append(
+                Finding(path, line_number, f"secret-like assignment {key}=<redacted>")
+            )
     return findings
 
 

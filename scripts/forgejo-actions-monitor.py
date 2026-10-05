@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from values_context import ValuesContextError, from_environment
 from canonical_projections import (
     render_projection_set,
     verify_cross_projection_identity,
@@ -22,6 +21,7 @@ from canonical_projections import (
 from canonical_values import load_site, model_digest
 from projection_manifest import verify_manifest
 from service_catalog import load_catalog
+from values_context import ValuesContext, ValuesContextError, from_environment
 
 REPO = Path(__file__).resolve().parents[1]
 INVENTORY = "values/ansible/inventory/local.yml"
@@ -70,6 +70,8 @@ class MonitorError(RuntimeError):
 
 
 def status_name(value: int | str | None) -> str:
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        return "unknown"
     try:
         return STATUS[int(value)]
     except (TypeError, ValueError, KeyError):
@@ -80,9 +82,14 @@ def safe_int(value: object, *, maximum: int = MAX_SAFE_ID) -> int | None:
     """Return a bounded non-negative integer, never attacker-controlled text."""
     if isinstance(value, bool):
         return None
-    try:
-        result = int(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError, OverflowError):
+    if isinstance(value, int):
+        result = value
+    elif isinstance(value, str):
+        try:
+            result = int(value)
+        except ValueError:
+            return None
+    else:
         return None
     return result if 0 <= result <= maximum else None
 
@@ -144,7 +151,7 @@ def shell_quote(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
 
 
-def verify_canonical_monitor_inputs(context: object) -> Path:
+def verify_canonical_monitor_inputs(context: ValuesContext) -> Path:
     site_file = getattr(context, "canonical_site_path", None)
     if site_file is None:
         raise MonitorError("canonical site.yaml is required")
@@ -164,7 +171,7 @@ def verify_canonical_monitor_inputs(context: object) -> Path:
     try:
         for name in names:
             projection = json.loads(
-                getattr(context, "generated_path")(name).read_text(encoding="utf-8")
+                context.generated_path(name).read_text(encoding="utf-8")
             )
             if not isinstance(projection, dict):
                 raise MonitorError(
@@ -172,7 +179,7 @@ def verify_canonical_monitor_inputs(context: object) -> Path:
                 )
             projections[name] = projection
         manifest = json.loads(
-            getattr(context, "projection_manifest_path").read_text(encoding="utf-8")
+            context.projection_manifest_path.read_text(encoding="utf-8")
         )
         if not isinstance(manifest, dict):
             raise MonitorError("canonical monitor manifest is not an object")
@@ -202,7 +209,7 @@ def verify_canonical_monitor_inputs(context: object) -> Path:
         raise MonitorError(
             "canonical monitor projection identity verification failed"
         ) from error
-    return getattr(context, "generated_path")("ansible-inventory.json")
+    return context.generated_path("ansible-inventory.json")
 
 
 def run_ansible_shell(command: str) -> str:
@@ -221,7 +228,7 @@ def run_ansible_shell(command: str) -> str:
             "-a",
             command,
         ]
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - remote shell arguments are quoted at construction.
         argv,
         cwd=REPO,
         text=True,
@@ -323,7 +330,7 @@ def runners_payload(rows: list[dict[str, Any]], service: object) -> dict[str, An
 def latest_runs(limit: int) -> list[dict[str, Any]]:
     selected_limit = bounded_limit(limit, MAX_STATUS_ROWS)
     return forgejo_sql(
-        "select r.id, r.status, r.event, r.workflow_id, r.created, r.updated, "
+        "select r.id, r.status, r.event, r.workflow_id, r.created, r.updated, "  # noqa: S608 - only bounded integers are interpolated
         "coalesce(j.name, '-') as job_name, coalesce(j.status, 0) as job_status, "
         "coalesce(j.task_id, 0) as task_id, coalesce(j.started, 0) as started, "
         "coalesce(j.stopped, 0) as stopped "
@@ -367,7 +374,7 @@ def run_id_or_latest(value: str) -> int:
 
 def run_state(run_id: int) -> dict[str, Any]:
     rows = forgejo_sql(
-        "select r.id, r.status, r.workflow_id, coalesce(j.name, '-') as job_name, "
+        "select r.id, r.status, r.workflow_id, coalesce(j.name, '-') as job_name, "  # noqa: S608 - run_id is validated as an integer
         "coalesce(j.status, 0) as job_status, coalesce(j.started, 0) as started, "
         "coalesce(j.stopped, 0) as stopped, coalesce(j.task_id, 0) as task_id "
         "from action_run r left join action_run_job j on j.run_id = r.id "
@@ -401,7 +408,7 @@ def watch(run: str, interval: int, timeout: int) -> int:
 
 def print_runners(as_json: bool) -> None:
     rows = forgejo_sql(
-        "select id, name, owner_id, repo_id, last_online, last_active, agent_labels "
+        "select id, name, owner_id, repo_id, last_online, last_active, agent_labels "  # noqa: S608 - limit is a source constant
         f"from action_runner order by id limit {MAX_RUNNERS + 1}"
     )
     service_output = run_ansible_shell(

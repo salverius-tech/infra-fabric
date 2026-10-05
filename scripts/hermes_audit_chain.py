@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 try:
@@ -25,7 +26,7 @@ LIFECYCLE_FIELDS = frozenset({"correlation_id", "phase", "action", "returncode",
 LEGACY_RESULT_FIELDS = frozenset({"action", "returncode", "ok"})
 
 
-def audit_record_hash(record: dict[str, object]) -> str:
+def audit_record_hash(record: Mapping[str, object]) -> str:
     unsigned = {key: value for key, value in record.items() if key != "record_hash"}
     payload = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode(
         "utf-8"
@@ -71,7 +72,9 @@ def validate_audit_lifecycles(records: list[dict[str, object]]) -> list[str]:
     lifecycles: dict[str, dict[str, object]] = {}
     for record in records:
         if not LIFECYCLE_FIELDS.issubset(record):
-            if any(field in record for field in ("correlation_id", "phase")) or not LEGACY_RESULT_FIELDS.issubset(record):
+            if any(
+                field in record for field in ("correlation_id", "phase")
+            ) or not LEGACY_RESULT_FIELDS.issubset(record):
                 raise AuditChainError(
                     "Hermes operator audit lifecycle record shape is invalid"
                 )
@@ -79,8 +82,14 @@ def validate_audit_lifecycles(records: list[dict[str, object]]) -> list[str]:
             returncode = record["returncode"]
             ok = record["ok"]
             if not isinstance(action, str) or action not in SUPPORTED_AUDIT_ACTIONS:
-                raise AuditChainError("Hermes operator audit action is empty or unsupported")
-            if isinstance(returncode, bool) or not isinstance(returncode, int) or not isinstance(ok, bool):
+                raise AuditChainError(
+                    "Hermes operator audit action is empty or unsupported"
+                )
+            if (
+                isinstance(returncode, bool)
+                or not isinstance(returncode, int)
+                or not isinstance(ok, bool)
+            ):
                 raise AuditChainError("Hermes operator legacy result shape is invalid")
             if ok != (returncode == 0):
                 raise AuditChainError("Hermes operator legacy result is inconsistent")

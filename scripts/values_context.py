@@ -1,4 +1,5 @@
 """Resolve the private values context selected for an infrastructure run."""
+
 from __future__ import annotations
 
 import os
@@ -91,7 +92,10 @@ def from_environment(repo: Path | None = None) -> ValuesContext:
             values_dir = values_root
         else:
             candidates = (values_root / "sites" / site, values_root / site)
-            values_dir = next((candidate for candidate in candidates if candidate.is_dir()), candidates[0])
+            values_dir = next(
+                (candidate for candidate in candidates if candidate.is_dir()),
+                candidates[0],
+            )
             if not values_dir.is_dir():
                 raise ValuesContextError(f"selected values site does not exist: {site}")
 
@@ -113,5 +117,7 @@ def load_metadata(context: ValuesContext) -> dict[str, Any]:
         raise ValuesContextError(f"site metadata must be an object: {path}")
     declared = data.get("name", context.site)
     if declared != context.site:
-        raise ValuesContextError(f"site metadata name does not match VALUES_SITE: {path}")
+        raise ValuesContextError(
+            f"site metadata name does not match VALUES_SITE: {path}"
+        )
     return data

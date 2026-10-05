@@ -46,9 +46,9 @@ class FakeRouter:
 
 
 fake_fastapi = types.ModuleType("fastapi")
-setattr(fake_fastapi, "APIRouter", FakeRouter)
-setattr(fake_fastapi, "HTTPException", FakeHTTPException)
-setattr(fake_fastapi, "Request", object)
+fake_fastapi.APIRouter = FakeRouter
+fake_fastapi.HTTPException = FakeHTTPException
+fake_fastapi.Request = object
 
 dashboard_spec = importlib.util.spec_from_file_location(
     "homelab_infra_operator_dashboard_api", DASHBOARD_API
@@ -208,9 +208,7 @@ class HermesOperatorPluginTests(unittest.TestCase):
         )
         with (
             patch.dict(os.environ, environment, clear=True),
-            patch.object(
-                dashboard.subprocess, "run", return_value=dashboard_completed
-            ),
+            patch.object(dashboard.subprocess, "run", return_value=dashboard_completed),
         ):
             dashboard_result = dashboard._bridge("validate")
         self.assertEqual(dashboard_result["correlation_id"], correlation)

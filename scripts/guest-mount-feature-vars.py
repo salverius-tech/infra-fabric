@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Emit Ansible vars for LXC guest mount feature preflight checks."""
+
 from __future__ import annotations
 
 import argparse
@@ -10,6 +11,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import settings
+
 REQUIRED_FEATURES = {"guest_nfs": "nfs", "guest_cifs": "cifs"}
 SERVICE_HOSTS = settings.SERVICE_REGISTRY_DATA["services"]
 
@@ -22,13 +24,19 @@ def load_projection(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise GuestMountFeatureError(f"cannot read canonical projection {path}: {error}") from error
+        raise GuestMountFeatureError(
+            f"cannot read canonical projection {path}: {error}"
+        ) from error
     if not isinstance(data, dict):
-        raise GuestMountFeatureError(f"canonical projection {path} must contain an object")
+        raise GuestMountFeatureError(
+            f"canonical projection {path} must contain an object"
+        )
     return data
 
 
-def build_feature_checks(enabled_services: list[str], tfvars: dict[str, Any]) -> list[dict[str, Any]]:
+def build_feature_checks(
+    enabled_services: list[str], tfvars: dict[str, Any]
+) -> list[dict[str, Any]]:
     storage = tfvars.get("service_storage", {})
     if not isinstance(storage, dict):
         return []
@@ -40,7 +48,9 @@ def build_feature_checks(enabled_services: list[str], tfvars: dict[str, Any]) ->
         vmid = tfvars.get(vmid_key) if vmid_key else None
         runtimes = tfvars.get("service_runtime", {})
         runtime = runtimes.get(service, {}) if isinstance(runtimes, dict) else {}
-        runtime_type = runtime.get("type", "lxc") if isinstance(runtime, dict) else "lxc"
+        runtime_type = (
+            runtime.get("type", "lxc") if isinstance(runtime, dict) else "lxc"
+        )
         if runtime_type != "lxc":
             continue
         service_storage = storage.get(service, {})
@@ -49,11 +59,16 @@ def build_feature_checks(enabled_services: list[str], tfvars: dict[str, Any]) ->
         for mount_name, definition in service_storage.items():
             if not isinstance(definition, dict):
                 continue
-            feature = REQUIRED_FEATURES.get(definition.get("type"))
+            mount_type = definition.get("type")
+            if not isinstance(mount_type, str):
+                continue
+            feature = REQUIRED_FEATURES.get(mount_type)
             if not feature:
                 continue
             if vmid is None:
-                raise GuestMountFeatureError(f"missing VMID for {service}.{mount_name} guest mount feature check")
+                raise GuestMountFeatureError(
+                    f"missing VMID for {service}.{mount_name} guest mount feature check"
+                )
             checks.append(
                 {
                     "service": service,
@@ -82,25 +97,48 @@ def format_summary(checks: list[dict[str, Any]]) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--projection", type=Path, required=True, help="generated canonical OpenTofu JSON projection")
+    parser.add_argument(
+        "--projection",
+        type=Path,
+        required=True,
+        help="generated canonical OpenTofu JSON projection",
+    )
     parser.add_argument("--summary", action="store_true")
     args = parser.parse_args(argv)
 
     try:
         projection = load_projection(args.projection)
         enabled_services = projection.get("enabled_services")
-        if not isinstance(enabled_services, list) or not all(isinstance(service, str) for service in enabled_services):
-            raise GuestMountFeatureError("canonical projection enabled_services must be a string list")
+        if not isinstance(enabled_services, list) or not all(
+            isinstance(service, str) for service in enabled_services
+        ):
+            raise GuestMountFeatureError(
+                "canonical projection enabled_services must be a string list"
+            )
         runtimes = projection.get("service_runtime")
         storage = projection.get("service_storage")
         if not isinstance(runtimes, dict):
-            raise GuestMountFeatureError("canonical projection service_runtime must be an object")
+            raise GuestMountFeatureError(
+                "canonical projection service_runtime must be an object"
+            )
         if not isinstance(storage, dict):
-            raise GuestMountFeatureError("canonical projection service_storage must be an object")
-        if any(service in runtimes and not isinstance(runtimes[service], dict) for service in enabled_services):
-            raise GuestMountFeatureError("canonical projection service_runtime entries must be objects")
-        if any(service in storage and not isinstance(storage[service], dict) for service in enabled_services):
-            raise GuestMountFeatureError("canonical projection service_storage entries must be objects")
+            raise GuestMountFeatureError(
+                "canonical projection service_storage must be an object"
+            )
+        if any(
+            service in runtimes and not isinstance(runtimes[service], dict)
+            for service in enabled_services
+        ):
+            raise GuestMountFeatureError(
+                "canonical projection service_runtime entries must be objects"
+            )
+        if any(
+            service in storage and not isinstance(storage[service], dict)
+            for service in enabled_services
+        ):
+            raise GuestMountFeatureError(
+                "canonical projection service_storage entries must be objects"
+            )
         tfvars = projection
         checks = build_feature_checks(enabled_services, tfvars)
     except GuestMountFeatureError as error:

@@ -1,0 +1,160 @@
+- name: Flush Hermes service restarts before endpoint checks
+  tags: [health]
+  ansible.builtin.meta: flush_handlers
+- name: Verify Hermes Caddy service is active
+  tags: [health]
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - caddy
+  changed_when: false
+  register: hermes_caddy_active
+  retries: 6
+  delay: 5
+  until: hermes_caddy_active.rc == 0
+- name: Configure optional Hermes Control companion stack
+  tags: [always]
+  ansible.builtin.include_role:
+    name: hermes_control
+  when: hermes_control_enabled | default(false) | bool
+- name: Verify Hermes Control HTTPS health through Caddy
+  tags: [health]
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
+      - --max-time
+      - "10"
+      - --resolve
+      - "{{ hermes_control_domain }}:443:127.0.0.1"
+      - "https://{{ hermes_control_domain }}/health"
+  changed_when: false
+  when: hermes_control_enabled | default(false) | bool
+  register: hermes_control_https_health
+  retries: 12
+  delay: 5
+  until: hermes_control_https_health.rc == 0
+
+- name: Verify Hermes Control HTTPS diagnostics through Caddy
+  tags: [health]
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
+      - --max-time
+      - "10"
+      - --resolve
+      - "{{ hermes_control_domain }}:443:127.0.0.1"
+      - -H
+      - "Authorization: Bearer {{ hermes_control_api_token }}"
+      - "https://{{ hermes_control_domain }}/diagnostics"
+  changed_when: false
+  no_log: true
+  when: hermes_control_enabled | default(false) | bool
+  register: hermes_control_https_diagnostics
+  retries: 12
+  delay: 5
+  until: hermes_control_https_diagnostics.rc == 0
+
+- name: Verify Hermes gateway service is active
+  tags: [health]
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - hermes-gateway
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+  changed_when: false
+  register: hermes_gateway_active
+  retries: 6
+  delay: 5
+  until: hermes_gateway_active.rc == 0
+- name: Verify Hermes dashboard service is active
+  tags: [health]
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - hermes-dashboard
+  when: hermes_dashboard_enabled | default(true) | bool
+  changed_when: false
+  register: hermes_dashboard_active
+  retries: 6
+  delay: 5
+  until: hermes_dashboard_active.rc == 0
+- name: Verify Hermes dashboard login page
+  tags: [validation]
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ hermes_dashboard_port | default(9119) }}/login"
+    status_code: 200
+    return_content: false
+  when: hermes_dashboard_enabled | default(true) | bool
+  register: hermes_dashboard_login_check
+  retries: 12
+  delay: 5
+  until: hermes_dashboard_login_check.status == 200
+- name: Verify Hermes Caddy basic-auth login rewrite
+  tags: [validation]
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
+      - --max-time
+      - "10"
+      - --resolve
+      - "{{ hermes_domain }}:443:127.0.0.1"
+      - "https://{{ hermes_domain }}/auth/login?provider=basic&next=%2F"
+  changed_when: false
+  when: hermes_dashboard_enabled | default(true) | bool
+  register: hermes_https_login_check
+  retries: 12
+  delay: 5
+  until: hermes_https_login_check.rc == 0
+- name: Reject Hermes startup journal errors
+  tags: [config]
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - >-
+        set -euo pipefail;
+        if journalctl --unit hermes-dashboard --unit hermes-gateway
+        --since "@{{ hermes_deployment_started_epoch.stdout | trim }}"
+        --no-pager --output=cat |
+        grep -Eqi
+        'HERMES_PREFLIGHT_|Chat unavailable|node not found|npm not found|Traceback \(most recent call last\)|ModuleNotFoundError|ImportError:';
+        then echo 'Hermes startup journal contains a fatal readiness marker.' >&2; exit 1; fi
+  changed_when: false
+  when: hermes_dashboard_enabled | default(true) | bool
+- name: Verify Hermes static HTTPS route locally
+  tags: [health]
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - --insecure
+      - --max-time
+      - "10"
+      - --resolve
+      - "{{ hermes_domain }}:443:127.0.0.1"
+      - "https://{{ hermes_domain }}/"
+  changed_when: false
+  when: not (hermes_dashboard_enabled | default(true) | bool)
+  register: hermes_static_https_check
+  retries: 12
+  delay: 5
+  until: hermes_static_https_check.rc == 0

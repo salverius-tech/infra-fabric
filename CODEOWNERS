@@ -1,0 +1,6 @@
+# Reviewers for high-impact operator and supply-chain boundaries.
+/tools/Dockerfile @salverius
+/tools/*.lock @salverius
+/scripts/site-context.sh @salverius
+/scripts/apply-infra.sh @salverius
+/docs/governance/** @salverius

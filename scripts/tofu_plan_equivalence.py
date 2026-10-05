@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Normalize OpenTofu JSON plans for the provider-neutral equivalence contract."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -27,7 +28,10 @@ def _marker_tree(value: Any, markers: Any, *, marker: str) -> Any:
                 for index, child in enumerate(value)
             ]
     if isinstance(value, Mapping):
-        return {key: _marker_tree(child, None, marker=marker) for key, child in value.items()}
+        return {
+            key: _marker_tree(child, None, marker=marker)
+            for key, child in value.items()
+        }
     if isinstance(value, list):
         return [_marker_tree(child, None, marker=marker) for child in value]
     return value
@@ -35,7 +39,11 @@ def _marker_tree(value: Any, markers: Any, *, marker: str) -> Any:
 
 def _change_values(change: Mapping[str, Any]) -> Any:
     actions = change.get("actions")
-    if not isinstance(actions, list) or not actions or not all(isinstance(item, str) for item in actions):
+    if (
+        not isinstance(actions, list)
+        or not actions
+        or not all(isinstance(item, str) for item in actions)
+    ):
         raise TofuPlanError("OpenTofu resource change actions are invalid")
     after = change.get("after")
     before = change.get("before")
@@ -69,12 +77,16 @@ def normalize_tofu_plan(document: Mapping[str, Any]) -> dict[str, Any]:
         resources.append(
             {
                 "address": address,
-                "actions": list(change.get("change", {}).get("actions", []))
-                if isinstance(change.get("change"), Mapping)
-                else [],
-                "values": _change_values(change.get("change", {}))
-                if isinstance(change.get("change"), Mapping)
-                else _change_values({}),
+                "actions": (
+                    list(change.get("change", {}).get("actions", []))
+                    if isinstance(change.get("change"), Mapping)
+                    else []
+                ),
+                "values": (
+                    _change_values(change.get("change", {}))
+                    if isinstance(change.get("change"), Mapping)
+                    else _change_values({})
+                ),
             }
         )
     return {"schema_version": 1, "resources": resources}

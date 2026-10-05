@@ -2,12 +2,11 @@
 
 import importlib.util
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts/site_lock.py"
@@ -23,7 +22,16 @@ class SiteLockTests(unittest.TestCase):
             lock = Path(temporary) / ".infra-fabric.lock"
             with site_lock.acquire_site_lock(lock):
                 result = subprocess.run(
-                    [sys.executable, str(SCRIPT), "--lock-path", str(lock), "--", sys.executable, "-c", "pass"],
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--lock-path",
+                        str(lock),
+                        "--",
+                        sys.executable,
+                        "-c",
+                        "pass",
+                    ],
                     text=True,
                     capture_output=True,
                     check=False,
@@ -41,7 +49,12 @@ class SiteLockTests(unittest.TestCase):
     def test_lock_is_private_persistent_and_released_after_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             lock = Path(temporary) / ".infra-fabric.lock"
-            self.assertEqual(site_lock.run_locked(lock, [sys.executable, "-c", "raise SystemExit(7)"]), 7)
+            self.assertEqual(
+                site_lock.run_locked(
+                    lock, [sys.executable, "-c", "raise SystemExit(7)"]
+                ),
+                7,
+            )
             self.assertTrue(lock.is_file())
             self.assertEqual(lock.stat().st_mode & 0o777, 0o600)
             with site_lock.acquire_site_lock(lock):
@@ -62,7 +75,10 @@ class SiteLockTests(unittest.TestCase):
 
     def test_run_infra_wraps_container_command_before_preflight(self) -> None:
         source = (ROOT / "scripts/run-infra.sh").read_text(encoding="utf-8")
-        self.assertIn('infra python scripts/site_lock.py --lock-path "${values_dir}/.infra-fabric.lock" -- "$@"', source)
+        self.assertIn(
+            'infra python scripts/site_lock.py --lock-path "${values_dir}/.infra-fabric.lock" -- "$@"',
+            source,
+        )
 
 
 if __name__ == "__main__":

@@ -1,0 +1,246 @@
+- name: Install Caddy package and service prerequisites
+  tags: [packages]
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+    update_cache: true
+
+- name: Ensure Caddy service account exists
+  tags: [config]
+  ansible.builtin.user:
+    name: caddy
+    system: true
+    state: present
+
+- name: Install reviewed Hermes Caddy with Cloudflare DNS module
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/caddy-cloudflare/{{ hermes_caddy_cloudflare_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/caddy-cloudflare-{{ hermes_caddy_cloudflare_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/bin/caddy
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
+  notify: Restart caddy
+- name: Require reviewed Hermes tooling artifacts before guest mutation
+  tags: [always]
+  ansible.builtin.include_tasks: ../../../tasks/reviewed-artifact-cache.yml
+  vars:
+    reviewed_artifact_cache_root: "{{ hermes_artifact_cache_root | default('/var/lib/infra-fabric/artifacts') }}"
+    reviewed_artifact_stage_root: /var/tmp/infra-fabric-artifacts
+    reviewed_artifacts:
+      - name: docker-compose
+        version: "{{ hermes_compose_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "docker-compose-{{ hermes_compose_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ hermes_compose_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else hermes_compose_sha256_arm64 }}
+      - name: just
+        version: "{{ hermes_just_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "just-{{ hermes_just_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ hermes_just_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else hermes_just_sha256_arm64 }}
+
+- name: Ensure Hermes executable install parents exist
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /usr/local/lib/docker/cli-plugins
+    - /usr/local/bin
+
+- name: Install reviewed Hermes Docker Compose plugin
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/docker-compose/{{ hermes_compose_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/docker-compose-{{ hermes_compose_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/local/lib/docker/cli-plugins/docker-compose
+    remote_src: true
+    mode: '0755'
+
+- name: Install reviewed Hermes just binary
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "/var/tmp/infra-fabric-artifacts/just/{{ hermes_just_version }}/{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}/just-{{ hermes_just_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"  # yamllint disable-line rule:line-length
+    dest: /usr/local/bin/just
+    remote_src: true
+    mode: '0755'
+
+- name: Ensure Hermes runtime user exists
+  tags: [config]
+  ansible.builtin.user:
+    name: "{{ hermes_runtime_user | default('anvil') }}"
+    shell: /bin/bash
+    create_home: true
+    groups: users
+    append: true
+
+- name: Ensure home directory is traversable by non-root service users
+  tags: [config]
+  ansible.builtin.file:
+    path: /home
+    state: directory
+    mode: "0755"
+
+- name: Restore guarded private Hermes state during bootstrap
+  tags: [always]
+  ansible.builtin.include_tasks: bootstrap-state.yml
+
+- name: Ensure Hermes runtime home directory is traversable by the runtime user
+  tags: [config]
+  ansible.builtin.file:
+    path: "/home/{{ hermes_runtime_user | default('anvil') }}"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: "0750"
+
+- name: Ensure Hermes runtime state directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0700'
+
+- name: Ensure Hermes operator audit directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ (hermes_operator_audit_path | default('/var/lib/hermes/operator-audit.jsonl', true)) | dirname }}"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0700'
+
+- name: Initialize empty Hermes operator audit journal
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ hermes_operator_audit_path | default('/var/lib/hermes/operator-audit.jsonl', true) }}"
+    state: touch
+    access_time: preserve
+    modification_time: preserve
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0600'
+
+- name: Enable linger for Hermes runtime user services
+  tags: [service]
+  ansible.builtin.command:
+    argv:
+      - loginctl
+      - enable-linger
+      - "{{ hermes_runtime_user | default('anvil') }}"
+  changed_when: false
+
+- name: Ensure Hermes runtime SSH directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: "/home/{{ hermes_runtime_user | default('anvil') }}/.ssh"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: "0700"
+
+- name: Install Hermes runtime authorized keys
+  tags: [packages]
+  ansible.builtin.copy:
+    dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.ssh/authorized_keys"
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: "0600"
+    content: "{{ (hermes_ssh_public_keys | default([])) | join('\n') }}{{ '\n' if (hermes_ssh_public_keys | default([]) | length) > 0 else '' }}"
+  no_log: true
+
+
+- name: Install Hermes OS dependencies in LXC
+  tags: [packages]
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - "set -euo pipefail; packages=\"build-essential ca-certificates curl docker.io gh git gnupg jq openssh-client python3 python3-pip python3-venv rsync sudo tar unzip xz-utils\"; missing=0; for package in ${packages}; do\n  dpkg-query -W \"${package}\" >/dev/null 2>&1 || missing=1;\ndone; if [[ \"${missing}\" -eq 1 ]]; then\n  DEBIAN_FRONTEND=noninteractive apt-get update;\n  DEBIAN_FRONTEND=noninteractive apt-get install -y ${packages};\nfi; systemctl enable --now docker"  # yamllint disable-line rule:line-length
+  changed_when: false
+- name: Grant Hermes runtime user access to Docker
+  tags: [config]
+  ansible.builtin.user:
+    name: "{{ hermes_runtime_user | default('anvil') }}"
+    groups: docker
+    append: true
+  notify: Restart hermes gateway
+- name: Install passwordless sudo policy for Hermes runtime user
+  tags: [packages]
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/hermes-runtime
+    owner: root
+    group: root
+    mode: '0440'
+    content: "{{ hermes_runtime_user | default('anvil') }} ALL=(ALL:ALL) NOPASSWD: ALL\n"  # public-safety: allow-secret
+    validate: /usr/sbin/visudo -cf %s
+  when: hermes_runtime_passwordless_sudo | default(false) | bool
+
+- name: Remove Hermes runtime passwordless sudo policy when disabled
+  tags: [config]
+  ansible.builtin.file:
+    path: /etc/sudoers.d/hermes-runtime
+    state: absent
+  when: not (hermes_runtime_passwordless_sudo | default(false) | bool)
+
+- name: Ensure Hermes directories exist
+  tags: [config]
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - "install -d -m 0755 /srv /var/www/hermes; install -d -m 0755 -o {{ (hermes_runtime_user | default('anvil')) | quote }} -g {{ (hermes_runtime_user | default('anvil')) | quote }} {{ hermes_repo_path | default('/srv/homelab-infra') | quote }}"  # yamllint disable-line rule:line-length
+  changed_when: false
+
+- name: Ensure homelab-infra operator runtime directories exist
+  tags: [config]
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ hermes_operator_runtime_path | default('/usr/local/lib/homelab-infra-operator') }}/scripts"
+      mode: '0755'
+    - path: "{{ (hermes_operator_context_path | default('/etc/homelab-infra-operator/context.json')) | dirname }}"
+      mode: '0755'
+
+- name: Install homelab-infra operator runtime bundle
+  tags: [packages]
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../../scripts/{{ item }}"
+    dest: "{{ hermes_operator_runtime_path | default('/usr/local/lib/homelab-infra-operator') }}/scripts/{{ item }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - hermes-operator.py
+    - hermes_audit_chain.py
+    - private_files.py
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway
+
+- name: Install homelab-infra operator context
+  tags: [config]
+  ansible.builtin.copy:
+    dest: "{{ hermes_operator_context_path | default('/etc/homelab-infra-operator/context.json') }}"
+    content: "{{ {'site': canonical_site, 'enabled_services': (canonical_enabled_services | default([]) | sort)} | to_nice_json }}\n"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway

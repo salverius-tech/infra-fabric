@@ -1,0 +1,271 @@
+- name: Install Hermes landing page
+  tags: [packages]
+  ansible.builtin.template:
+    src: index.html.j2
+    dest: /var/www/hermes/index.html
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Install Hermes Caddy env
+  tags: [packages]
+  ansible.builtin.template:
+    src: "{{ role_path }}/../caddy_proxy/templates/caddy.env.j2"
+    dest: /etc/caddy/env
+    mode: '0600'
+    owner: root
+    group: caddy
+  no_log: true
+  notify: Restart caddy
+- name: Select Hermes managed Node.js artifact
+  tags: [packages]
+  ansible.builtin.set_fact:
+    hermes_node_arch: "{{ 'x64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+    hermes_node_sha256: >-
+      {{ hermes_node_sha256_amd64
+         if ansible_architecture == 'x86_64'
+         else hermes_node_sha256_arm64 }}
+  when: ansible_architecture in ['x86_64', 'aarch64']
+
+- name: Reject unsupported Hermes managed Node.js architecture
+  tags: [config]
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in ['x86_64', 'aarch64']
+    fail_msg: Hermes managed Node.js supports only amd64 and arm64.
+
+- name: Detect Hermes managed wheel runtime support
+  tags: [config]
+  ansible.builtin.set_fact:
+    hermes_managed_runtime_supported: >-
+      {{ ansible_distribution == 'Debian' and
+         ansible_distribution_major_version == '13' and
+         ansible_architecture == 'x86_64' and
+         ansible_python.version.major == 3 and
+         ansible_python.version.minor == 13 }}
+
+- name: Reject unsupported Hermes managed runtime
+  tags: [config]
+  ansible.builtin.assert:
+    that:
+      - hermes_managed_runtime_supported | bool
+    fail_msg: Hermes requires Debian 13 amd64 with Python 3.13 for its checksum-verified managed runtime.
+
+- name: Install verified managed Node.js runtime
+  tags: [packages]
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - |
+        set -euo pipefail
+        version={{ hermes_node_version | quote }}
+        arch={{ hermes_node_arch | quote }}
+        sha256={{ hermes_node_sha256 | trim | quote }}
+        root=/usr/local/lib/hermes-node
+        release="${root}/releases/${version}-${sha256:0:12}"
+        changed=0
+
+        install -d -m 0755 "${root}/releases"
+        if [[ ! -f "${release}/.artifact-sha256" ]]; then
+          [[ ! -e "${release}" ]] || {
+            echo "existing Hermes Node.js release is incomplete: ${release}" >&2
+            exit 1
+          }
+          archive="$(mktemp)"
+          staging="$(mktemp -d "${root}/releases/.${version}.XXXXXX")"
+          trap 'rm -f "${archive}"; [[ -z "${staging:-}" ]] || rm -rf "${staging}"' EXIT
+          curl -fsSL -o "${archive}" \
+            "https://nodejs.org/dist/v${version}/node-v${version}-linux-${arch}.tar.xz"
+          printf '%s  %s\n' "${sha256}" "${archive}" | sha256sum -c -
+          tar -xJf "${archive}" --strip-components=1 -C "${staging}"
+          [[ "$("${staging}/bin/node" --version)" = "v${version}" ]]
+          chmod 0755 "${staging}"
+          printf '%s\n' "${sha256}" > "${staging}/.artifact-sha256"
+          mv "${staging}" "${release}"
+          staging=
+          changed=1
+        fi
+
+        [[ "$(cat "${release}/.artifact-sha256")" = "${sha256}" ]]
+        if [[ "$(stat -c %a "${release}")" != 755 ]]; then
+          chmod 0755 "${release}"
+          changed=1
+        fi
+        current="$(readlink -f "${root}/current" 2>/dev/null || true)"
+        if [[ "${current}" != "${release}" ]]; then
+          ln -s "${release}" "${root}/.current-new"
+          mv -Tf "${root}/.current-new" "${root}/current"
+          changed=1
+        fi
+        [[ "$("${root}/current/bin/node" --version)" = "v${version}" ]]
+        [[ "${changed}" -eq 0 ]] || echo changed
+  register: hermes_node_install
+  changed_when: "'changed' in hermes_node_install.stdout_lines"
+  when: hermes_dashboard_enabled | default(true) | bool
+
+
+- name: Ensure local libexec directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+
+- name: Install Hermes dashboard preflight
+  tags: [packages]
+  ansible.builtin.template:
+    src: hermes-dashboard-preflight.sh.j2
+    dest: /usr/local/libexec/hermes-dashboard-preflight
+    mode: '0755'
+    owner: root
+    group: root
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+  notify: Restart hermes dashboard
+
+- name: Install Hermes dashboard env
+  tags: [packages]
+  ansible.builtin.template:
+    src: hermes-dashboard.env.j2
+    dest: /etc/hermes-dashboard.env
+    mode: '0600'
+    owner: root
+    group: root
+  when: hermes_dashboard_enabled | default(true) | bool
+  no_log: true
+  notify: Restart hermes dashboard
+
+- name: Install Hermes dashboard systemd unit
+  tags: [packages]
+  ansible.builtin.template:
+    src: hermes-dashboard.service.j2
+    dest: /etc/systemd/system/hermes-dashboard.service
+    mode: '0644'
+    owner: root
+    group: root
+  when: hermes_dashboard_enabled | default(true) | bool
+  notify: Restart hermes dashboard
+
+- name: Install Hermes gateway systemd unit
+  tags: [packages]
+  ansible.builtin.template:
+    src: hermes-gateway.service.j2
+    dest: /etc/systemd/system/hermes-gateway.service
+    mode: '0644'
+    owner: root
+    group: root
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+  notify: Restart hermes gateway
+
+- name: Ensure Hermes TUI bundle directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: /usr/local/lib/hermes-agent/tui/dist
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+
+- name: Install managed Hermes Agent runtime
+  tags: [always]
+  ansible.builtin.include_tasks: managed-runtime.yml
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+
+- name: Ensure homelab-infra operator plugin directory exists
+  tags: [config]
+  ansible.builtin.file:
+    path: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator"
+    state: directory
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0750'
+  when: hermes_dashboard_enabled | default(true) | bool
+
+- name: Install homelab-infra operator plugin manifest
+  tags: [packages]
+  ansible.builtin.copy:
+    src: homelab-infra-operator/plugin.yaml
+    dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator/plugin.yaml"
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0644'
+  when: hermes_dashboard_enabled | default(true) | bool
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway
+
+- name: Install homelab-infra operator plugin implementation
+  tags: [packages]
+  ansible.builtin.copy:
+    src: homelab-infra-operator/__init__.py
+    dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator/__init__.py"
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0750'
+  when: hermes_dashboard_enabled | default(true) | bool
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway
+
+- name: Install homelab-infra operator dashboard plugin
+  tags: [packages]
+  ansible.builtin.copy:
+    src: homelab-infra-operator/dashboard/
+    dest: "/home/{{ hermes_runtime_user | default('anvil') }}/.hermes/plugins/homelab-infra-operator/dashboard/"
+    owner: "{{ hermes_runtime_user | default('anvil') }}"
+    group: "{{ hermes_runtime_user | default('anvil') }}"
+    mode: '0644'
+    directory_mode: '0750'
+  when: hermes_dashboard_enabled | default(true) | bool
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway
+
+- name: Enable homelab-infra operator plugin
+  tags: [service]
+  ansible.builtin.command:
+    argv:
+      - runuser
+      - -u
+      - "{{ hermes_runtime_user | default('anvil') }}"
+      - --
+      - env
+      - "HERMES_HOME=/home/{{ hermes_runtime_user | default('anvil') }}/.hermes"
+      - /usr/local/bin/hermes
+      - plugins
+      - enable
+      - homelab-infra-operator
+  register: hermes_operator_plugin_enabled
+  changed_when: "'already enabled' not in (hermes_operator_plugin_enabled.stdout | lower)"
+  when: hermes_dashboard_enabled | default(true) | bool
+  notify:
+    - Restart hermes dashboard
+    - Restart hermes gateway
+
+- name: Link Hermes dashboard TUI bundle to the active release
+  tags: [config]
+  ansible.builtin.file:
+    src: /usr/local/lib/hermes-agent/venv/lib/python3.13/site-packages/hermes_cli/tui_dist/entry.js
+    dest: /usr/local/lib/hermes-agent/tui/dist/entry.js
+    state: link
+    force: true
+    owner: root
+    group: root
+  when:
+    - hermes_dashboard_enabled | default(true) | bool
+    - hermes_managed_runtime_supported | default(false) | bool
+  notify: Restart hermes dashboard

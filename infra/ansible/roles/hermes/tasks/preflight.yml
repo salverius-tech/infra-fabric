@@ -1,0 +1,60 @@
+- name: Validate Hermes required variables
+  tags: [validation]
+  ansible.builtin.assert:
+    that:
+      - canonical_site is defined
+      - canonical_site is match('^[a-z0-9][a-z0-9-]{0,63}$')
+      - hermes_vmid is defined
+      - hermes_domain is defined
+      - caddy_email is defined
+      - caddy_cloudflare_api_token is defined
+      - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_username | default('') | length) > 0
+      - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_password_hash | default('') | length) > 0
+      - not (hermes_dashboard_enabled | default(true) | bool) or (hermes_dashboard_basic_auth_secret | default('') | length) > 0
+      - hermes_compression_threshold | default(0.75) | float >= 0.5
+      - hermes_compression_threshold | default(0.75) | float <= 0.95
+      - hermes_max_concurrent_children | default(5) | int >= 1
+      - hermes_max_concurrent_children | default(5) | int <= 10
+      - hermes_max_spawn_depth | default(2) | int >= 1
+      - hermes_max_spawn_depth | default(2) | int <= 3
+      - hermes_runtime_user | default('anvil') is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - hermes_runtime_user | default('anvil') != 'root'
+      - not (hermes_operator_mutation_enabled | default(false) | bool)
+      - hermes_node_version is defined
+      - hermes_node_version is match('^[0-9]+[.][0-9]+[.][0-9]+$')
+      - hermes_node_sha256_amd64 is defined
+      - hermes_node_sha256_amd64 is match('^[0-9a-f]{64}$')
+      - hermes_node_sha256_arm64 is defined
+      - hermes_node_sha256_arm64 is match('^[0-9a-f]{64}$')
+    fail_msg: >-
+      canonical_site, hermes_vmid, hermes_domain, caddy_email, caddy_cloudflare_api_token,
+      non-empty dashboard auth variables, sane Hermes tuning values, a
+      non-root runtime user, a disabled Hermes mutation gate for the hard read-only
+      pilot, and complete managed Node.js pins are required. Mutation reactivation
+      requires a reviewed source change after trusted principal acceptance.
+- name: Check whether Hermes Caddy has Cloudflare DNS module
+  tags: [validation]
+  ansible.builtin.command:
+    argv:
+      - bash
+      - -lc
+      - caddy list-modules 2>/dev/null | grep -Fx dns.providers.cloudflare
+  register: hermes_caddy_cloudflare_module
+  changed_when: false
+  failed_when: false
+
+- name: Require reviewed Hermes Caddy artifact before guest mutation
+  tags: [always]
+  ansible.builtin.include_tasks: ../../../tasks/reviewed-artifact-cache.yml
+  vars:
+    reviewed_artifact_cache_root: "{{ hermes_artifact_cache_root | default('/var/lib/infra-fabric/artifacts') }}"
+    reviewed_artifact_stage_root: /var/tmp/infra-fabric-artifacts
+    reviewed_artifacts:
+      - name: caddy-cloudflare
+        version: "{{ hermes_caddy_cloudflare_version }}"
+        architecture: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else 'unsupported' }}"
+        filename: "caddy-cloudflare-{{ hermes_caddy_cloudflare_version }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}"
+        sha256: >-
+          {{ hermes_caddy_cloudflare_sha256_amd64
+             if ansible_architecture == 'x86_64'
+             else hermes_caddy_cloudflare_sha256_arm64 }}

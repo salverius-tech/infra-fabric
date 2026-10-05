@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import unittest
+from pathlib import Path
 
+import tomllib
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,8 +41,10 @@ class Phase7ToolingContractTests(unittest.TestCase):
             lock, r"(?m)^[A-Za-z0-9_.-]+==[^\s]+ \\\n    --hash=sha256:[0-9a-f]{64}$"
         )
         self.assertRegex(
-            bootstrap_lock, r"(?m)^pip==[^\s]+ \\\n    --hash=sha256:[0-9a-f]{64}$"
+            bootstrap_lock,
+            r"(?m)^(?:pip|setuptools)==[^\s]+ \\\n    --hash=sha256:[0-9a-f]{64}$",
         )
+        self.assertIn("setuptools==84.0.0", bootstrap_lock)
         self.assertNotIn("-r tools/requirements.txt", text)
 
     def test_apt_and_advisory_policy_are_documented(self) -> None:
@@ -77,20 +80,81 @@ class Phase7ToolingContractTests(unittest.TestCase):
             "shell",
             "python-quality",
             "contracts",
+            "unit-tests",
             "ansible",
             "summary",
         ):
             self.assertIn(f'run_stage "{stage}"', text)
         self.assertIn("black --check", text)
         self.assertIn("tools/python-format-files.txt", text)
-        self.assertIn("ruff check --select=E9,F63,F7,F82", text)
+        self.assertIn("ruff check", text)
+        config_text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        ruff_config = tomllib.loads(config_text)["tool"]["ruff"]["lint"]
+        selected = set(ruff_config["select"])
+        self.assertTrue(
+            {
+                "S101",
+                "S102",
+                "S104",
+                "S105",
+                "S106",
+                "S107",
+                "S108",
+                "S201",
+                "S301",
+                "S310",
+                "S324",
+                "S501",
+                "S506",
+                "S603",
+                "S606",
+                "S607",
+                "S608",
+                "S701",
+            }
+            <= selected
+        )
+        self.assertTrue({"S603", "S606", "S607"} <= selected)
+        per_file = ruff_config["per-file-ignores"]
+        self.assertEqual(per_file["tests/**/*.py"], ["S101", "S603", "S606", "S607"])
+        self.assertEqual(
+            per_file["scripts/bootstrap-technitium-api-token.py"],
+            ["S105", "S310"],
+        )
+        self.assertEqual(
+            per_file["infra/ansible/scripts/apply-technitium-dns.py"], ["S310"]
+        )
         self.assertIn("${python_files[@]}", text)
         self.assertIn("mypy", text)
         self.assertIn("coverage run", text)
+        self.assertIn("coverage combine --quiet", text)
         self.assertIn("coverage report --fail-under=", text)
+        self.assertIn("scripts/check-coverage-floors.py", text)
+        self.assertTrue((ROOT / "tools" / "coverage-floors.json").is_file())
         self.assertIn('stages+=("FAIL ${current_stage}")', text)
         self.assertIn("scripts/canonical-render.py", text)
         self.assertIn("scripts/verify-projections.py", text)
+
+    def test_mypy_covers_all_operator_python_modules(self) -> None:
+        config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        self.assertEqual(
+            config["tool"]["mypy"]["files"],
+            ["scripts", "infra/ansible/scripts"],
+        )
+        self.assertEqual(config["tool"]["mypy"]["follow_imports"], "silent")
+
+    def test_black_inventory_covers_every_python_source(self) -> None:
+        sources = sorted(
+            str(path.relative_to(ROOT))
+            for base in (ROOT / "infra/ansible", ROOT / "scripts", ROOT / "tests")
+            for path in base.rglob("*.py")
+        )
+        formatted = (
+            (ROOT / "tools/python-format-files.txt")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        self.assertEqual(formatted, sources)
 
     def test_validation_requires_just_before_unittest_contracts(self) -> None:
         text = VALIDATE.read_text(encoding="utf-8")
@@ -101,7 +165,7 @@ class Phase7ToolingContractTests(unittest.TestCase):
         self.assertLess(text.index('run_stage "contracts"'), text.index(guard))
         self.assertLess(
             text.index(guard),
-            text.index("coverage run --source=scripts -m unittest discover"),
+            text.index("coverage run -m unittest discover"),
         )
 
     def test_validate_public_checkout_fetches_full_history_for_reconciliation(
@@ -110,7 +174,7 @@ class Phase7ToolingContractTests(unittest.TestCase):
         workflow = yaml.load(
             WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader
         )
-        checkout = workflow["jobs"]["validate-public"]["steps"][0]
+        checkout = workflow["jobs"]["unit"]["steps"][0]
 
         self.assertEqual(
             checkout["uses"],
@@ -124,14 +188,32 @@ class Phase7ToolingContractTests(unittest.TestCase):
         workflow = yaml.load(
             WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader
         )
-        job = workflow["jobs"]["supply-chain-evidence"]
-        rendered = "\n".join(str(step) for step in job["steps"])
+        scan_job = workflow["jobs"]["dependency-scan"]
+        scan_steps = "\n".join(str(step) for step in scan_job["steps"])
+        scheduled_job = workflow["jobs"]["supply-chain-evidence"]
+        scheduled_steps = "\n".join(str(step) for step in scheduled_job["steps"])
 
-        self.assertIn("dependencies", rendered.lower())
-        self.assertIn("fs", rendered)
-        self.assertIn("HIGH,CRITICAL", rendered)
-        self.assertIn("workflow_dispatch", job["if"])
-        self.assertIn("schedule", job["if"])
+        self.assertIn("fs", scan_steps)
+        self.assertIn("HIGH,CRITICAL", scan_steps)
+        self.assertIn("workflow_dispatch", scheduled_job["if"])
+        self.assertIn("schedule", scheduled_job["if"])
+        self.assertIn("image", scheduled_steps)
+        self.assertIn("scripts/python.sh scripts/update.py --dry-run", scheduled_steps)
+        self.assertIn("scaffold/sites/_template/site.yaml", scheduled_steps)
+        self.assertNotIn("scan-type: fs", scheduled_steps)
+
+    def test_workflow_runs_unit_before_cached_full_validation(self) -> None:
+        workflow = yaml.load(
+            WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader
+        )
+        jobs = workflow["jobs"]
+        self.assertEqual(jobs["full"]["needs"], "unit")
+        for name in ("unit", "full"):
+            rendered = "\n".join(str(step) for step in jobs[name]["steps"])
+            self.assertIn(
+                "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830", rendered
+            )
+            self.assertIn("linux-amd64-tooling-", rendered)
 
 
 if __name__ == "__main__":

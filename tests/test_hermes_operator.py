@@ -660,11 +660,23 @@ class HermesOperatorTests(unittest.TestCase):
             self.write_hash_valid_audit(
                 audit,
                 [
-                    {"_remove": ["correlation_id", "phase"], "action": "validate", "returncode": 0, "ok": True},
-                    {"_remove": ["correlation_id", "phase"], "action": "plan", "returncode": 0, "ok": True},
+                    {
+                        "_remove": ["correlation_id", "phase"],
+                        "action": "validate",
+                        "returncode": 0,
+                        "ok": True,
+                    },
+                    {
+                        "_remove": ["correlation_id", "phase"],
+                        "action": "plan",
+                        "returncode": 0,
+                        "ok": True,
+                    },
                 ],
             )
-            with mock.patch.dict(os.environ, {"HERMES_OPERATOR_AUDIT_PATH": str(audit)}):
+            with mock.patch.dict(
+                os.environ, {"HERMES_OPERATOR_AUDIT_PATH": str(audit)}
+            ):
                 result = hermes_operator.verify_audit(root)
             self.assertEqual(result["record_count"], 2)
             self.assertEqual(result["unresolved_correlations"], [])
@@ -1279,7 +1291,9 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertEqual(status["enabled_services"], ["hermes"])
             self.assertNotIn("terraform.tfvars", json.dumps(status))
 
-    def test_status_uses_deployed_non_secret_context_without_canonical_values(self) -> None:
+    def test_status_uses_deployed_non_secret_context_without_canonical_values(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             context = root / "operator-context.json"
@@ -1297,7 +1311,9 @@ class HermesOperatorTests(unittest.TestCase):
             self.assertTrue(status["values_configured"])
             self.assertEqual(status["canonical_context"], "deployed-projection")
 
-    def test_deployed_context_rejects_site_mismatch_or_unsafe_service_data(self) -> None:
+    def test_deployed_context_rejects_site_mismatch_or_unsafe_service_data(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             context = root / "operator-context.json"
@@ -1312,7 +1328,10 @@ class HermesOperatorTests(unittest.TestCase):
                     with (
                         mock.patch.dict(
                             os.environ,
-                            {"VALUES_SITE": "dev", "HERMES_OPERATOR_CONTEXT_PATH": str(context)},
+                            {
+                                "VALUES_SITE": "dev",
+                                "HERMES_OPERATOR_CONTEXT_PATH": str(context),
+                            },
                             clear=False,
                         ),
                         self.assertRaisesRegex(hermes_operator.OperatorError, error),
@@ -1413,7 +1432,7 @@ class HermesOperatorTests(unittest.TestCase):
                 root = Path(temp)
                 with self.assertRaises(hermes_operator.OperatorError) as caught:
                     hermes_operator.run_action(
-                        root, "validate", runner=lambda *_: invalid
+                        root, "validate", runner=lambda *_, invalid=invalid: invalid
                     )
                 records = [
                     json.loads(line)

@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Rotate a Technitium API token into the canonical SOPS bundle when needed."""
+
 from __future__ import annotations
 
 import argparse
 import importlib.util
 import json
 import os
-from pathlib import Path
 import sys
 import time
 import urllib.parse
 import urllib.request
-from typing import Any, Mapping
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -51,7 +53,10 @@ class TechnitiumBootstrapClient:
         data = urllib.parse.urlencode(params or {}).encode()
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         request = urllib.request.Request(
-            f"{self.api_url}{path}", data=data if method == "POST" else None, headers=headers, method=method
+            f"{self.api_url}{path}",
+            data=data if method == "POST" else None,
+            headers=headers,
+            method=method,
         )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             result = json.loads(response.read().decode())
@@ -69,7 +74,9 @@ class TechnitiumBootstrapClient:
                     return {"status": "ok", "hasDefaultCredentials": False}
                 last_error = error
                 time.sleep(delay)
-            except Exception as error:  # noqa: BLE001 - report the final connection/API failure.
+            except (
+                Exception
+            ) as error:  # noqa: BLE001 - report the final connection/API failure.
                 last_error = error
                 time.sleep(delay)
         raise BootstrapError(f"Technitium API did not become ready: {last_error}")
@@ -86,15 +93,21 @@ def validate_existing_token(client: TechnitiumBootstrapClient, token: str) -> bo
 
 
 def login(client: TechnitiumBootstrapClient, password: str, user: str = "admin") -> str:
-    result = client.call("/user/login", {"user": user, "pass": password, "includeInfo": "true"})
+    result = client.call(
+        "/user/login", {"user": user, "pass": password, "includeInfo": "true"}
+    )
     token = str(result.get("token", ""))
     if not token:
         raise BootstrapError("Technitium login did not return a session token")
     return token
 
 
-def create_api_token(client: TechnitiumBootstrapClient, session_token: str, token_name: str) -> str:
-    result = client.call("/user/createToken", {"tokenName": token_name}, token=session_token)
+def create_api_token(
+    client: TechnitiumBootstrapClient, session_token: str, token_name: str
+) -> str:
+    result = client.call(
+        "/user/createToken", {"tokenName": token_name}, token=session_token
+    )
     token = str(result.get("token", ""))
     if not token:
         raise BootstrapError("Technitium createToken did not return an API token")
@@ -113,7 +126,9 @@ def bootstrap_canonical(
     token_name: str,
 ) -> bool:
     if not api_url or not admin_password:
-        raise BootstrapError("canonical Technitium API URL and administrator password are required")
+        raise BootstrapError(
+            "canonical Technitium API URL and administrator password are required"
+        )
     client = TechnitiumBootstrapClient(api_url)
     client.wait_for_status(retries, delay)
     if validate_existing_token(client, api_token):
@@ -125,14 +140,29 @@ def bootstrap_canonical(
         try:
             default_session_token = login(client, "admin")
         except BootstrapError:
-            raise configured_login_error
-        client.call("/user/changePassword", {"pass": "admin", "newPass": admin_password}, token=default_session_token)
+            raise configured_login_error from None
+        client.call(
+            "/user/changePassword",
+            {"pass": "admin", "newPass": admin_password},
+            token=default_session_token,
+        )
         session_token = login(client, admin_password)
     api_token = create_api_token(client, session_token, token_name)
     try:
-        set_canonical_secret(bundle, CANONICAL_API_CREDENTIAL_PATH, api_token, key_file, replace=True, sops="sops")
-    except Exception as error:  # noqa: BLE001 - preserve a redacted canonical persistence boundary.
-        raise BootstrapError("canonical Technitium API token persistence failed") from error
+        set_canonical_secret(
+            bundle,
+            CANONICAL_API_CREDENTIAL_PATH,
+            api_token,
+            key_file,
+            replace=True,
+            sops="sops",
+        )
+    except (
+        Exception
+    ) as error:  # noqa: BLE001 - preserve a redacted canonical persistence boundary.
+        raise BootstrapError(
+            "canonical Technitium API token persistence failed"
+        ) from error
     print("Rotated canonical Technitium API token.")
     return True
 

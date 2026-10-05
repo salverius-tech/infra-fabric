@@ -14,7 +14,7 @@ class CompatibilityBoundaryTests(unittest.TestCase):
         env = os.environ.copy()
         env.update({"VALUES_DIR": str(values_dir), "VALUES_SITE": "dev"})
         return subprocess.run(
-            ["bash", "-c", "source scripts/site-context.sh; require_canonical_authority"],
+            ["bash", "-c", "source scripts/site-context.sh; require_site_context"],
             cwd=ROOT,
             env=env,
             text=True,
@@ -36,7 +36,9 @@ class CompatibilityBoundaryTests(unittest.TestCase):
         self.assertIn("just setup", result.stderr)
         self.assertIn("migration or recovery", result.stderr)
 
-    def test_legacy_compatibility_environment_cannot_bypass_canonical_authority(self) -> None:
+    def test_legacy_compatibility_environment_cannot_bypass_canonical_authority(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             env = os.environ.copy()
             env.update(
@@ -47,7 +49,7 @@ class CompatibilityBoundaryTests(unittest.TestCase):
                 }
             )
             result = subprocess.run(
-                ["bash", "-c", "source scripts/site-context.sh; require_canonical_authority"],
+                ["bash", "-c", "source scripts/site-context.sh; require_site_context"],
                 cwd=ROOT,
                 env=env,
                 text=True,

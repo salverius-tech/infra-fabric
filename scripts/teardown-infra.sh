@@ -5,7 +5,7 @@ set -euo pipefail
 # it only accepts a fresh, metadata-bound destroy plan and never runs Ansible.
 source scripts/site-context.sh
 require_site_context
-require_canonical_authority
+require_site_context
 
 action="${1:-}"
 case "${action}" in

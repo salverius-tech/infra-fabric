@@ -6,8 +6,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-
-SCRIPT = Path(__file__).resolve().parents[1] / "infra" / "ansible" / "scripts" / "service-state-capacity-preflight.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[1]
+    / "infra"
+    / "ansible"
+    / "scripts"
+    / "service-state-capacity-preflight.py"
+)
 spec = importlib.util.spec_from_file_location("service_state_capacity", SCRIPT)
 assert spec and spec.loader
 capacity = importlib.util.module_from_spec(spec)
@@ -21,7 +26,9 @@ class CapacityPreflightTests(unittest.TestCase):
             state = root / "state"
             state.mkdir()
             (state / "data").write_bytes(b"x" * 4096)
-            with patch.object(capacity, "filesystem_key", return_value=(1, root, 10**9)):
+            with patch.object(
+                capacity, "filesystem_key", return_value=(1, root, 10**9)
+            ):
                 result = capacity.preflight(100, root, [state], reserve_bytes=50)
             self.assertEqual(len(result), 1)
             self.assertGreaterEqual(result[0]["required_bytes"], 150)
@@ -40,8 +47,12 @@ class CapacityPreflightTests(unittest.TestCase):
 
             with patch.object(capacity, "filesystem_key", side_effect=filesystem):
                 with patch.object(capacity, "allocated_bytes", return_value=100):
-                    result = capacity.preflight(50, root, [first, second], reserve_bytes=10)
-            self.assertEqual({entry["filesystem"] for entry in result}, {str(root), str(first)})
+                    result = capacity.preflight(
+                        50, root, [first, second], reserve_bytes=10
+                    )
+            self.assertEqual(
+                {entry["filesystem"] for entry in result}, {str(root), str(first)}
+            )
             self.assertTrue(all(entry["ok"] for entry in result))
 
     def test_insufficient_capacity_reports_deficit_without_mutation(self) -> None:
@@ -57,17 +68,28 @@ class CapacityPreflightTests(unittest.TestCase):
             capacity.preflight(-1, Path("/tmp"), [])
 
     def test_restore_playbook_preflights_before_stopping_services(self) -> None:
-        restore = (SCRIPT.parents[1] / "playbooks" / "service-state-restore.yml").read_text(encoding="utf-8")
+        restore = (
+            SCRIPT.parents[1] / "playbooks" / "service-state-restore.yml"
+        ).read_text(encoding="utf-8")
         self.assertIn("service-state-capacity-preflight.py", restore)
         self.assertIn("validate-service-state-archive.py", restore)
         self.assertIn("fetch-service-state.py", restore)
         self.assertNotIn("ansible.builtin.fetch:", restore)
         self.assertIn("Validate managed system service stop results", restore)
         self.assertNotIn("tar -tzf", restore)
-        self.assertIn("- name: Restore service state with failure-safe service recovery\n      block:", restore)
-        self.assertNotIn("- name: Restore service state with failure-safe service recovery\n      tags:", restore)
+        self.assertIn(
+            "- name: Restore service state with failure-safe service recovery\n      block:",
+            restore,
+        )
+        self.assertNotIn(
+            "- name: Restore service state with failure-safe service recovery\n      tags:",
+            restore,
+        )
         self.assertIn("      always:\n", restore)
-        self.assertLess(restore.index("      always:"), restore.index("Report service-state restore result"))
+        self.assertLess(
+            restore.index("      always:"),
+            restore.index("Report service-state restore result"),
+        )
         self.assertLess(
             restore.index("Preflight service-state restore capacity"),
             restore.index("Stop managed system services before restore"),
@@ -75,8 +97,12 @@ class CapacityPreflightTests(unittest.TestCase):
         self.assertIn("- --extract", restore)
         self.assertIn("- --numeric-owner", restore)
         self.assertIn("- --no-overwrite-dir", restore)
-        self.assertIn('ansible.builtin.raw: "systemctl stop {{ item | quote }}"', restore)
-        self.assertIn('ansible.builtin.raw: "systemctl start {{ item | quote }}"', restore)
+        self.assertIn(
+            'ansible.builtin.raw: "systemctl stop {{ item | quote }}"', restore
+        )
+        self.assertIn(
+            'ansible.builtin.raw: "systemctl start {{ item | quote }}"', restore
+        )
 
 
 if __name__ == "__main__":

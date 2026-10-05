@@ -9,10 +9,13 @@ import re
 import sys
 import urllib.parse
 import urllib.request
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
-DNS_NAME_RE = re.compile(r"^(?=.{1,253}\.?$)([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.?$")
+DNS_NAME_RE = re.compile(
+    r"^(?=.{1,253}\.?$)([A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.?$"
+)
 TOP_LEVEL_KEYS = {"settings", "zones", "a_records", "cname_records"}
 SETTINGS_KEYS = {
     "forwarders",
@@ -90,7 +93,9 @@ def require_object(config: Mapping[str, Any], key: str) -> dict[str, Any]:
 def validate_config(config: Mapping[str, Any]) -> dict[str, Any]:
     missing = {"zones", "a_records", "cname_records"} - set(config)
     if missing:
-        raise ConfigError(f"Missing required top-level keys: {', '.join(sorted(missing))}")
+        raise ConfigError(
+            f"Missing required top-level keys: {', '.join(sorted(missing))}"
+        )
     unknown = set(config) - TOP_LEVEL_KEYS
     if unknown:
         raise ConfigError(f"Unknown top-level keys: {', '.join(sorted(unknown))}")
@@ -214,7 +219,10 @@ def record_matches(
             continue
         if str(record.get("name", record.get("domain", domain))).rstrip(".") != domain:
             continue
-        r_data = record.get("rData") if isinstance(record.get("rData"), Mapping) else {}
+        raw_r_data = record.get("rData")
+        r_data: Mapping[str, Any] = (
+            raw_r_data if isinstance(raw_r_data, Mapping) else {}
+        )
         current_value = record.get(value_field, r_data.get(value_field, ""))
         if str(current_value).rstrip(".") == desired_value.rstrip("."):
             return True
@@ -307,8 +315,12 @@ def apply_config(config: Mapping[str, Any], client: TechnitiumClient) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Apply or validate Technitium DNS records JSON.")
-    parser.add_argument("--check", action="store_true", help="validate JSON without API calls")
+    parser = argparse.ArgumentParser(
+        description="Apply or validate Technitium DNS records JSON."
+    )
+    parser.add_argument(
+        "--check", action="store_true", help="validate JSON without API calls"
+    )
     parser.add_argument("dns_records_file", type=Path)
     args = parser.parse_args(argv)
 

@@ -9,7 +9,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / "infra" / "ansible" / "scripts" / "apply-technitium-dns.py"
+SCRIPT = (
+    Path(__file__).resolve().parents[1]
+    / "infra"
+    / "ansible"
+    / "scripts"
+    / "apply-technitium-dns.py"
+)
 spec = importlib.util.spec_from_file_location("apply_technitium_dns", SCRIPT)
 assert spec and spec.loader
 apply_dns = importlib.util.module_from_spec(spec)
@@ -47,7 +53,9 @@ class DnsValidationTests(unittest.TestCase):
         self.assertEqual(validated["a_records"]["dns.example.internal"], "192.0.2.53")
 
     def test_check_mode_does_not_need_api_environment(self) -> None:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as file:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", suffix=".json", delete=False
+        ) as file:
             json.dump(VALID_CONFIG, file)
             path = file.name
         old_api_url = os.environ.pop("TECHNITIUM_API_URL", None)
@@ -110,14 +118,18 @@ class DnsValidationTests(unittest.TestCase):
 
 
 class FakeClient:
-    def __init__(self, records: dict[tuple[str, str, str], dict[str, str]] | None = None) -> None:
+    def __init__(
+        self, records: dict[tuple[str, str, str], dict[str, str]] | None = None
+    ) -> None:
         self.calls: list[tuple[str, dict[str, str]]] = []
         self.records = records or {}
 
     def call(self, path: str, params: dict[str, str]) -> dict[str, object]:
         self.calls.append((path, params))
         if path == "/zones/records/get":
-            record = self.records.get((params["zone"], params["domain"], params["type"]))
+            record = self.records.get(
+                (params["zone"], params["domain"], params["type"])
+            )
             return {"status": "ok", "records": [record] if record else []}
         return {"status": "ok"}
 
@@ -163,7 +175,8 @@ class DnsApplyTests(unittest.TestCase):
         a_record = next(
             params
             for path, params in client.calls
-            if path == "/zones/records/add" and params.get("domain") == "app.apps.example.net"
+            if path == "/zones/records/add"
+            and params.get("domain") == "app.apps.example.net"
         )
         self.assertEqual(a_record["zone"], "apps.example.net")
         self.assertEqual(a_record["type"], "A")
@@ -261,7 +274,12 @@ class DnsApplyTests(unittest.TestCase):
             for path, params in client.calls
             if path == "/zones/records/add" and params["type"] == "A"
         ]
-        self.assertTrue(any(record["domain"] == "dns.example.internal" for record in changed_a_records))
+        self.assertTrue(
+            any(
+                record["domain"] == "dns.example.internal"
+                for record in changed_a_records
+            )
+        )
         self.assertIn("upserted A dns.example.internal", buffer.getvalue())
 
 

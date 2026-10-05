@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_TASKS = ROOT / "infra/ansible/roles/root_credentials/tasks/main.yml"
 ROLE_DEFAULTS = ROOT / "infra/ansible/roles/root_credentials/defaults/main.yml"
@@ -20,7 +19,10 @@ class RootCredentialsTests(unittest.TestCase):
         self.assertNotIn("TF_VAR_lxc_root_password", self.tasks)
         self.assertIn("no_log: true", self.tasks)
         self.assertIn("password_hash(", self.tasks)
-        self.assertIn("root_credentials_root_password_hash_salt ~ ':' ~ canonical_site ~ ':' ~ canonical_resource", self.tasks)
+        self.assertIn(
+            "root_credentials_root_password_hash_salt ~ ':' ~ canonical_site ~ ':' ~ canonical_resource",
+            self.tasks,
+        )
         self.assertIn("hash('sha256')", self.tasks)
         self.assertIn("update_password: always", self.tasks)
 
@@ -32,7 +34,13 @@ class RootCredentialsTests(unittest.TestCase):
         self.assertIn("role: root_credentials", playbook.read_text(encoding="utf-8"))
 
     def test_service_playbooks_do_not_rotate_root_password(self) -> None:
-        for service in ("hermes", "technitium", "forgejo", "infisical", "tailscale-client"):
+        for service in (
+            "hermes",
+            "technitium",
+            "forgejo",
+            "infisical",
+            "tailscale-client",
+        ):
             playbook = ROOT / f"infra/ansible/playbooks/{service}.yml"
             text = playbook.read_text(encoding="utf-8")
             self.assertNotIn("role: lxc_credentials", text)

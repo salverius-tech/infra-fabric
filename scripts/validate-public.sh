@@ -12,7 +12,7 @@ git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
 # lint_root="$(mktemp -d)"; cleanup_lint_root(); trap cleanup_lint_root EXIT;
 # cp -a .ansible-lint ansible.cfg settings.example.json infra scaffold scripts "${lint_root}/";
 # cd "${lint_root}"; ANSIBLE_CONFIG="${lint_root}/ansible.cfg" ansible-lint infra/ansible.
-docker compose run --rm -v "${git_common_dir}:${git_common_dir}:ro" infra bash -euo pipefail -c '
+docker compose run --rm -v "${git_common_dir}:${git_common_dir}:ro" --env "INFRA_VALIDATE_MODE=${INFRA_VALIDATE_MODE:-all}" infra bash -euo pipefail -c '
 stages=()
 current_stage=""
 fixture_root=""
@@ -32,6 +32,17 @@ print_summary() {
 run_stage() {
   local name=$1
   shift
+  case "${INFRA_VALIDATE_MODE:-all}:${name}" in
+    unit:preflight|unit:python-quality|unit:contracts|unit:unit-tests|full:preflight|full:opentofu|full:shell|full:contracts|full:ansible|full:summary|all:*) ;;
+    unit:*|full:*)
+      stages+=("SKIP ${name}")
+      return 0
+      ;;
+    *)
+      printf "Unknown INFRA_VALIDATE_MODE: %s\\n" "${INFRA_VALIDATE_MODE}" >&2
+      return 2
+      ;;
+  esac
   current_stage=${name}
   printf "\n=== validation stage: %s ===\n" "${name}"
   "$@"
@@ -111,9 +122,13 @@ run_stage "python-quality" bash -euo pipefail -c "
   while IFS= read -r file; do
     if [[ -n \"\${file}\" && \"\${file}\" != \#* ]]; then quality_files+=(\"\${file}\"); fi
   done < tools/python-format-files.txt
+  if [[ \"\${quality_files[*]}\" != \"\${python_files[*]}\" ]]; then
+    printf \"%s\\n\" \"tools/python-format-files.txt must enumerate every Python source exactly once.\" >&2
+    exit 1
+  fi
   black --check --diff \"\${quality_files[@]}\"
-  ruff check --select=E9,F63,F7,F82 \"\${python_files[@]}\"
-  mypy --follow-imports=skip --ignore-missing-imports scripts/canonical_values.py scripts/service_catalog.py
+  ruff check \"\${python_files[@]}\"
+  mypy
 "
 run_stage "contracts" bash -euo pipefail -c "
   if ! command -v just >/dev/null 2>&1; then
@@ -124,9 +139,14 @@ run_stage "contracts" bash -euo pipefail -c "
   python scripts/settings.py --settings settings.example.json validate >/dev/null
   python scripts/validate-service-contracts.py --repo .
   python scripts/validate-design-reconciliation.py --check
+"
+run_stage "unit-tests" bash -euo pipefail -c "
   coverage erase
-  coverage run --source=scripts -m unittest discover -s tests -p '\''test_*.py'\''
+  coverage run -m unittest discover -s tests -p '\''test_*.py'\''
+  coverage combine --quiet
   coverage report --fail-under=70
+  coverage json --quiet -o \"${fixture_root}/coverage.json\"
+  python scripts/check-coverage-floors.py --report \"${fixture_root}/coverage.json\"
 "
 run_stage "ansible" bash -euo pipefail -c "
   ansible-inventory -i \"${fixture_inventory}\" --list >/dev/null

@@ -1,22 +1,25 @@
 from __future__ import annotations
 
 import importlib.util
-import os
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1] / "scripts"
-spec = importlib.util.spec_from_file_location("canonical_ssh_identity", ROOT / "canonical_ssh_identity.py")
+spec = importlib.util.spec_from_file_location(
+    "canonical_ssh_identity", ROOT / "canonical_ssh_identity.py"
+)
 assert spec and spec.loader
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 
 class FakeProvider:
-    def __init__(self, value: str, path: str = "secrets.bootstrap.ssh_private_key") -> None:
+    def __init__(
+        self, value: str, path: str = "secrets.bootstrap.ssh_private_key"
+    ) -> None:
         self.value = value
         self.path = path
 
@@ -35,7 +38,12 @@ class CanonicalSshIdentityTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        return private, (private.with_name(private.name + ".pub")).read_text(encoding="utf-8").strip()
+        return (
+            private,
+            (private.with_name(private.name + ".pub"))
+            .read_text(encoding="utf-8")
+            .strip(),
+        )
 
     def test_materializes_matching_private_key_with_restrictive_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -48,7 +56,10 @@ class CanonicalSshIdentityTests(unittest.TestCase):
                 public_keys=[public],
             )
             self.assertEqual(result, destination)
-            self.assertEqual(destination.read_text(encoding="utf-8"), private.read_text(encoding="utf-8"))
+            self.assertEqual(
+                destination.read_text(encoding="utf-8"),
+                private.read_text(encoding="utf-8"),
+            )
             self.assertEqual(destination.stat().st_mode & 0o777, 0o600)
 
     def test_rejects_nonmatching_private_key_and_removes_destination(self) -> None:
@@ -56,7 +67,9 @@ class CanonicalSshIdentityTests(unittest.TestCase):
             directory = Path(temp_dir)
             private, _public = self.make_key(directory)
             destination = directory / "materialized" / "bootstrap"
-            with self.assertRaisesRegex(module.CanonicalSshIdentityError, "does not match"):
+            with self.assertRaisesRegex(
+                module.CanonicalSshIdentityError, "does not match"
+            ):
                 module.materialize_private_key(
                     FakeProvider(private.read_text(encoding="utf-8")),
                     destination=destination,
@@ -72,7 +85,9 @@ class CanonicalSshIdentityTests(unittest.TestCase):
             target.write_text("unchanged", encoding="utf-8")
             destination = directory / "materialized"
             destination.symlink_to(target)
-            with self.assertRaisesRegex(module.CanonicalSshIdentityError, "destination is unsafe"):
+            with self.assertRaisesRegex(
+                module.CanonicalSshIdentityError, "destination is unsafe"
+            ):
                 module.materialize_private_key(
                     FakeProvider(private.read_text(encoding="utf-8")),
                     destination=destination,
@@ -88,14 +103,18 @@ class CanonicalSshIdentityTests(unittest.TestCase):
             target_directory.mkdir()
             destination_directory = directory / "materialized"
             destination_directory.symlink_to(target_directory, target_is_directory=True)
-            with self.assertRaisesRegex(module.CanonicalSshIdentityError, "directory is unsafe"):
+            with self.assertRaisesRegex(
+                module.CanonicalSshIdentityError, "directory is unsafe"
+            ):
                 module.materialize_private_key(
                     FakeProvider(private.read_text(encoding="utf-8")),
                     destination=destination_directory / "identity",
                     public_keys=[public],
                 )
 
-    def test_materializes_management_identity_only_from_the_fixed_proxmox_secret_path(self) -> None:
+    def test_materializes_management_identity_only_from_the_fixed_proxmox_secret_path(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             directory = Path(temp_dir)
             private, public = self.make_key(directory)
@@ -117,13 +136,26 @@ class CanonicalSshIdentityTests(unittest.TestCase):
             directory = Path(temp_dir)
             private = directory / "source-key"
             subprocess.run(
-                ["ssh-keygen", "-q", "-t", "ed25519", "-N", "passphrase", "-f", str(private)],
+                [
+                    "ssh-keygen",
+                    "-q",
+                    "-t",
+                    "ed25519",
+                    "-N",
+                    "passphrase",
+                    "-f",
+                    str(private),
+                ],
                 check=True,
                 capture_output=True,
                 text=True,
             )
-            public = private.with_name(private.name + ".pub").read_text(encoding="utf-8")
-            with self.assertRaisesRegex(module.CanonicalSshIdentityError, "invalid or passphrase-protected"):
+            public = private.with_name(private.name + ".pub").read_text(
+                encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                module.CanonicalSshIdentityError, "invalid or passphrase-protected"
+            ):
                 module.materialize_private_key(
                     FakeProvider(private.read_text(encoding="utf-8")),
                     destination=directory / "materialized",
@@ -133,7 +165,9 @@ class CanonicalSshIdentityTests(unittest.TestCase):
     def test_public_key_derivation_explicitly_uses_an_empty_passphrase(self) -> None:
         completed = subprocess.CompletedProcess([], 1, "", "incorrect passphrase")
         with mock.patch.object(module.subprocess, "run", return_value=completed) as run:
-            with self.assertRaisesRegex(module.CanonicalSshIdentityError, "invalid or passphrase-protected"):
+            with self.assertRaisesRegex(
+                module.CanonicalSshIdentityError, "invalid or passphrase-protected"
+            ):
                 module.derive_public_key(Path("/tmp/test-key"))
         command = run.call_args.args[0]
         self.assertEqual(command[:4], ["ssh-keygen", "-y", "-P", ""])

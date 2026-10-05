@@ -1,11 +1,10 @@
 """Sensitive Ansible role inputs must be hidden during argument validation."""
 
 import json
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 import yaml
-
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLE_SECRET_FIELDS = {
@@ -56,20 +55,28 @@ class SensitiveArgumentSpecsTests(unittest.TestCase):
     def test_known_secret_fields_are_no_log(self) -> None:
         for role, fields in ROLE_SECRET_FIELDS.items():
             path = ROOT / "infra/ansible/roles" / role / "meta/argument_specs.yml"
-            options = yaml.safe_load(path.read_text(encoding="utf-8"))["argument_specs"]["main"]["options"]
+            options = yaml.safe_load(path.read_text(encoding="utf-8"))[
+                "argument_specs"
+            ]["main"]["options"]
             for field in fields:
                 self.assertIn(field, options, f"{role}.{field}")
                 self.assertTrue(options[field].get("no_log"), f"{role}.{field}")
 
     def test_catalog_secret_environment_binds_to_no_log_role_arguments(self) -> None:
-        catalog = json.loads((ROOT / "infra/services.json").read_text(encoding="utf-8"))["services"]
+        catalog = json.loads(
+            (ROOT / "infra/services.json").read_text(encoding="utf-8")
+        )["services"]
         role_options = {
-            path.parents[1].name: yaml.safe_load(path.read_text(encoding="utf-8"))["argument_specs"]["main"]["options"]
+            path.parents[1].name: yaml.safe_load(path.read_text(encoding="utf-8"))[
+                "argument_specs"
+            ]["main"]["options"]
             for path in (ROOT / "infra/ansible/roles").glob("*/meta/argument_specs.yml")
         }
 
         for service, capability in catalog.items():
-            for logical_path, environment_name in capability.get("secret_environment", {}).items():
+            for logical_path, environment_name in capability.get(
+                "secret_environment", {}
+            ).items():
                 bound_fields: set[str] = set()
                 for playbook_name in capability["playbooks"]:
                     playbook_path = ROOT / playbook_name
@@ -81,14 +88,20 @@ class SensitiveArgumentSpecsTests(unittest.TestCase):
                             if isinstance(value, str) and environment_name in value:
                                 bound_fields.add(field)
 
-                self.assertTrue(bound_fields, f"{service}.{logical_path} is not wired from {environment_name}")
+                self.assertTrue(
+                    bound_fields,
+                    f"{service}.{logical_path} is not wired from {environment_name}",
+                )
                 for field in bound_fields:
                     matching = [
                         (role, options[field])
                         for role, options in role_options.items()
                         if field in options
                     ]
-                    self.assertTrue(matching, f"{service}.{logical_path} binds unknown argument {field}")
+                    self.assertTrue(
+                        matching,
+                        f"{service}.{logical_path} binds unknown argument {field}",
+                    )
                     for role, specification in matching:
                         self.assertTrue(specification.get("no_log"), f"{role}.{field}")
 

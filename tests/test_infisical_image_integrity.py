@@ -1,9 +1,8 @@
 """Regression coverage for digest-qualified stateful Infisical images."""
 
-from pathlib import Path
 import re
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_TEMPLATES = (
@@ -19,8 +18,12 @@ class InfisicalImageIntegrityTests(unittest.TestCase):
             text = template.read_text(encoding="utf-8")
             images = DIGEST_IMAGE.findall(text)
             self.assertGreaterEqual(len(images), 2, template)
-            self.assertTrue(any("postgres:16-alpine@sha256:" in image for image in images), template)
-            self.assertTrue(any("redis:7-alpine@sha256:" in image for image in images), template)
+            self.assertTrue(
+                any("postgres:16-alpine@sha256:" in image for image in images), template
+            )
+            self.assertTrue(
+                any("redis:7-alpine@sha256:" in image for image in images), template
+            )
 
 
 if __name__ == "__main__":

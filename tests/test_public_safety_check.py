@@ -21,19 +21,35 @@ class PublicSafetyScanTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_rfc1918_address_fails(self) -> None:
-        findings = public_safety.scan_ips("README.md", 1, "host 192.168.1.10")  # public-safety: allow-ip
+        findings = public_safety.scan_ips(
+            "README.md",
+            1,
+            "host 192.168.1.10",  # public-safety: allow-ip
+        )
         self.assertEqual(len(findings), 1)
 
     def test_cgnat_address_fails(self) -> None:
-        findings = public_safety.scan_ips("README.md", 1, "host 100.64.1.10")  # public-safety: allow-ip
+        findings = public_safety.scan_ips(
+            "README.md",
+            1,
+            "host 100.64.1.10",  # public-safety: allow-ip
+        )
         self.assertEqual(len(findings), 1)
 
     def test_ipv6_ula_fails(self) -> None:
-        findings = public_safety.scan_ips("README.md", 1, "host fd00::1")  # public-safety: allow-ip
+        findings = public_safety.scan_ips(
+            "README.md",
+            1,
+            "host fd00::1",  # public-safety: allow-ip
+        )
         self.assertEqual(len(findings), 1)
 
     def test_unspecified_and_loopback_addresses_pass(self) -> None:
-        for line in ("bind 0.0.0.0", "bind ::1", "bind 127.0.0.1"):  # public-safety: allow-ip
+        for line in (
+            "bind 0.0.0.0",
+            "bind ::1",
+            "bind 127.0.0.1",
+        ):  # public-safety: allow-ip
             findings = public_safety.scan_ips("README.md", 1, line)
             self.assertEqual(findings, [], line)
 
@@ -53,7 +69,9 @@ class PublicSafetyScanTests(unittest.TestCase):
 
     def test_password_assignment_remains_rejected(self) -> None:
         key = "PASS" + "WORD"
-        findings = public_safety.scan_secrets("tasks/main.yml", 1, f"{key}: actual-value")
+        findings = public_safety.scan_secrets(
+            "tasks/main.yml", 1, f"{key}: actual-value"
+        )
         self.assertEqual(len(findings), 1)
 
     def test_allow_comment_skips_ip_scan(self) -> None:
@@ -69,27 +87,37 @@ class PublicSafetyScanTests(unittest.TestCase):
         self.assertEqual(findings, [])
 
     def test_real_secret_assignment_is_redacted(self) -> None:
-        secret_line = "TECHNITIUM_ADMIN_PASSWORD=" + "supersecretvalue"  # public-safety: allow-secret
+        secret_line = (
+            "TECHNITIUM_ADMIN_PASSWORD=" + "supersecretvalue"
+        )  # public-safety: allow-secret
         findings = public_safety.scan_secrets("README.md", 1, secret_line)
         self.assertEqual(len(findings), 1)
         self.assertIn("<redacted>", findings[0].message)
         self.assertNotIn("supersecretvalue", findings[0].message)
 
     def test_python_requirement_with_token_in_name_passes(self) -> None:
-        findings = public_safety.scan_secrets("tools/requirements.txt", 1, "pytokens==0.4.1")  # public-safety: allow-secret
+        findings = public_safety.scan_secrets(
+            "tools/requirements.txt", 1, "pytokens==0.4.1"
+        )  # public-safety: allow-secret
         self.assertEqual(findings, [])
 
     def test_python_secret_key_constant_passes(self) -> None:
-        findings = public_safety.scan_secrets("scripts/secret_delivery.py", 1, "SECRET_KEYS = {")
+        findings = public_safety.scan_secrets(
+            "scripts/secret_delivery.py", 1, "SECRET_KEYS = {"
+        )
         self.assertEqual(findings, [])
 
     def test_lowercase_python_token_variable_passes(self) -> None:
-        findings = public_safety.scan_secrets("scripts/secret_delivery.py", 1, "new_token = value")
+        findings = public_safety.scan_secrets(
+            "scripts/secret_delivery.py", 1, "new_token = value"
+        )
         self.assertEqual(findings, [])
 
     def test_private_key_header_fails(self) -> None:
         findings = public_safety.scan_secrets(
-            "README.md", 1, "-----BEGIN OPENSSH PRIVATE KEY-----"  # public-safety: allow-secret
+            "README.md",
+            1,
+            "-----BEGIN OPENSSH PRIVATE KEY-----",  # public-safety: allow-secret
         )
         self.assertEqual(len(findings), 1)
 
@@ -100,7 +128,10 @@ class PublicSafetyScanTests(unittest.TestCase):
             (root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
             subprocess.run(["git", "add", "tracked.txt"], cwd=root, check=True)
             (root / "untracked.txt").write_text("untracked\n", encoding="utf-8")
-            paths = {path.relative_to(root).as_posix() for path in public_safety.tracked_files(root)}
+            paths = {
+                path.relative_to(root).as_posix()
+                for path in public_safety.tracked_files(root)
+            }
         self.assertEqual(paths, {"tracked.txt", "untracked.txt"})
 
 

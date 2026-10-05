@@ -13,20 +13,24 @@ SCRIPT = ROOT / "scripts" / "report-plan-equivalence.py"
 
 def tofu_plan(*, vmid: int, sensitive: str = "placeholder") -> dict[str, object]:
     return {
-        "resource_changes": [{
-            "address": "resource.example",
-            "change": {
-                "actions": ["update"],
-                "before": {"vmid": vmid - 1},
-                "after": {"vmid": vmid, "password": sensitive},
-                "after_sensitive": {"password": True},
-            },
-        }]
+        "resource_changes": [
+            {
+                "address": "resource.example",
+                "change": {
+                    "actions": ["update"],
+                    "before": {"vmid": vmid - 1},
+                    "after": {"vmid": vmid, "password": sensitive},
+                    "after_sensitive": {"password": True},
+                },
+            }
+        ]
     }
 
 
 class ReportPlanEquivalenceTests(unittest.TestCase):
-    def run_report(self, before: dict[str, object], after: dict[str, object]) -> subprocess.CompletedProcess[str]:
+    def run_report(
+        self, before: dict[str, object], after: dict[str, object]
+    ) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory(prefix="hermes-plan-report-") as directory:
             before_path = Path(directory) / "before.json"
             after_path = Path(directory) / "after.json"
@@ -41,9 +45,13 @@ class ReportPlanEquivalenceTests(unittest.TestCase):
             )
 
     def test_equivalent_report_is_redacted_and_successful(self) -> None:
-        result = self.run_report(tofu_plan(vmid=101), tofu_plan(vmid=101, sensitive="different-secret"))
+        result = self.run_report(
+            tofu_plan(vmid=101), tofu_plan(vmid=101, sensitive="different-secret")
+        )
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(json.loads(result.stdout), {"differences": [], "equivalent": True})
+        self.assertEqual(
+            json.loads(result.stdout), {"differences": [], "equivalent": True}
+        )
         self.assertNotIn("different-secret", result.stdout)
 
     def test_changed_plan_is_redacted_and_nonzero(self) -> None:
@@ -51,7 +59,10 @@ class ReportPlanEquivalenceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         report = json.loads(result.stdout)
         self.assertFalse(report["equivalent"])
-        self.assertEqual(report["differences"], [{"address": "resource.example", "kind": "values_changed"}])
+        self.assertEqual(
+            report["differences"],
+            [{"address": "resource.example", "kind": "values_changed"}],
+        )
         self.assertNotIn("102", result.stdout)
 
     def test_invalid_plan_is_error_without_values(self) -> None:

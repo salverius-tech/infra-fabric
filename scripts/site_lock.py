@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Serialize supported infrastructure operations for one selected site."""
+
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
 import fcntl
 import os
-from pathlib import Path
 import stat
 import subprocess
 import sys
-from typing import Iterator, Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from pathlib import Path
 
 
 class SiteLockError(RuntimeError):
@@ -66,7 +67,9 @@ def acquire_site_lock(lock_path: Path) -> Iterator[None]:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
-            raise SiteLockError("another operation already holds the selected site lock") from error
+            raise SiteLockError(
+                "another operation already holds the selected site lock"
+            ) from error
     except BaseException:
         os.close(descriptor)
         raise
@@ -85,7 +88,9 @@ def run_locked(lock_path: Path, command: Sequence[str]) -> int:
     with acquire_site_lock(lock_path):
         environment = dict(os.environ)
         environment[HELD_LOCK_ENV] = str(lock_path)
-        return subprocess.run(list(command), check=False, env=environment).returncode
+        return subprocess.run(  # noqa: S603 - the lock wrapper preserves caller argv without a shell.
+            list(command), check=False, env=environment
+        ).returncode
 
 
 def main(argv: list[str] | None = None) -> int:

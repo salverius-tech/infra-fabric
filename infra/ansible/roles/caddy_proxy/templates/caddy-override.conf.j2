@@ -1,4 +1,6 @@
 [Service]
 EnvironmentFile=/etc/caddy/env
+{% if caddy_override_execstart | default(true) %}
 ExecStart=
 ExecStart=/usr/bin/caddy run --config /etc/caddy/Caddyfile
+{% endif %}

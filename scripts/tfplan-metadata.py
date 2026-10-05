@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Create and verify metadata for a saved OpenTofu plan."""
+
 from __future__ import annotations
 
 import argparse
@@ -20,11 +21,19 @@ except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
 
 try:
     from canonical_values import load_site, model_digest
-    from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
+    from projection_manifest import (
+        ManifestError,
+        verify_manifest,
+        verify_projection_permissions,
+    )
 except ModuleNotFoundError:  # pragma: no cover - direct import in test loaders
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from canonical_values import load_site, model_digest
-    from projection_manifest import ManifestError, verify_manifest, verify_projection_permissions
+    from projection_manifest import (
+        ManifestError,
+        verify_manifest,
+        verify_projection_permissions,
+    )
 
 SCHEMA_VERSION = 7
 DEFAULT_MAX_AGE_HOURS = 24
@@ -93,7 +102,11 @@ def git_commit(repo: Path) -> str | None:
         return env_commit
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            [  # noqa: S607 - controlled tooling PATH resolves the bundled Git client.
+                "git",
+                "rev-parse",
+                "HEAD",
+            ],
             cwd=repo,
             text=True,
             capture_output=True,
@@ -119,7 +132,7 @@ def load_plan_json(plan: Path, repo: Path) -> dict[str, Any]:
         ]
     else:
         command = ["tofu", "show", "-json", plan.as_posix()]
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - inspected plan path is validated and passed as argv.
         command,
         cwd=repo,
         text=True,
@@ -153,17 +166,27 @@ def enabled_stateful_services_by_address(repo: Path) -> dict[str, list[str]]:
                 catalog_path=registry_path,
             )
         except (OSError, ValueError) as error:
-            raise MetadataError(f"cannot load canonical site selection: {context.canonical_site_path}") from error
+            raise MetadataError(
+                f"cannot load canonical site selection: {context.canonical_site_path}"
+            ) from error
         enabled = [name for name, service in model.services.items() if service.enabled]
     else:
         settings_path = context.metadata_path or (repo / "settings.local.json")
         try:
-            local_settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
+            local_settings = (
+                json.loads(settings_path.read_text(encoding="utf-8"))
+                if settings_path.is_file()
+                else {}
+            )
         except json.JSONDecodeError as error:
-            raise MetadataError(f"cannot parse site settings: {settings_path}") from error
+            raise MetadataError(
+                f"cannot parse site settings: {settings_path}"
+            ) from error
         enabled = local_settings.get("services", registry.get("default_services", []))
     if not isinstance(services, dict) or not isinstance(enabled, list):
-        raise MetadataError("service registry or operator settings has an invalid service list")
+        raise MetadataError(
+            "service registry or operator settings has an invalid service list"
+        )
 
     result: dict[str, list[str]] = {}
     for service in enabled:
@@ -179,18 +202,31 @@ def enabled_stateful_services_by_address(repo: Path) -> dict[str, list[str]]:
     return result
 
 
-def stateful_services_for_address(address: str, stateful_by_address: dict[str, list[str]]) -> tuple[str | None, list[str]]:
+def stateful_services_for_address(
+    address: str, stateful_by_address: dict[str, list[str]]
+) -> tuple[str | None, list[str]]:
     for prefix, services in stateful_by_address.items():
         if address.startswith(prefix):
             return prefix, services
     return None, []
 
 
-def summarize_plan(plan_json: dict[str, Any], repo: Path | None = None) -> dict[str, Any]:
-    counts = {"create": 0, "update": 0, "replace": 0, "delete": 0, "read": 0, "no_op": 0}
+def summarize_plan(
+    plan_json: dict[str, Any], repo: Path | None = None
+) -> dict[str, Any]:
+    counts = {
+        "create": 0,
+        "update": 0,
+        "replace": 0,
+        "delete": 0,
+        "read": 0,
+        "no_op": 0,
+    }
     destructive_changes: list[dict[str, Any]] = []
     stateful_changes: list[dict[str, Any]] = []
-    stateful_by_address = enabled_stateful_services_by_address(repo) if repo is not None else {}
+    stateful_by_address = (
+        enabled_stateful_services_by_address(repo) if repo is not None else {}
+    )
     for change in plan_json.get("resource_changes", []):
         if not isinstance(change, dict):
             continue
@@ -216,7 +252,9 @@ def summarize_plan(plan_json: dict[str, Any], repo: Path | None = None) -> dict[
         elif "delete" in actions:
             destructive_item = {"address": address, "actions": "/".join(actions)}
         if destructive_item is not None:
-            target, services = stateful_services_for_address(address, stateful_by_address)
+            target, services = stateful_services_for_address(
+                address, stateful_by_address
+            )
             if target and services:
                 destructive_item["stateful_target"] = target
                 destructive_item["stateful_services"] = services
@@ -227,8 +265,16 @@ def summarize_plan(plan_json: dict[str, Any], repo: Path | None = None) -> dict[
         "destructive": bool(destructive_changes),
         "destructive_changes": destructive_changes,
         "stateful_changes": stateful_changes,
-        "stateful_targets": sorted({change["stateful_target"] for change in stateful_changes}),
-        "stateful_services": sorted({service for change in stateful_changes for service in change["stateful_services"]}),
+        "stateful_targets": sorted(
+            {change["stateful_target"] for change in stateful_changes}
+        ),
+        "stateful_services": sorted(
+            {
+                service
+                for change in stateful_changes
+                for service in change["stateful_services"]
+            }
+        ),
     }
 
 
@@ -248,12 +294,16 @@ def format_plan_summary(summary: dict[str, Any], *, operation: str = "apply") ->
             suffix = ""
             if item.get("stateful_services"):
                 suffix = f" [stateful: {', '.join(item.get('stateful_services', []))}]"
-            lines.append(f"  - {item.get('address', 'unknown')}: {item.get('actions', 'delete')}{suffix}")
+            lines.append(
+                f"  - {item.get('address', 'unknown')}: {item.get('actions', 'delete')}{suffix}"
+            )
         remaining = len(destructive_changes) - 20
         if remaining > 0:
             lines.append(f"  ... and {remaining} more")
         if plan_operation(operation) == "destroy":
-            lines.append("Guarded teardown apply requires a reviewed destroy plan and explicit --approve.")
+            lines.append(
+                "Guarded teardown apply requires a reviewed destroy plan and explicit --approve."
+            )
         else:
             lines.append("Apply is gated. Set INFRA_ALLOW_DESTROY=1 only after review.")
     else:
@@ -261,7 +311,9 @@ def format_plan_summary(summary: dict[str, Any], *, operation: str = "apply") ->
     stateful_targets = summary.get("stateful_targets", [])
     if stateful_targets:
         lines.append(f"Stateful infrastructure targets: {', '.join(stateful_targets)}")
-        lines.append(f"Affected stateful services: {', '.join(summary.get('stateful_services', []))}")
+        lines.append(
+            f"Affected stateful services: {', '.join(summary.get('stateful_services', []))}"
+        )
         if len(stateful_targets) > 1:
             lines.append(
                 "Stateful batch is blocked. Split the rollout or set INFRA_ALLOW_STATEFUL_BATCH=1 after review."
@@ -298,14 +350,20 @@ def canonical_identity(repo: Path) -> dict[str, Any] | None:
         raise MetadataError("canonical site requires VALUES_SITE")
     catalog_path = repo / "infra" / "services.json"
     try:
-        model = load_site(site_file, expected_site=context.site, catalog_path=catalog_path)
-        generated_dir = Path(os.environ.get("INFRA_GENERATED_DIR", context.generated_dir))
+        model = load_site(
+            site_file, expected_site=context.site, catalog_path=catalog_path
+        )
+        generated_dir = Path(
+            os.environ.get("INFRA_GENERATED_DIR", context.generated_dir)
+        )
         manifest_path = generated_dir / "manifest.json"
         verify_projection_permissions(manifest_path.parent)
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         entries = manifest.get("projections")
         if not isinstance(entries, dict) or not entries:
-            raise MetadataError("Saved tfplan canonical projection manifest is invalid. Run `just plan` again.")
+            raise MetadataError(
+                "Saved tfplan canonical projection manifest is invalid. Run `just plan` again."
+            )
         projections: dict[str, Any] = {}
         for name in entries:
             projection_path = generated_dir / name
@@ -317,7 +375,14 @@ def canonical_identity(repo: Path) -> dict[str, Any] | None:
             secret_digest=None,
             projections=projections,
         )
-    except (OSError, KeyError, TypeError, json.JSONDecodeError, ManifestError, ValueError) as error:
+    except (
+        OSError,
+        KeyError,
+        TypeError,
+        json.JSONDecodeError,
+        ManifestError,
+        ValueError,
+    ) as error:
         raise MetadataError(
             "Saved tfplan canonical projection manifest is missing or invalid. Run `just plan` again."
         ) from error
@@ -343,7 +408,9 @@ def create_metadata(
     if not plan.is_file():
         raise MetadataError(f"Missing plan file: {plan}")
     now = datetime.now(timezone.utc)
-    summary = summarize_plan(plan_json if plan_json is not None else load_plan_json(plan, repo), repo)
+    summary = summarize_plan(
+        plan_json if plan_json is not None else load_plan_json(plan, repo), repo
+    )
     operation = plan_operation(operation)
     if operation == "destroy" and (target_service or replace_service):
         raise MetadataError("A destroy plan cannot target or replace one service.")
@@ -363,7 +430,9 @@ def create_metadata(
         "scope": plan_scope(target_service, replace_service),
         "inputs": matching_inputs(repo),
     }
-    metadata.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    metadata.write_text(
+        json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     return data
 
 
@@ -375,7 +444,9 @@ def validate_summary(summary: Any) -> dict[str, Any]:
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     for key in ("create", "update", "replace", "delete"):
         if not isinstance(counts.get(key), int):
-            raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
+            raise MetadataError(
+                "Saved tfplan metadata is invalid. Run `just plan` again."
+            )
     if not isinstance(summary.get("destructive"), bool):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     if not isinstance(summary.get("destructive_changes"), list):
@@ -384,9 +455,13 @@ def validate_summary(summary: Any) -> dict[str, Any]:
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     stateful_targets = summary.get("stateful_targets")
     stateful_services = summary.get("stateful_services")
-    if not isinstance(stateful_targets, list) or not all(isinstance(target, str) for target in stateful_targets):
+    if not isinstance(stateful_targets, list) or not all(
+        isinstance(target, str) for target in stateful_targets
+    ):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
-    if not isinstance(stateful_services, list) or not all(isinstance(service, str) for service in stateful_services):
+    if not isinstance(stateful_services, list) or not all(
+        isinstance(service, str) for service in stateful_services
+    ):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     return summary
 
@@ -395,11 +470,28 @@ def validate_canonical_identity(identity: Any) -> dict[str, str] | None:
     if identity is None:
         return None
     if not isinstance(identity, dict) or not all(
-        isinstance(identity.get(key), str) and identity.get(key) for key in
-        ("site", "model_digest", "projection_digest", "renderer_version", "source_commit")
+        isinstance(identity.get(key), str) and identity.get(key)
+        for key in (
+            "site",
+            "model_digest",
+            "projection_digest",
+            "renderer_version",
+            "source_commit",
+        )
     ):
-        raise MetadataError("Saved tfplan metadata has invalid canonical identity. Run `just plan` again.")
-    return {key: identity[key] for key in ("site", "model_digest", "projection_digest", "renderer_version", "source_commit")}
+        raise MetadataError(
+            "Saved tfplan metadata has invalid canonical identity. Run `just plan` again."
+        )
+    return {
+        key: identity[key]
+        for key in (
+            "site",
+            "model_digest",
+            "projection_digest",
+            "renderer_version",
+            "source_commit",
+        )
+    }
 
 
 def load_metadata(metadata: Path) -> dict[str, Any]:
@@ -408,9 +500,13 @@ def load_metadata(metadata: Path) -> dict[str, Any]:
     try:
         data = json.loads(metadata.read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
-        raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.") from error
+        raise MetadataError(
+            "Saved tfplan metadata is invalid. Run `just plan` again."
+        ) from error
     if data.get("schema_version") != SCHEMA_VERSION:
-        raise MetadataError("Saved tfplan metadata is unsupported. Run `just plan` again.")
+        raise MetadataError(
+            "Saved tfplan metadata is unsupported. Run `just plan` again."
+        )
     if not isinstance(data.get("plan", {}).get("sha256"), str):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     if not isinstance(data.get("inputs"), dict):
@@ -420,7 +516,9 @@ def load_metadata(metadata: Path) -> dict[str, Any]:
     data["operation"] = plan_operation(data.get("operation"))
     data["canonical"] = validate_canonical_identity(data.get("canonical"))
     scope = data.get("scope")
-    if not isinstance(scope, dict) or not all(isinstance(scope.get(key), str) for key in ("target_service", "replace_service")):
+    if not isinstance(scope, dict) or not all(
+        isinstance(scope.get(key), str) for key in ("target_service", "replace_service")
+    ):
         raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.")
     plan_scope(scope["target_service"], scope["replace_service"])
     data["summary"] = validate_summary(data.get("summary"))
@@ -441,21 +539,29 @@ def verify_metadata(
         raise MetadataError("Saved tfplan is missing. Run `just plan` again.")
     data = load_metadata(metadata)
     if data["operation"] != plan_operation(operation):
-        raise MetadataError("Saved tfplan operation differs from this execution. Run `just plan` again.")
+        raise MetadataError(
+            "Saved tfplan operation differs from this execution. Run `just plan` again."
+        )
 
     try:
         expires_at = datetime.fromisoformat(data["expires_at"])
     except (KeyError, TypeError, ValueError) as error:
-        raise MetadataError("Saved tfplan metadata is invalid. Run `just plan` again.") from error
+        raise MetadataError(
+            "Saved tfplan metadata is invalid. Run `just plan` again."
+        ) from error
     if datetime.now(timezone.utc) > expires_at:
         raise MetadataError("Saved tfplan is expired. Run `just plan` again.")
 
     if data.get("site") != selected_site(repo):
-        raise MetadataError("Saved tfplan site differs from this apply. Run `just plan` again.")
+        raise MetadataError(
+            "Saved tfplan site differs from this apply. Run `just plan` again."
+        )
 
     expected_canonical = data["canonical"]
     if expected_canonical != canonical_identity(repo):
-        raise MetadataError("Saved tfplan canonical identity differs from this apply. Run `just plan` again.")
+        raise MetadataError(
+            "Saved tfplan canonical identity differs from this apply. Run `just plan` again."
+        )
 
     expected_plan_hash = data.get("plan", {}).get("sha256")
     if expected_plan_hash != sha256_file(plan):
@@ -471,7 +577,9 @@ def verify_metadata(
     # do not unnecessarily invalidate an otherwise identical saved plan.
 
     if data["scope"] != plan_scope(target_service, replace_service):
-        raise MetadataError("Saved tfplan scope differs from this apply. Run `just plan` again.")
+        raise MetadataError(
+            "Saved tfplan scope differs from this apply. Run `just plan` again."
+        )
 
     summary = data["summary"]
     if summary.get("destructive") and not allow_destroy:
@@ -500,7 +608,9 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--print-summary", action="store_true")
     create.add_argument("--target-service", default="")
     create.add_argument("--replace-service", default="")
-    create.add_argument("--operation", choices=tuple(sorted(PLAN_OPERATIONS)), default="apply")
+    create.add_argument(
+        "--operation", choices=tuple(sorted(PLAN_OPERATIONS)), default="apply"
+    )
 
     verify = subparsers.add_parser("verify")
     verify.add_argument("--plan", type=Path, required=True)
@@ -509,7 +619,9 @@ def main(argv: list[str] | None = None) -> int:
     verify.add_argument("--allow-stateful-batch", action="store_true")
     verify.add_argument("--target-service", default="")
     verify.add_argument("--replace-service", default="")
-    verify.add_argument("--operation", choices=tuple(sorted(PLAN_OPERATIONS)), default="apply")
+    verify.add_argument(
+        "--operation", choices=tuple(sorted(PLAN_OPERATIONS)), default="apply"
+    )
 
     summary = subparsers.add_parser("summary")
     summary.add_argument("--metadata", type=Path, required=True)

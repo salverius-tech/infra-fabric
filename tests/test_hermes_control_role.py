@@ -63,20 +63,33 @@ ROLLBACK_REHEARSAL = (
 )
 
 
+def parent_tasks() -> list[dict[str, object]]:
+    manifest = yaml.safe_load(PARENT_TASKS.read_text(encoding="utf-8"))
+    return [
+        task
+        for entry in manifest
+        for task in yaml.safe_load(
+            (PARENT_TASKS.parent / entry["ansible.builtin.import_tasks"]).read_text(
+                encoding="utf-8"
+            )
+        )
+    ]
+
+
 class HermesControlRoleTests(unittest.TestCase):
     def test_parent_configures_control_after_caddy_is_active(self) -> None:
-        text = PARENT_TASKS.read_text(encoding="utf-8")
+        names = [str(task.get("name")) for task in parent_tasks()]
         self.assertLess(
-            text.index("Verify Hermes Caddy service is active"),
-            text.index("Configure optional Hermes Control companion stack"),
+            names.index("Verify Hermes Caddy service is active"),
+            names.index("Configure optional Hermes Control companion stack"),
         )
         self.assertLess(
-            text.index("Configure optional Hermes Control companion stack"),
-            text.index("Verify Hermes Control HTTPS health through Caddy"),
+            names.index("Configure optional Hermes Control companion stack"),
+            names.index("Verify Hermes Control HTTPS health through Caddy"),
         )
 
     def test_parent_control_diagnostics_use_templated_private_header(self) -> None:
-        tasks = yaml.safe_load(PARENT_TASKS.read_text(encoding="utf-8"))
+        tasks = parent_tasks()
         diagnostic = next(
             task
             for task in tasks

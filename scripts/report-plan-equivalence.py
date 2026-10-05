@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Report semantic equivalence for two saved OpenTofu JSON plans."""
+
 from __future__ import annotations
 
 import argparse
@@ -25,11 +26,18 @@ def _load(path: Path) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("before", type=Path, help="saved tofu show -json output before migration")
-    parser.add_argument("after", type=Path, help="saved tofu show -json output after migration")
+    parser.add_argument(
+        "before", type=Path, help="saved tofu show -json output before migration"
+    )
+    parser.add_argument(
+        "after", type=Path, help="saved tofu show -json output after migration"
+    )
     args = parser.parse_args(argv)
     try:
-        result = compare_plans(normalize_tofu_plan(_load(args.before)), normalize_tofu_plan(_load(args.after)))
+        result = compare_plans(
+            normalize_tofu_plan(_load(args.before)),
+            normalize_tofu_plan(_load(args.after)),
+        )
     except (OSError, PlanEquivalenceError, ValueError) as error:
         print(json.dumps({"equivalent": False, "error": str(error)}, sort_keys=True))
         return 2

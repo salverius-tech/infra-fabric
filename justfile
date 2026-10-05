@@ -14,6 +14,7 @@ default:
 # Fresh-checkout canonical setup: build tools, create or clone values/, then show selected site inputs
 setup remote="" site="":
     @site_arg="{{site}}"; [[ -n "${site_arg}" ]] || { printf 'A canonical site is required. Run `just setup "" <site>`; use explicit migration or recovery tools for legacy forensics.\n' >&2; exit 2; }
+    @source scripts/host-ssh-directory.sh; require_host_ssh_directory
     docker compose build infra
     @selected_remote="{{remote}}"; \
     if [[ -d values ]]; then \
@@ -30,7 +31,7 @@ setup remote="" site="":
 
 # Initialize the selected canonical site's bootstrap SSH identity through SOPS
 ssh-initialize SITE="dev":
-    @site_arg="{{SITE}}"; site="${site_arg#SITE=}"; VALUES_SITE="${site}" SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${HOME}/.config/infra-fabric/keys/${site}/site.age}" INFRA_VALUES_DIR="values/sites/${site}" scripts/run-infra.sh python scripts/ssh-initialize.py --site-file "/workspace/values/sites/${site}/site.yaml" --bundle "/workspace/values/sites/${site}/secrets.sops.yaml"; VALUES_SITE="${site}" scripts/python.sh scripts/canonical-render.py --site-file "/workspace/values/sites/${site}/site.yaml" --output-dir "/workspace/values/sites/${site}/generated"
+    @scripts/ssh-initialize.sh "{{SITE}}"
 
 # Show private values repo git status
 [private]
@@ -67,9 +68,16 @@ validate:
 test *args:
     scripts/python.sh -m unittest discover -s tests -p 'test_*.py' {{args}}
 
+# Run portable documentation contracts on the host; not a substitute for just test
+test-local:
+    python3 -m unittest \\
+        tests.test_documentation_contract.DocumentationContractTests.test_documentation_inventory_covers_every_tracked_markdown_file \\
+        tests.test_documentation_contract.DocumentationContractTests.test_tracked_markdown_relative_links_and_anchors_resolve \\
+        tests.test_documentation_contract.DocumentationContractTests.test_installed_scaffold_readme_has_no_broken_relative_document_links
+
 # Edit the selected site's encrypted SOPS bundle; the external site age key is required
 edit-secrets SITE="dev":
-    @site_arg="{{SITE}}"; site="${site_arg#SITE=}"; VALUES_SITE="${site}" bash -c 'set -euo pipefail; source scripts/site-context.sh; require_site_context; require_canonical_authority; values_dir="$(site_values_dir)"; SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-${HOME}/.config/infra-fabric/keys/${VALUES_SITE}/site.age}"; export SOPS_AGE_KEY_FILE; [[ -f "${SOPS_AGE_KEY_FILE}" && -r "${SOPS_AGE_KEY_FILE}" ]] || { printf "External site age identity is missing or unreadable: %s\\n" "${SOPS_AGE_KEY_FILE}" >&2; exit 2; }; [[ -f "${values_dir}/.sops.yaml" && -f "${values_dir}/secrets.sops.yaml" ]] || { printf "Selected site SOPS policy or bundle is missing: %s\\n" "${values_dir}" >&2; exit 2; }; sops_bin="$(command -v sops || true)"; [[ -n "${sops_bin}" ]] || [[ -x "${HOME}/.local/bin/sops" ]] && sops_bin="${sops_bin:-${HOME}/.local/bin/sops}"; if [[ -n "${sops_bin}" ]]; then SOPS_EDITOR="${SOPS_EDITOR:-${EDITOR:-vi}}" "${sops_bin}" --config "${values_dir}/.sops.yaml" edit "${values_dir}/secrets.sops.yaml"; else source scripts/container-secret-transport.sh; transport_prepare; docker compose run --rm "${transport_compose_mount_args[@]}" "${transport_compose_env_args[@]}" infra sops --config "/workspace/${values_dir}/.sops.yaml" edit "/workspace/${values_dir}/secrets.sops.yaml"; fi'
+    @scripts/edit-secrets.sh "{{SITE}}"
 
 # Site age-identity lifecycle: generate | store | fetch | verify (store/fetch accept --force)
 [positional-arguments]
@@ -79,7 +87,7 @@ site-identity +args:
 # Check upstream releases and update eligible pinned versions after the safety hold period; pass --dry-run to report without writes
 update *args:
     scripts/require-site-context.sh
-    source scripts/site-context.sh; require_canonical_authority
+    source scripts/site-context.sh; require_site_context
     scripts/python.sh scripts/update.py {{args}}
 
 # Show recent Forgejo Actions runs for the private values repo

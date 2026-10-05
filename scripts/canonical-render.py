@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Render disposable non-secret canonical consumer projections."""
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +25,6 @@ from projection_manifest import (
 )
 from service_catalog import ServiceCatalogError, load_catalog
 
-
 PROJECTION_FILES = {
     "terraform.auto.tfvars.json": "terraform",
     "ansible-inventory.json": "ansible",
@@ -35,7 +35,9 @@ PROJECTION_FILES = {
 
 
 def _write_json(path: Path, value: object) -> None:
-    handle = tempfile.NamedTemporaryFile("w", dir=path.parent, prefix=f".{path.name}.", delete=False, encoding="utf-8")
+    handle = tempfile.NamedTemporaryFile(
+        "w", dir=path.parent, prefix=f".{path.name}.", delete=False, encoding="utf-8"
+    )
     temporary = Path(handle.name)
     try:
         with handle:
@@ -51,9 +53,15 @@ def _write_json(path: Path, value: object) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site-file", type=Path, required=True)
-    parser.add_argument("--catalog", type=Path, default=Path(__file__).resolve().parents[1] / "infra" / "services.json")
+    parser.add_argument(
+        "--catalog",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "infra" / "services.json",
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--source-commit", default=os.environ.get("INFRA_GIT_COMMIT", "unknown"))
+    parser.add_argument(
+        "--source-commit", default=os.environ.get("INFRA_GIT_COMMIT", "unknown")
+    )
     parser.add_argument("--renderer-version", default="canonical-renderer/0.1")
     args = parser.parse_args(argv)
     try:
@@ -69,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
             renderer_version=args.renderer_version,
             source_commit=args.source_commit,
         )
+
         def populate(directory: Path) -> None:
             for name, value in projections.items():
                 _write_json(directory / name, value)
@@ -92,8 +101,16 @@ def main(argv: list[str] | None = None) -> int:
             )
 
         atomic_output_directory(args.output_dir, populate)
-        print(f"rendered {len(projections)} non-secret projections for {model.site.name} into {args.output_dir}")
-    except (CanonicalValuesError, ServiceCatalogError, ManifestError, OSError, ValueError) as error:
+        print(
+            f"rendered {len(projections)} non-secret projections for {model.site.name} into {args.output_dir}"
+        )
+    except (
+        CanonicalValuesError,
+        ServiceCatalogError,
+        ManifestError,
+        OSError,
+        ValueError,
+    ) as error:
         print(f"canonical projection error: {error}", file=sys.stderr)
         return 1
     return 0

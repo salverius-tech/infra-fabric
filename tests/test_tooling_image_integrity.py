@@ -1,8 +1,8 @@
 """Static integrity contract for the repository tooling image."""
 
-from pathlib import Path
 import re
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = ROOT / "tools/Dockerfile"

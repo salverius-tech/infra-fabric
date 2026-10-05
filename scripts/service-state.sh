@@ -188,7 +188,6 @@ case "${command_name}" in
     ;;
   backup)
     require_site_context
-    require_canonical_authority
     if [[ $# -ne 1 ]]; then
       usage
       exit 2
@@ -215,7 +214,6 @@ case "${command_name}" in
     ;;
   restore)
     require_site_context
-    require_canonical_authority
     if [[ $# -ne 2 ]]; then
       usage
       exit 2
@@ -232,7 +230,6 @@ case "${command_name}" in
     ;;
   restore-if-present)
     require_site_context
-    require_canonical_authority
     if [[ $# -lt 1 || $# -gt 2 ]]; then
       usage
       exit 2

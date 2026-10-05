@@ -34,7 +34,7 @@ from private_files import PrivateFileError, _fsync_descriptor, _private_director
 # deployed read-only bundle intentionally carries neither canonical values nor
 # snapshot code; status/audit-verify use only their allow-listed context/audit
 # journal inputs. These public symbols preserve testable controller boundaries.
-load_site = None
+load_site: Callable[..., Any] | None = None
 
 
 class AuditSnapshotError(RuntimeError):
@@ -59,6 +59,7 @@ def verify_snapshot(*args: Any, **kwargs: Any) -> Any:
         return implementation(*args, **kwargs)
     except implementation_error as error:
         raise AuditSnapshotError(str(error)) from error
+
 
 # Keep this aligned with scripts/tfplan-metadata.py, the canonical saved-plan
 # producer and verifier consumed by the operator bridge.
@@ -128,14 +129,21 @@ def deployed_context() -> list[str] | None:
     try:
         payload = json.loads(Path(path_value).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise OperatorError("deployed Hermes operator context is unavailable") from error
+        raise OperatorError(
+            "deployed Hermes operator context is unavailable"
+        ) from error
     selected_site = os.environ.get("VALUES_SITE", "").strip()
     services = payload.get("enabled_services") if isinstance(payload, dict) else None
     if payload.get("site") != selected_site:
-        raise OperatorError("deployed Hermes operator context site does not match VALUES_SITE")
+        raise OperatorError(
+            "deployed Hermes operator context site does not match VALUES_SITE"
+        )
     if (
         not isinstance(services, list)
-        or not all(isinstance(service, str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", service) for service in services)
+        or not all(
+            isinstance(service, str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", service)
+            for service in services
+        )
         or len(services) != len(set(services))
     ):
         raise OperatorError("deployed Hermes operator context services are unsafe")
@@ -154,25 +162,26 @@ def enabled_services(repo: Path) -> list[str]:
     if not canonical_path.is_file():
         raise OperatorError(f"selected canonical site is missing: {selected_site}")
     try:
-        loader = load_site
-        if loader is None:
-            from canonical_values import load_site as loader
+        if load_site is None:
+            from canonical_values import load_site as default_load_site
+
+            loader = default_load_site
+        else:
+            loader = load_site
         model = loader(
             canonical_path,
             expected_site=selected_site,
             catalog_path=repo / "infra" / "services.json",
         )
     except Exception as error:
-        raise OperatorError(
-            f"selected canonical site is invalid: {error}"
-        ) from error
+        raise OperatorError(f"selected canonical site is invalid: {error}") from error
     return sorted(name for name, service in model.services.items() if service.enabled)
 
 
 def plan_metadata_path(repo: Path) -> Path:
     """Resolve saved-plan metadata from the selected canonical site context."""
     try:
-        from values_context import ValuesContextError, from_environment
+        from values_context import from_environment
 
         context = from_environment(repo)
     except Exception as error:
@@ -231,7 +240,12 @@ def load_plan_summary(repo: Path) -> dict[str, Any] | None:
 def git_dirty(repo: Path) -> bool:
     try:
         result = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=no"],
+            [  # noqa: S607 - controlled tooling PATH resolves the bundled Git client.
+                "git",
+                "status",
+                "--porcelain",
+                "--untracked-files=no",
+            ],
             cwd=repo,
             text=True,
             capture_output=True,
@@ -409,14 +423,16 @@ def write_audit_record(
 def default_runner(
     command: list[str], env: dict[str, str], repo: Path
 ) -> tuple[int, str]:
-    result = subprocess.run(
-        command,
-        cwd=repo,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
+    result = (
+        subprocess.run(  # noqa: S603 - actions are allow-listed and assembled as argv.
+            command,
+            cwd=repo,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
     )
     return result.returncode, result.stdout
 

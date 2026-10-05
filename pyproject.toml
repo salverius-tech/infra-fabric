@@ -1,0 +1,56 @@
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "PERF", "SIM", "S101", "S102", "S104", "S105", "S106", "S107", "S108", "S201", "S301", "S310", "S324", "S501", "S506", "S603", "S606", "S607", "S608", "S701"]
+ignore = [
+  "E402",
+  "E501",
+  "PERF203",
+  "PERF401",
+  "SIM105",
+  "SIM115",
+  "SIM117",
+  "UP022",
+  "UP031",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S603", "S606", "S607"] # Assertions and test-harness subprocesses are intentional.
+"tests/test_sssf_supply_chain.py" = ["S102", "S701"] # Intentional isolated exec and template rendering fixtures.
+"scripts/public-safety-check.py" = ["S104"] # 0.0.0.0 is an allow-list example, not a bind.
+"tests/test_canonical_values.py" = ["S104"] # Non-routable address is canonical-validation fixture data.
+"scripts/bootstrap-technitium-api-token.py" = ["S105", "S310"] # Token name is a label; this accesses the canonical local API.
+"scripts/canonical_values.py" = ["S105"] # *_secret_ref identifiers contain logical paths, not secret values.
+"scripts/check-direct-service-ansible.py" = ["S105"] # token is a redaction classifier's field name.
+"tests/test_apply_ansible_services.py" = ["S106", "S108"] # Credential fixtures and isolated temporary roots.
+"tests/test_bootstrap_technitium_api_token.py" = ["S106"] # Synthetic credentials exercise token rotation.
+"tests/test_hermes_control_role.py" = ["S106"] # Synthetic credentials exercise role contracts.
+"tests/test_projection_manifest.py" = ["S106"] # Test-only manifest values are not deployed credentials.
+"infra/ansible/scripts/fetch-service-state.py" = ["S108"] # Remote archive uses mkstemp-managed /tmp staging.
+"infra/ansible/scripts/service-state-capacity-preflight.py" = ["S108"] # /tmp is an operator-selected capacity target.
+"tests/test_canonical_ssh_identity.py" = ["S108"] # Isolated temporary homes are test fixtures.
+"tests/test_fetch_service_state.py" = ["S108"] # Isolated temporary archive roots are test fixtures.
+"tests/test_plan_equivalence.py" = ["S108"] # Isolated temporary workspaces are test fixtures.
+"tests/test_service_state_capacity.py" = ["S108"] # Temporary filesystem capacity fixtures.
+"tests/test_template_path_contract.py" = ["S108"] # Temporary template roots are test fixtures.
+"tests/test_phase7_tooling_contract.py" = ["S506"] # Unsafe YAML parsing is the tested policy violation.
+"tests/test_supply_chain_workflow.py" = ["S506"] # Workflow YAML is repository-owned test input.
+"tests/test_caddy_template_dedup.py" = ["S701"] # Jinja rendering is only a source-contract test.
+"infra/ansible/scripts/apply-technitium-dns.py" = ["S310"] # Uses the configured in-guest Technitium endpoint.
+
+[tool.mypy]
+follow_imports = "silent"
+ignore_missing_imports = true
+files = ["scripts", "infra/ansible/scripts"]
+
+[tool.coverage.run]
+patch = ["subprocess"]
+parallel = true
+source = ["scripts", "infra/ansible/scripts"]
+
+[tool.coverage.report]
+show_missing = true

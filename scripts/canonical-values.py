@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate and summarize a canonical site model without exposing secrets."""
+
 from __future__ import annotations
 
 import argparse
@@ -15,9 +16,14 @@ def _default_site_path() -> Path:
     repo = Path(__file__).resolve().parents[1]
     site = os.environ.get("VALUES_SITE")
     if not site:
-        raise CanonicalValuesError("VALUES_SITE is required unless --site-file is provided")
+        raise CanonicalValuesError(
+            "VALUES_SITE is required unless --site-file is provided"
+        )
     values_root = Path(os.environ.get("VALUES_DIR", repo / "values")).expanduser()
-    candidates = [values_root / "sites" / site / "site.yaml", values_root / site / "site.yaml"]
+    candidates = [
+        values_root / "sites" / site / "site.yaml",
+        values_root / site / "site.yaml",
+    ]
     for candidate in candidates:
         if candidate.is_file():
             return candidate
@@ -37,8 +43,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         site_path = (args.site_file or _default_site_path()).resolve()
-        expected_site = os.environ.get("VALUES_SITE") if args.site_file is None else None
-        model = load_site(site_path, expected_site=expected_site, catalog_path=args.catalog)
+        expected_site = (
+            os.environ.get("VALUES_SITE") if args.site_file is None else None
+        )
+        model = load_site(
+            site_path, expected_site=expected_site, catalog_path=args.catalog
+        )
         if args.command == "summary":
             print(json.dumps(redacted_summary(model), sort_keys=True, indent=2))
         else:

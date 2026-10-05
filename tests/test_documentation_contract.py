@@ -6,7 +6,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
 HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$")
@@ -38,7 +37,9 @@ def _document_anchors(path: Path) -> set[str]:
 
 class DocumentationContractTests(unittest.TestCase):
     def test_documentation_inventory_covers_every_tracked_markdown_file(self) -> None:
-        inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
+        inventory = json.loads(
+            (ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8")
+        )
         self.assertEqual(inventory["schema_version"], 2)
         self.assertEqual(
             inventory["classifications"],
@@ -57,7 +58,17 @@ class DocumentationContractTests(unittest.TestCase):
             tracked = {
                 relative
                 for relative in subprocess.check_output(
-                    ["git", "-C", str(ROOT), "ls-files", "--cached", "--others", "--exclude-standard", "--", "*.md"],
+                    [
+                        "git",
+                        "-C",
+                        str(ROOT),
+                        "ls-files",
+                        "--cached",
+                        "--others",
+                        "--exclude-standard",
+                        "--",
+                        "*.md",
+                    ],
                     text=True,
                 ).splitlines()
                 # A P10-A artifact can be deleted before its successor is staged.
@@ -73,7 +84,9 @@ class DocumentationContractTests(unittest.TestCase):
                 if not ignored_roots.intersection(path.parts)
             }
         self.assertEqual(set(documents), tracked)
-        self.assertTrue(set(inventory["classifications"]).issuperset(documents.values()))
+        self.assertTrue(
+            set(inventory["classifications"]).issuperset(documents.values())
+        )
         for relative, classification in documents.items():
             self.assertIn(classification, inventory["classifications"], relative)
             self.assertTrue((ROOT / relative).is_file(), relative)
@@ -89,8 +102,15 @@ class DocumentationContractTests(unittest.TestCase):
             self.assertTrue((ROOT / replacement).is_file(), replacement)
 
     def test_tracked_markdown_relative_links_and_anchors_resolve(self) -> None:
-        inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
-        maintained = {"current authority", "operator guidance", "working design", "implementation tracker"}
+        inventory = json.loads(
+            (ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8")
+        )
+        maintained = {
+            "current authority",
+            "operator guidance",
+            "working design",
+            "implementation tracker",
+        }
         for relative, classification in inventory["documents"].items():
             if classification not in maintained:
                 continue
@@ -98,22 +118,33 @@ class DocumentationContractTests(unittest.TestCase):
             for raw_link in MARKDOWN_LINK.findall(source.read_text(encoding="utf-8")):
                 if "://" in raw_link or raw_link.startswith(("mailto:", "#")):
                     if raw_link.startswith("#"):
-                        self.assertIn(raw_link.removeprefix("#"), _document_anchors(source), f"{relative}: {raw_link}")
+                        self.assertIn(
+                            raw_link.removeprefix("#"),
+                            _document_anchors(source),
+                            f"{relative}: {raw_link}",
+                        )
                     continue
                 path_part, separator, fragment = raw_link.partition("#")
                 target = (source.parent / path_part).resolve()
                 self.assertTrue(target.is_file(), f"{relative}: {raw_link}")
                 if separator and target.suffix == ".md":
-                    self.assertIn(fragment, _document_anchors(target), f"{relative}: {raw_link}")
+                    self.assertIn(
+                        fragment, _document_anchors(target), f"{relative}: {raw_link}"
+                    )
 
         index = ROOT / "docs" / "README.md"
         text = index.read_text(encoding="utf-8")
         for retired in ("upstream", "repository-audit", "phase0", "mapping-v1"):
             self.assertNotIn(retired, text.lower())
 
-    def test_retired_implementation_trackers_are_not_active_backlog_authorities(self) -> None:
-        inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
-        matrix = json.loads((ROOT / "docs" / "governance" / "acceptance-matrix.json").read_text(encoding="utf-8"))
+    def test_retired_implementation_trackers_are_not_active_backlog_authorities(
+        self,
+    ) -> None:
+        matrix = json.loads(
+            (ROOT / "docs" / "governance" / "acceptance-matrix.json").read_text(
+                encoding="utf-8"
+            )
+        )
         development = matrix["rows"]["development"]
         self.assertEqual(
             {
@@ -121,12 +152,32 @@ class DocumentationContractTests(unittest.TestCase):
                 for category, status in development.items()
                 if status == "evidenced"
             },
-            {"plan", "apply", "health-idempotence", "service-restore", "infrastructure-recovery", "hermes-integration", "rollback"},
+            {
+                "plan",
+                "apply",
+                "health-idempotence",
+                "service-restore",
+                "infrastructure-recovery",
+                "hermes-integration",
+                "rollback",
+            },
         )
-        self.assertTrue(all(status == "not-evidenced" for status in matrix["rows"]["isolated-recovery"].values()))
-        self.assertTrue(all(status == "not-evidenced" for status in matrix["rows"]["production"].values()))
+        self.assertTrue(
+            all(
+                status == "not-evidenced"
+                for status in matrix["rows"]["isolated-recovery"].values()
+            )
+        )
+        self.assertTrue(
+            all(
+                status == "not-evidenced"
+                for status in matrix["rows"]["production"].values()
+            )
+        )
 
-        prd = (ROOT / "docs" / "hermes-operator-pilot-prd.md").read_text(encoding="utf-8")
+        prd = (ROOT / "docs" / "hermes-operator-pilot-prd.md").read_text(
+            encoding="utf-8"
+        )
         for evidenced in (
             "plan, apply, health/idempotence, service restore, infrastructure recovery",
             "read-only Hermes integration",
@@ -145,7 +196,9 @@ class DocumentationContractTests(unittest.TestCase):
             self.assertIn(unevidenced, prd)
         self.assertNotIn("not yet provider-equivalence, Hermes live-integration", prd)
 
-    def test_installed_scaffold_readme_has_no_broken_relative_document_links(self) -> None:
+    def test_installed_scaffold_readme_has_no_broken_relative_document_links(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             installed = Path(temporary) / "values"
             shutil.copytree(ROOT / "scaffold", installed)
@@ -171,13 +224,19 @@ class DocumentationContractTests(unittest.TestCase):
             "just plan",
             "just apply",
         )
-        for relative in ("README.md", "docs/canonical-quick-start.md", "docs/just-recipes.md"):
+        for relative in (
+            "README.md",
+            "docs/canonical-quick-start.md",
+            "docs/just-recipes.md",
+        ):
             text = (ROOT / relative).read_text(encoding="utf-8")
             for marker in required:
                 self.assertIn(marker, text, f"{marker!r} missing from {relative}")
 
     def test_hermes_independent_recovery_doc_preserves_fail_closed_order(self) -> None:
-        recovery = (ROOT / "docs" / "hermes-independent-recovery.md").read_text(encoding="utf-8")
+        recovery = (ROOT / "docs" / "hermes-independent-recovery.md").read_text(
+            encoding="utf-8"
+        )
         required = (
             "Hermes is an operator surface, not a recovery dependency",
             "This is a public-safe procedure",
@@ -194,10 +253,22 @@ class DocumentationContractTests(unittest.TestCase):
         )
         for marker in required:
             self.assertIn(marker, recovery, marker)
-        self.assertLess(recovery.index("Restore public source"), recovery.index("Restore private site inputs"))
-        self.assertLess(recovery.index("Restore audit continuity"), recovery.index("Re-establish infrastructure control"))
-        self.assertLess(recovery.index("Run non-mutating checks"), recovery.index("Re-establish infrastructure control"))
-        self.assertLess(recovery.index("Re-establish infrastructure control"), recovery.index("Converge services and recover Hermes last"))
+        self.assertLess(
+            recovery.index("Restore public source"),
+            recovery.index("Restore private site inputs"),
+        )
+        self.assertLess(
+            recovery.index("Restore audit continuity"),
+            recovery.index("Re-establish infrastructure control"),
+        )
+        self.assertLess(
+            recovery.index("Run non-mutating checks"),
+            recovery.index("Re-establish infrastructure control"),
+        )
+        self.assertLess(
+            recovery.index("Re-establish infrastructure control"),
+            recovery.index("Converge services and recover Hermes last"),
+        )
 
     def test_current_docs_do_not_teach_retired_authoring_surfaces(self) -> None:
         files = (
@@ -244,15 +315,30 @@ class DocumentationContractTests(unittest.TestCase):
     def test_lifecycle_examples_have_site_context(self) -> None:
         docs = "\n".join(
             (ROOT / relative).read_text(encoding="utf-8")
-            for relative in ("README.md", "docs/canonical-quick-start.md", "docs/just-recipes.md", "docs/service-update-policy.md")
+            for relative in (
+                "README.md",
+                "docs/canonical-quick-start.md",
+                "docs/just-recipes.md",
+                "docs/service-update-policy.md",
+            )
         )
         for recipe in ("validate", "plan", "apply", "update"):
-            self.assertRegex(docs, rf"VALUES_SITE=<site>[^\n]*just {recipe}|export VALUES_SITE=<site>", recipe)
-        update_policy = (ROOT / "docs/service-update-policy.md").read_text(encoding="utf-8")
+            self.assertRegex(
+                docs,
+                rf"VALUES_SITE=<site>[^\n]*just {recipe}|export VALUES_SITE=<site>",
+                recipe,
+            )
+        update_policy = (ROOT / "docs/service-update-policy.md").read_text(
+            encoding="utf-8"
+        )
         for recipe in ("update", "validate", "plan", "apply"):
-            self.assertRegex(update_policy, rf"VALUES_SITE=<site> just {recipe}", recipe)
+            self.assertRegex(
+                update_policy, rf"VALUES_SITE=<site> just {recipe}", recipe
+            )
 
-    def test_apply_docs_distinguish_canonical_proxmox_identity_from_guest_bootstrap(self) -> None:
+    def test_apply_docs_distinguish_canonical_proxmox_identity_from_guest_bootstrap(
+        self,
+    ) -> None:
         for relative in ("docs/canonical-quick-start.md", "docs/just-recipes.md"):
             text = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn("secrets.providers.proxmox.ssh_private_key", text, relative)
@@ -262,7 +348,9 @@ class DocumentationContractTests(unittest.TestCase):
             self.assertIn("guest bootstrap key", text.lower(), relative)
 
     def test_operator_bash_lifecycle_examples_establish_site_context(self) -> None:
-        inventory = json.loads((ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8"))
+        inventory = json.loads(
+            (ROOT / "docs" / "documentation-inventory.json").read_text(encoding="utf-8")
+        )
         for relative, classification in inventory["documents"].items():
             if classification != "operator guidance":
                 continue
@@ -282,16 +370,27 @@ class DocumentationContractTests(unittest.TestCase):
                 if "VALUES_SITE=<site>" in line or "export VALUES_SITE=" in line:
                     has_context = True
                 if re.search(r"\bjust (validate|plan|apply|update)\b", line):
-                    self.assertTrue(has_context, f"missing site context in {relative}: {line.strip()}")
+                    self.assertTrue(
+                        has_context,
+                        f"missing site context in {relative}: {line.strip()}",
+                    )
 
-    def test_service_operations_matrix_covers_the_catalog_and_day_two_contract(self) -> None:
-        catalog = json.loads((ROOT / "infra" / "services.json").read_text(encoding="utf-8"))["services"]
+    def test_service_operations_matrix_covers_the_catalog_and_day_two_contract(
+        self,
+    ) -> None:
+        catalog = json.loads(
+            (ROOT / "infra" / "services.json").read_text(encoding="utf-8")
+        )["services"]
         matrix = (ROOT / "docs" / "service-operations.md").read_text(encoding="utf-8")
         self.assertIn("infra/services.json", matrix)
         self.assertIn("external evidence required", matrix)
         self.assertIn("Health and logs", matrix)
         for service, metadata in catalog.items():
-            rows = [line for line in matrix.splitlines() if line.startswith(f"| `{service}` |")]
+            rows = [
+                line
+                for line in matrix.splitlines()
+                if line.startswith(f"| `{service}` |")
+            ]
             self.assertEqual(len(rows), 1, service)
             row = rows[0]
             self.assertIn("catalog:", row.lower(), service)
@@ -302,20 +401,39 @@ class DocumentationContractTests(unittest.TestCase):
 
     def test_operator_command_snippets_preserve_supported_boundaries(self) -> None:
         matrix = (ROOT / "docs" / "service-operations.md").read_text(encoding="utf-8")
-        migration = (ROOT / "docs" / "canonical-model-operations.md").read_text(encoding="utf-8")
-        troubleshooting = (ROOT / "docs" / "canonical-troubleshooting.md").read_text(encoding="utf-8")
-        for command in ("VALUES_SITE=<site> just validate", "VALUES_SITE=<site> just plan", "VALUES_SITE=<site> just apply"):
+        migration = (ROOT / "docs" / "canonical-model-operations.md").read_text(
+            encoding="utf-8"
+        )
+        troubleshooting = (ROOT / "docs" / "canonical-troubleshooting.md").read_text(
+            encoding="utf-8"
+        )
+        for command in (
+            "VALUES_SITE=<site> just validate",
+            "VALUES_SITE=<site> just plan",
+            "VALUES_SITE=<site> just apply",
+        ):
             self.assertIn(command, matrix)
             self.assertIn(command, migration)
         for prohibited in ("raw OpenTofu/Terraform", "site.yml"):
             self.assertIn(prohibited, matrix)
             self.assertIn(prohibited, migration)
-        for stage in ("canonical-input", "provider-plan", "host-trust", "service-health", "state-recovery"):
+        for stage in (
+            "canonical-input",
+            "provider-plan",
+            "host-trust",
+            "service-health",
+            "state-recovery",
+        ):
             self.assertIn(stage, matrix)
             self.assertIn(stage, troubleshooting)
 
     def test_service_state_operator_docs_use_selected_site_paths(self) -> None:
-        for relative in ("docs/service-operations.md", "docs/service-state-backup.md", "docs/hermes-state-backup.md", "docs/sssf.md"):
+        for relative in (
+            "docs/service-operations.md",
+            "docs/service-state-backup.md",
+            "docs/hermes-state-backup.md",
+            "docs/sssf.md",
+        ):
             text = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn("VALUES_SITE=<site> scripts/service-state.sh", text, relative)
             self.assertNotIn(" values/service-backups/", text, relative)
@@ -324,7 +442,9 @@ class DocumentationContractTests(unittest.TestCase):
         shared = (ROOT / "docs/service-state-backup.md").read_text(encoding="utf-8")
         self.assertIn("values/sites/<site>/service-backups/", shared)
 
-    def test_sssf_maintained_doc_preserves_upstream_and_runtime_boundaries(self) -> None:
+    def test_sssf_maintained_doc_preserves_upstream_and_runtime_boundaries(
+        self,
+    ) -> None:
         sssf = (ROOT / "docs" / "sssf.md").read_text(encoding="utf-8")
         required = (
             "Pinned upstream artifacts remain unmodified",
@@ -343,10 +463,14 @@ class DocumentationContractTests(unittest.TestCase):
         self.assertIn("/usr/local/bin/sssf-init https://host/org/repo", sssf)
         self.assertIn("must not supply the optional workspace argument", sssf)
 
-    def test_maintained_docs_do_not_present_legacy_or_ambient_authority_as_normal(self) -> None:
+    def test_maintained_docs_do_not_present_legacy_or_ambient_authority_as_normal(
+        self,
+    ) -> None:
         prd = (ROOT / "docs/hermes-operator-pilot-prd.md").read_text(encoding="utf-8")
         self.assertIn("Private selected-site inputs", prd)
-        self.assertNotIn("current tfvars, inventory, DNS records, environment values", prd)
+        self.assertNotIn(
+            "current tfvars, inventory, DNS records, environment values", prd
+        )
 
         sssf = (ROOT / "docs/sssf.md").read_text(encoding="utf-8")
         self.assertIn("must not use an ambient inventory", sssf)
@@ -355,7 +479,6 @@ class DocumentationContractTests(unittest.TestCase):
         state = (ROOT / "docs/service-state-backup.md").read_text(encoding="utf-8")
         self.assertIn("generated inventory and variables", state)
         self.assertNotIn("normal direct Ansible inventory group", state)
-
 
 
 if __name__ == "__main__":

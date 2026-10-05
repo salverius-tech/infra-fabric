@@ -21,12 +21,6 @@ require_site_context() {
   return 0
 }
 
-require_canonical_authority() {
-  local values_path
-  values_path="$(site_values_dir)" || return
-  require_site_context
-}
-
 canonical_projection_names() {
   printf '%s\n' \
     manifest.json \

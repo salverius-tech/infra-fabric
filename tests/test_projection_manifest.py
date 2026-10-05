@@ -61,7 +61,10 @@ class ProjectionManifestTests(unittest.TestCase):
 
     def test_altered_projection_fails_closed(self) -> None:
         manifest, projections = self.manifest()
-        altered = {**projections, "dns-records.json": {"a_records": {"git.example.internal": "192.0.2.63"}}}
+        altered = {
+            **projections,
+            "dns-records.json": {"a_records": {"git.example.internal": "192.0.2.63"}},
+        }
         with self.assertRaisesRegex(ManifestError, "stale or altered"):
             verify_manifest(
                 manifest,
@@ -85,7 +88,11 @@ class ProjectionManifestTests(unittest.TestCase):
 
     def test_projection_set_mismatch_fails_closed(self) -> None:
         manifest, projections = self.manifest()
-        missing = {name: value for name, value in projections.items() if name != "dns-records.json"}
+        missing = {
+            name: value
+            for name, value in projections.items()
+            if name != "dns-records.json"
+        }
         with self.assertRaisesRegex(ManifestError, "projection set does not match"):
             verify_manifest(
                 manifest,
